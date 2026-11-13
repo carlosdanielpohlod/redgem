@@ -1,10 +1,11 @@
-// Camera natives: the scene's main camera. What it does on its own (follow, orbit, shake) is built
-// on these in ruby/engine/camera.rb.
+// Camera natives: the camera the game is seen through, and choosing another. What it does on its
+// own (follow, orbit, shake, cut) is built on these in ruby/engine/camera*.rb.
 
 #include <mruby.h>
 #include <mruby/array.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "scene/camera_ray.hpp"
 #include "scene/scene_config.hpp"
@@ -21,6 +22,8 @@ constexpr double kMinFovDegrees = 10.0;
 constexpr double kMaxFovDegrees = 150.0;
 constexpr double kNoBlur = 0.0;
 constexpr double kFullBlur = 1.0;
+constexpr mrb_int kNoLight = 0;        // a channel of black, and a cover that hides nothing
+constexpr mrb_int kFullChannel = 255;  // a channel at its most: a cover that hides everything
 
 // The main camera's own description, or nullptr when the scene has no camera.
 CameraDesc* main_camera(mrb_state* mrb) {
@@ -31,6 +34,48 @@ CameraDesc* main_camera(mrb_state* mrb) {
 }
 
 mrb_value camera_main(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).main_camera()); }
+
+// An object the game can be seen through: one still there and staying, not a template, holding a
+// camera. An error starting with `asker` otherwise.
+ObjectId viewable_camera(mrb_state* mrb, mrb_value object, const char* asker) {
+  const ObjectId id = placeable_id(mrb, object, asker);
+  if (!scene(mrb).at(id).camera) mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v holds no camera", asker, object);
+  return id;
+}
+
+// Camera.__choose(object or nil, asker): the camera the game is seen through from now on; nil
+// goes back to the scene's first camera.
+mrb_value camera_choose(mrb_state* mrb, mrb_value) {
+  mrb_value object;
+  const char* asker = nullptr;
+  mrb_get_args(mrb, "oz", &object, &asker);
+  scene(mrb).choose_main_camera(mrb_nil_p(object) ? kNoObject : viewable_camera(mrb, object, asker));
+  return object;
+}
+
+// Camera.__check(object, asker): the object, when the game can be seen through it.
+mrb_value camera_check(mrb_state* mrb, mrb_value) {
+  mrb_value object;
+  const char* asker = nullptr;
+  mrb_get_args(mrb, "oz", &object, &asker);
+  viewable_camera(mrb, object, asker);
+  return object;
+}
+
+// Camera.__darken(alpha): black over the whole picture, 0 to 255 opaque, under everything the UI
+// draws this frame, before it or after (the fade of a cut: Camera::Cut).
+mrb_value camera_darken(mrb_state* mrb, mrb_value) {
+  mrb_int alpha = 0;
+  mrb_get_args(mrb, "i", &alpha);
+  ScriptContext& ctx = context(mrb);
+  HudItem cover;
+  cover.kind = HudItem::Kind::Rect;
+  cover.width = ctx.screen_width;
+  cover.height = ctx.screen_height;
+  cover.color = color_from(kNoLight, kNoLight, kNoLight, std::clamp<mrb_int>(alpha, kNoLight, kFullChannel));
+  ctx.hud.insert(ctx.hud.begin(), std::move(cover));
+  return mrb_nil_value();
+}
 
 // The screen scripts draw on, and the world's picture on it as the presenter draws it (at a render
 // scale, into a recording) and shows it stretched over the screen.
@@ -125,6 +170,9 @@ mrb_value camera_shake_by(mrb_state* mrb, mrb_value) {
 void install_camera_bindings(mrb_state* mrb) {
   RClass* camera_module = mrb_define_module(mrb, "Camera");
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "__choose", camera_choose, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, camera_module, "__check", camera_check, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, camera_module, "__darken", camera_darken, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "screen_ray", camera_screen_ray, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, camera_module, "world_to_screen", camera_world_to_screen, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "fov", camera_fov, MRB_ARGS_NONE());
