@@ -73,7 +73,10 @@ the same pull request.
   transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
   textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
   pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
-  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too.
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too. The
+  scene memory budget counts a KTX2 picture at its RGBA8 size even when it goes up compressed
+  (4 to 8 times smaller). The KTX2 transcoder is opened once per KTX2 texture as the scene is
+  read (to fall back when it refuses the data), and again when it is uploaded.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and

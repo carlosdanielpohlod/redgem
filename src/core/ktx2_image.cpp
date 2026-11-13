@@ -1,7 +1,10 @@
 #include "core/ktx2_image.hpp"
 
+// (<exception> first: the transcoder's header uses std::terminate without including it.)
+#include <exception>
 #include <basisu_transcoder.h>
 
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -30,6 +33,8 @@ constexpr transcoder_texture_format kTranscoderFormats[] = {
     transcoder_texture_format::cTFBC1_RGB,       transcoder_texture_format::cTFBC3_RGBA,
     transcoder_texture_format::cTFASTC_4x4_RGBA, transcoder_texture_format::cTFETC1_RGB,
     transcoder_texture_format::cTFETC2_RGBA,     transcoder_texture_format::cTFRGBA32};
+static_assert(std::size(kTranscoderFormats) == static_cast<std::size_t>(GpuBlockFormat::Rgba8) + 1,
+              "kTranscoderFormats follows GpuBlockFormat");
 
 transcoder_texture_format transcoder_format(GpuBlockFormat format) {
   return kTranscoderFormats[static_cast<std::size_t>(format)];
@@ -96,6 +101,8 @@ std::optional<TranscodedPicture> transcode_ktx2(const std::uint8_t* data, std::s
   }
   return picture;
 }
+
+bool opens_ktx2(const std::uint8_t* data, std::size_t size) { return opened_transcoder(data, size) != nullptr; }
 
 bool decode_ktx2_rgba_into(const std::uint8_t* data, std::size_t size, std::uint8_t* output, std::size_t capacity) {
   if (output == nullptr) return false;

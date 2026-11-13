@@ -11,6 +11,7 @@ using Json = nlohmann::json;
 namespace {
 
 constexpr float kBumpy = 0.5f;  // the normal map's scale in the document below
+constexpr int kKtx2Image = 2;   // the picture the KTX2 case adds after the document's two
 
 // Two pictures (the second a WebP one), a texture showing the first, and a material using it.
 Json document() {
@@ -113,4 +114,17 @@ TEST_CASE("slots are written into a material whose metallic-roughness part is no
   desc.base_color_image = kNoIndex;
   write_slots(doc, material, desc);  // nothing to take out, nothing thrown
   CHECK(slot_image(doc, material, Slot::BaseColor) == kNoIndex);
+}
+
+TEST_CASE("a KTX2 picture is shown through KHR_texture_basisu, and its texture is found by any of its pictures") {
+  Json doc = document();
+  doc["images"].push_back({{"bufferView", kKtx2Image}, {"mimeType", "image/ktx2"}});
+  CHECK(texture_showing(doc, kKtx2Image) == 1);
+  CHECK(doc["textures"][1] == Json::parse(R"({"extensions": {"KHR_texture_basisu": {"source": 2}}})"));
+  CHECK(doc["extensionsRequired"] == Json::array({"KHR_texture_basisu"}));
+  // A texture with a KTX2 picture and a PNG fallback is the texture of either.
+  doc["textures"][0]["extensions"]["KHR_texture_basisu"]["source"] = kKtx2Image;
+  CHECK(texture_showing(doc, 0) == 0);
+  CHECK(texture_showing(doc, kKtx2Image) == 0);
+  CHECK(doc["textures"].size() == 2);
 }

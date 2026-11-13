@@ -56,7 +56,7 @@ void embed_linked_image(GlbFile& glb, nlohmann::json& image, const std::filesyst
 }  // namespace
 
 std::string mime_type_of(const std::vector<std::uint8_t>& bytes) {
-  if (read_ktx2_header(bytes.data(), bytes.size())) return kKtx2Mime;
+  if (starts_as_ktx2(bytes.data(), bytes.size())) return kKtx2Mime;
   const std::optional<EncodedImage> image = EncodedImage::read(bytes.data(), bytes.size());
   if (!image) return {};
   if (image->format() == EncodedImageFormat::Png) return kPngMime;

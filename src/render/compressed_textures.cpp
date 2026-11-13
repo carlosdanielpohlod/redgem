@@ -1,5 +1,6 @@
 #include "render/compressed_textures.hpp"
 
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -36,6 +37,9 @@ constexpr GlFormat kGlFormats[] = {{kRgbS3tcDxt1, PIXELFORMAT_COMPRESSED_DXT1_RG
                                    {kRgbaAstc4x4, PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA},
                                    {kRgb8Etc2, PIXELFORMAT_COMPRESSED_ETC2_RGB},
                                    {kRgba8Etc2Eac, PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA}};
+// One for each compressed GpuBlockFormat, in its order (RGBA8, the last, is not uploaded here).
+static_assert(std::size(kGlFormats) == static_cast<std::size_t>(GpuBlockFormat::Rgba8),
+              "kGlFormats follows GpuBlockFormat");
 
 std::vector<std::string> gl_extensions() {
   GLint count = 0;

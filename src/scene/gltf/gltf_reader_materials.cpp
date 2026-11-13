@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "core/ktx2_header.hpp"
+#include "core/ktx2_image.hpp"
 #include "core/safe_path.hpp"
 #include "scene/gltf/extras_parser.hpp"
 #include "scene/props.hpp"
@@ -35,11 +35,12 @@ const cgltf_image* fallback_image(const cgltf_texture& texture) {
   return texture.image;
 }
 
-// Whether the scene's image `image` (a number, perhaps kNoIndex) holds a KTX2 picture the engine reads.
+// Whether the scene's image `image` (a number, perhaps kNoIndex) holds a KTX2 picture the engine
+// reads: one the transcoder takes, not only one whose header passes (newer Basis formats do).
 bool readable_ktx2(const std::vector<ImageData>& images, int image) {
   if (!is_index_of(image, images.size())) return false;
   const std::vector<std::uint8_t>& encoded = images[static_cast<std::size_t>(image)].encoded;
-  return read_ktx2_header(encoded.data(), encoded.size()).has_value();
+  return opens_ktx2(encoded.data(), encoded.size());
 }
 
 // A texture shows its KTX2 picture (KHR_texture_basisu) when the engine reads it, or when it has

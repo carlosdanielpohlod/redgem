@@ -45,8 +45,11 @@ constexpr std::size_t kFaceCountAt = 36;
 constexpr std::size_t kLevelCountAt = 40;
 constexpr std::size_t kSupercompressionAt = 44;
 constexpr std::size_t kLevelIndexAt = 80;
-constexpr std::size_t kKeyValuesLengthTopAt = 63;     // the high byte of the key/value data's length
+constexpr std::size_t kKeyValuesLengthTopAt = 63;      // the high byte of the key/value data's length
 constexpr std::size_t kFirstLevelUnpackedTopAt = 103;  // the high byte of the first level's uncompressed length
+constexpr std::size_t kDescriptorOffsetAt = 48;        // where the data format descriptor is (32 bits)
+constexpr std::size_t kColorModelInDescriptor = 12;    // its color model's byte, from its start
+constexpr std::uint8_t kRgbColorModel = 1;             // KHR_DF_MODEL_RGBSDA: not Basis data
 constexpr std::uint8_t kAllBits = 0xFF;
 constexpr std::uint8_t kSomeVkFormat = 37;  // VK_FORMAT_R8G8B8A8_UNORM
 constexpr std::uint8_t kCubeFaces = 6;
@@ -94,6 +97,14 @@ void check_levels(const TranscodedPicture& picture, ImageSize full, std::uint32_
 
 const std::uint8_t* pixel(const TranscodedLevel& level, std::uint32_t x, std::uint32_t y) {
   return level.bytes.data() + (std::size_t{y} * level.size.width + x) * kRgbaBytes;
+}
+
+// The file with its data format descriptor saying plain RGB: its header still passes, but the
+// transcoder does not take it.
+std::vector<std::uint8_t> not_basis_data(std::vector<std::uint8_t> bytes) {
+  const std::size_t descriptor = bytes[kDescriptorOffsetAt] | (std::size_t{bytes[kDescriptorOffsetAt + 1]} << 8U);
+  bytes[descriptor + kColorModelInDescriptor] = kRgbColorModel;
+  return bytes;
 }
 
 bool reads(std::vector<std::uint8_t> bytes) { return read_ktx2_header(bytes.data(), bytes.size()).has_value(); }
@@ -204,6 +215,17 @@ TEST_CASE("ETC1S and UASTC pictures transcode every mipmap level to each format 
   }
 }
 
+TEST_CASE("the transcoder opens Basis data, and not a file whose header alone passes") {
+  for (const char* name : {kOpaqueFixture, kAlphaFixture}) {
+    const auto good = ktx2_bytes(name);
+    CHECK(opens_ktx2(good.data(), good.size()));
+    const auto other = not_basis_data(good);
+    CHECK(reads(other));
+    CHECK_FALSE(opens_ktx2(other.data(), other.size()));
+    CHECK_FALSE(transcode_ktx2(other.data(), other.size(), GpuTextureSupport{}).has_value());
+  }
+}
+
 TEST_CASE("a KTX2 picture decodes to RGBA8 pixels close to what was compressed") {
   const auto opaque = ktx2_bytes(kOpaqueFixture);
   const auto flat = decode_ktx2_rgba(opaque.data(), opaque.size());
@@ -248,6 +270,8 @@ TEST_CASE("a KTX2 picture decodes into the caller's buffer only when it holds th
 TEST_CASE("the editor carries KTX2 pictures in under their own mime type") {
   CHECK(glb_images::mime_type_of(ktx2_bytes(kAlphaFixture)) == "image/ktx2");
   CHECK(glb_images::mime_type_of(std::vector<std::uint8_t>(kLevelIndexAt, 0)).empty());
+  // (by its identifier: also one the engine does not draw)
+  CHECK(glb_images::mime_type_of(with_byte(ktx2_bytes(kAlphaFixture), kFaceCountAt, kCubeFaces)) == "image/ktx2");
 }
 
 TEST_CASE("a KTX2 picture counts toward a scene's decoded memory as an RGBA8 one") {
@@ -273,7 +297,8 @@ TEST_CASE("glTF KHR_texture_basisu shows its KTX2 picture over the plain fallbac
 TEST_CASE("a KTX2 picture the engine cannot read leaves the texture its fallback, when it has one") {
   Ktx2Scene scene;
   auto broken = ktx2_bytes(kAlphaFixture);
-  broken[kFaceCountAt] = kCubeFaces;
+  SUBCASE("refused by its header") { broken[kFaceCountAt] = kCubeFaces; }
+  SUBCASE("refused by the transcoder") { broken = not_basis_data(broken); }
   std::ofstream file(scene.folder / "picture.ktx2", std::ios::binary | std::ios::trunc);
   file.write(reinterpret_cast<const char*>(broken.data()), static_cast<std::streamsize>(broken.size()));
   file.close();

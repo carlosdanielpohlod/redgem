@@ -266,8 +266,9 @@ add_library(basisu_transcoder STATIC
 target_include_directories(basisu_transcoder SYSTEM PUBLIC ${basis_universal_SOURCE_DIR}/transcoder)
 target_compile_definitions(basisu_transcoder PUBLIC BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1)
 # Its headers call std::terminate without including <exception>, which some standard libraries
-# (the Windows toolchain's) do not bring in through others; so do whatever includes them.
-target_compile_options(basisu_transcoder PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include exception>")
+# (the Windows toolchain's) do not bring in through others. Its own sources get it here; the one
+# engine file that includes them (core/ktx2_image.cpp) includes <exception> first.
+target_compile_options(basisu_transcoder PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include exception>")
 
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")

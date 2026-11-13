@@ -27,6 +27,10 @@ struct TranscodedPicture {
   std::vector<TranscodedLevel> levels;
 };
 
+// Whether the transcoder takes the file: a KTX2 header the engine reads (ktx2_header.hpp) of
+// ETC1S or UASTC LDR data whose tables it can set up. (Its levels are not transcoded yet.)
+bool opens_ktx2(const std::uint8_t* data, std::size_t size);
+
 // Every level of a KTX2 picture in the best format a card that takes `support` has for it;
 // nullopt when the file is not a KTX2 picture the engine reads, or its data is corrupt.
 std::optional<TranscodedPicture> transcode_ktx2(const std::uint8_t* data, std::size_t size,
