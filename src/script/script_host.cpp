@@ -50,6 +50,13 @@ bool holds_serial(mrb_value serial, mrb_int wanted) { return mrb_integer_p(seria
 
 }  // namespace
 
+bool is_ruby_prelude_source(std::string_view source) {
+  for (const auto& entry : generated::kPreludeSources) {
+    if (source == entry.file_name) return true;
+  }
+  return false;
+}
+
 ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
 
 ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir, bool live_reload)

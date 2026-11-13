@@ -185,9 +185,22 @@ TEST_CASE("opening a backtrace location focuses the tab and keeps edits") {
   const auto spelled = scripts / "." / "guard.rb";
   REQUIRE(workspace.open_at(spelled, 2, error));
   CHECK(tab->line_request() == 2);
+  for (int attempt = 0; attempt < 3; ++attempt) tab->age_line_request();
+  CHECK(tab->line_request() == 0);
   CHECK_FALSE(workspace.open_at("engine/guard.rb", 1, error));
   CHECK_FALSE(workspace.open_at(dir / "outside.rb", 1, error));
   CHECK_FALSE(workspace.open_at("../outside.rb", 1, error));
   CHECK(workspace.tabs().size() == 1);
   std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("console retains project backtrace candidates and skips engine prelude frames") {
+  ConsoleLog console;
+  log::error("RuntimeError\n    from engine/input.rb:12\n    from scripts/guard.rb:9\n");
+  REQUIRE(console.entries().size() == 1);
+  const auto& rows = console.entries().back().rows;
+  REQUIRE(rows.size() == 3);
+  CHECK_FALSE(rows[1].source);
+  REQUIRE(rows[2].source);
+  CHECK(rows[2].source->line == 9);
 }

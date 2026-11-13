@@ -4,6 +4,8 @@
 #include <charconv>
 #include <utility>
 
+#include "script/script_host.hpp"
+
 namespace redgem {
 namespace {
 
@@ -40,17 +42,25 @@ std::optional<ConsoleScriptLine> console_script_line(std::string_view row) {
 
 namespace {
 
+std::optional<ConsoleScriptLine> project_location(std::string_view row) {
+  auto source = console_script_line(row);
+  if (!source) return std::nullopt;
+  if (is_ruby_prelude_source(source->file)) return std::nullopt;
+  return source;
+}
+
 std::vector<ConsoleRow> rows_of(log::Level level, const std::string& message) {
   std::vector<ConsoleRow> rows;
   std::size_t start = 0;
-  for (;;) {
+  while (start < message.size()) {
     const auto end = message.find('\n', start);
     const std::string_view row = std::string_view(message).substr(start, end - start);
-    const auto source = level == log::Level::Error ? console_script_line(row) : std::nullopt;
+    const auto source = level == log::Level::Error ? project_location(row) : std::nullopt;
     rows.push_back({start, row.size(), source});
-    if (end == std::string::npos) return rows;
+    if (end == std::string::npos) break;
     start = end + 1;
   }
+  return rows;
 }
 
 }  // namespace

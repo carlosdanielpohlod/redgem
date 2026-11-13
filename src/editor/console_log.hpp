@@ -23,6 +23,7 @@ struct ConsoleRow {
   std::size_t offset = 0;
   std::size_t length = 0;
   std::optional<ConsoleScriptLine> source;
+  mutable std::optional<bool> source_exists{};  // checked when first shown, outside the log sink
 };
 
 struct ConsoleEntry {

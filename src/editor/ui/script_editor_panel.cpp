@@ -191,6 +191,7 @@ bool draw_tab(ScriptEditor& editor, unsigned int new_tab_dock, bool focus, Scrip
     draw_body(editor, name, result);
   }
   ImGui::End();
+  editor.age_line_request();
   return open;
 }
 

@@ -14,13 +14,15 @@ ScriptEditor* ScriptWorkspace::open(const std::string& file_name, std::string& e
     tab = created.get();
     tabs_.push_back(std::move(created));
   }
-  focus_request_ = file_name;
+  focus_request_ = tab->file_name();
   return tab;
 }
 
-std::filesystem::path ScriptWorkspace::relative_source(const std::filesystem::path& source) const {
+namespace {
+
+std::filesystem::path relative_source(const std::filesystem::path& folder, const std::filesystem::path& source) {
   std::error_code problem;
-  const auto root = std::filesystem::weakly_canonical(scripts_dir_, problem);
+  const auto root = std::filesystem::weakly_canonical(folder, problem);
   if (problem) return {};
   const auto absolute = std::filesystem::absolute(source, problem);
   if (problem) return {};
@@ -29,16 +31,20 @@ std::filesystem::path ScriptWorkspace::relative_source(const std::filesystem::pa
   return (parent / absolute.filename()).lexically_relative(root);
 }
 
-namespace {
 bool valid_source(const std::filesystem::path& root, const std::filesystem::path& relative) {
   return relative.extension() == ".rb" && safe_asset_name(relative.generic_u8string()) &&
          file_inside(root, relative).has_value();
 }
 }  // namespace
 
+std::filesystem::path project_script_source(const std::filesystem::path& root, const std::filesystem::path& source) {
+  const auto relative = relative_source(root, source);
+  return valid_source(root, relative) ? relative : std::filesystem::path{};
+}
+
 bool ScriptWorkspace::open_at(const std::filesystem::path& source, std::size_t line, std::string& error) {
-  const auto relative = relative_source(source);
-  if (!valid_source(scripts_dir_, relative)) {
+  const auto relative = project_script_source(scripts_dir_, source);
+  if (relative.empty()) {
     error = "cannot open script source " + printable(source.generic_u8string());
     return false;
   }
@@ -50,7 +56,13 @@ bool ScriptWorkspace::open_at(const std::filesystem::path& source, std::size_t l
 
 ScriptEditor* ScriptWorkspace::find(const std::string& file_name) {
   const auto found = std::find_if(tabs_.begin(), tabs_.end(), [&](const std::unique_ptr<ScriptEditor>& tab) {
-    return tab->file_name() == file_name;
+    if (tab->file_name() == file_name) return true;
+#if defined(_WIN32) || defined(__APPLE__)
+    std::error_code problem;
+    return std::filesystem::equivalent(tab->path(), scripts_dir_ / file_name, problem);
+#else
+    return false;
+#endif
   });
   return found == tabs_.end() ? nullptr : found->get();
 }

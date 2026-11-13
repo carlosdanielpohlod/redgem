@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include "core/safe_path.hpp"
-
 #include "editor/editor_config.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/panels.hpp"
@@ -77,31 +75,35 @@ struct ConsoleInteraction {
   bool link_hovered = false;
 };
 
-bool links_to_project(const ConsoleScriptLine& source, const ScriptWorkspace& scripts) {
+bool source_exists(const ConsoleScriptLine& source, const ScriptWorkspace& scripts) {
   try {
-    const auto relative = scripts.relative_source(std::filesystem::u8path(source.file));
-    return safe_asset_name(relative.generic_u8string());
+    return !project_script_source(scripts.scripts_dir(), std::filesystem::u8path(source.file)).empty();
   } catch (const std::filesystem::filesystem_error&) {
     return false;
   }
 }
 
+const ConsoleScriptLine* project_link(const ConsoleRow& row, const ScriptWorkspace& scripts) {
+  if (!row.source) return nullptr;
+  if (!row.source_exists) row.source_exists = source_exists(*row.source, scripts);
+  return row.source_exists.value_or(false) ? &*row.source : nullptr;
+}
+
 void draw_source_link(const ConsoleScriptLine& source, std::string_view text, ConsoleInteraction& interaction) {
   const auto origin = ImGui::GetCursorScreenPos();
-  const char* end = text.data() + text.size();
-  const auto size = ImGui::CalcTextSize(text.data(), end);
+  const auto size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
   if (ImGui::InvisibleButton("source", size, ImGuiButtonFlags_EnableNav)) interaction.selected = &source;
   if (ImGui::IsItemHovered()) {
     interaction.link_hovered = true;
     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
   }
-  ImGui::GetWindowDrawList()->AddText(origin, ImGui::GetColorU32(ImGuiCol_TextLink), text.data(), end);
+  ImGui::GetWindowDrawList()->AddText(origin, ImGui::GetColorU32(ImGuiCol_TextLink), text.data(),
+                                      text.data() + text.size());
 }
 
 void draw_row_text(const VisibleRow& row, const ScriptWorkspace& scripts, ConsoleInteraction& interaction) {
-  const auto& source = row.row->source;
   const auto text = std::string_view(row.entry->message).substr(row.row->offset, row.row->length);
-  if (source && links_to_project(*source, scripts)) {
+  if (const auto* source = project_link(*row.row, scripts)) {
     draw_source_link(*source, text, interaction);
   } else if (text.empty()) {
     ImGui::Dummy(ImVec2(0, ImGui::GetTextLineHeight()));
@@ -152,13 +154,17 @@ void open_source(ScriptWorkspace& scripts, const ConsoleScriptLine& selected) {
   }
 }
 
+bool follows_output(bool at_bottom, const ConsoleInteraction& interaction) {
+  return at_bottom && !interaction.link_hovered;
+}
+
 ConsoleInteraction draw_log(const ConsoleLog& console, const ConsoleFilters& filters, const ScriptWorkspace& scripts) {
   ImGui::BeginChild(kLogId, ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
   const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
   ImGui::PushFont(code_font(), 0.0f);
   const auto interaction = draw_entries(console, filters, scripts);
   ImGui::PopFont();
-  if (at_bottom && !interaction.link_hovered) ImGui::SetScrollHereY(kScrollToBottom);
+  if (follows_output(at_bottom, interaction)) ImGui::SetScrollHereY(kScrollToBottom);
   ImGui::EndChild();
   return interaction;
 }
