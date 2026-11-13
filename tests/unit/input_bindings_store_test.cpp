@@ -87,6 +87,25 @@ TEST_CASE("what players bound is written and read back, player by player") {
   CHECK_FALSE(std::filesystem::exists(file.string() + ".part"));
 }
 
+TEST_CASE("a player's second key and second button are written and read back in their order") {
+  const TempFolder folder;
+  const std::filesystem::path file = folder.dir / "bindings.json";
+  PlayerBindings played;
+  played.unbind(0, "jump", InputBinding(Key::Space), std::nullopt);
+  for (const InputBinding binding : {InputBinding(Key::K), InputBinding(Key::Space), InputBinding(GamepadButton::Y)}) {
+    played.bind(0, "jump", binding, std::nullopt);
+  }
+  played.bind(kThirdPad, "vertical", GamepadButton::DpadUp, AxisSide::Positive);
+  REQUIRE(write_player_bindings(file, played));
+
+  PlayerBindings next_run;
+  read_player_bindings(file, next_run);
+  CHECK(listed(next_run.action(0, "jump")) ==
+        std::vector<InputBinding>{Key::K, Key::Space, GamepadButton::A, GamepadButton::Y});
+  CHECK(next_run.axis(kThirdPad, "vertical")->positive.all() == std::vector<InputBinding>{GamepadButton::DpadUp});
+  CHECK(next_run.axis(0, "vertical")->positive.all() == std::vector<InputBinding>{Key::W, Key::Up});
+}
+
 TEST_CASE("a missing or broken bindings file leaves every player with the game's bindings") {
   const TempFolder folder;
   PlayerBindings bindings;

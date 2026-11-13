@@ -10,6 +10,8 @@ module Input
   PAD_PREFIX = "pad:".freeze
   # What calls a capture off unless it is told otherwise: Escape, and a gamepad's B or Back.
   CANCEL_CAPTURE = ["key:escape", "pad:b", "pad:back"].freeze
+  RUMBLE_SUPPORTED = false     # (see Input.rumble?)
+  RUMBLE_STRENGTHS = (0..1)    # from still to as hard as a gamepad shakes
 
   def self.axis(name, pad: FIRST_PAD) = __axis(name, __pad(pad))
   def self.action?(name, pad: FIRST_PAD) = __action_down(name, __pad(pad))
@@ -21,6 +23,21 @@ module Input
   def self.gamepad_down?(button, pad: FIRST_PAD) = __gamepad_down(button, __pad(pad))
   def self.gamepad_pressed?(button, pad: FIRST_PAD) = __gamepad_pressed(button, __pad(pad))
   def self.gamepad_released?(button, pad: FIRST_PAD) = __gamepad_released(button, __pad(pad))
+
+  # Whether gamepads can rumble here: never yet. The window library the engine runs on (raylib 5.5)
+  # has no vibration on desktops nor on Android, so Input.rumble is a hook that does nothing until
+  # one does; a game asks this before offering a "vibration" option.
+  def self.rumble? = RUMBLE_SUPPORTED
+
+  # Rumbles a player's gamepad at `strength` (0 to 1) for `seconds`. Does nothing for now (see
+  # rumble?) and says so: false. A player, a strength or a time out of range is an error all the same.
+  def self.rumble(pad, strength, seconds)
+    raise ArgumentError, "no player #{pad.inspect}" unless (FIRST_PAD...PLAYERS).cover?(__pad(pad))
+    raise ArgumentError, "rumble strength goes from 0 to 1" unless RUMBLE_STRENGTHS.cover?(strength)
+    raise ArgumentError, "rumble time cannot be negative" if seconds.negative?
+
+    rumble?
+  end
 
   # Input.define_action(:dash, keys: [:left_shift], buttons: [:b]), define_action(:fire, mouse:
   # [:left]), or define_action(:dash, :e, "pad:b"). Declaring a name again binds it anew.

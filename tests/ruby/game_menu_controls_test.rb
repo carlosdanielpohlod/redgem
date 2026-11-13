@@ -30,6 +30,8 @@ class GameMenuControlsTest < RedGemTest::Case
   SECOND_PAD = 1
   JUMP = GameMenu::ControlsPage::Row.new(:jump, nil)
   RUN = GameMenu::ControlsPage::Row.new(:run, nil)
+  FIRST = 0
+  SECOND = 1
 
   def setup
     Input.cancel_capture
@@ -91,17 +93,18 @@ class GameMenuControlsTest < RedGemTest::Case
   def test_keys_and_a_gamepad_pick_a_cell_and_confirming_it_waits_for_its_binding
     opened, controls = opened_page
     pressing(UI::DOWN) { opened.update(0) }
-    pressing(UI::RIGHT) { opened.update(0) }
-    assert_equal BUTTONS, controls.column
+    2.times { pressing(UI::RIGHT) { opened.update(0) } }
+    assert_equal BUTTONS, controls.column, "(past the keys' two cells)"
     pressing(UI::CONFIRM) { opened.update(0) }
-    assert_equal [controls.page.rows.first, BUTTONS], controls.page.waiting
+    assert_equal [controls.page.rows.first, BUTTONS, FIRST], controls.page.waiting
   end
 
   def test_the_page_says_where_it_drew_each_cell
     opened, controls = opened_page
     opened.update(0)
-    assert controls.cells.key?([:jump, nil, KEYS])
-    assert controls.cells.key?([:horizontal, :negative, BUTTONS])
+    assert controls.cells.key?([:jump, nil, KEYS, FIRST])
+    assert controls.cells.key?([:jump, nil, KEYS, SECOND])
+    assert controls.cells.key?([:horizontal, :negative, BUTTONS, SECOND])
   end
 
   def test_the_rows_scroll_to_the_focused_one_and_start_over_when_the_page_opens_again
@@ -114,7 +117,7 @@ class GameMenuControlsTest < RedGemTest::Case
     assert drawn?(controls, controls.page.rows.first), "back at the first row"
   end
 
-  def drawn?(controls, row) = controls.cells.key?([row.name, row.side, KEYS])
+  def drawn?(controls, row) = controls.cells.key?([row.name, row.side, KEYS, FIRST])
 
   def test_leaving_the_page_calls_a_capture_off
     _opened, controls = opened_page
@@ -150,11 +153,11 @@ class GameMenuControlsTest < RedGemTest::Case
   def test_a_click_on_a_cell_moves_the_focus_and_the_column_there_and_waits_for_it
     opened, controls = opened_page
     opened.update(0)
-    UI.clicked_now = controls.cells.fetch([:run, nil, BUTTONS])
+    UI.clicked_now = controls.cells.fetch([:run, nil, BUTTONS, SECOND])
     opened.update(0)
     assert controls.focus.at?(1 + Input.actions.index(:run))
-    assert_equal BUTTONS, controls.column
-    assert_equal [RUN, BUTTONS], controls.page.waiting
+    assert_equal [BUTTONS, SECOND], [controls.column, controls.slot]
+    assert_equal [RUN, BUTTONS, SECOND], controls.page.waiting
   end
 
   def test_going_to_the_controls_page_keeps_the_settings_and_coming_back_focuses_its_button

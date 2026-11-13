@@ -864,6 +864,17 @@
           "about": "whether a gamepad button went up this frame"
         },
         {
+          "name": "rumble?",
+          "static": true,
+          "about": "whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)"
+        },
+        {
+          "name": "rumble",
+          "static": true,
+          "args": "pad, strength, seconds",
+          "about": "rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)"
+        },
+        {
           "name": "text",
           "static": true,
           "about": "what was typed this frame"
