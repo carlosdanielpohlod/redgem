@@ -238,6 +238,10 @@ redgem_add_library(redgem_net
   net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
   net/rooms/relay_texts.cpp
+  net/stun/stun_message.cpp
+  net/stun/stun_probe.cpp
+  net/stun/stun_responder.cpp
+  net/stun/route_choice.cpp
   net/http/http_url.cpp
   net/http/http_message.cpp
   net/http/http_chunks.cpp

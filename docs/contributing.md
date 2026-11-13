@@ -135,8 +135,9 @@ The parsers of what comes from outside have fuzz targets in `tests/fuzz/` (`fuzz
 `gltf` (the glTF loader), `image_header` (PNG, JPEG, WebP and Radiance headers, Radiance and small
 WebP pictures decoded), `wire` (MessagePack messages and the frames they travel in),
 `http_response` (answers of web servers, in pieces), `json_scanner` (the custom properties of
-a scene's objects) and `game_archive` (a built game's `game.rgpak`: its header, its table and every
-file it lists, inflated and checked). With clang, libFuzzer makes up inputs for them:
+a scene's objects), `game_archive` (a built game's `game.rgpak`: its header, its table and every
+file it lists, inflated and checked) and `stun` (STUN Binding requests and answers, read as a
+relay and a game read them). With clang, libFuzzer makes up inputs for them:
 
 ```bash
 cmake -S . -B build-fuzz -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
