@@ -19,6 +19,7 @@ constexpr std::uint16_t kRelayPort = 7778;
 constexpr float kFrame = 0.125f;  // a power of two: the frames add up to the chooser's times exactly
 constexpr int kFramesPerDirectTry = static_cast<int>(kDirectTrySeconds / kFrame);
 constexpr int kFramesPerRelayTry = static_cast<int>(kRelayTrySeconds / kFrame);
+constexpr float kHitchSeconds = 2 * kRelayTrySeconds;  // a frame that took far longer than any try
 
 // A dialer that answers each address as the test says: Trying (silent, as a router that drops
 // what nobody asked for), Connected or Refused.
@@ -118,4 +119,12 @@ TEST_CASE("a silent relay is given up on after its own, longer time") {
   CHECK(chooser.state() == ChoiceState::Trying);
   run_frames(chooser, 1);
   CHECK(chooser.state() == ChoiceState::Failed);
+}
+
+TEST_CASE("one long frame does not use up a direct route's time") {
+  FakeDialer dialer;
+  RouteChooser chooser(dialer, direct_routes(), relay_route());
+  chooser.update(kHitchSeconds);
+  CHECK(dialer.dialed.size() == 1);
+  CHECK(chooser.state() == ChoiceState::Trying);
 }

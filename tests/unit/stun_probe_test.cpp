@@ -23,6 +23,12 @@ constexpr float kFrame = 0.125f;  // a power of two: the frames add up to the pr
 constexpr int kFramesPerRetry = static_cast<int>(kProbeRetrySeconds / kFrame);
 constexpr int kFramesToGiveUp = static_cast<int>(kProbeGiveUpSeconds / kFrame);
 constexpr std::size_t kFlood = 3 * kMostReadsPerPoll;
+constexpr float kHitchSeconds = 2 * kProbeGiveUpSeconds;  // a frame that took far longer than the probe's time
+// Where no answer goes, whatever a request says: "this network", broadcast, multicast, no port.
+constexpr const char* kThisNetwork = "0.1.2.3";
+constexpr const char* kBroadcast = "255.255.255.255";
+constexpr const char* kMulticast = "239.1.2.3";
+constexpr const char* kNotNumbers = "relay.example.com";
 
 // A link whose datagrams the test hands in and takes out.
 class FakeLink final : public DatagramLink {
@@ -138,4 +144,24 @@ TEST_CASE("a probe and a responder over one fake network agree on the address") 
   probe.update(kFrame);
   REQUIRE(probe.state() == ProbeState::Found);
   CHECK(probe.found() == MappedAddress{kPublicAddress, kPublicPort});
+}
+
+TEST_CASE("one long first frame still asks, and does not give up") {
+  FakeLink link;
+  StunProbe probe(link, server(), random_transaction_id());
+  probe.update(kHitchSeconds);
+  CHECK(link.sent.size() == 1);
+  CHECK(probe.state() == ProbeState::Asking);
+}
+
+TEST_CASE("a responder never answers toward a broadcast, multicast or made-up source") {
+  FakeLink link;
+  StunResponder responder(link);
+  const std::string request = binding_request(random_transaction_id());
+  for (const char* address : {kThisNetwork, kBroadcast, kMulticast, kNotNumbers}) {
+    link.arriving.push_back(Datagram{request, address, kPublicPort});
+  }
+  link.arriving.push_back(Datagram{request, kPublicAddress, 0});
+  CHECK(responder.poll() == 0);
+  CHECK(link.sent.empty());
 }

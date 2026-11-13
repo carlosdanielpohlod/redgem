@@ -32,6 +32,12 @@ constexpr TransactionId kPlainId = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x
 constexpr const char* kPlainAddress = "198.51.100.2";
 constexpr std::uint16_t kPlainPort = 40000;
 
+// An answer whose XOR-ed address is IPv6 (::1 port 40000) with the plain IPv4 one after it.
+constexpr std::uint8_t kIpv6ThenPlainAnswer[] = {
+    0x01, 0x01, 0x00, 0x24, 0x21, 0x12, 0xa4, 0x42, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+    0x0c, 0x00, 0x20, 0x00, 0x14, 0x00, 0x02, 0xbd, 0x52, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x08, 0x00, 0x01, 0x9c, 0x40, 0xc6, 0x33, 0x64, 0x02};
+
 constexpr std::size_t kHeaderBytes = 20;
 constexpr std::size_t kTypeAt = 0;
 constexpr std::size_t kLengthAt = 3;  // the low byte of the length
@@ -105,6 +111,12 @@ TEST_CASE("the RFC's test answer names the address it was written with") {
 
 TEST_CASE("an old server's plain address is read when no XOR-ed one is there") {
   const auto seen_at = mapped_address(plain_answer(), kPlainId);
+  REQUIRE(seen_at.has_value());
+  CHECK(*seen_at == MappedAddress{kPlainAddress, kPlainPort});
+}
+
+TEST_CASE("a plain IPv4 address is read when the XOR-ed one is IPv6") {
+  const auto seen_at = mapped_address(bytes_of(kIpv6ThenPlainAnswer, sizeof(kIpv6ThenPlainAnswer)), kPlainId);
   REQUIRE(seen_at.has_value());
   CHECK(*seen_at == MappedAddress{kPlainAddress, kPlainPort});
 }

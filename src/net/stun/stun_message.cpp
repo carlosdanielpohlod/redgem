@@ -4,10 +4,9 @@
 
 #include <algorithm>
 #include <random>
-#include <sstream>
 #include <vector>
 
-#include "net/decimal_text.hpp"
+#include "net/private_address.hpp"
 
 namespace redgem::net::stun {
 
@@ -45,8 +44,6 @@ constexpr std::uint32_t kHalfMask = 0xFFFF;
 constexpr std::uint16_t kCookieHigh = kMagicCookie >> kBitsPerHalf;  // what a port is XOR-ed with
 // An IPv4 address in numbers: four of them, dots between.
 constexpr std::size_t kOctets = 4;
-constexpr std::size_t kMostOctetDigits = 3;
-constexpr unsigned long kLargestOctet = 255;
 constexpr char kOctetSeparator = '.';
 constexpr unsigned kHighestOctetShift = (kOctets - 1) * kBitsPerByte;
 
@@ -161,23 +158,12 @@ std::optional<MappedAddress> read_ipv4(const std::string& bytes, const Attribute
   return MappedAddress{dotted(address), port};
 }
 
-bool is_octet(const std::string& part) {
-  return is_decimal(part, kMostOctetDigits) && std::stoul(part) <= kLargestOctet;
-}
-
-bool ends_in_separator(const std::string& numbers) { return !numbers.empty() && numbers.back() == kOctetSeparator; }
-
-// An IPv4 address in numbers as one 32-bit number; nothing when it is no such address.
-std::optional<std::uint32_t> ipv4_number(const std::string& numbers) {
-  std::uint32_t value = 0;
-  std::size_t parts = 0;
-  std::istringstream text(numbers);
-  for (std::string part; std::getline(text, part, kOctetSeparator); ++parts) {
-    if (parts == kOctets || !is_octet(part)) return std::nullopt;
-    value = (value << kBitsPerByte) | static_cast<std::uint32_t>(std::stoul(part));
-  }
-  if (parts != kOctets || ends_in_separator(numbers)) return std::nullopt;
-  return value;
+// The IPv4 address the attribute of that type holds; nothing when there is none.
+std::optional<MappedAddress> ipv4_attribute(const std::string& bytes, const std::vector<Attribute>& found,
+                                            std::uint16_t type, bool xored) {
+  const Attribute* attribute = find_attribute(found, type);
+  if (attribute == nullptr) return std::nullopt;
+  return read_ipv4(bytes, *attribute, xored);
 }
 
 }  // namespace
@@ -215,9 +201,9 @@ std::optional<MappedAddress> mapped_address(const std::string& response, const T
   if (!answers(response, id)) return std::nullopt;
   const auto found = attributes_of(response);
   if (!found) return std::nullopt;
-  if (const Attribute* xored = find_attribute(*found, kXorMappedAddress)) return read_ipv4(response, *xored, true);
-  if (const Attribute* plain = find_attribute(*found, kMappedAddress)) return read_ipv4(response, *plain, false);
-  return std::nullopt;
+  // (An XOR-ed address that is no IPv4 one, IPv6 say, leaves the plain one to be read, if any.)
+  if (const auto xored = ipv4_attribute(response, *found, kXorMappedAddress, true)) return xored;
+  return ipv4_attribute(response, *found, kMappedAddress, false);
 }
 
 }  // namespace redgem::net::stun

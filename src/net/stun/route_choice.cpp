@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include "net/stun/step_time.hpp"
+
 namespace redgem::net::stun {
 
 RouteChooser::RouteChooser(Dialer& dialer, std::vector<Route> direct, Route relay)
@@ -14,7 +16,7 @@ RouteChooser::RouteChooser(Dialer& dialer, std::vector<Route> direct, Route rela
 
 void RouteChooser::update(float seconds) {
   if (state_ != ChoiceState::Trying) return;
-  trying_for_ += seconds;
+  trying_for_ += counted_step(seconds);
   const DialStatus status = dialer_.status();
   if (status == DialStatus::Connected) {
     state_ = ChoiceState::Connected;

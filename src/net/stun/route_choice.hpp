@@ -17,8 +17,10 @@ inline constexpr float kDirectTrySeconds = 3.0f;
 inline constexpr float kRelayTrySeconds = 10.0f;
 
 enum class RouteKind {
-  Direct,  // straight to the host: its address on the local network, or the public one STUN found
-  Relay    // through the relay both machines reach
+  // Straight to the host: its address on the local network, or its public address (which STUN
+  // finds) with the game's own TCP port, which only answers where the host forwarded it.
+  Direct,
+  Relay  // through the relay both machines reach
 };
 
 struct Route {

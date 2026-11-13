@@ -16,8 +16,9 @@ inline constexpr std::size_t kMostReadsPerPoll = 64;
 // A small STUN server: answers each Binding request that arrives on `link` with the address and
 // port it came from. A relay runs one on its own port number (over UDP), so games that meet there
 // can learn their public address from a machine they already trust, with no third party. It keeps
-// nothing between requests, and its answer is barely longer than the request (32 bytes for 20):
-// little use to whoever would bounce traffic off it.
+// nothing between requests, its answer is barely longer than the request (32 bytes for 20), and
+// it never answers toward a broadcast or multicast address: little use to whoever would bounce
+// traffic off it.
 class StunResponder {
  public:
   explicit StunResponder(DatagramLink& link) : link_(link) {}
@@ -32,7 +33,8 @@ class StunResponder {
   DatagramLink& link_;
 };
 
-// A StunResponder on a UDP port of this machine: what redgem-relay runs beside its rooms.
+// A StunResponder on a UDP port of this machine that nothing else shares and that sends to no
+// broadcast address: what redgem-relay runs beside its rooms.
 class UdpStunServer {
  public:
   UdpStunServer() = default;

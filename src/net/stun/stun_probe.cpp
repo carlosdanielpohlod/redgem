@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include "net/stun/step_time.hpp"
+
 namespace redgem::net::stun {
 
 StunProbe::StunProbe(DatagramLink& link, MappedAddress server, const TransactionId& id)
@@ -16,6 +18,7 @@ void StunProbe::update(float seconds) {
 }
 
 void StunProbe::keep_time(float seconds) {
+  seconds = counted_step(seconds);
   waited_ += seconds;
   if (waited_ >= kProbeGiveUpSeconds) {
     state_ = ProbeState::Failed;

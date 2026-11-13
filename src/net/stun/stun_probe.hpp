@@ -22,7 +22,9 @@ enum class ProbeState {
 
 // Asks a STUN server, over `link`, where it sees this machine: the public address and port its
 // router gives the datagrams of this port. Call update() every frame until it is no longer Asking.
-// Only the server's own answer to its own request counts: anything else that arrives is dropped.
+// Only the server's own answer to its own request counts: anything else that arrives is read and
+// dropped, so the link is the probe's alone while it asks. The address found is that of this UDP
+// port: a router maps TCP connections apart, so it says nothing of a game's TCP port.
 class StunProbe {
  public:
   // `server` in numbers. `id` tells this probe's request apart (random_transaction_id()).

@@ -394,15 +394,19 @@ not a promise of how it will be closed.
   relay answers STUN on its UDP port (a game can learn the public address its router gives it),
   and a joining machine can try direct routes before the relay (`RouteChooser`), but no game asks
   either yet: the relay does not pass a host's public address to who joins its room, and
-  `Network` does not use them. The ceiling, even once wired: a direct route only connects where
-  the host's router lets connections in (a forwarded port, UPnP done by hand, a router that keeps
-  the port STUN saw and lets anyone use it); game connections are TCP, and TCP hole punching
-  (simultaneous open) is not done, since routers handle it unevenly and both ends would have to
-  agree on which is the TLS client. Everyone else plays through the relay, as now.
+  `Network` does not use them. The ceiling, even once wired: game connections are TCP, and STUN
+  maps a UDP port (routers map TCP apart), so what STUN finds is the host's public address, not
+  a TCP port anyone can reach. A direct route only connects where the host's router lets
+  connections in (a forwarded port, UPnP done by hand). TCP hole punching (simultaneous open) is
+  not done: routers handle it unevenly, and both ends would have to agree on which is the TLS
+  client. Everyone else plays through the relay, as now.
 - The relay's STUN answers are IPv4 only, unauthenticated (no MESSAGE-INTEGRITY or FINGERPRINT)
-  and only as fast as the relay wakes (about once a second while no TCP traffic arrives): a game
-  asks again every half second for five seconds. Its UDP port is not limited per address; an
-  answer is 32 bytes for a request of at least 20, little to bounce traffic with.
+  and only as fast as the relay wakes: about once a second while no TCP traffic arrives, 64
+  requests a wake at most (a game asks again every half second for five seconds). Its UDP port is
+  not limited per address; an answer is 32 bytes for a request of at least 20, and none goes to
+  a broadcast or multicast address, little to bounce traffic with. Behind something that proxies
+  UDP (Docker's userland proxy, rootless Docker), the relay sees the proxy's address and names
+  that instead of the player's.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,
