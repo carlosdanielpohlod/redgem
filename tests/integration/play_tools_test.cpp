@@ -240,6 +240,61 @@ TEST_CASE("a run replays held keys and releases them at the given frame") {
   CHECK(has(ran.out, "frame 1: 1\nframe 2: 2\nframe 3: 2\nframe 4: 2\n"));
 }
 
+TEST_CASE("a run replays the mouse, gamepads and touch through the input the game reads") {
+  const GameCopy game("pointer_pad_touch_replay");
+  game.write("input.json", R"([
+    {"frame": 0, "mouse": {"x": 100, "y": 50, "buttons": ["left"]},
+                 "pads": [{"pad": 1, "buttons": ["a"], "axes": {"left_x": -1}}]},
+    {"frame": 1, "mouse": {"click": ["right"], "wheel": 2}},
+    {"frame": 3, "touch": {"x": 30, "y": 40}},
+    {"frame": 4, "touch": {"x": 35, "y": 45}},
+    {"frame": 5, "keys": []},
+    {"frame": 6, "tap": {"x": 10, "y": 20}}
+  ])");
+  // What the game saw each frame: the pointer; the left button (down, pressed, released, its
+  // action), the right button's edges, the wheel; gamepad 1, its A (down, pressed, released, its
+  // action), its left stick.
+  game.write("scripts/main_scene.rb", R"(
+    class InputWitness < Behaviour
+      def update(_dt)
+        $seen = [pointer, buttons, pad]
+      end
+      def pointer = [Input.mouse_x.round, Input.mouse_y.round]
+      def buttons
+        [Input.mouse_down?(:left), Input.mouse_pressed?(:left), Input.mouse_released?(:left), Input.action?(:fire),
+         Input.mouse_pressed?(:right), Input.mouse_released?(:right), Input.mouse_wheel.round]
+      end
+      def pad
+        [Input.gamepad?(pad: 1), Input.gamepad_down?(:a, pad: 1), Input.gamepad_pressed?(:a, pad: 1),
+         Input.gamepad_released?(:a, pad: 1), Input.action?(:jump, pad: 1), Input.gamepad_axis(:left_x, pad: 1).round]
+      end
+    end
+    Input.define_action(:fire, mouse: [:left])
+    Input.define_action(:jump, buttons: [:a])
+    Scene.find('Player').add_component(InputWitness)
+    class MainScene < SceneScript; end
+  )");
+  const ToolResult ran = tool(
+      {"run", game.dir(), "--frames", "8", "--input", game.dir() + "/input.json", "--print", "$seen", "--every", "1"});
+  CHECK_MESSAGE(ran.exit_code == kExitSuccess, ran.out, ran.err);
+  const std::string idle_pad = "[true, false, false, false, false, 0]]\n";  // plugged in, nothing pressed
+  // Left held and pad 1's A pressed.
+  CHECK(has(ran.out,
+            "frame 1: [[100, 50], [true, true, false, true, false, false, 0], [true, true, true, false, true, -1]]"));
+  // Left and A let go; a right click and the wheel.
+  CHECK(has(ran.out,
+            "frame 2: [[100, 50], [false, false, true, false, true, false, 2], [true, false, false, true, false, 0]]"));
+  // The click let go of, the wheel still.
+  CHECK(has(ran.out, "frame 3: [[100, 50], [false, false, false, false, false, true, 0], " + idle_pad));
+  // A finger down, moved, lifted.
+  CHECK(has(ran.out, "frame 4: [[30, 40], [true, true, false, true, false, false, 0], " + idle_pad));
+  CHECK(has(ran.out, "frame 5: [[35, 45], [true, false, false, true, false, false, 0], " + idle_pad));
+  CHECK(has(ran.out, "frame 6: [[35, 45], [false, false, true, false, false, false, 0], " + idle_pad));
+  // A tap: pressed one frame, released the next.
+  CHECK(has(ran.out, "frame 7: [[10, 20], [true, true, false, true, false, false, 0], " + idle_pad));
+  CHECK(has(ran.out, "frame 8: [[10, 20], [false, false, true, false, false, false, 0], " + idle_pad));
+}
+
 TEST_CASE("run assertions and stop conditions are evaluated after each frame") {
   const GameCopy game("run_conditions");
   const ToolResult stopped = tool({"run", game.dir(), "--frames", "20", "--until", "($n ||= 0; $n += 1) == 3",
@@ -274,9 +329,13 @@ TEST_CASE("run plans reject invalid seeds and malformed input before playing") {
   for (const auto* seed : {"-1", "1.5", "1e30", "2147483648", "nan"}) {
     CHECK(tool({"run", game.dir(), "--seed", seed}).exit_code == kExitUsage);
   }
-  for (const auto* json :
-       {"bad", "{}", R"([{"frame":0,"keys":["missing"]}])", R"([{"frame":-1,"keys":[]}])", R"([{"frame":2,"keys":[]}])",
-        R"([{"frame":0,"keys":[]},{"frame":0,"keys":[]}])", R"([{"frame":0,"keys":[],"typo":true}])"}) {
+  for (const auto* json : {"bad", "{}", R"([{"frame":0,"keys":["missing"]}])", R"([{"frame":-1,"keys":[]}])",
+                           R"([{"frame":2,"keys":[]}])", R"([{"frame":0,"keys":[]},{"frame":0,"keys":[]}])",
+                           R"([{"frame":0,"mouse":{"click":["left"]}},{"frame":1,"mouse":{"click":["left"]}}])",
+                           R"([{"frame":0,"tap":{"x":1,"y":1}},{"frame":1,"keys":[]}])",
+                           R"([{"frame":0,"touch":{"x":1,"y":1}},{"frame":2,"tap":{"x":1,"y":1}}])",
+                           R"([{"frame":0,"mouse":{"buttons":["right"]}},{"frame":2,"mouse":{"click":["right"]}}])",
+                           R"([{"frame":0,"keys":[],"typo":true}])"}) {
     game.write("bad-input.json", json);
     CHECK(tool({"run", game.dir(), "--frames", "2", "--input", game.dir() + "/bad-input.json"}).exit_code ==
           kExitUsage);

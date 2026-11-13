@@ -119,6 +119,25 @@ came), led by the place in the game's scripts it points at, then one line of sum
 with an error when a script failed. `--scene level2` starts on another scene. What the game saves
 goes to a folder of the run's own, deleted afterwards: a run never touches your progress.
 
+`--input plan.json` plays input from a JSON list of events, each at a zero-based frame. An event
+holds keys, mouse buttons, gamepads and a finger on the screen until the next one, and may click,
+tap or turn the wheel for its frame only:
+
+```json
+[
+  {"frame": 0, "keys": ["w"], "mouse": {"x": 320, "y": 180, "buttons": ["left"]}},
+  {"frame": 30, "mouse": {"click": ["right"], "wheel": 1}},
+  {"frame": 45, "pads": [{"pad": 0, "buttons": ["a"], "axes": {"left_x": -1}}]},
+  {"frame": 60, "touch": {"x": 0.5, "y": 0.5, "normalized": true}},
+  {"frame": 90, "tap": {"x": 100, "y": 200}},
+  {"frame": 120, "keys": []}
+]
+```
+
+Points are in screen pixels, or fractions of the screen with `"normalized": true`; a finger is
+the pointer, as on a phone. `--seed`, `--assert`, `--until` and `--print` make a run that checks
+itself; [Making games with an AI assistant](assistants.md#repeating-a-headless-session) has every field.
+
 ## `redgem shot`: a picture of a moment
 
 ```console

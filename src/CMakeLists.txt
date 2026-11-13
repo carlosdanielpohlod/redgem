@@ -710,6 +710,7 @@ if(NOT ANDROID)
     project/script_messages.cpp
     project/tool_play.cpp
     project/run_command.cpp
+    project/run_input.cpp
     project/run_plan.cpp
     project/run_session.cpp
     project/runtime_query.cpp

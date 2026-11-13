@@ -18,6 +18,14 @@ until 1.0, a release may change what games rely on (see
   and never holds up the server: few connections, small requests, short deadlines.
   `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
 
+- **Replaying the mouse, gamepads and touch**: an event of `redgem run --input` (and MCP
+  `game_run`'s `input`) may now move the mouse, hold, click and release its buttons and turn its
+  wheel (`mouse`), hold buttons and push sticks and triggers of gamepads 0 to 3 (`pads`), and put
+  a finger down, move it and lift it, or tap (`touch`, `tap`). Points are in screen pixels, or
+  fractions of the screen with `normalized`. It all goes through the input the game reads, so
+  `Input.mouse_*`, actions bound to `mouse:left` or `pad:a`, and gamepad reads see it as a
+  player's.
+
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
   back key puts it away, and a tap on the field brings it back. What it types reaches `Input.text`
