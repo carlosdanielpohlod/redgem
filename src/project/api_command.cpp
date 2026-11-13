@@ -63,6 +63,13 @@ ToolResult usage_failure(const std::string& problem) {
   return failed(problem + "\n\n" + tr("project.api.usage"), kExitUsage);
 }
 
+// What is wrong with how the command was asked; nothing when it can answer.
+std::string misuse(const ToolLine& line) {
+  if (line.words.size() > 1) return tr("project.api.one_class");
+  if (asks_part_as_rbs(line)) return tr("project.api.rbs_whole");
+  return {};
+}
+
 }  // namespace
 
 ToolResult run_api_command(const std::vector<std::string>& args) {
@@ -70,8 +77,8 @@ ToolResult run_api_command(const std::vector<std::string>& args) {
   const auto line = read_tool_line(args, 0, grammar(), error);
   if (!line) return usage_failure(error);
   if (line->has(command_line::kHelpOption)) return answer(tr("project.api.usage"));
-  if (line->words.size() > 1) return usage_failure(tr("project.api.one_class"));
-  if (asks_part_as_rbs(*line)) return usage_failure(tr("project.api.rbs_whole"));
+  const std::string problem = misuse(*line);
+  if (!problem.empty()) return usage_failure(problem);
   if (const auto word = line->value(kSearchOption)) return search(*word, line->has(kJsonOption));
   if (!line->words.empty()) return one_class(line->words.front(), line->has(kJsonOption));
   return whole(*line);

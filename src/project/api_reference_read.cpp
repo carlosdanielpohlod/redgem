@@ -188,6 +188,7 @@ void check_class(const ApiClass& owner, const std::vector<std::string>& classes)
 
 void check_reference(const ApiReference& reference) {
   std::vector<std::string> classes;
+  classes.reserve(reference.classes.size());
   for (const ApiClass& owner : reference.classes) classes.push_back(owner.name);
   for (const ApiClass& owner : reference.classes) check_class(owner, classes);
 }
