@@ -56,12 +56,12 @@ bool ScriptWorkspace::open_at(const std::filesystem::path& source, std::size_t l
 
 ScriptEditor* ScriptWorkspace::find(const std::string& file_name) {
   const auto found = std::find_if(tabs_.begin(), tabs_.end(), [&](const std::unique_ptr<ScriptEditor>& tab) {
-    if (tab->file_name() == file_name) return true;
 #if defined(_WIN32) || defined(__APPLE__)
+    if (tab->file_name() == file_name) return true;
     std::error_code problem;
     return std::filesystem::equivalent(tab->path(), scripts_dir_ / file_name, problem);
 #else
-    return false;
+    return tab->file_name() == file_name;
 #endif
   });
   return found == tabs_.end() ? nullptr : found->get();
