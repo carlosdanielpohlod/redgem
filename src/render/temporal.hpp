@@ -39,6 +39,9 @@ struct TemporalView {
   Vec3 forward;   // unit length
   float fov_y = 0.0f;
   std::uint64_t scene = 0;  // the scene's upload number: a new scene shares nothing with the last
+  // Which camera object it was seen through (its serial): seeing through another one is a cut,
+  // however near it is (Camera.main =).
+  std::uint64_t viewer = 0;
 };
 
 // A camera that moved farther than this in a frame cut to another place.
@@ -49,6 +52,8 @@ inline constexpr float kCutTurnCosine = 0.7071f;
 inline constexpr float kCutZoom = 0.25f;
 
 bool resized(const TemporalView& before, const TemporalView& now);
+// Whether the camera cut between two frames: it jumped, turned or zoomed too far, or the game is
+// seen through another camera object.
 bool camera_cut(const TemporalView& before, const TemporalView& now);
 // Whether the frame `now` can use the picture of the one `before` it: the same picture size and
 // scene, and the camera did not cut.

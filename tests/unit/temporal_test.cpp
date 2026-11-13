@@ -118,6 +118,15 @@ TEST_CASE("the frames before are dropped when the camera cuts: jumps, turns arou
   for (const TemporalView& cut : {jumped, turned, zoomed}) CHECK_FALSE(keeps_history(before, cut));
 }
 
+TEST_CASE("the frames before are dropped when the game is seen through another camera, however near") {
+  constexpr std::uint64_t kOtherCamera = 7;
+  const TemporalView before = looking_ahead();
+  TemporalView switched = before;
+  switched.viewer = kOtherCamera;
+  CHECK(camera_cut(before, switched));
+  CHECK_FALSE(keeps_history(before, switched));
+}
+
 TEST_CASE("fast chase camera translations keep global history for surfaces that stay in view") {
   constexpr Vec3 kChaseStep{1.25f, 0.0f, -0.25f};  // meters per frame: fast screen motion without a camera cut
   TemporalView before = looking_ahead();
