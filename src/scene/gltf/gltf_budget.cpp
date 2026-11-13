@@ -4,6 +4,7 @@
 #include <limits>
 #include <optional>
 
+#include "core/game_files.hpp"
 #include "core/image_header.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 
@@ -21,9 +22,8 @@ std::uint64_t plus(std::uint64_t a, std::uint64_t b) { return a > kMost - b ? kM
 std::uint64_t times(std::uint64_t a, std::uint64_t b) { return b != 0 && a > kMost / b ? kMost : a * b; }
 
 std::uint64_t size_of(const std::filesystem::path& file) {
-  std::error_code fs_error;
-  const std::uintmax_t size = std::filesystem::file_size(file, fs_error);
-  return fs_error ? 0 : size;
+  // (A picture that names no file has an empty path, of no size.)
+  return file.empty() ? 0 : game_files::file_size(file).value_or(0);
 }
 
 // What the buffers kept apart from the file's own bytes hold: data files, and data written into

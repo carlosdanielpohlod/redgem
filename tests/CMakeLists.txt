@@ -10,6 +10,7 @@ add_executable(redgem_tests
   unit/log_test.cpp
   unit/event_journal_test.cpp
   unit/files_test.cpp
+  unit/game_archive_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
   unit/folder_names_test.cpp
@@ -218,6 +219,7 @@ add_executable(redgem_tests
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
   integration/game_project_test.cpp
+  integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp

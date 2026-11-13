@@ -104,6 +104,9 @@ bool bundle_outside_build(const CliOptions& options) {
   return options.android_bundle && options.mode != RunMode::BuildGame;
 }
 
+// Whether --loose was given to anything but a build (nothing else ships the game's files).
+bool loose_outside_build(const CliOptions& options) { return options.loose && options.mode != RunMode::BuildGame; }
+
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const Reading& reading) {
   const CliOptions& options = reading.result.options;
@@ -111,6 +114,7 @@ std::string problem_with(const Reading& reading) {
   if (lacks_game(options)) return tr("project.cli.missing_game_dir");
   if (lacks_out_dir(options)) return tr("project.cli.missing_out_dir");
   if (bundle_outside_build(options)) return tr("project.cli.bundle_needs_build");
+  if (loose_outside_build(options)) return tr("project.cli.loose_needs_build");
   return {};
 }
 

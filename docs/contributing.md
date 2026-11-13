@@ -134,8 +134,9 @@ commit what it writes. The test `tools.license_notices_are_up_to_date` fails whe
 The parsers of what comes from outside have fuzz targets in `tests/fuzz/` (`fuzz_<target>.cpp`):
 `gltf` (the glTF loader), `image_header` (PNG, JPEG, WebP and Radiance headers, Radiance and small
 WebP pictures decoded), `wire` (MessagePack messages and the frames they travel in),
-`http_response` (answers of web servers, in pieces) and `json_scanner` (the custom properties of
-a scene's objects). With clang, libFuzzer makes up inputs for them:
+`http_response` (answers of web servers, in pieces), `json_scanner` (the custom properties of
+a scene's objects) and `game_archive` (a built game's `game.rgpak`: its header, its table and every
+file it lists, inflated and checked). With clang, libFuzzer makes up inputs for them:
 
 ```bash
 cmake -S . -B build-fuzz -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \

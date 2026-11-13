@@ -7,6 +7,8 @@
 
 #include "app/bundled_game.hpp"
 #include "core/files.hpp"
+#include "core/game_archive.hpp"
+#include "project/build_steps.hpp"
 #include "project/android/android_package_names.hpp"
 #include "project/game_build.hpp"
 #include "project/game_shipping.hpp"
@@ -63,14 +65,28 @@ bool stage_file(const std::filesystem::path& file, const std::filesystem::path& 
 
 // Copies the game into the app's assets. `files` gets where each file is inside them: the app
 // cannot list what is inside its own APK, so the list of the game's files travels with it.
-bool stage_files(const std::filesystem::path& game_dir, const std::filesystem::path& assets,
-                 std::vector<std::string>& files, std::string& error) {
+bool stage_loose_files(const std::filesystem::path& game_dir, const std::filesystem::path& assets,
+                       std::vector<std::string>& files, std::string& error) {
+  build_steps::begin(build_steps::kCopyingFiles);
   // (The same files as any other build of the game: no links, hidden files, backups or keys.)
   for (const std::filesystem::path& relative : shipped_files(game_dir)) {
     if (!stage_file(game_dir / relative, relative, assets, error)) return false;
     files.push_back((std::filesystem::path(kBundledGameFolder) / relative).generic_string());
   }
   return true;
+}
+
+// Packs the game into one asset, the only file the app unpacks.
+bool stage_packed_files(const std::filesystem::path& game_dir, const std::filesystem::path& assets,
+                        std::vector<std::string>& files, std::string& error) {
+  files.emplace_back(kArchiveFileName);
+  return pack_game(game_dir, assets / kArchiveFileName, error);
+}
+
+bool stage_files(const std::filesystem::path& game_dir, const std::filesystem::path& assets, GameLayout layout,
+                 std::vector<std::string>& files, std::string& error) {
+  if (layout == GameLayout::Loose) return stage_loose_files(game_dir, assets, files, error);
+  return stage_packed_files(game_dir, assets, files, error);
 }
 
 // The paths of the game's files, sorted, one per line.
@@ -159,7 +175,7 @@ std::filesystem::path any_android_runtime_in(const std::filesystem::path& runtim
 
 bool stage_android_game(const std::filesystem::path& game_folder,
                         const std::map<std::string, std::filesystem::path>& runtimes, const std::string& stamp,
-                        const std::filesystem::path& stage_dir, std::string& error) {
+                        const std::filesystem::path& stage_dir, std::string& error, GameLayout layout) {
   const std::filesystem::path game_dir = normalized_folder(game_folder);
   if (!can_stage(game_dir, runtimes, error)) return false;
   const auto assets = stage_dir / android_names::kAssetsFolder;
@@ -168,7 +184,8 @@ bool stage_android_game(const std::filesystem::path& game_folder,
   std::vector<std::string> files;
   std::string manifest;
   // (The licenses of what the app contains go inside it, beside the game.)
-  const bool staged = stage_files(game_dir, assets, files, error) && stage_runtimes(runtimes, stage_dir, error) &&
+  const bool staged = stage_files(game_dir, assets, layout, files, error) &&
+                      stage_runtimes(runtimes, stage_dir, error) &&
                       manifest_for(game_dir, stage_dir, manifest, error) && write_notices(assets, error);
   return staged && write_listing(stage_dir, std::move(files), stamp, manifest, error);
 }

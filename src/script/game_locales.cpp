@@ -8,6 +8,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/game_files.hpp"
 #include "core/safe_path.hpp"
 #include "script/script_config.hpp"
 
@@ -40,29 +41,28 @@ bool is_locale_file_name(const fs::path& file) {
 // Whether a game has a locales folder of its own (not a link to one somewhere else, which
 // through_link warns of).
 bool has_locales_folder(const fs::path& game_dir) {
-  std::error_code fs_error;
-  if (!fs::is_directory(game_dir / config::kLocalesDirName, fs_error)) return false;
+  if (!game_files::is_folder(game_dir / config::kLocalesDirName)) return false;
   return !through_link(game_dir, config::kLocalesDirName);
 }
 
 // Why a file of the locales folder is left out before it is read; nothing when it may be read.
-std::optional<std::string> refusal(const fs::directory_entry& entry) {
+std::optional<std::string> refusal(const fs::path& entry) {
   std::error_code fs_error;
-  if (entry.is_symlink(fs_error)) return "it is a symbolic link, which built games do not carry";
-  if (!entry.is_regular_file(fs_error)) return "it is not a file";
-  if (!is_locale_file_name(entry.path())) return "a translation file is named for its language, such as en.json";
+  if (fs::is_symlink(entry, fs_error)) return "it is a symbolic link, which built games do not carry";
+  if (!game_files::is_file(entry)) return "it is not a file";
+  if (!is_locale_file_name(entry)) return "a translation file is named for its language, such as en.json";
   return std::nullopt;
 }
 
 // Adds a file of the locales folder to `texts`, in the language it is named for. Why it was left
 // out; nothing when it was added.
-std::optional<std::string> add_file(const fs::directory_entry& entry, Texts& texts) {
+std::optional<std::string> add_file(const fs::path& entry, Texts& texts) {
   if (auto refused = refusal(entry)) return refused;
-  const auto bytes = read_file_up_to(entry.path(), config::kMaxLocaleFileBytes);
+  const auto bytes = read_file_up_to(entry, config::kMaxLocaleFileBytes);
   if (!bytes) return "it cannot be read, or is larger than " + std::to_string(config::kMaxLocaleFileBytes) + " bytes";
   std::string error;
   const std::string_view json(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-  if (!texts.add(stem_of(entry.path()), json, error)) return error;
+  if (!texts.add(stem_of(entry), json, error)) return error;
   return std::nullopt;
 }
 
@@ -75,12 +75,11 @@ bool is_language_name(std::string_view name) {
 GameLocales read_game_locales(const fs::path& game_dir) {
   GameLocales locales;
   if (!has_locales_folder(game_dir)) return locales;
-  std::error_code fs_error;
-  for (const fs::directory_entry& entry : fs::directory_iterator(game_dir / config::kLocalesDirName, fs_error)) {
+  for (const fs::path& entry : game_files::entries_in(game_dir / config::kLocalesDirName)) {
     if (const auto left_out = add_file(entry, locales.texts)) {
-      log::warning("left out " + printable(entry.path().u8string()) + ": " + printable(*left_out));
+      log::warning("left out " + printable(entry.u8string()) + ": " + printable(*left_out));
     } else {
-      locales.languages.push_back(stem_of(entry.path()));
+      locales.languages.push_back(stem_of(entry));
     }
   }
   std::sort(locales.languages.begin(), locales.languages.end());

@@ -114,7 +114,7 @@ bool fill_app(const std::filesystem::path& game_dir, const std::filesystem::path
   std::error_code fs_error;
   std::filesystem::create_directories(contents / kMacProgramFolder, fs_error);
   return copy_player(player, contents / kMacProgramFolder / executable, error) &&
-         copy_game(game_dir, resources / kBundledGameFolder, error) &&
+         ship_game_files(game_dir, resources, identity.layout, error) &&
          write_resources(resources, identity, executable, error) &&
          write_text_file(contents / kInfoFile, mac_info_plist(app_of(identity, executable)), error);
 }

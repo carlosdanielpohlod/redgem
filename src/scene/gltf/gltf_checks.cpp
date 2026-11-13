@@ -4,6 +4,7 @@
 #include <limits>
 #include <optional>
 
+#include "core/game_files.hpp"
 #include "core/safe_path.hpp"
 
 namespace redgem::gltf_checks {
@@ -58,8 +59,8 @@ bool sparse_fits(const cgltf_accessor& accessor) {
 bool loadable_file(const cgltf_buffer& buffer, const std::filesystem::path& file) {
   const bool may_be_opened = !file.empty() && buffer.size <= kMaxBufferFileBytes;
   if (!may_be_opened) return false;
-  std::error_code fs_error;
-  return std::filesystem::file_size(file, fs_error) <= kMaxBufferFileBytes && !fs_error;
+  const auto size = game_files::file_size(file);
+  return size && *size <= kMaxBufferFileBytes;
 }
 
 // (A buffer that names no file keeps its data in the scene's own file.)

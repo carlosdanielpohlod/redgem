@@ -21,6 +21,7 @@ constexpr const char* kEditorBridgeOption = "--editor-bridge";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kBundleOption = "--bundle";
+constexpr const char* kLooseOption = "--loose";
 constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kRecordOption = "--record";
 constexpr const char* kRecordFpsOption = "--record-fps";
@@ -70,6 +71,8 @@ void read_target(Reading& reading) {
 }
 
 void read_bundle(Reading& reading) { reading.result.options.android_bundle = true; }
+
+void read_loose(Reading& reading) { reading.result.options.loose = true; }
 
 void read_gpu(Reading& reading) {
   const std::string name = value(reading).value_or("");
@@ -134,6 +137,7 @@ constexpr Option kOptions[] = {
     {kTemplateOption, read_template},
     {kTargetOption, read_target},
     {kBundleOption, read_bundle},
+    {kLooseOption, read_loose},
     {kGpuOption, read_gpu},
     {kRecordOption, read_record},
     {kRecordFpsOption, read_record_fps},

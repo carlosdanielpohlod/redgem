@@ -8,10 +8,12 @@
 #include "app/bundled_game.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
+#include "core/game_archive.hpp"
 #include "core/translations.hpp"
 #include "project/notices.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
+#include "project/game_shipping.hpp"
 #include "project/game_templates.hpp"
 #include "test_support.hpp"
 
@@ -116,7 +118,8 @@ TEST_CASE("a build replaces only what an earlier build made") {
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Windows, error), error);
 
   const std::string executable = executable_name(scratch.game);  // for Linux
-  for (const std::string& name : {std::string(kBundledGameFolder), executable, std::string(kNoticesFolder)}) {
+  for (const std::string& name :
+       {std::string(kBundledGameFolder), std::string(kArchiveFileName), executable, std::string(kNoticesFolder)}) {
     CAPTURE(name);
     const std::filesystem::path other_out = scratch.dir / ("other_out_" + std::to_string(name.size()));
     std::filesystem::remove_all(other_out);
@@ -129,22 +132,78 @@ TEST_CASE("a build replaces only what an earlier build made") {
 }
 
 #ifndef _WIN32  // (a folder that cannot be emptied, made by taking away the right to change it)
-TEST_CASE("a build whose earlier game folder cannot be emptied fails instead of shipping what is left") {
+TEST_CASE("a loose build whose earlier game folder cannot be taken away fails, and says why") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  const std::filesystem::path out = scratch.dir / "out";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose), error);
+  const std::filesystem::path stuck = out / kBundledGameFolder / "stuck";
+  std::filesystem::create_directories(stuck);
+  std::ofstream(stuck / "stale.txt") << "from before";
+  std::filesystem::permissions(stuck, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
+  CHECK(error.find("cannot empty") != std::string::npos);
+  // The new copy took the folder's place all the same: nothing of the earlier one is played.
+  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / config::kSceneFileName));
+  CHECK_FALSE(std::filesystem::exists(out / kBundledGameFolder / "stuck"));
+  std::error_code fs_error;
+  for (const char* folder : {"game.replaced", "game"}) {
+    std::filesystem::permissions(out / folder / "stuck", std::filesystem::perms::owner_all, fs_error);
+  }
+}
+#endif
+
+#ifndef _WIN32  // (a file that cannot be read, made by taking away the right to read it)
+TEST_CASE("a rebuild that fails leaves the earlier build's game as it was") {
   const Scratch scratch;
   const std::filesystem::path player = scratch.dir / "player";
   std::ofstream(player) << "player";
   const std::filesystem::path out = scratch.dir / "out";
   std::string error;
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
-  const std::filesystem::path stuck = out / kBundledGameFolder / "stuck";
-  std::filesystem::create_directories(stuck);
-  std::ofstream(stuck / "stale.txt") << "from before";
-  std::filesystem::permissions(stuck, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+  const std::filesystem::path unreadable = scratch.game / "unreadable.txt";
+  std::ofstream(unreadable) << "new";
+  std::filesystem::permissions(unreadable, std::filesystem::perms::none);
+  // Packed: the earlier archive stays, whole, and nothing half written is left beside it.
   CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error));
-  CHECK(error.find("cannot empty") != std::string::npos);
-  std::filesystem::permissions(stuck, std::filesystem::perms::owner_all);
+  CHECK(error.find("cannot pack the game") != std::string::npos);
+  const auto archive = GameArchive::open(out / kArchiveFileName, error);
+  REQUIRE_MESSAGE(archive.has_value(), error);
+  CHECK(archive->find(config::kSceneFileName) != nullptr);
+  CHECK_FALSE(std::filesystem::exists(out / (std::string(kArchiveFileName) + kArchivePartialSuffix)));
+  // Loose, over a loose build: the earlier folder stays, and no copy is left beside it.
+  std::filesystem::permissions(unreadable, std::filesystem::perms::owner_all);
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose), error);
+  CHECK_FALSE(std::filesystem::exists(out / kArchiveFileName));
+  std::ofstream(scratch.game / "later.txt") << "later";
+  std::filesystem::permissions(unreadable, std::filesystem::perms::none);
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
+  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / "unreadable.txt"));
+  CHECK_FALSE(std::filesystem::exists(out / kBundledGameFolder / "later.txt"));
+  CHECK_FALSE(std::filesystem::exists(out / kStagedGameFolder));
+  CHECK_FALSE(std::filesystem::exists(out / kReplacedGameFolder));
+  std::filesystem::permissions(unreadable, std::filesystem::perms::owner_all);
 }
 #endif
+
+TEST_CASE("a build never goes where its game is kept under one of the names it works with") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  std::string error;
+  for (const char* name : {kStagedGameFolder, kReplacedGameFolder}) {
+    CAPTURE(name);
+    const std::filesystem::path out = scratch.dir / "out" / name;  // (a folder of its own each time)
+    const std::filesystem::path game = out / name;
+    std::filesystem::create_directories(game);
+    std::ofstream(game / config::kSceneFileName) << "scene";
+    CHECK_FALSE(build_game(game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
+    CHECK(error.find((out / name).string()) != std::string::npos);
+    CHECK(std::filesystem::is_regular_file(game / config::kSceneFileName));
+  }
+}
 
 TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {
   for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::MacOS}) {
