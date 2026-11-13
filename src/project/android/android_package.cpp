@@ -6,7 +6,6 @@
 #include "core/platform.hpp"
 #include "project/android/android_package_names.hpp"
 #include "project/android/android_stage_folder.hpp"
-#include "project/build_steps.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
