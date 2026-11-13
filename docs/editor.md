@@ -63,7 +63,8 @@ icons):
   New / Open Game goes back to the hub.
 
 **Edit > Preferences** sets the scene camera's fly speed and the move, rotate and scale snap
-steps. Save applies the values and keeps them for the next session. Restore defaults fills the
+steps. The fly camera accepts six distinct letter or arrow keys. Choosing an assigned key swaps
+its direction with the key you replaced. Save applies the values and keeps them for the next session. Restore defaults fills the
 original values; Cancel discards changes.
 
 ## Material pictures

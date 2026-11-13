@@ -12,6 +12,7 @@ namespace redgem {
 namespace {
 
 constexpr const char* kPreferencesFile = "editor-preferences.json";
+constexpr const char* kFlyKeys = "fly_keys";
 constexpr const char* kFly = "fly_speed";
 constexpr const char* kTranslate = "translate_snap";
 constexpr const char* kRotate = "rotate_snap";
@@ -25,6 +26,30 @@ float number(const nlohmann::json& json, const char* key, float fallback, float 
   return in_range(value, min, max) ? static_cast<float>(value) : fallback;
 }
 
+FlyBindings read_fly_bindings(const nlohmann::json& json) {
+  FlyBindings bindings;
+  if (!json.is_object()) return bindings;
+  for (const auto& field : kFlyBindingFields) {
+    if (!holds_text(json, field.setting)) continue;
+    if (const auto key = key_from_name(json.at(field.setting).get<std::string>())) bindings.*field.direction = *key;
+  }
+  return valid_fly_bindings(bindings) ? bindings : FlyBindings{};
+}
+
+nlohmann::json fly_bindings_json(const FlyBindings& bindings) {
+  auto json = nlohmann::json::object();
+  for (const auto& field : kFlyBindingFields) json[field.setting] = key_name(bindings.*field.direction);
+  return json;
+}
+
+void merge_fly_bindings(nlohmann::json& json, const FlyBindings& previous, const FlyBindings& values) {
+  if (same_fly_bindings(previous, values)) return;
+  auto keys = json.contains(kFlyKeys) ? json.at(kFlyKeys) : nlohmann::json::object();
+  if (!keys.is_object()) keys = nlohmann::json::object();
+  keys.update(fly_bindings_json(values));
+  json[kFlyKeys] = std::move(keys);
+}
+
 }  // namespace
 
 std::filesystem::path editor_preferences_file() { return platform::user_data_dir() / kPreferencesFile; }
@@ -36,6 +61,7 @@ EditorPreferences read_editor_preferences(const std::filesystem::path& file) {
   values.translate_snap = number(json, kTranslate, values.translate_snap, kMinSnapStep, kMaxSnapStep);
   values.rotate_snap = number(json, kRotate, values.rotate_snap, kMinSnapStep, kMaxRotateSnap);
   values.scale_snap = number(json, kScale, values.scale_snap, kMinSnapStep, kMaxSnapStep);
+  if (json.contains(kFlyKeys)) values.fly_bindings = read_fly_bindings(json.at(kFlyKeys));
   return values;
 }
 
@@ -81,11 +107,16 @@ bool write_editor_preferences(const std::filesystem::path& file, const EditorPre
     error = "Camera speed and snap steps must be finite and within their displayed ranges.";
     return false;
   }
+  if (!valid_fly_bindings(values.fly_bindings)) {
+    error = "Camera movement needs six distinct letter or arrow keys.";
+    return false;
+  }
   RecoveryLease lease;
   if (!lock_preferences(file, lease, error)) return false;
   auto json = read_json_for_update(file, error);
   if (!json) return false;
   merge_changes(*json, previous, values);
+  merge_fly_bindings(*json, previous.fly_bindings, values.fly_bindings);
   return write_json_file(file, *json, error);
 }
 

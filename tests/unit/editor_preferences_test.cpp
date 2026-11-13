@@ -94,3 +94,21 @@ TEST_CASE("an editor preferences save preserves a damaged file and refuses a dir
   CHECK_FALSE(write_editor_preferences(directory, defaults, defaults, error));
   CHECK(std::filesystem::is_directory(directory));
 }
+
+TEST_CASE("editor fly keys swap conflicts, persist, and fall back from duplicate keys") {
+  const Scratch scratch;
+  const EditorPreferences defaults;
+  auto edited = defaults;
+  rebind_fly_key(edited.fly_bindings, &FlyBindings::forward, Key::A);
+  CHECK(edited.fly_bindings.forward == Key::A);
+  CHECK(edited.fly_bindings.left == Key::W);
+  CHECK(valid_fly_bindings(edited.fly_bindings));
+
+  std::string error;
+  REQUIRE(write_editor_preferences(scratch.file, defaults, edited, error));
+  const auto saved = read_editor_preferences(scratch.file);
+  CHECK(same_fly_bindings(saved.fly_bindings, edited.fly_bindings));
+
+  REQUIRE(write_text_file(scratch.file, R"({"fly_keys":{"forward":"a","left":"a"}})", error));
+  CHECK(same_fly_bindings(read_editor_preferences(scratch.file).fly_bindings, defaults.fly_bindings));
+}

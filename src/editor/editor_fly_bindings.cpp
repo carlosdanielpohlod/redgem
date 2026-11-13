@@ -32,9 +32,8 @@ bool valid_fly_bindings(const FlyBindings& bindings) {
 }
 
 bool same_fly_bindings(const FlyBindings& first, const FlyBindings& second) {
-  return std::all_of(kFlyBindingFields.begin(), kFlyBindingFields.end(), [&](const auto& field) {
-    return first.*field.direction == second.*field.direction;
-  });
+  return std::all_of(kFlyBindingFields.begin(), kFlyBindingFields.end(),
+                     [&](const auto& field) { return first.*field.direction == second.*field.direction; });
 }
 
 void rebind_fly_key(FlyBindings& bindings, FlyDirection direction, Key key) {
@@ -45,11 +44,16 @@ void rebind_fly_key(FlyBindings& bindings, FlyDirection direction, Key key) {
 
 std::string fly_key_label(Key key) {
   switch (key) {
-    case Key::Right: return tr("editor.preferences.key_right");
-    case Key::Left: return tr("editor.preferences.key_left");
-    case Key::Down: return tr("editor.preferences.key_down");
-    case Key::Up: return tr("editor.preferences.key_up");
-    default: break;
+    case Key::Right:
+      return tr("editor.preferences.key_right");
+    case Key::Left:
+      return tr("editor.preferences.key_left");
+    case Key::Down:
+      return tr("editor.preferences.key_down");
+    case Key::Up:
+      return tr("editor.preferences.key_up");
+    default:
+      break;
   }
   auto name = key_name(key);
   if (!name.empty()) name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
