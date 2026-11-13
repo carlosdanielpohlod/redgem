@@ -136,6 +136,7 @@ class Scene {
   // Returns the ids of the copies, the copy of `source` first; none for a source that is not
   // alive. Copies are new objects: one made of an object pending destruction lives on.
   std::vector<ObjectId> clone(ObjectId source);
+  std::vector<ObjectId> instantiate_rigid(const std::vector<NodeDesc>& nodes, int mesh_offset);
   // The alive copies of an object of the loaded scene (see GameObject::copy_of).
   std::vector<ObjectId> copies_of(ObjectId original) const;
 

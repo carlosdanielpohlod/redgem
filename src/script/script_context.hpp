@@ -136,6 +136,7 @@ struct ScriptContext {
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
   std::function<ObjectId(const SpawnRequest&)> spawn;
+  std::function<ObjectId(const std::string&, const SpawnRequest&)> spawn_prefab;
   AudioSystem* audio = nullptr;
   // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;

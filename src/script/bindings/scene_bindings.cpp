@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 
+#include <exception>
 #include <optional>
 
 #include "script/bindings/binding_helpers.hpp"
@@ -90,6 +91,30 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   return object_or_nil(mrb, spawned(mrb, request));
 }
 
+ObjectId spawned_prefab(mrb_state* mrb, const std::string& file, const SpawnRequest& request) {
+  try {
+    const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+    return context(mrb).spawn_prefab(file, request);
+  } catch (const std::exception& error) {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, error.what());
+  }
+}
+
+mrb_value scene_spawn_prefab(mrb_state* mrb, mrb_value) {
+  mrb_value file, position, rotation, name, parent;
+  mrb_bool physics = true;
+  mrb_get_args(mrb, "oooboo", &file, &position, &rotation, &physics, &name, &parent);
+  if (!context(mrb).spawn_prefab) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn_prefab only works while the game runs");
+  SpawnRequest request;
+  request.world = Transform{};
+  if (!mrb_nil_p(position)) request.world->position = to_vec3(mrb, position);
+  if (!mrb_nil_p(rotation)) request.world->rotation = quat_from_euler_degrees(to_vec3(mrb, rotation));
+  request.physics = physics;
+  request.name = spawn_name(mrb, name);
+  request.parent = spawn_parent(mrb, parent);
+  return object_or_nil(mrb, spawned_prefab(mrb, to_name(mrb, file), request));
+}
+
 }  // namespace
 
 void install_scene_bindings(mrb_state* mrb) {
@@ -99,6 +124,7 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_REQ(kSpawnArguments));
+  mrb_define_module_function(mrb, scene_module, "__spawn_prefab", scene_spawn_prefab, MRB_ARGS_REQ(kSpawnArguments));
 }
 
 }  // namespace redgem

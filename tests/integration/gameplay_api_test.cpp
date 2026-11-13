@@ -8,6 +8,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "editor/document/scene_document.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -737,4 +738,39 @@ TEST_CASE("Ruby two dimensional animation graphs require a parameter pair") {
   auto engine = engine_for(scene, temp.file);
   CHECK(fails(*engine, "Animation::Graph.new(initial: :move).blend_2d(:move, parameters: :x, clips: [])"));
   CHECK(fails(*engine, "Animation::Graph.new(initial: :move).blend_2d(:move, parameters: [:x], clips: [])"));
+}
+
+TEST_CASE("Ruby spawns a rigid prefab file with its children and shares its mesh assets") {
+  const TempSave temporary;
+  const auto folder = temporary.dir / config::kPrefabsDirName;
+  std::filesystem::create_directories(folder);
+  auto prefab = SceneDocument::create_empty(folder / "crate.glb");
+  const int root = prefab.add_primitive(PrimitiveShape::Cube, "Crate", {});
+  prefab.add_primitive(PrimitiveShape::Cube, "Lid", {}, root);
+  std::string error;
+  REQUIRE_MESSAGE(prefab.save(error), error);
+
+  const auto scene = small_scene();
+  EngineOptions options;
+  options.game_dir = temporary.dir;
+  options.fixed_step = true;
+  options.scene = &scene;
+  auto started = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(started));
+  auto engine = gameplay_engine(std::move(std::get<std::unique_ptr<Engine>>(started)));
+  CHECK(ruby(*engine, "Scene.spawn_prefab('crate.glb', name: 'First', physics: false).name") == "First");
+  CHECK(ruby(*engine, "Scene.spawn_prefab('crate.glb', name: 'Second', physics: false).name") == "Second");
+  const auto& world = engine->scene();
+  const auto first = world.find("First");
+  const auto second = world.find("Second");
+  REQUIRE(first != kNoObject);
+  REQUIRE(second != kNoObject);
+  CHECK(world.at(first).mesh == world.at(second).mesh);
+  REQUIRE(world.at(first).children.size() == 1);
+  CHECK(world.at(world.at(first).children.front()).name == "Lid");
+
+  const auto count = world.alive_ids().size();
+  CHECK_FALSE(engine->scripts().eval("Scene.spawn_prefab('../crate.glb')", "test.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("Scene.spawn_prefab('missing.glb')", "test.rb").ok);
+  CHECK(world.alive_ids().size() == count);
 }
