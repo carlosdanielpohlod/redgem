@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "scene/animation/character_animation.hpp"
 #include "scene/animation/animation_graph_player.hpp"
 #include "scene/animation/animation_blend.hpp"
+#include "scene/animation/animation_event.hpp"
 #include "scene/animation/clip_clock.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -35,7 +37,8 @@ struct ClipStart {
 // Implemented in parts: animation_player.cpp (the scene's clips, by name),
 // animation_player_characters.cpp (a character's own clip), animation_player_posing.cpp (what
 // every frame does: moving the clips on and posing the objects) and animation_player_sync.cpp
-// (a character's clips as other machines see them).
+// (a character's clips as other machines see them), animation_player_events.cpp (the moments of
+// its clips scripts listen for) and animation_player_root_motion.cpp (its clips moving it).
 class AnimationPlayer {
  public:
   // Starts over with a scene's clips, which must outlive the player (or the next reset). The
@@ -79,6 +82,30 @@ class AnimationPlayer {
   bool set_parameter(const Scene& scene, ObjectId object, const std::string& name, const AnimationParameter& value);
   std::optional<std::string> graph_state(const Scene& scene, ObjectId object) const;
 
+  // --- Events and root motion of a character's own animation --------------------------------
+  // Events come from the clip a character plays (or fades to), the one with the most weight in a
+  // blend, and a clip mixed over it with at least kLayerEventWeight; never from a clip it fades
+  // from, nor from the scene's clips, nor from a graph received from another machine.
+  // Hands an event to `object` (take_events) each time the character it belongs to passes `at`
+  // (0..1) of clip `name`; kNoAnimationListener for an unknown clip.
+  std::uint32_t listen_at(const Scene& scene, ObjectId object, const std::string& name, float at);
+  // The same for the markers called `marker` that the glTF authored with any of its clips.
+  std::uint32_t listen_marker(const Scene& scene, ObjectId object, const std::string& marker);
+  void unlisten(std::uint32_t listener);
+  // What the characters went past in the advances since the last call, in order.
+  std::vector<AnimationEvent> take_events();
+  // Root motion: the horizontal motion and the turning (yaw) of each clip's root (the highest
+  // node it moves) go to the character instead (take_root_motion), the root staying at its rest
+  // place and heading. For every clip of the character, or for one clip by name (false for an
+  // unknown one).
+  void set_root_motion(const Scene& scene, ObjectId object, bool on);
+  bool root_motion(const Scene& scene, ObjectId object) const;
+  bool set_clip_root_motion(const Scene& scene, ObjectId object, const std::string& name, bool on);
+  // How far each character's root moved in the advances since the last call.
+  std::vector<RootMotion> take_root_motion();
+
+  static constexpr float kLayerEventWeight = 0.5f;
+
   // --- What other machines see (NetworkSync) ------------------------------------------------
   // What the character `object` belongs to does of its own, for the others.
   CharacterAnimation animation_of(const Scene& scene, ObjectId object) const;
@@ -94,6 +121,7 @@ class AnimationPlayer {
   struct Track {
     std::size_t clip = 0;
     ClipClock clock;
+    ClockSpan span;  // where the clock went in the last advance
   };
   // What one character does instead of following the scene: `from` on its way to `to` (either
   // one may be "the scene's clips": nullopt), `faded` of `fade` seconds into the change.
@@ -110,6 +138,47 @@ class AnimationPlayer {
   };
 
   static constexpr float kWhole = 1.0f;  // a clip laid on with all its weight
+
+  // A script waiting for a moment of a character's clips: `at` of `clip`, or every marker
+  // called `marker`.
+  struct Listener {
+    std::uint32_t id = kNoAnimationListener;
+    ObjectHandle object;
+    std::optional<std::size_t> clip;
+    float at = 0.0f;
+    std::string marker;
+  };
+  // A moment some listener waits for, in one clip.
+  struct ListenedMark {
+    const Listener* listener = nullptr;
+    float at = 0.0f;
+    std::string name;
+  };
+  struct RootMotionChoice {
+    bool every_clip = false;
+    std::set<std::size_t> clips;
+  };
+  // Where one clip a character shows went in the last advance, and with which share of its side.
+  struct ClipStep {
+    std::size_t clip = 0;
+    ClockSpan span;  // seconds
+    bool loop = true;
+    float weight = kWhole;
+  };
+  // Everything a character showed in the last advance: what it fades from and to (`blend` of the
+  // way), and what is mixed over.
+  struct CharacterSteps {
+    std::vector<ClipStep> from;
+    std::vector<ClipStep> to;
+    float blend = kWhole;
+    std::optional<ClipStep> layer;
+  };
+  // The node a clip moves highest in the scene, with its channels (null when it has none).
+  struct ClipRoot {
+    int node = kNoIndex;
+    const AnimationChannel* translation = nullptr;
+    const AnimationChannel* rotation = nullptr;
+  };
 
   std::optional<std::size_t> find(const std::string& name) const;
   float duration_of(std::size_t clip) const { return (*clips_)[clip].duration; }
@@ -153,6 +222,36 @@ class AnimationPlayer {
   bool known_graph_clip(const WeightedClipState& entry) const;
   bool known_graph_side(const std::vector<WeightedClipState>& side) const;
 
+  // Events and root motion (animation_player_events.cpp, animation_player_root_motion.cpp).
+  std::uint32_t listen(const Scene& scene, ObjectId object, Listener listener);
+  void forget_departed(const Scene& scene);
+  static bool fade_arrived(const Own& own);
+  static ClipStep step_of(const Track& track, float weight);
+  CharacterSteps steps_of(const Own& own) const;
+  static void manual_steps(const Own& own, CharacterSteps& steps);
+  void graph_steps(const AnimationGraphPlayer& graph, CharacterSteps& steps) const;
+  std::vector<ClipStep> sample_steps(const std::vector<AnimationGraphSample>& samples, ClockSpan phases) const;
+  // After a character's advance: what it went past, and where its root took it.
+  void follow_up(ObjectId character, const Own& own, Scene& scene);
+  bool followed_up(ObjectHandle character) const;
+  void queue_events(const Scene& scene, ObjectId character, const CharacterSteps& steps);
+  void queue_step_events(const std::vector<Listener>& listeners, const ClipStep& step);
+  std::vector<ListenedMark> marks_of(const std::vector<Listener>& listeners, std::size_t clip) const;
+  static void add_authored(const Listener& listener, const AnimationDesc& clip, std::vector<ListenedMark>& marks);
+  void forget_scripts();
+  void advance_characters(float dt, Scene& scene);
+  void find_roots(const Scene& scene);
+  static bool moves_root(const RootMotionChoice& choice, std::size_t clip);
+  void move_by_root(ObjectId character, const CharacterSteps& steps, Scene& scene);
+  void add_side(const RootMotionChoice& choice, const std::vector<ClipStep>& side, float weight, Scene& scene,
+                RootMotion& motion);
+  void add_step(const ClipStep& step, float weight, Scene& scene, RootMotion& motion);
+  // Keeps a root at its rest place and heading, horizontally: its motion went to the character.
+  void pin(Scene& scene, ObjectId root, const Transform& parent) const;
+  // The object a character shows the node `node` of a clip as; kNoObject when it has none.
+  static ObjectId root_object(const Scene& scene, ObjectId character, int node);
+  Transform rest_of(const Scene& scene, ObjectId object) const;
+
   // Poses everything that follows the scene's clips.
   void pose_followers(Scene& scene);
   // Lays every scene clip that is posing over the objects `options` wants.
@@ -178,7 +277,13 @@ class AnimationPlayer {
   std::map<ObjectHandle, std::uint32_t> revisions_;  // by character, from its first change on
   std::vector<Transform> rest_;                      // by object id, as the scene was loaded
   AnimationBlendLayout blend_layout_;
-  std::unordered_set<std::uint64_t> posed_;  // (object, path) pairs posed so far this frame
+  std::unordered_set<std::uint64_t> posed_;                  // (object, path) pairs posed so far this frame
+  std::vector<ClipRoot> roots_;                              // one for each of the scene's clips
+  std::map<ObjectHandle, std::vector<Listener>> listeners_;  // by character
+  std::map<ObjectHandle, RootMotionChoice> root_motion_;     // by character
+  std::vector<AnimationEvent> events_;
+  std::vector<RootMotion> motions_;
+  std::uint32_t next_listener_ = kNoAnimationListener + 1;
 };
 
 }  // namespace redgem

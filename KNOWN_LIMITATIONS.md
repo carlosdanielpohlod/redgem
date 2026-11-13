@@ -35,6 +35,17 @@ the same pull request.
 
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
+- Animation events and root motion come from a character's own clips only: the scene's clips
+  (`Animation`) fire no events and move nothing, and a graph received from another machine fires
+  no events there. In a blend only the clip with the most weight fires events; a clip a
+  character fades from is silent. At most eight laps of a clip fire per frame.
+- Authored markers are read from one string custom property of the action (`redgem_events`):
+  Blender's timeline and pose markers are not exported by its glTF exporter.
+- Root motion takes the horizontal travel and the yaw of each clip's highest moving node; its
+  vertical motion stays in the pose (a jump lifts the mesh, not the character). A clip mixed
+  over a character (`mix`) adds none, a clip that moves the character's own object has none, and
+  a character controller follows it one frame late. Rigid bodies are moved by the physics, not by
+  root motion.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -251,7 +262,7 @@ not a promise of how it will be closed.
 ### Gameplay API
 
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
-- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
+- Animation clips have no IK.
 - No navigation mesh or pathfinding.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.

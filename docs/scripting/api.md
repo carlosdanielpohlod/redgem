@@ -27,6 +27,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
 | [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
 | [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
+| [`Animation::Event`](#animationevent) | What the block of an animation event is given (animation.on). |
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
@@ -395,7 +396,7 @@ The scene's own animations (exported from Blender), by name. See [animation.md](
 
 game_object.animation (animation in a behaviour): an object's own clips. See [animation.md](animation.md).
 
-- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`: plays a clip, fading from the last one
+- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil)`: plays a clip, fading from the last one; root_motion: true lets the clip move the object
 - `mix(name, weight: 1.0, loop: true, speed: 1.0)`: plays a clip over the one playing
 - `unmix`: stops the clip mixed over
 - `pause`: pauses its clips
@@ -406,6 +407,11 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `use(graph)`: installs an Animation::Graph
 - `set(parameter, value)`: sets a parameter of the graph
 - `state`: the graph's state, or nil
+- `on(clip, at: nil, seconds: nil, &block)`: calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+- `on_marker(name, &block)`: calls the block each time a clip passes a marker of that name authored in Blender
+- `off(listener)`: stops calling a block that on or on_marker returned
+- `root_motion = on`: whether all its clips move the object by their root's horizontal motion and turning
+- `root_motion?`: whether all its clips move the object
 
 ## Animation::Graph
 
@@ -416,6 +422,15 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 - `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
 - `blend_2d(name, parameters:, clips:, loop: true, speed: 1.0)`: a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
 - `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
+
+## Animation::Event
+
+What the block of an animation event is given (animation.on). See [animation.md#events](animation.md#events).
+
+- `game_object`: the object that listened
+- `clip`: the clip's name
+- `name`: the marker's name, or nil for a moment the script named
+- `at`: where in the clip, from 0 (its start) to 1 (its end)
 
 ## Audio
 

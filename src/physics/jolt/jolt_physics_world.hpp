@@ -52,6 +52,7 @@ struct Record {
   Transform pose;
   bool has_target = false;
   Vec3 desired_move;
+  Vec3 pending_displacement;  // characters: root motion, gone through in the next step
   std::optional<float> pending_jump;
   std::set<ObjectId> overlaps;  // triggers only
 };
@@ -97,6 +98,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void set_velocity(ObjectId object, Vec3 velocity) override;
   void add_impulse(ObjectId object, Vec3 impulse) override;
   void set_character_move(ObjectId object, Vec3 horizontal_velocity) override;
+  void add_character_displacement(ObjectId object, Vec3 offset) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
