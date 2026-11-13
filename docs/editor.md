@@ -65,7 +65,7 @@ icons):
 ## Material pictures
 
 Under a material's color, metallic, roughness and emission, the Inspector lists its five texture
-slots, each with the picture it shows or *None*:
+slots, each with a thumbnail and the picture's name, or *None*:
 
 * **Color map**: the surface's colors, tinted by the material's color.
 * **Surface map**: roughness in the green channel and metalness in the blue one (glTF's
