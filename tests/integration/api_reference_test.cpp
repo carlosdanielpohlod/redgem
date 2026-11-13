@@ -48,6 +48,8 @@ constexpr const char* kInternalPrefix = "__";  // the engine's own plumbing, nev
 // tell (the others are C++'s): with fewer, the test of parameters would be checking next to nothing.
 constexpr std::size_t kLeastRubyMethods = 100;
 constexpr const char* kTestFile = "api_reference_test.rb";
+constexpr const char* kNewMethod = "new";
+constexpr const char* kInitializeMethod = "initialize";
 
 // What Ruby says of every class and module reachable from the top, nested ones included, each
 // under its path: "Class.method" for a method of its own called on it, "Class#method" for one of
@@ -230,10 +232,29 @@ void add_word_to_shape(Shape& shape, const std::string& word) {
   if (word == "block") shape.block = true;
 }
 
-// A Ruby method's proc as a value. mruby keeps it const, and mrb_obj_value takes a void*; the
-// proc is only read.
-mrb_value proc_value(const mrb_method_t& body) {
-  return mrb_obj_value(const_cast<RProc*>(MRB_METHOD_PROC(body)));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+// The proc Ruby runs for a method written in Ruby; nothing for one in C++ or one of mruby's own
+// (Class#new is a proc with no class, which Ruby cannot even ask its parameters). An alias's
+// proc leads to the method it names.
+bool is_written_in_cpp(const mrb_method_t& body) { return MRB_METHOD_UNDEF_P(body) || MRB_METHOD_CFUNC_P(body); }
+bool is_alias(const RProc* proc) { return proc != nullptr && MRB_PROC_ALIAS_P(proc); }
+bool is_ruby_proc(const RProc* proc) { return proc != nullptr && proc->c != nullptr && !MRB_PROC_CFUNC_P(proc); }
+
+const RProc* ruby_proc(const mrb_method_t& body) {
+  if (is_written_in_cpp(body)) return nullptr;
+  const RProc* proc = MRB_METHOD_PROC(body);
+  while (is_alias(proc)) proc = proc->upper;
+  return is_ruby_proc(proc) ? proc : nullptr;
+}
+
+bool is_class_new(const ApiMethod& method) { return method.on_class && method.name == kNewMethod; }
+
+// The method Ruby runs for a call: for new, the new object's initialize.
+mrb_method_t method_body(mrb_state* mrb, mrb_value found, const ApiMethod& method) {
+  const bool is_new = is_class_new(method);
+  const bool on_singleton = method.on_class && !is_new;
+  RClass* klass = mrb_class_ptr(on_singleton ? mrb_singleton_class(mrb, found) : found);
+  const char* name = is_new ? kInitializeMethod : method.name.c_str();
+  return mrb_method_search_vm(mrb, &klass, mrb_intern_cstr(mrb, name));
 }
 
 // What Ruby says of a method's parameters; nothing for one written in C++, of which it cannot tell.
@@ -241,11 +262,11 @@ std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMeth
   mrb_state* mrb = vm.state();
   const RubyResult found = vm.eval(owner.name, kTestFile);
   REQUIRE_MESSAGE(found.ok, found.error);
-  RClass* klass = mrb_class_ptr(method.on_class ? mrb_singleton_class(mrb, found.value) : found.value);
-  const mrb_method_t body = mrb_method_search_vm(mrb, &klass, mrb_intern_cstr(mrb, method.name.c_str()));
-  if (MRB_METHOD_UNDEF_P(body) || MRB_METHOD_CFUNC_P(body)) return std::nullopt;
-  const RubyResult parameters = vm.call(proc_value(body), "parameters");
-  REQUIRE_MESSAGE(parameters.ok, parameters.error);
+  const RProc* proc = ruby_proc(method_body(mrb, found.value, method));
+  if (proc == nullptr) return std::nullopt;
+  // (mrb_obj_value takes a void*; the proc is only read)
+  const RubyResult parameters = vm.call(mrb_obj_value(const_cast<RProc*>(proc)), "parameters");  // NOLINT
+  REQUIRE_MESSAGE(parameters.ok, owner.name + " " + method.name + ": " + parameters.error);
   const RubyResult words = vm.call(mrb_top_self(mrb), "__api_shape", {parameters.value});
   REQUIRE_MESSAGE(words.ok, words.error);
   Shape shape;
