@@ -13,6 +13,7 @@ namespace redgem {
 namespace {
 
 constexpr const char* kNameSeparator = ", ";
+constexpr const char* kStuck = " (could not be put back)";
 constexpr const char* kReassignedError =
     "EngineConstantError: a script cannot set the engine's constants to something else or remove them; put back: ";
 
@@ -63,14 +64,20 @@ void EngineConstants::remember(mrb_state* mrb) {
     names_.push_back(name);
     mrb_ary_push(mrb, values_, value);
   }
+  stuck_.assign(names_.size(), false);
 }
 
-std::vector<std::string> EngineConstants::restore(mrb_state* mrb) const {
+std::vector<std::string> EngineConstants::restore(mrb_state* mrb) {
   std::vector<std::string> restored;
   for (std::size_t i = 0; i < names_.size(); ++i) {
     const mrb_value kept = mrb_ary_ref(mrb, values_, static_cast<mrb_int>(i));
     if (intact(mrb, names_[i], kept)) continue;
-    if (put_back(mrb, names_[i], kept)) restored.emplace_back(mrb_sym_name(mrb, names_[i]));
+    if (put_back(mrb, names_[i], kept)) {
+      restored.emplace_back(mrb_sym_name(mrb, names_[i]));
+    } else if (!stuck_[i]) {
+      stuck_[i] = true;
+      restored.emplace_back(std::string(mrb_sym_name(mrb, names_[i])) + kStuck);
+    }
   }
   return restored;
 }

@@ -38,12 +38,14 @@ class FrameBuffer {
  private:
   // Whether the length of the next message can be read: it arrived, and what arrives is still trusted.
   bool length_arrived() const;
-  // Forgets the bytes of the messages already taken, and gives memory back once they are few.
-  void compact();
-  // Whether it holds far more memory than its bytes use (see kShrinkRatio).
-  bool oversized() const;
-  // Keeps its bytes in kRetainedFrameBytes of memory (or as many as they need).
-  void shrink();
+  // Forgets the bytes of the messages already taken, and gives memory back once they are few,
+  // before `incoming` more bytes are appended.
+  void compact(std::size_t incoming);
+  // Whether it holds far more memory than its bytes and `incoming` ones would use (see kShrinkRatio).
+  bool oversized(std::size_t incoming) const;
+  // Keeps the bytes not taken yet in kRetainedFrameBytes of memory (or as many as they and
+  // `incoming` need).
+  void shrink(std::size_t incoming);
 
   std::vector<std::uint8_t> bytes_;
   // Where the next message starts. Messages taken are skipped, not erased one by one: erasing

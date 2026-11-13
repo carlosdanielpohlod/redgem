@@ -180,7 +180,7 @@ class ScriptHost {
   void disable_failed(std::size_t index, const char* method, const std::string& error);
   // The result of running a script's code, failed if the code set the engine's constants.
   RubyResult guarded(RubyResult result);
-  // Puts back the engine's constants a method set while the frame's behaviours ran, reported.
+  // Puts back the engine's constants a method set while behaviours ran, reported as their error.
   void restore_engine_constants();
 
   ScriptContext& context_;

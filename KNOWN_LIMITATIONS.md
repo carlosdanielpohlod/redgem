@@ -360,7 +360,9 @@ not a promise of how it will be closed.
   receive buffer gives memory back after a large message, down to 64 KiB.
 - On a dedicated server, `Save.update`'s block holds its key's lock: a slow block holds up the
   other rooms' writes of that key (not of others). A block that writes a second key another room
-  is updating waits for it at most 250 ms; past that the write is not made and a warning is logged.
+  is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
+  then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
+  runs while another room clears the save writes its key back afterwards.
 - The threads of web requests are detached: one still running at exit may outlive the program's
   static objects.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near

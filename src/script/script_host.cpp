@@ -85,6 +85,7 @@ void ScriptHost::report_error(const std::string& where, const std::string& error
 }
 
 RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) {
+  restore_engine_constants();  // (what ran before is not this code's doing)
   return guarded(vm_.eval(code, file_name));
 }
 
@@ -119,6 +120,7 @@ RubyResult ScriptHost::load_source(const std::filesystem::path& path) {
     return result;
   }
   const std::string& code = *source;
+  restore_engine_constants();  // (what ran before is not this file's doing)
   const auto result = guarded(vm_.eval(code, path.u8string()));
   if (result.ok) remember_source(path, code);
   return result;

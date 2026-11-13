@@ -76,11 +76,14 @@ void ScriptHost::update_running(const char* entry, float dt, bool fixed) {
   }
 }
 
-void ScriptHost::fixed_update(float dt) { update_running("fixed_update", dt, true); }
+void ScriptHost::fixed_update(float dt) {
+  update_running("fixed_update", dt, true);
+  restore_engine_constants();
+}
 
 void ScriptHost::update(float dt) {
   update_running(kUpdateEntry, dt, false);
-  restore_engine_constants();  // (once a frame: a method that set one is caught here)
+  restore_engine_constants();  // (after each round of callbacks: a method that set one is caught here)
 }
 
 void ScriptHost::draw_loading(float unscaled_delta) {

@@ -262,7 +262,7 @@ TEST_CASE("rooms updating their own keys and a shared one at once lose no change
   CHECK(*slot->get("visits") == kRooms * kWritesPerRoom);
 }
 
-TEST_CASE("a block that writes a key another room is updating gives up after a bounded wait, never deadlocks") {
+TEST_CASE("a block that writes a key another room is updating is refused after a bounded wait, never deadlocks") {
   const TempData temp;
   auto database = opened(temp.database);
   std::atomic<bool> holding{false};
@@ -275,16 +275,17 @@ TEST_CASE("a block that writes a key another room is updating gives up after a b
     });
   });
   REQUIRE(comes_up(holding));
-  bool inner = true;
+  bool refused = false;
   const auto started = std::chrono::steady_clock::now();
   CHECK(database->update("a", [&](const std::optional<nlohmann::json>&) {
-    inner = database->set("b", kInnerValue);
+    CHECK_THROWS_AS(database->set("b", kInnerValue), redgem::SaveKeyBusy);
+    refused = true;
     return nlohmann::json(kOuterValue);
   }));
   CHECK(std::chrono::steady_clock::now() - started >= redgem::server::kNestedKeyWait);
   released = true;
   holder.join();
-  CHECK_FALSE(inner);
+  CHECK(refused);
   CHECK(*database->get("a") == kOuterValue);
   CHECK(*database->get("b") == kHolderValue);
 }
@@ -295,9 +296,6 @@ TEST_CASE("a key's lock is taken again by the thread holding it, and is gone onc
     const KeyLocks::Hold outer = locks.hold("", "coins");
     const KeyLocks::Hold again = locks.hold("", "coins");  // (an update's block saving its own key)
     const KeyLocks::Hold slot = locks.hold("arena", "coins");
-    CHECK(static_cast<bool>(outer));
-    CHECK(static_cast<bool>(again));
-    CHECK(static_cast<bool>(slot));
     CHECK(locks.size() == 2);
   }
   CHECK(locks.size() == 0);

@@ -161,7 +161,8 @@ until 1.0, a release may change what games rely on (see
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
   side by side instead of waiting for each other's blocks, and writes of the same key still wait,
   so no change is lost. A block that writes a second key another room is updating waits at most
-  250 ms, then that write is refused (logged), so two rooms can never wait for each other forever.
+  250 ms, then raises an error instead of writing, so two rooms can never wait for each other
+  forever.
 - **A connection's receive buffer gives memory back** after a large message, down to 64 KiB, once
   what it holds uses less than a quarter of it.
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a

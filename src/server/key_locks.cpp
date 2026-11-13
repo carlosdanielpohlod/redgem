@@ -1,8 +1,14 @@
 #include "server/key_locks.hpp"
 
+#include "storage/save_store.hpp"
+
 namespace redgem::server {
 
 namespace {
+
+constexpr const char* kBusyStart = "Save key '";
+constexpr const char* kBusyEnd =
+    "' is being changed by another room for too long to be written from inside a Save.update block";
 
 // How many key locks the calling thread holds, of every save.
 thread_local int keys_held = 0;
@@ -32,7 +38,7 @@ KeyLocks::Hold KeyLocks::hold(const std::string& slot, const std::string& key) {
   const Entries::iterator entry = enter({slot, key});
   if (acquired(entry->second.lock)) return Hold(this, entry);
   leave(entry);
-  return Hold();
+  throw SaveKeyBusy(kBusyStart + key + kBusyEnd);
 }
 
 std::size_t KeyLocks::size() {

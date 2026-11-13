@@ -18,8 +18,9 @@ inline constexpr std::chrono::milliseconds kNestedKeyWait{250};
 // side by side, and changes to the same key one after another. A key's lock exists while some
 // thread holds or waits for it, and is gone after. The same thread may take a key it holds again.
 // A thread holding no key waits for as long as it takes; one already holding a key waits at most
-// kNestedKeyWait for another, then is refused: a cycle of rooms waiting for each other can only
-// form among such nested waits, so it always breaks.
+// kNestedKeyWait for another, then is refused with SaveKeyBusy: a cycle of rooms waiting for each
+// other can only form among such nested waits, so it always breaks. (The wait is bounded whether or
+// not there is a cycle: a nested write of a key another room holds for longer is refused too.)
 class KeyLocks {
   using Name = std::pair<std::string, std::string>;  // the slot (empty for the save itself), the key
   struct Entry {
@@ -29,17 +30,15 @@ class KeyLocks {
   using Entries = std::map<Name, Entry>;
 
  public:
-  // A key held until it is destroyed; false when the lock was refused (a nested wait ran out).
+  // A key held until it is destroyed.
   class Hold {
    public:
-    Hold() = default;
     Hold(KeyLocks* owner, Entries::iterator entry) : owner_(owner), entry_(entry) {}
     Hold(Hold&& other) noexcept : owner_(std::exchange(other.owner_, nullptr)), entry_(other.entry_) {}
     Hold(const Hold&) = delete;
     Hold& operator=(const Hold&) = delete;
     Hold& operator=(Hold&&) = delete;
     ~Hold();
-    explicit operator bool() const { return owner_ != nullptr; }
 
    private:
     KeyLocks* owner_ = nullptr;
@@ -50,6 +49,7 @@ class KeyLocks {
   KeyLocks(const KeyLocks&) = delete;
   KeyLocks& operator=(const KeyLocks&) = delete;
 
+  // Throws SaveKeyBusy when a nested wait ran out.
   Hold hold(const std::string& slot, const std::string& key);
   // How many keys have a lock now (for the tests: none once nobody holds one).
   std::size_t size();
