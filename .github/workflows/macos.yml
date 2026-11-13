@@ -23,7 +23,7 @@ jobs:
   editor:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 150
+    timeout-minutes: ${{ matrix.job_minutes }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,9 +31,13 @@ jobs:
           - name: macOS arm64 (Apple Silicon)
             runner: macos-15
             arch: arm64
+            job_minutes: 150
+            editor_minutes: 90
           - name: macOS x86_64 (Intel)
             runner: macos-15-intel
             arch: x86_64
+            job_minutes: 180
+            editor_minutes: 120
     env:
       # The oldest macOS the programs run on (written into the app's Info.plist as well).
       MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -77,12 +81,11 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ctest --test-dir build --output-on-failure -LE system
 
-      # Software rendering varies by runner: a successful Intel run has taken 45 minutes.
+      # Intel software rendering can still be drawing test scenes after 90 minutes.
       - name: Editor system test (opens the editor window)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        # The Macs draw it without a graphics card: on the Intel one it takes nearly an hour.
-        timeout-minutes: 90
-        run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
+        timeout-minutes: ${{ matrix.editor_minutes }}
+        run: ctest --test-dir build -R '^system\.editor\.window$' --verbose
 
       - name: Open the editor on a demo and take a picture of the screen
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
