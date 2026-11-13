@@ -21,6 +21,8 @@ struct Arrival {
 
   // Whether it asks for its place back, in a room it names.
   bool resumes() const { return !resume.empty() && !room.empty(); }
+  // The token its room's game checks: none for a newcomer (a token with no room is nobody's).
+  std::string resume_token() const { return resumes() ? resume : std::string(); }
 };
 
 // How many machines from an address are in the server's rooms already.

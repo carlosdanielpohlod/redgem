@@ -4,7 +4,6 @@
 // it. The others hear it left only when that time is over.
 
 #include <algorithm>
-#include <iterator>
 
 #include "net/network_session.hpp"
 #include "net/resume_token.hpp"
@@ -18,19 +17,21 @@ void NetworkSession::allow_reconnect(float seconds) {
   reconnect_window_ = seconds > 0.0f ? std::min(seconds, kMostReconnectWindowSeconds) : 0.0f;
 }
 
-std::string NetworkSession::token_for_newcomer() const {
-  return reconnect_window_ > 0.0f ? new_resume_token() : std::string();
+void NetworkSession::issue_token(Link& link) const {
+  const bool holding = reconnect_window_ > 0.0f;
+  link.token = holding ? new_resume_token() : std::string();
+  link.window = holding ? reconnect_window_ : 0.0f;
 }
 
 void NetworkSession::hold_place(const Link& link, std::vector<NetworkEvent>& events) {
-  held_.push_back({link.peer, link.token, 0.0f});
+  held_.push_back({link.peer, link.token, 0.0f, {}, link.window});
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Reconnecting, link.peer));
 }
 
 void NetworkSession::expire_held_places(float seconds, std::vector<NetworkEvent>& events) {
   for (Held& held : held_) held.held_for += seconds;
   const auto expired = std::stable_partition(held_.begin(), held_.end(),
-                                             [this](const Held& held) { return held.held_for <= reconnect_window_; });
+                                             [](const Held& held) { return held.held_for <= held.window; });
   const std::vector<Held> gone(expired, held_.end());
   held_.erase(expired, held_.end());
   for (const Held& held : gone) farewell(held.peer, events);
@@ -40,8 +41,8 @@ void NetworkSession::resume(Link& link, const std::string& token, std::vector<Ne
   const Held claimed = claim_place(token, events);
   if (claimed.peer == 0) return refuse(link, kResumeRefused);
   link.peer = claimed.peer;
-  link.token = token_for_newcomer();  // a token gets a place back once
-  link.connection.send(welcome_back(link));
+  issue_token(link);  // a token gets a place back once
+  link.connection.send(welcome_for(link));
   tell_departures(link, claimed.departed);
   // The others start its objects over from whole poses: it missed what they sent meanwhile.
   queue_for_everyone_but(link.peer, word_about(kBack, link.peer));
@@ -59,7 +60,7 @@ void NetworkSession::tell_departures(Link& link, const std::vector<int>& departe
 }
 
 NetworkSession::Held NetworkSession::claim_place(const std::string& token, std::vector<NetworkEvent>& events) {
-  if (reconnect_window_ <= 0.0f) return {};
+  // (Only a token handed out is anyone's, held for as long as its welcome said.)
   Held held = claim_held(token);
   return held.peer != 0 ? held : claim_open(token, events);
 }
@@ -80,20 +81,13 @@ NetworkSession::Held NetworkSession::claim_open(const std::string& token, std::v
   const auto found = std::find_if(links_.begin(), links_.end(),
                                   [&token](const Link& link) { return same_resume_token(token, link.token); });
   if (found == links_.end()) return {};
-  Held claimed{found->peer, std::move(found->token)};
+  Held claimed{found->peer, std::move(found->token), 0.0f, {}, found->window};
   found->peer = 0;
   found->token.clear();
   found->connection.close();
   // (The game hears it dropped, as for a drop seen here, right before it hears it is back.)
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Reconnecting, claimed.peer));
   return claimed;
-}
-
-nlohmann::json NetworkSession::welcome_back(const Link& link) const {
-  std::vector<int> others{kHostId};
-  std::copy_if(peers_.begin(), peers_.end(), std::back_inserter(others),
-               [&link](int peer) { return peer != link.peer; });
-  return welcome_for(link, others);
 }
 
 void NetworkSession::hear_back(int peer) {

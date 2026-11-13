@@ -5,6 +5,9 @@ class NetworkReconnectTest < RedGemTest::Case
   DROPPED = 2
   WINDOW = 20.0
   TIMED_OUT = "the game could not be reached again in time".freeze
+  REMOVED_KEY = "ship#2.5".freeze
+  OTHER_KEY = "ship#2.6".freeze
+  TEMPLATE = "ship".freeze
 
   def setup
     Network.reconnect_window = 0
@@ -38,5 +41,18 @@ class NetworkReconnectTest < RedGemTest::Case
     Network.on_lost { |reason| reasons << reason }
     Network.__event(:lost, DROPPED, TIMED_OUT, nil)
     assert_equal [TIMED_OUT], reasons
+  end
+
+  def test_an_object_removed_while_away_stays_gone_and_only_that_one
+    Network.instance_variable_set(:@despawned_away, [REMOVED_KEY])
+    assert Network.__send__(:removed_away?, [REMOVED_KEY, TEMPLATE, DROPPED])
+    refute Network.__send__(:removed_away?, [OTHER_KEY, TEMPLATE, DROPPED])
+    refute Network.__send__(:removed_away?, REMOVED_KEY)
+  end
+
+  def test_what_went_while_away_is_forgotten_with_the_game
+    Network.instance_variable_set(:@despawned_away, [REMOVED_KEY])
+    Network.__event(:lost, DROPPED, TIMED_OUT, nil)
+    assert_equal [], Network.instance_variable_get(:@despawned_away)
   end
 end

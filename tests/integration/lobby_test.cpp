@@ -234,8 +234,10 @@ TEST_CASE("a machine that reconnects to a server comes out with the room it name
   CHECK(door.arrivals.front().room == kSomeRoom);
   CHECK(door.arrivals.front().resume == token);
   CHECK(door.arrivals.front().resumes());
+  CHECK(door.arrivals.front().resume_token() == token);
   // A token without a room to go back to asks for nothing in particular.
   Arrival anywhere;
   anywhere.resume = token;
   CHECK_FALSE(anywhere.resumes());
+  CHECK(anywhere.resume_token().empty());  // (its room's game checks none)
 }

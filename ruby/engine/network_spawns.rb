@@ -35,6 +35,7 @@ module Network
 
     def enter_game(_peer)
       @my_id = id
+      @despawned_away = []
       adopt_local_objects
     end
 
@@ -97,6 +98,7 @@ module Network
     # The game is gone: what this machine was moving stays, as its own; the rest leaves with the
     # others.
     def keep_only_my_objects(_peer)
+      @despawned_away = []  # (no game to tell any more)
       @spawned.to_a.each do |key, entry|
         sync = entry[:object].get_component(NetworkSync)
         next remove(key) unless mine?(entry)
@@ -109,7 +111,7 @@ module Network
     # Someone got its place back after its connection dropped. The host shows it the objects as
     # they are now; the machine that was away catches up.
     def welcome_back(peer)
-      return send_spawned_to(peer) if host?
+      return greet(peer) if host?
 
       catch_up_after_drop if peer == id
     end
@@ -123,8 +125,8 @@ module Network
     end
 
     def tell_what_changed_away
+      # (Kept until the host's list comes: an object listed there that went meanwhile stays gone.)
       __deliver(DESPAWN, @despawned_away, :all) unless @despawned_away.empty?
-      @despawned_away = []
       spawned_by(@my_id).each { |key, entry| __deliver(SPAWN, record_of(key, entry), :all) if entry[:object].alive? }
     end
 

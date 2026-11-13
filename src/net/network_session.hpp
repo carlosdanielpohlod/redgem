@@ -199,6 +199,7 @@ class NetworkSession {
     int ticket = 0;         // ... and what the decision names
     float asking_for = 0.0f;
     std::string token{};  // what gets its place back should it drop (empty: none is held for it)
+    float window = 0.0f;  // ... and for how long, as its welcome said
 
     bool let_in() const { return peer != 0; }
     bool asking() const { return asking_as != 0; }
@@ -218,6 +219,7 @@ class NetworkSession {
     std::string token{};
     float held_for = 0.0f;
     std::vector<int> departed{};  // who left meanwhile (an id may be someone else's by its return)
+    float window = 0.0f;          // how long it is held, as the machine was told
   };
 
   // How a guest calls its host again, with what, and for how long (allow_reconnect).
@@ -289,9 +291,12 @@ class NetworkSession {
   void peer_gone(int peer, std::vector<NetworkEvent>& events);
   // The ids of the others in the game and of the newcomers the game is deciding on.
   std::vector<int> ids_taken() const;
-  // What a newcomer let in through `link` is told: its id and who else is here (and, on a dedicated
-  // server, the room's code and that its host plays nobody; and the token that gets its place back).
-  nlohmann::json welcome_for(const Link& link, const std::vector<int>& already_here) const;
+  // What a machine let in (or back) through `link` is told: its id and who else is here (and, on
+  // a dedicated server, the room's code and that its host plays nobody; and the token that gets
+  // its place back).
+  nlohmann::json welcome_for(const Link& link) const;
+  // The host and everyone in the game but `peer`.
+  std::vector<int> others_than(int peer) const;
   void drop_silent_newcomers(float seconds);
   void await_connection(float seconds, std::vector<NetworkEvent>& events);
   void handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
@@ -334,14 +339,17 @@ class NetworkSession {
   // Says goodbye on the way out: to the host (so that no place is held), or to everyone (the game is over).
   void say_bye();
   // Reconnecting, on the host (network_session_held.cpp).
-  // A token for a newcomer let in, when places are held (empty otherwise).
-  std::string token_for_newcomer() const;
-  // Whether the place of a link that closed is held: places are held, it was in the game with a
-  // token, and it was lost.
-  bool place_held_for(const Link& link) const {
-    return reconnect_window_ > 0.0f && link.let_in() && !link.token.empty() && link.connection.lost();
+  // Gives a machine let in (or back) a token, when places are held (none otherwise), and the
+  // window its welcome tells it: its place is held that long, whatever the game sets later.
+  void issue_token(Link& link) const;
+  // Whether the place of a link that closed is held: it was in the game with a token, and it was
+  // lost.
+  static bool place_held_for(const Link& link) {
+    return link.let_in() && !link.token.empty() && link.connection.lost();
   }
   void hold_place(const Link& link, std::vector<NetworkEvent>& events);
+  // A machine that said goodbye.
+  void let_go(Link& link);
   // Tells the others `peer` left, and the game.
   void farewell(int peer, std::vector<NetworkEvent>& events);
   void expire_held_places(float seconds, std::vector<NetworkEvent>& events);
@@ -354,8 +362,6 @@ class NetworkSession {
   Held claim_open(const std::string& token, std::vector<NetworkEvent>& events);
   // Tells a machine back in its place who left while it was away (and who has their id now).
   void tell_departures(Link& link, const std::vector<int>& departed);
-  // What a machine that got its place back is told: who else is here now, and its next token.
-  nlohmann::json welcome_back(const Link& link) const;
   // Reconnecting, on the machine whose connection dropped (network_session_reconnect.cpp).
   // Whether the link to the host that closed can be made again: it was lost, in a game that holds places.
   bool can_reconnect() const;

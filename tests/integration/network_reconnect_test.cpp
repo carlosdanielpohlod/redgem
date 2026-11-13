@@ -32,6 +32,9 @@ constexpr int kFirstGuest = kFirstGuestId;
 constexpr int kSecondGuest = kFirstGuestId + 1;
 constexpr std::size_t kReadBytes = 64 * 1024;
 constexpr int kSettleRounds = 50;
+constexpr float kLongerWindow = kWindow * 2.0f;  // a window the host sets after a welcome
+constexpr float kShorterWindow = 1.0f;
+constexpr std::chrono::milliseconds kArrivalPause{20};  // for bytes sent to arrive, unpolled
 
 using Kind = NetworkEvent::Kind;
 using State = NetworkSession::State;
@@ -136,6 +139,12 @@ struct Stranger {
     socket = Socket::connect_to(kLocalhost, port, error);
     REQUIRE(socket.valid());
     REQUIRE(table.until([this] { return socket.connect_status() == IoStatus::Ok; }));
+  }
+
+  // Sends `message` without polling anyone (it waits, unread, for the next poll).
+  void say_unpolled(const nlohmann::json& message) {
+    std::vector<std::uint8_t> bytes = wire::packed(message);
+    while (!bytes.empty()) REQUIRE(socket.write(bytes) == IoStatus::Ok);
   }
 
   void say(const nlohmann::json& message) {
@@ -393,4 +402,38 @@ TEST_CASE("a token that comes back before the host noticed the drop takes its pl
   // The game hears it dropped and came back, as for a drop the host saw.
   CHECK(held.table.count(0, Kind::Reconnecting) == 1);
   CHECK(held.table.count(0, Kind::Reconnected) == 1);
+}
+
+TEST_CASE("a place is held for the window its welcome told, whatever the host sets later") {
+  // Longer later: the place still goes when the window told is over.
+  {
+    HeldPlace held;
+    held.host.allow_reconnect(kLongerWindow);
+    held.drop_holder();
+    held.table.poll_all(kPastWindow);
+    CHECK(held.host.peers().empty());
+    CHECK(held.table.count(0, Kind::PeerLeft) == 1);
+  }
+  // Shorter later: the place is still held past the new window.
+  {
+    HeldPlace held;
+    held.host.allow_reconnect(kShorterWindow);
+    held.drop_holder();
+    held.table.poll_all(kShorterWindow + kShorterWindow);
+    CHECK(held.host.peers() == std::vector<int>{kFirstGuest});
+    std::unique_ptr<Stranger> back;
+    CHECK(held.ask_back(held.token, back).value(wire::kKind, std::string()) == wire::kWelcome);
+  }
+}
+
+TEST_CASE("the token of a machine that said goodbye gets nothing back, even heard in the same poll") {
+  HeldPlace held;
+  Stranger asking(held.host.port(), held.table);
+  held.table.settle();
+  held.holder->say_unpolled(wire::word(wire::kBye));
+  asking.say_unpolled(wire::resume_hello(held.token));
+  std::this_thread::sleep_for(kArrivalPause);
+  CHECK(refused_for_its_token(asking.hear()));
+  CHECK(held.host.peers().empty());
+  CHECK(held.table.count(0, Kind::Reconnected) == 0);
 }

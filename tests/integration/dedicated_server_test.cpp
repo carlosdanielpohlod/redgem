@@ -582,3 +582,17 @@ TEST_CASE("a dedicated server opens a status port only when told, and only on an
   CHECK_FALSE(misplaced.start(error));
   CHECK(error.find("status port") != std::string::npos);
 }
+
+TEST_CASE("a machine coming back to its held place does not take another place in its room") {
+  constexpr const char* kRoomCode = "ROOM";
+  constexpr const char* kSomeToken = "token";
+  server::RoomSlot slot(kRoomCode);
+  net::Arrival newcomer;
+  REQUIRE(slot.hand(newcomer));
+  CHECK(slot.places_taken() == 1);
+  net::Arrival coming_back;
+  coming_back.room = kRoomCode;
+  coming_back.resume = kSomeToken;
+  REQUIRE(slot.hand(coming_back));
+  CHECK(slot.places_taken() == 1);  // (its place is counted among the players already)
+}

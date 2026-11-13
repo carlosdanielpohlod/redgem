@@ -48,7 +48,7 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
     hear_newcomer(link, message, events);
     return;
   }
-  if (message[kKind] == kBye) return link.connection.close();  // it left: no place is held for it
+  if (message[kKind] == kBye) return let_go(link);
   if (!is_game_message(message)) return;
   link.idle_for = 0.0f;
   // Who it is from is what the host knows, not what the message claims.
@@ -77,21 +77,26 @@ void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& eve
     link.connection.close();  // full
     return;
   }
-  std::vector<int> already_here{kHostId};
-  already_here.insert(already_here.end(), peers_.begin(), peers_.end());
-  link.token = token_for_newcomer();
-  link.connection.send(welcome_for(link, already_here));
+  issue_token(link);
+  link.connection.send(welcome_for(link));
   queue_for_everyone_but(link.peer, word_about(kArrived, link.peer));
   poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(link.peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, link.peer));
 }
 
-nlohmann::json NetworkSession::welcome_for(const Link& link, const std::vector<int>& already_here) const {
-  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, link.peer}, {kPeers, already_here}, {kVersion, kProtocolVersion}};
+std::vector<int> NetworkSession::others_than(int peer) const {
+  std::vector<int> others{kHostId};
+  std::copy_if(peers_.begin(), peers_.end(), std::back_inserter(others), [peer](int other) { return other != peer; });
+  return others;
+}
+
+nlohmann::json NetworkSession::welcome_for(const Link& link) const {
+  nlohmann::json welcome = {
+      {kKind, kWelcome}, {kTo, link.peer}, {kPeers, others_than(link.peer)}, {kVersion, kProtocolVersion}};
   if (!link.token.empty()) {
     welcome[kResume] = link.token;
-    welcome[kWindow] = reconnect_window_;
+    welcome[kWindow] = link.window;
   }
   if (!server_hosted_) return welcome;
   welcome[kRoom] = room_;
@@ -115,6 +120,12 @@ void NetworkSession::farewell_closed_links(std::vector<NetworkEvent>& events) {
       farewell(link.peer, events);
     }
   }
+}
+
+void NetworkSession::let_go(Link& link) {
+  // It left: no place is held for it, and its token gets nothing back any more.
+  link.token.clear();
+  link.connection.close();
 }
 
 void NetworkSession::farewell(int peer, std::vector<NetworkEvent>& events) {

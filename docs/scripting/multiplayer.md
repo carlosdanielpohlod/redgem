@@ -230,7 +230,8 @@ The machine whose connection dropped stays in the game (`Network.reconnecting?` 
 `Network.id` and `Network.peers` stay the same; nothing can be sent meanwhile) and calls the
 host again every second. Its welcome gave it a secret token, which is what gets the place back:
 a machine that does not have it is turned away, a token gets a place back once (each return
-gives a new one), and once the window is over the place is gone. The others hear the player left
+gives a new one), and once the window is over the place is gone. The window is the one the
+player's welcome told: setting another one later counts for those let in afterwards. The others hear the player left
 (`on_leave`) only when the window is over; if it gets back first they hear nothing. A player
 who leaves (`Network.leave`) says so and holds no place; a host that leaves ends the game at once
 for everyone, as before.

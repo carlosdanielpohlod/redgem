@@ -110,8 +110,9 @@ the same pull request.
   so a shorter window covers only the drops that are heard (a network that changes, a router
   that restarts). Each side counts the window from when it noticed the drop: when the host
   noticed long before the player did, the place may be gone by the time the player calls back
-  (it is turned away, and hears `on_lost`). A player who quits while reconnecting, between two
-  calls, cannot say goodbye: its place stays held until the window is over. There is no
+  (it is turned away, and hears `on_lost`). A player who quits while reconnecting cannot say
+  goodbye (between two calls nobody hears it, and a call on its way is not a goodbye): its place
+  stays held until the window is over. There is no
   transport resumption below TCP: each return is a new connection and a new TLS handshake.
 - There is no host migration: when the player hosting a game leaves or drops, the game ends for
   everyone. Hosting on a dedicated server avoids it.
@@ -397,8 +398,9 @@ not a promise of how it will be closed.
 
 ### Multiplayer
 
-- A dropped player cannot reconnect, and when the host of a hosted game leaves, the game ends for
-  everyone (dedicated servers do not have this problem).
+- A dropped player can reconnect only when the host holds places (`Network.reconnect_window`),
+  and when the host of a hosted game leaves or drops, the game ends for everyone (there is no
+  host migration; dedicated servers do not have this problem).
 - Game connections are encrypted, but who answers is checked only when the game gives its
   fingerprint (`fingerprint:`, or `"servers"` in `game.json`): without one, someone who can
   redirect the players' traffic can stand in for the host, the relay or the server. Nothing
