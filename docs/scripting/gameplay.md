@@ -386,7 +386,33 @@ bullet = Scene.spawn("Bullet", position: transform.position, rotation: transform
 bullet.add_component(Bullet, speed: 30.0)
 ```
 
-The copy comes with the template's physics and scripts.
+The copy comes with the template's physics and scripts. `name:` names it (so `Scene.find` finds
+it) and `parent:` puts it under another object, keeping the place it was given in the world:
+
+```ruby
+torch = Scene.spawn("Torch", name: "Lit Torch", parent: hand, position: hand.transform.position)
+```
+
+## Change an object's parent
+
+An object moves with its parent. `parent =` puts it under another object while the game runs,
+where it is in the world, and `nil` takes it off; `set_parent` with `keep_world: false` keeps
+where it is relative to its parent instead, so the new parent places it:
+
+```ruby
+crate.parent = truck                              # stays put, then rides along
+crate.parent = nil                                # dropped where it is
+sword.set_parent(hand, keep_world: false)         # its pose in the old parent, now in the hand
+```
+
+`parent` reads it back. An object never goes under itself or anything it carries (an
+`ArgumentError`), nor under a template, and a vehicle's wheel stays on it. A kinematic body or a
+trigger under a parent goes where the parent takes it. A dynamic body, a character and a vehicle
+are simulated in the world: the parent does not carry them, and under it they keep their own
+motion (make a body kinematic, with `rigidbody.kinematic = true`, to carry it). A static collider
+stays where it was made. When `keep_world: false` moves a body, it is taken to its new place and
+stops, as when a script sets its position. A part taken out of a spawned copy is no longer posed
+by that copy's animation.
 
 ## Look ahead with a ray
 
@@ -465,6 +491,33 @@ end
 ```
 
 A camera with a parent (on a vehicle, a dolly) works too: the helpers place it in the world.
+
+## Switch cameras
+
+A scene may hold many cameras: the game is seen through its first one until a script picks
+another. `Camera.main = camera` switches at once; `Camera.cut_to` can fade through black:
+
+```ruby
+class SecurityDesk < Behaviour
+  def update(_dt)
+    Camera.cut_to(find!("LobbyCam"), fade: 0.6) if Input.pressed?(:f1)
+    Camera.main = find!("Player Camera") if Input.pressed?(:escape)   # back at once
+  end
+end
+```
+
+The picture darkens over the first half of the fade, the cut happens on the darkest frame, and it
+comes back over the second half; it plays on while the game is paused, and `Camera.cutting?` says
+whether it still is. The black covers the world, never the UI. A newer cut darkens on from where
+the last one had the picture; `Camera.main =` stops a cut. `Camera.main = nil` goes back to the
+scene's first camera, and so does the game when the chosen camera is destroyed.
+
+`Camera.main` and everything above act on the camera switched to: `follow`, `orbit` and `shake`
+move it. The camera left behind stays where it was, and takes up its follow or orbit again when
+the game is seen through it once more (during a fade, that is from its darkest frame on). The
+choice is the scene's: a scene loaded anew starts at its own first camera. The engine never moves
+the sound listener; move `Audio.listener` with `Camera.main` when the ears should follow the
+picture.
 
 ## Mark things on the screen
 

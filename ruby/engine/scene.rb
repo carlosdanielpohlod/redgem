@@ -8,9 +8,12 @@ module Scene
   end
 
   # Copies an object (usually a `prefab = true` template) into the running game, with its physics
-  # and scripts. position: Vector3, rotation: Euler degrees (Vector3); both default to the template's.
-  # physics: false leaves the copy without bodies: something to look at that nothing bumps into.
-  def self.spawn(template, position: nil, rotation: nil, physics: true)
-    __spawn(template, position, rotation, physics)
+  # and scripts. position: Vector3, rotation: Euler degrees (Vector3); both are in the world and
+  # default to the template's. physics: false leaves the copy without bodies: something to look at
+  # that nothing bumps into. name: what the copy is called (Scene.find finds it by it); the
+  # template's name by default. parent: an object the copy goes under, keeping its place in the
+  # world (it then moves with it).
+  def self.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)
+    __spawn(template, position, rotation, physics, name, parent)
   end
 end
