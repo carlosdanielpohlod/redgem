@@ -10,9 +10,9 @@ namespace redgem {
 struct FlyInput {
   float look_x = 0.0f;  // mouse delta in pixels while looking (right mouse button held)
   float look_y = 0.0f;
-  float forward = 0.0f;  // -1..1 (W/S)
-  float right = 0.0f;    // -1..1 (D/A)
-  float up = 0.0f;       // -1..1 (E/Q)
+  float forward = 0.0f;  // -1..1
+  float right = 0.0f;    // -1..1
+  float up = 0.0f;       // -1..1
   float zoom = 0.0f;     // mouse wheel notches
   bool fast = false;     // shift held
   float dt = 0.0f;
@@ -32,7 +32,7 @@ struct FlyKeys {
 // What the keys ask of the camera: where to fly, and fast with either Shift.
 void steer(FlyInput& input, const FlyKeys& keys);
 
-// Fly-through scene camera: hold right mouse to look around and fly with WASD/QE, wheel to dolly.
+// Fly-through scene camera: hold right mouse to look and fly, or use the wheel to dolly.
 class EditorCamera {
  public:
   EditorCamera();
