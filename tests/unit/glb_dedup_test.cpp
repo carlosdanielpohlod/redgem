@@ -253,7 +253,7 @@ TEST_CASE("importing the same model twice adds its data to the saved scene once"
   }
   CHECK(entries(twice, "meshes") > entries(once, "meshes"));  // each object keeps a mesh to edit
   CHECK(doc.last_save().left_out_bytes > 0);
-  CHECK(doc.last_save().written_bytes == twice.bin.size());
+  CHECK(glb_padded_size(doc.last_save().written_bytes) == twice.bin.size());  // (the chunk is padded on disk)
   const SceneDesc saved = load(file);
   const SceneDesc original = load(model);
   check_like_model(saved, kModelChild, original);
