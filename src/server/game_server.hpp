@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "app/engine.hpp"
+#include "core/clock.hpp"
 #include "net/rooms/lobby.hpp"
 #include "net/wire.hpp"
 #include "scene/scene_desc.hpp"
@@ -68,6 +69,9 @@ struct ServerSettings {
   std::filesystem::path data_dir;   // where Save is kept; empty: nothing is written (kept in memory for this run)
   int threads = processor_count();  // the threads the rooms run on, at most
   StatusSettings status;
+  // What the server's turns and its rooms keep to (a test's own clock in tests); it outlives the
+  // server.
+  Clock* clock = &steady_clock();
 };
 
 // A game played on a server with nobody at it (redgem-server): everyone joins, nobody hosts. One
@@ -97,8 +101,10 @@ class GameServer {
   // empty before start.
   std::string fingerprint() const;
   // The lobby's turn: newcomers are heard and handed to their rooms, and the rooms whose match
-  // ended are let go. (The rooms play on their own threads meanwhile, on the real clock.)
+  // ended are let go. (The rooms play on their own threads meanwhile, on the server's clock.)
   void tick(float seconds);
+  // The clock the server keeps to (see ServerSettings::clock).
+  Clock& clock() const { return *settings_.clock; }
   // Ends every match (their players are told the game is gone), waits for the rooms' threads to
   // end, and closes the port.
   void stop();
@@ -157,7 +163,7 @@ class GameServer {
   net::Lobby lobby_;
   std::vector<Room> rooms_;  // in the order they opened
   std::vector<std::unique_ptr<RoomThread>> threads_;
-  double started_at_ = 0.0;  // steady_seconds when it started
+  double started_at_ = 0.0;  // on the server's clock, when it started
   StatusPort status_port_;
   TrafficRate traffic_;
   float since_status_logged_ = 0.0f;

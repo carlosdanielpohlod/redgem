@@ -13,6 +13,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "fake_clock.hpp"
 #include "integration/swordsman.hpp"
 #include "net/socket/socket.hpp"
 #include "net/traffic.hpp"
@@ -61,9 +62,14 @@ class MainScene < SceneScript
 end
 )";
 constexpr int kServedTurns = 30;
-constexpr double kLateness = 0.9;  // a turn may come a little early on a busy clock, never much
-// (A visit waits for the room's next turn, which on a busy machine comes late.)
-constexpr float kRealTimeTolerance = 0.25f;
+constexpr int kOneThread = 1;
+// A room's sleeps on the fake clock wake this late: its turns cover more than a tick each.
+constexpr double kOversleep = config::kFixedDeltaSeconds;
+// Game time comes in whole fixed steps: it trails the clock by less than one, give or take what
+// adding up its steps in floats rounds off.
+constexpr double kFloatRounding = 1e-3;
+constexpr double kStepTolerance = config::kFixedDeltaSeconds + kFloatRounding;
+constexpr double kClockTolerance = 1e-9;
 constexpr std::chrono::milliseconds kHalfASecond{500};
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
@@ -106,6 +112,12 @@ struct SlowGame {
   ~SlowGame() { std::filesystem::remove_all(root); }
 };
 
+// The game time of a room and its clock's reading, both read at the same turn of the room's.
+struct GameAndClock {
+  double game = 0.0;
+  double clock = 0.0;
+};
+
 bool online(Engine& engine) { return engine.network().state() == net::NetworkSession::State::Online; }
 bool offline(Engine& engine) { return engine.network().state() == net::NetworkSession::State::Offline; }
 
@@ -118,8 +130,8 @@ struct Online {
   std::filesystem::path game;
 
   explicit Online(server::RoomLimits limits, std::filesystem::path played = fixture("games/sandbox"),
-                  int threads = server::processor_count())
-      : server(settings(limits, played, threads)), game(std::move(played)) {
+                  int threads = server::processor_count(), Clock* clock = &steady_clock())
+      : server(settings(limits, played, threads, clock)), game(std::move(played)) {
     std::filesystem::remove_all(dir);
     std::string error;
     REQUIRE_MESSAGE(server.start(error), error);
@@ -129,8 +141,10 @@ struct Online {
     std::filesystem::remove_all(dir);
   }
 
-  static server::ServerSettings settings(server::RoomLimits limits, const std::filesystem::path& played, int threads) {
+  static server::ServerSettings settings(server::RoomLimits limits, const std::filesystem::path& played, int threads,
+                                         Clock* clock) {
     server::ServerSettings settings;
+    settings.clock = clock;
     settings.threads = threads;
     settings.game_dir = played;
     settings.port = 0;
@@ -224,6 +238,22 @@ nlohmann::json body_of(const std::string& answer) {
   const std::size_t head_end = answer.find(kHeadEnd);
   REQUIRE(head_end != std::string::npos);
   return nlohmann::json::parse(answer.substr(head_end + std::string(kHeadEnd).size()));
+}
+
+// What `player`'s room says Time.elapsed is, and what `clock` reads, at one of the room's turns.
+GameAndClock game_and_clock(Online& online_game, Engine& player, const Clock& clock) {
+  GameAndClock read;
+  RubyResult result;
+  std::string elapsed;
+  const bool visited = online_game.server.visit(player.network().room(), [&](Engine& game) {
+    result = game.scripts().eval("Time.elapsed", "test.rb");
+    if (result.ok) elapsed = RSTRING_PTR(mrb_obj_as_string(game.scripts().vm().state(), result.value));
+    read.clock = clock.now();
+  });
+  REQUIRE(visited);
+  REQUIRE_MESSAGE(result.ok, result.error);
+  read.game = std::stod(elapsed);
+  return read;
 }
 
 }  // namespace
@@ -345,28 +375,34 @@ TEST_CASE("on a dedicated server the menu never opens, the game never freezes, a
   CHECK(online_game.served(player, "Save[:best] = 3; Save[:best] == 3") == "true");
 }
 
-TEST_CASE("a dedicated server's room plays the time that really passed, on its own thread") {
-  Online online_game(kRoomy);
+TEST_CASE("a dedicated server's room plays the time its clock says passed, on its own thread") {
+  test::FakeClock clock(kOversleep);  // (only the room's thread sleeps on it)
+  Online online_game(kRoomy, fixture("games/sandbox"), kOneThread, &clock);
   Engine& player = online_game.join();
-  const float before = std::stof(online_game.served(player, "Time.elapsed"));
-  const auto started = std::chrono::steady_clock::now();
-  std::this_thread::sleep_for(kHalfASecond);  // nobody ticks the server meanwhile
-  const float after = std::stof(online_game.served(player, "Time.elapsed"));
-  const double real = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-  CHECK(std::abs(after - before - static_cast<float>(real)) <= kRealTimeTolerance);
+  const GameAndClock first = game_and_clock(online_game, player, clock);
+  // Each visit comes at a later turn of the room's, each turn of which covered more than a tick.
+  for (int turn = 0; turn < kServedTurns; ++turn) game_and_clock(online_game, player, clock);
+  const GameAndClock last = game_and_clock(online_game, player, clock);
+  const double clock_passed = last.clock - first.clock;
+  CHECK(clock_passed > kServedTurns * config::kFixedDeltaSeconds);
+  CHECK(std::abs(last.game - first.game - clock_passed) <= kStepTolerance);
 }
 
-TEST_CASE("the server's turns keep to the real clock until it is asked to stop") {
-  Online online_game(kRoomy);
-  Engine& player = online_game.join();
-  const float game_before = std::stof(online_game.served(player, "Time.elapsed"));
+TEST_CASE("the server's turns keep to its clock until it is asked to stop") {
+  test::FakeClock clock;
+  Online online_game(kRoomy, fixture("games/sandbox"), kOneThread, &clock);  // (no room: nothing else sleeps on it)
+  const double started = clock.now();
   int turns = 0;
-  const auto started = std::chrono::steady_clock::now();
-  server::serve_until(online_game.server, [&turns] { return turns++ == kServedTurns; });
-  const double real = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-  CHECK(real >= kServedTurns * config::kFixedDeltaSeconds * kLateness);
-  const float game = std::stof(online_game.served(player, "Time.elapsed")) - game_before;
-  CHECK(std::abs(game - static_cast<float>(real)) <= kRealTimeTolerance);
+  bool on_time = true;
+  server::serve_until(online_game.server, [&] {
+    // Asked between turns: each came a tick after the one before, as the clock tells it.
+    const double due = started + turns * config::kFixedDeltaSeconds;
+    on_time = on_time && std::abs(clock.now() - due) <= kClockTolerance;
+    return turns++ == kServedTurns;
+  });
+  CHECK(on_time);
+  CHECK(clock.sleeps() == kServedTurns);
+  CHECK(clock.slept() == doctest::Approx(kServedTurns * config::kFixedDeltaSeconds));
 }
 
 TEST_CASE("a player who floods a dedicated server's room is let go") {

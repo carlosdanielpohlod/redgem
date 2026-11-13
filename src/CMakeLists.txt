@@ -185,7 +185,8 @@ redgem_add_library(redgem_core
   core/math.cpp
   core/fixed_clock.cpp
   core/frame_profiler.cpp
-  core/stopwatch.cpp)
+  core/stopwatch.cpp
+  core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
 # (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)

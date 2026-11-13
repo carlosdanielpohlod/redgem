@@ -3,11 +3,8 @@
 // Keeps a server's turns on the real clock: one every tick, each advancing the game by the real
 // time since the turn before. A late turn is not made up for with a burst of quick ones: the next
 // simply covers more time (and the engine steps its physics in fixed steps however long that is).
-// Times are seconds on a clock that only goes forward.
+// Times are seconds on a clock that only goes forward (see core/clock.hpp).
 namespace redgem::server {
-
-// Seconds on a clock that only goes forward.
-double steady_seconds();
 
 class TickPacer {
  public:

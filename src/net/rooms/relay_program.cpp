@@ -1,9 +1,9 @@
 #include "net/rooms/relay_program.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <iostream>
 
+#include "core/clock.hpp"
 #include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
@@ -84,12 +84,12 @@ void report_rooms(const RelayServer& relay, std::size_t& rooms) {
   log::info(std::to_string(rooms) + " room(s) open, " + std::to_string(relay.connection_count()) + " machine(s)");
 }
 
-[[noreturn]] void serve_until_stopped(RelayServer& relay) {
+[[noreturn]] void serve_until_stopped(RelayServer& relay, const Clock& clock) {
   std::size_t rooms = 0;
-  auto before = std::chrono::steady_clock::now();
+  double before = clock.now();
   for (;;) {
-    const auto now = std::chrono::steady_clock::now();
-    serve_relay_once(relay, std::chrono::duration<float>(now - before).count());
+    const double now = clock.now();
+    serve_relay_once(relay, static_cast<float>(now - before));
     before = now;
     report_rooms(relay, rooms);
   }
@@ -116,7 +116,7 @@ bool start_relay(RelayServer& relay, const RelayCommand& command) {
 int run_relay(const RelayCommand& command) {
   RelayServer relay(command.limits);
   if (!start_relay(relay, command)) return kExitFailure;
-  serve_until_stopped(relay);
+  serve_until_stopped(relay, steady_clock());
 }
 
 int show_fingerprint(const RelayCommand& command) {
@@ -135,9 +135,9 @@ RelayCommand parse_relay_command(const std::vector<std::string>& args) {
   return command;
 }
 
-void serve_relay_once(RelayServer& relay, float seconds) {
+bool serve_relay_once(RelayServer& relay, float seconds) {
   relay.poll(seconds);
-  relay.wait(kRelayWakeSeconds);
+  return relay.wait(kRelayWakeSeconds);
 }
 
 int run_relay_program(const std::vector<std::string>& args) {

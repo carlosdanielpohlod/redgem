@@ -47,7 +47,8 @@ void GameServer::run(Room& room) {
 RoomThread& GameServer::thread_for_new_room() {
   RoomThread* least_busy = least_busy_thread();
   if (!needs_new_thread(least_busy)) return *least_busy;
-  threads_.push_back(std::make_unique<RoomThread>(RoomStart{settings_.game_dir, &scene_, saves_.get()}));
+  threads_.push_back(
+      std::make_unique<RoomThread>(RoomStart{settings_.game_dir, &scene_, saves_.get(), settings_.clock}));
   return *threads_.back();
 }
 

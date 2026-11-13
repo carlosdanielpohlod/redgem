@@ -197,6 +197,10 @@ until 1.0, a release may change what games rely on (see
 - **`Audio.music` with a missing file** leaves the track playing as it was, instead of stopping it.
 - **`Audio.stop_sources`** stops every sound with an id, flat ones included. A game's sounds stop
   when it ends (the editor's Stop included), and so do its player's group volumes.
+- **The network tests no longer time the real clock**: the relay, a dedicated server's turns and
+  rooms, and HTTP timeouts read time from a small `Clock` (`core/clock.hpp`, the steady clock by
+  default), which tests replace with a fake one they move by hand. A server room thread now stops
+  within one turn's wait instead of at once.
 
 ### Fixed
 
