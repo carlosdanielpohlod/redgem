@@ -136,7 +136,7 @@ struct Bounds {
 struct MeshDesc {
   std::string name;
   std::vector<PrimitiveDesc> primitives;
-  Bounds bounds;  // in the mesh's local space (with every shape key applied whole too)
+  Bounds bounds;  // in the mesh's local space, as modeled (render_math::drawn_bounds adds the shape keys)
   // Its shape keys (every primitive has them all, in this order): their names ("Key 3" for one
   // the file does not name) and how much of each an object of the mesh starts with.
   std::vector<std::string> target_names;
