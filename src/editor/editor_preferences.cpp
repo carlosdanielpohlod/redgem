@@ -6,7 +6,7 @@
 
 #include "app/json_file.hpp"
 #include "core/platform.hpp"
-#include "editor/recovery_lease.hpp"
+#include "core/recovery_lease.hpp"
 
 namespace redgem {
 namespace {
