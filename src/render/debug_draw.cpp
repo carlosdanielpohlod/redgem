@@ -28,7 +28,13 @@ bool valid(const DebugDrawItem& item) {
   }
   return false;
 }
+bool valid_label_size(int size) { return size >= kMinDebugLabelSize && size <= kMaxDebugLabelSize; }
+bool valid_label_text(const std::string& text) { return text.size() <= kMaxDebugLabelBytes; }
 }  // namespace
+bool valid_debug_label(const DebugLabel& label) {
+  const bool shape = valid_label_text(label.text) && valid_label_size(label.size);
+  return shape && finite_vector(label.at) && valid_color(label.color);
+}
 bool valid_debug_draw(const DebugDrawItem& item) { return valid(item); }
 bool DebugDrawBuffer::append(const DebugDrawItem& item) {
   if (!valid(item)) return false;
@@ -39,8 +45,18 @@ bool DebugDrawBuffer::append(const DebugDrawItem& item) {
   items_.push_back(item);
   return true;
 }
+bool DebugDrawBuffer::append(const DebugLabel& label) {
+  if (!valid_debug_label(label)) return false;
+  if (labels_.size() == kMaxDebugLabels) {
+    ++dropped_;
+    return false;
+  }
+  labels_.push_back(label);
+  return true;
+}
 void DebugDrawBuffer::clear() {
   items_.clear();
+  labels_.clear();
   dropped_ = 0;
 }
 }  // namespace redgem

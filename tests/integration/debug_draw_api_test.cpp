@@ -98,3 +98,19 @@ TEST_CASE("debug command capacity is bounded through Ruby and is renewed every f
   CHECK(game.engine->script_context().debug_draw->dropped() == 0);
   CHECK(game.ruby("Debug.line(Vector3.zero, Vector3.up)") == "true");
 }
+TEST_CASE("Debug.label keeps its text, point, color and size for the frame, and rejects bad ones") {
+  DrawGame game;
+  CHECK(game.ruby("Debug.label('door', at: Vector3.new(1, 2, 3), color: :red, size: 24)") == "true");
+  CHECK(game.ruby("Debug.label(42, at: Vector3.zero)") == "true");
+  const auto& labels = game.engine->script_context().debug_draw->labels();
+  REQUIRE(labels.size() == 2);
+  CHECK(labels[0].text == "door");
+  CHECK(labels[0].at.z == 3);
+  CHECK(labels[0].color.r == 1);
+  CHECK(labels[0].size == 24);
+  CHECK(labels[1].text == "42");
+  CHECK(labels[1].size == 16);
+  CHECK_FALSE(game.engine->scripts().eval("Debug.label('x', at: Vector3.zero, size: 0)", "invalid_label.rb").ok);
+  game.frame();
+  CHECK(game.engine->script_context().debug_draw->labels().empty());
+}

@@ -5,6 +5,10 @@ add_executable(redgem_tests
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
+  unit/script_profile_test.cpp
+  unit/profile_overlay_test.cpp
+  unit/gpu_timers_test.cpp
+  unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/log_test.cpp
@@ -188,6 +192,7 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
+  integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp

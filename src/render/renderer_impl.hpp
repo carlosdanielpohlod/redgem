@@ -40,6 +40,7 @@
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
 #include "render/gl_extras.hpp"
+#include "render/gpu_timers.hpp"
 #include "render/instance_batches.hpp"
 #include "render/water_ripple_packet.hpp"
 #include "render/instance_records.hpp"
@@ -269,6 +270,8 @@ struct Renderer::Impl {
   Material sky_material{};
   Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
   render_detail::SkyTextures sky;
+  // How long the card takes over each pass, while the statistics overlay shows it.
+  GpuTimers gpu_timers;
   // Texts and pictures.
   GameFonts ui_fonts;
   std::filesystem::path images_dir;
@@ -409,6 +412,9 @@ struct Renderer::Impl {
   // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
                      const ParticleSystem* particles);
+  // The frame's passes, each timed by gpu_timers: prepare_frame, draw_lit_scene, post_process.
+  void draw_timed_passes(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
+                         const ParticleSystem* particles, const RenderTexture2D* output);
   // The scene as the camera sees it, into the HDR target.
   void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
   // What the environment asks of the frame's shaders: the sky picture, the lit shader's features,

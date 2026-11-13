@@ -10,6 +10,15 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
+  overlay also shows how long the graphics card spent on the frame's prepare, scene and post
+  passes (timer queries read back a frame late, so the game never waits for the card; hidden
+  where the card cannot time, such as OpenGL ES), and the five script methods a sampling profiler
+  caught most often. The profiler reads the Ruby call stack about every millisecond while
+  profiling is on; `Debug.script_profile` returns its methods and `Debug.export_script_profile`
+  writes the whole profile to `script_profile.tsv` in the game's data folder.
+- **`Debug.label(text, at:)`**: text pinned to a world position for one frame, centered where the
+  main camera shows it, with `color:`, `alpha:` and `size:` like `UI.text`.
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
