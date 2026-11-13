@@ -29,6 +29,11 @@ bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pa
          render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 
+// Whether a view draws an object (see `seen`) and its winding is the one asked for.
+bool seen_wound(const ObjectSight& sight, const render_math::View& view, bool depth_pass, bool mirrored) {
+  return sight.mirrored == mirrored && seen(sight, view, depth_pass);
+}
+
 // Whether the picture's samples smooth a material's cut-out edges (alpha to coverage): one cut out
 // by a cutoff, not a dithered one or one mixed with what is behind it.
 bool smooths_edges(const render_math::AlphaTest& test) {
@@ -154,11 +159,18 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
 
 void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {
   batches.start();
+  // The unmirrored objects first, then the mirrored ones (each in the order they come): copies of
+  // a mesh mirrored every other one still make two batches, and the winding turns once a pass.
+  gather_wound(view, depth_pass, false);
+  gather_wound(view, depth_pass, true);
+  gather_scattered(view, depth_pass);
+}
+
+void Renderer::Impl::gather_wound(const render_math::View& view, bool depth_pass, bool mirrored) {
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
     const ObjectSight& sight = sights[slot];
-    if (seen(sight, view, depth_pass)) batches.add(sight.mesh, scattered_records + slot, sight.mirrored);
+    if (seen_wound(sight, view, depth_pass, mirrored)) batches.add(sight.mesh, scattered_records + slot, mirrored);
   }
-  gather_scattered(view, depth_pass);
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {

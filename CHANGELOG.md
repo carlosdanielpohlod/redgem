@@ -18,8 +18,8 @@ until 1.0, a release may change what games rely on (see
 
 - **Duplicated characters animate**: duplicating an object in the editor copies the channels of
   every clip that moves it onto the copy, so a duplicated character plays the original's clips
-  (Wave, Walk...) instead of standing in the pose it was copied in. Undoing the duplicate drops
-  them again.
+  (Wave, Walk...) instead of standing in the pose it was copied in; the copy itself stays where
+  it is put. Undoing the duplicate drops them again.
 
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and

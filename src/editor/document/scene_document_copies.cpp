@@ -49,6 +49,13 @@ bool all_copied(const std::vector<int>& joints, const std::vector<int>& copy_of)
   return std::all_of(joints.begin(), joints.end(), [&copy_of](int joint) { return copied(joint, copy_of); });
 }
 
+// `copy_of` without the copied roots: a copy is put where it is wanted, and the keys of its
+// original's root would pull it back onto the original (as Scene.spawn leaves a copy's root).
+std::vector<int> animated_copies(const std::vector<int>& roots, std::vector<int> copy_of) {
+  for (const int root : roots) copy_of[root] = kNoIndex;
+  return copy_of;
+}
+
 // Whether a node and its copy both have a node of the file behind them.
 bool both_in_file(int source_node, int copy_source_node) {
   return source_node != kNoIndex && copy_source_node != kNoIndex;
@@ -59,6 +66,7 @@ std::map<int, int> copied_sources(const std::vector<NodeDesc>& nodes, const std:
                                   const std::vector<int>& copy_of) {
   std::map<int, int> sources;
   for (const int original : source) {
+    if (!copied(original, copy_of)) continue;
     const int from = nodes[original].source_node;
     const int to = nodes[copy_of[original]].source_node;
     if (both_in_file(from, to)) sources[from] = to;
@@ -82,7 +90,7 @@ std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
   // own skeleton, and the clips that move the originals move the copies.
   give_copies_own_source_nodes(first_copy, source.size());
   give_copies_own_skins(first_copy, source.size(), copy_of);
-  give_copies_own_channels(source, copy_of);
+  give_copies_own_channels(source, animated_copies(roots, copy_of));
   touch();
   return copies_of(roots, copy_of);
 }

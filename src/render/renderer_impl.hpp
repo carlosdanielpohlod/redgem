@@ -486,6 +486,8 @@ struct Renderer::Impl {
   std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
   // Gathers into `batches` what the view sees (in the shadow map's pass, what casts a shadow).
   void gather_copies(const render_math::View& view, bool depth_pass);
+  // The objects of one winding (mirrored or not) the view sees, into `batches`.
+  void gather_wound(const render_math::View& view, bool depth_pass, bool mirrored);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   // Turns the pass's winding for mirrored copies (or back), only when it changes.

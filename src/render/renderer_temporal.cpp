@@ -128,6 +128,7 @@ void Renderer::Impl::mark_see_through_cover(Vec3 viewer) {
   rlDisableDepthMask();
   send_motion_frame(viewer);
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
+  unwind(pass);
   end_mesh_pass();
   rlEnableDepthMask();
   rlColorMask(true, true, true, true);

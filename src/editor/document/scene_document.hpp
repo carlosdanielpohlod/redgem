@@ -318,7 +318,8 @@ class SceneDocument {
   std::vector<int> point_at_copies(SkinDesc& skin, nlohmann::json& json, const std::vector<int>& copy_of) const;
   // Every clip that moves a copied node moves its copy the same way (a channel of its own per
   // copied channel), so a duplicated character plays the clips of the original instead of
-  // standing in the pose it was copied in. `source`: the copied nodes, `copy_of` as above.
+  // standing in the pose it was copied in. `source`: the copied nodes, `copy_of` as above but
+  // without the copied roots (a copy's root stays where it is put).
   void give_copies_own_channels(const std::vector<int>& source, const std::vector<int>& copy_of);
   // The described channels of clip `animation` copied onto the copied nodes.
   void copy_described_channels(std::size_t animation, const std::vector<int>& copy_of);

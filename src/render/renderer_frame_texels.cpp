@@ -62,9 +62,11 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                  : render_math::sight_of(bounds, worlds[slot]);
   seen.sphere.radius += mesh_wave_height(object.mesh) + water_ripple_bound(water_ripples, scene.handle(object.id));
-  sights[slot] = ObjectSight{
-      write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to, object.cast_shadow,
-      mirrors(worlds[slot])};
+  // A skinned mesh is placed by its bones alone (glTF ignores its node's placement): it is never
+  // taken as mirrored (see KNOWN_LIMITATIONS).
+  const bool mirrored = !pose && mirrors(worlds[slot]);
+  sights[slot] = ObjectSight{write_record(slot, look), seen,    object.mesh, object.visible_from, object.visible_to,
+                             object.cast_shadow,       mirrored};
   return pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone;
 }
 

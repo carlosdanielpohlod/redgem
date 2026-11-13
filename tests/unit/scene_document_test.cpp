@@ -776,19 +776,25 @@ TEST_CASE("a duplicated character has its own skeleton, also after the original 
   std::filesystem::remove(out);
 }
 
+namespace {
+
+// The names of the nodes the fixture's Wave clip moves.
+std::set<std::string> moved_by_wave(const SceneDesc& scene) {
+  const auto wave = std::find_if(scene.animations.begin(), scene.animations.end(),
+                                 [](const AnimationDesc& clip) { return clip.name == "Wave"; });
+  REQUIRE(wave != scene.animations.end());
+  std::set<std::string> names;
+  for (const AnimationChannel& channel : wave->channels) {
+    if (channel.node != kNoIndex) names.insert(scene.nodes[channel.node].name);
+  }
+  return names;
+}
+
+}  // namespace
+
 TEST_CASE("a duplicated character plays the clips of the original instead of keeping its pose") {
   auto opened = SceneDocument::open(fixture("skinned.glb"));
   SceneDocument doc = std::move(std::get<SceneDocument>(opened));
-  const auto moved_by_wave = [](const SceneDesc& scene) {
-    const auto wave = std::find_if(scene.animations.begin(), scene.animations.end(),
-                                   [](const AnimationDesc& clip) { return clip.name == "Wave"; });
-    REQUIRE(wave != scene.animations.end());
-    std::set<std::string> names;
-    for (const AnimationChannel& channel : wave->channels) {
-      if (channel.node != kNoIndex) names.insert(scene.nodes[channel.node].name);
-    }
-    return names;
-  };
   const std::set<std::string> originals{"Lower", "Upper"};
   const std::set<std::string> with_copies{"Lower", "Lower.001", "Upper", "Upper.001"};
   REQUIRE(moved_by_wave(doc.desc()) == originals);
@@ -811,6 +817,14 @@ TEST_CASE("a duplicated character plays the clips of the original instead of kee
   REQUIRE_MESSAGE(loaded.ok, loaded.error);
   CHECK(moved_by_wave(loaded.scene) == originals);
   std::filesystem::remove(out);
+}
+
+TEST_CASE("a duplicated animated root stays where it was put while what is under it plays the clip") {
+  auto opened = SceneDocument::open(fixture("skinned.glb"));
+  SceneDocument doc = std::move(std::get<SceneDocument>(opened));
+  // Lower is a bone the clip moves, with Upper under it.
+  doc.duplicate(doc.desc().find_node("Lower"));
+  CHECK(moved_by_wave(doc.desc()) == std::set<std::string>{"Lower", "Upper", "Upper.001"});
 }
 
 TEST_CASE("a brush stroke on a saved document stays undoable and unsaved once released") {
