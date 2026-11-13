@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "render/instance_records.hpp"
+#include "scene/transform.hpp"
 
 namespace redgem {
 namespace {
@@ -61,8 +62,9 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                  : render_math::sight_of(bounds, worlds[slot]);
   seen.sphere.radius += mesh_wave_height(object.mesh) + water_ripple_bound(water_ripples, scene.handle(object.id));
-  sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to,
-                             object.cast_shadow};
+  sights[slot] = ObjectSight{
+      write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to, object.cast_shadow,
+      mirrors(worlds[slot])};
   return pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone;
 }
 

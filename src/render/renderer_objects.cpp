@@ -146,6 +146,7 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
       depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
       depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
+  unwind(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
@@ -154,15 +155,23 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
 void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {
   batches.start();
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
-    if (seen(sights[slot], view, depth_pass)) batches.add(sights[slot].mesh, scattered_records + slot);
+    const ObjectSight& sight = sights[slot];
+    if (seen(sight, view, depth_pass)) batches.add(sight.mesh, scattered_records + slot, sight.mirrored);
   }
   gather_scattered(view, depth_pass);
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {
   const InstanceRun run{slots.id, first + batch.first, batch.count};
+  wind(batch.mirrored, pass);
   for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(batch.mesh)])
     draw_primitive(primitive, run, pass);
+}
+
+void Renderer::Impl::wind(bool mirrored, ObjectPass& pass) {
+  if (pass.mirrored == mirrored) return;
+  set_clockwise_front_faces(mirrored);
+  pass.mirrored = mirrored;
 }
 
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {

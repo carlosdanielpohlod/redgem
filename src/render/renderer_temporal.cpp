@@ -91,6 +91,7 @@ void Renderer::Impl::draw_motion(std::size_t first, Vec3 viewer) {
                      render_math::AlphaPass::Motion, render_math::View{}};
   send_motion_frame(viewer);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
+  unwind(objects);
   end_mesh_pass();
   rlEnableColorBlend();
   rlEnableFramebuffer(drawing_framebuffer());
