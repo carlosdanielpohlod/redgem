@@ -1,7 +1,5 @@
 #include "project/search_command.hpp"
 
-#include <cmath>
-#include <limits>
 #include <optional>
 #include <utility>
 
@@ -34,18 +32,9 @@ ToolResult usage_failure(const std::string& problem, const std::string& usage) {
   return failed(problem + "\n\n" + usage, kExitUsage);
 }
 
-bool is_count(double number) {
-  const double end = std::ldexp(1.0, std::numeric_limits<std::size_t>::digits);
-  return number >= 0 && number < end && std::floor(number) == number;
-}
-
 // --limit's count, the default without it; nothing when it is no count.
 std::optional<std::size_t> limit_of(const ToolLine& line) {
-  const auto value = line.value(kLimitOption);
-  if (!value) return kDefaultSearchLimit;
-  const auto number = number_from(*value);
-  if (!number || !is_count(*number)) return std::nullopt;
-  return static_cast<std::size_t>(*number);
+  return count_option(line, kLimitOption, kDefaultSearchLimit);
 }
 
 std::string words_from(const ToolLine& line, std::size_t first) {

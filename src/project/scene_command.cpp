@@ -1,7 +1,6 @@
 #include "project/scene_command.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -30,9 +29,10 @@ constexpr const char* kParentOption = "--parent";
 constexpr const char* kDepthOption = "--depth";
 constexpr const char* kLimitOption = "--limit";
 constexpr const char* kAgainstOption = "--against";
+constexpr const char* kRevisionOption = "--revision";
 // What the command takes after its name.
 ToolGrammar grammar() {
-  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption},
+  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption, kRevisionOption},
           {command_line::kHelpOption}};
 }
 // A list stops after this many lines unless --limit says otherwise (0: never).
@@ -82,21 +82,6 @@ std::variant<int, ToolResult> named_object(const OpenScene& scene) {
   const FoundObject found = find_object(scene.document.desc(), object_word(scene));
   if (found.index == kNoIndex) return failed(found.error);
   return found.index;
-}
-
-// What a count must be: a whole number, not below zero.
-bool is_count(double number) {
-  const double end = std::ldexp(1.0, std::numeric_limits<std::size_t>::digits);
-  return number >= 0 && number < end && std::floor(number) == number;
-}
-
-// The count an option is given: `otherwise` without the option, nothing when it is no count.
-std::optional<std::size_t> count_option(const ToolLine& line, const char* option, std::size_t otherwise) {
-  const auto value = line.value(option);
-  if (!value) return otherwise;
-  const auto number = number_from(*value);
-  if (!number || !is_count(*number)) return std::nullopt;
-  return static_cast<std::size_t>(*number);
 }
 
 ToolResult list(OpenScene& scene) {
@@ -184,13 +169,32 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+// Whether a diff compares with an earlier save: --against names one (no --revision does).
+bool compares_with_file(const ToolLine& line) {
+  const auto against = line.value(kAgainstOption);
+  return against && names_earlier_save(*against);
+}
+
+// Whether the line names what scene diff compares with: --against or --revision.
+bool names_baseline(const ToolLine& line) {
+  return line.value(kAgainstOption).has_value() || line.value(kRevisionOption).has_value();
+}
+
+ToolResult diff_with(OpenScene& scene, std::size_t limit) {
+  const SceneDesc& desc = scene.document.desc();
+  const ToolLine& line = scene.line;
+  if (compares_with_file(line)) return compare_scene_file(desc, scene.name, *line.value(kAgainstOption), limit);
+  const std::string revision = line.value(kRevisionOption).value_or(line.value(kAgainstOption).value_or(""));
+  return compare_scene_revision(desc, scene.name, scene.document.path(), revision, limit);
+}
+
 ToolResult diff(OpenScene& scene) {
-  const auto baseline = scene.line.value(kAgainstOption);
-  if (!baseline) return failed(tr("project.scene.diff_needs_against"), kExitUsage);
+  const bool against = scene.line.value(kAgainstOption).has_value();
+  if (against == scene.line.value(kRevisionOption).has_value())
+    return failed(tr("project.scene.diff_needs_against"), kExitUsage);
   const auto limit = count_option(scene.line, kLimitOption, kDefaultDiffLines);
   if (!limit) return failed(tr("project.scene.needs_count"), kExitUsage);
-  if (names_scene_file(*baseline)) return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
-  return compare_scene_revision(scene.document.desc(), scene.name, scene.document.path(), *baseline, *limit);
+  return diff_with(scene, *limit);
 }
 
 // A line that takes as many words as it wants after those it needs (what to set).
@@ -210,7 +214,7 @@ constexpr Known kSubcommands[] = {
 
 std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
   const bool diff_command = std::string(subcommand.word) == "diff";
-  if (!diff_command && line.value(kAgainstOption)) return tr("project.scene.diff_against_only");
+  if (!diff_command && names_baseline(line)) return tr("project.scene.diff_against_only");
   if (!diff_command) return {};
   for (const char* option : {kFromOption, kParentOption, kDepthOption}) {
     if (line.value(option)) return tr("project.scene.diff_bad_option", {{"option", option}});

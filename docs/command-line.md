@@ -88,16 +88,17 @@ renames and reparenting. New objects get hexadecimal identities: take them from 
 | `redgem scene add <game> <name> [--from <object>] [--parent <object>] [key=value...]` | adds an empty object, or a copy of another (with its children), and saves |
 | `redgem scene remove <game> <object>` | removes the object and its children, and saves |
 | `redgem scene diff <game> --against <before.glb>` | compares the current scene with an earlier save, without changing either file |
-| `redgem scene diff <game> --against <revision>` | compares the current scene with the scene a Git revision saved (`HEAD`, `HEAD~1`, `main`, a commit hash) |
+| `redgem scene diff <game> --revision <revision>` | compares the current scene with the scene a Git revision saved (`HEAD`, `HEAD~1`, `main`, a commit hash); `--against <revision>` does the same |
 
 Every command takes `--scene <name>` for another scene than `scene.glb`: `--scene level2` is
 `scenes/level2.glb`.
 
 For `diff`, save a copy of the scene before editing, then pass that file to `--against`; in a
 game kept in Git, pass a revision instead (`--against HEAD` shows what changed since the last
-commit). A value ending in `.glb` is a file, anything else a revision, read with `git show`
-(so `git` must be on the `PATH`). A revision that is not there, or a game in no repository, ends
-with an error that says so. Objects
+commit). `--against` takes a file that is there, or a name ending in `.glb`, for an earlier save,
+and anything else for a revision; `--revision` takes a revision only. A revision is read with
+`git rev-parse` and `git show` (so `git` must be on the `PATH`). A revision that is not there, or
+a game in no repository, ends with an error that says so. Objects
 are matched by their persistent identities: a rename or a reordered node array does not create
 a new object. The summary counts added, removed and changed objects; details show the fields
 that changed, including placement, hierarchy, properties, materials, image bytes, geometry,

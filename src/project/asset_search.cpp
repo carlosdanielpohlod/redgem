@@ -23,8 +23,8 @@ constexpr int kTextHoldsWord = 10;
 constexpr int kNoMatch = 0;
 // The score of everything when no word is asked for: all match, none better.
 constexpr int kEveryMatch = 1;
-// A folder bigger than this is not read further: a search answers, it does not walk a disk.
-constexpr std::size_t kMostAssets = 10000;
+// A kind's folder is read no further than this many files: a search answers, it does not walk a disk.
+constexpr std::size_t kMostAssetsOfAKind = 10000;
 constexpr char kHiddenMark = '.';
 
 struct KindFolder {
@@ -92,9 +92,8 @@ AssetEntry entry_of(const KindFolder& kind, const fs::path& folder, const fs::pa
 }
 
 // Whether a walk of a folder goes on: it did not fail, has files left, and found few enough.
-bool keeps_reading(const fs::recursive_directory_iterator& files, const std::error_code& error,
-                   const std::vector<AssetEntry>& assets) {
-  return !error && files != fs::recursive_directory_iterator() && assets.size() < kMostAssets;
+bool keeps_reading(const fs::recursive_directory_iterator& files, const std::error_code& error, std::size_t found) {
+  return !error && files != fs::recursive_directory_iterator() && found < kMostAssetsOfAKind;
 }
 
 // Takes the file a walk is at as an asset; a hidden one is left out, and so is what a hidden folder holds.
@@ -112,7 +111,9 @@ void add_kind(const fs::path& game_dir, const KindFolder& kind, std::vector<Asse
   std::error_code error;
   if (fs::is_symlink(folder, error)) return;
   fs::recursive_directory_iterator files(folder, fs::directory_options::skip_permission_denied, error);
-  for (; keeps_reading(files, error, assets); files.increment(error)) visit(files, kind, folder, assets);
+  const std::size_t before = assets.size();
+  for (; keeps_reading(files, error, assets.size() - before); files.increment(error))
+    visit(files, kind, folder, assets);
 }
 
 SearchFields asset_fields(const AssetEntry& asset) {
@@ -123,12 +124,38 @@ bool of_asked_kind(const AssetEntry& asset, const AssetQuery& query) {
   return !query.kind || asset.kind == *query.kind;
 }
 
-bool has_asked_tag(const AssetEntry& asset, const AssetQuery& query) {
-  return !query.tag || has_tag(lowered_all(asset.tags), lowered(*query.tag));
+// A query's words and tag in small letters, the words apart: made once for a whole search.
+struct PreparedQuery {
+  std::vector<std::string> words;
+  std::optional<std::string> tag;
+};
+
+PreparedQuery prepared(const AssetQuery& query) {
+  PreparedQuery ready{split_words(query.words), std::nullopt};
+  if (query.tag) ready.tag = lowered(*query.tag);
+  return ready;
 }
 
-bool wanted(const AssetEntry& asset, const AssetQuery& query) {
-  return of_asked_kind(asset, query) && has_asked_tag(asset, query);
+bool has_asked_tag(const SearchFields& low, const PreparedQuery& query) {
+  return !query.tag || has_tag(low.tags, *query.tag);
+}
+
+// How well every (lowercase) word matches lowercase fields: 0 when one of them matches nothing.
+int words_score(const SearchFields& low, const std::vector<std::string>& words) {
+  if (words.empty()) return kEveryMatch;
+  int score = 0;
+  for (const std::string& word : words) {
+    const int added = word_score(low, word);
+    if (added == kNoMatch) return kNoMatch;
+    score += added;
+  }
+  return score;
+}
+
+int asset_score(const AssetEntry& asset, const AssetQuery& query, const PreparedQuery& ready) {
+  if (!of_asked_kind(asset, query)) return kNoMatch;
+  const SearchFields low = lowered_fields(asset_fields(asset));
+  return has_asked_tag(low, ready) ? words_score(low, ready.words) : kNoMatch;
 }
 
 template <typename Found>
@@ -184,22 +211,14 @@ std::vector<AssetEntry> game_assets(const fs::path& game_dir) {
 }
 
 int match_score(const SearchFields& fields, const std::string& words) {
-  const std::vector<std::string> wanted_words = split_words(words);
-  if (wanted_words.empty()) return kEveryMatch;
-  const SearchFields low = lowered_fields(fields);
-  int score = 0;
-  for (const std::string& word : wanted_words) {
-    const int added = word_score(low, word);
-    if (added == kNoMatch) return kNoMatch;
-    score += added;
-  }
-  return score;
+  return words_score(lowered_fields(fields), split_words(words));
 }
 
 SearchResult<AssetEntry> search_assets(const std::vector<AssetEntry>& assets, const AssetQuery& query) {
+  const PreparedQuery ready = prepared(query);
   std::vector<Scored<AssetEntry>> scored;
   for (const AssetEntry& asset : assets) {
-    const int score = wanted(asset, query) ? match_score(asset_fields(asset), query.words) : kNoMatch;
+    const int score = asset_score(asset, query, ready);
     if (score != kNoMatch) scored.push_back({score, asset.path, &asset});
   }
   return ranked(std::move(scored), query.limit);
@@ -207,9 +226,10 @@ SearchResult<AssetEntry> search_assets(const std::vector<AssetEntry>& assets, co
 
 SearchResult<GameTemplate> search_templates(const std::vector<GameTemplate>& templates, const std::string& words,
                                             std::size_t limit) {
+  const std::vector<std::string> wanted = split_words(words);
   std::vector<Scored<GameTemplate>> scored;
   for (const GameTemplate& made : templates) {
-    const int score = match_score({made.name, {}, made.description}, words);
+    const int score = words_score(lowered_fields({made.name, {}, made.description}), wanted);
     if (score != kNoMatch) scored.push_back({score, made.name, &made});
   }
   return ranked(std::move(scored), limit);

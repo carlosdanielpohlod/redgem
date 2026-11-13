@@ -1,8 +1,10 @@
 #include "project/scene_revision.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <cctype>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #include "app/encoder_process.hpp"
@@ -23,6 +25,11 @@ constexpr const char* kFolderFlag = "-C";  // git runs as if started in that fol
 constexpr const char* kRevParse = "rev-parse";
 constexpr const char* kInsideWorkTree = "--is-inside-work-tree";
 constexpr const char* kShow = "show";
+constexpr const char* kVerify = "--verify";
+// The shortest object name Git gives in full (SHA-1's; SHA-256's are longer), and its letters.
+constexpr std::size_t kShortestObjectName = 40;
+constexpr std::string_view kObjectNameLetters = "0123456789abcdef";
+constexpr char kLineEnd = '\n';
 // "<revision>:./scene.glb": the file of that revision, by its path from the folder git runs in.
 constexpr const char* kRevisionFileSeparator = ":";
 constexpr const char* kFromHere = "./";
@@ -31,8 +38,9 @@ constexpr const char* kFromHere = "./";
 constexpr std::string_view kRevisionPunctuation = "._/~^@{}-";
 constexpr char kOptionMark = '-';
 constexpr std::string_view kRange = "..";
-// What a run of git says, and the scene a revision holds, in the scratch folder.
+// What a run of git says, the blob it names, and the scene a revision holds, in the scratch folder.
 constexpr const char* kAnswerFile = "git.txt";
+constexpr const char* kBlobFile = "blob.txt";
 constexpr const char* kSceneAtRevision = "revision.glb";
 constexpr const char* kTrailingSpace = " \t\r\n";
 constexpr const char* kCurrentFolder = ".";
@@ -86,10 +94,31 @@ std::string revision_file(const std::string& revision, const fs::path& scene_fil
   return revision + kRevisionFileSeparator + kFromHere + scene_file.filename().generic_string();
 }
 
+// The last line of what git said: after any warning, the object name it was asked for.
+std::string last_line(const std::string& said) { return said.substr(said.find_last_of(kLineEnd) + 1); }
+
+bool object_name(const std::string& name) {
+  const bool sized = name.size() >= kShortestObjectName;
+  return sized && name.find_first_not_of(kObjectNameLetters) == std::string::npos;
+}
+
+// The blob of `scene_file` at `revision`; nothing, with what git said in `said`, when there is none.
+std::optional<std::string> blob_at(const fs::path& folder, const std::string& revision, const fs::path& scene_file,
+                                   const fs::path& said) {
+  if (!ended_well(git(folder, {kRevParse, kVerify, revision_file(revision, scene_file)}, said))) return std::nullopt;
+  const std::string blob = last_line(git_said(said));
+  return object_name(blob) ? std::optional<std::string>(blob) : std::nullopt;
+}
+
 }  // namespace
 
 bool names_scene_file(const std::string& against) {
   return lowered(fs::path(against).extension().string()) == config::kSceneExtension;
+}
+
+bool names_earlier_save(const std::string& against) {
+  std::error_code error;
+  return names_scene_file(against) || fs::is_regular_file(fs::path(against), error);
 }
 
 bool valid_revision(const std::string& revision) {
@@ -106,9 +135,10 @@ ToolResult compare_scene_revision(const SceneDesc& current, const std::string& n
   const ScratchFolder scratch;  // (gone, with what git wrote in it, when this ends)
   const fs::path folder = folder_of(scene_file);
   if (!inside_repository(folder, scratch)) return failed(tr("project.scene.not_in_git", {{"folder", folder.string()}}));
+  const auto blob = blob_at(folder, revision, scene_file, scratch.path() / kBlobFile);
+  if (!blob) return no_revision(revision, scene_file, scratch.path() / kBlobFile);
   const fs::path before = scratch.path() / kSceneAtRevision;
-  if (!ended_well(git(folder, {kShow, revision_file(revision, scene_file)}, before)))
-    return no_revision(revision, scene_file, before);
+  if (!ended_well(git(folder, {kShow, *blob}, before))) return no_revision(revision, scene_file, before);
   return compare_scene_file(current, name, before, limit);
 }
 

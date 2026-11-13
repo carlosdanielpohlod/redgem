@@ -421,11 +421,13 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   a Git revision saved (`--against HEAD~1`), but does not compare unused assets or unsupported
   glTF data. A revision is read with `git show`, so it needs `git` on the `PATH`; a scene kept in
   Git LFS reads as its pointer file there, not as a scene. A revision is a branch, tag or commit
-  with `~N`, `^N` or `@{N}`; ranges and `rev:path` forms are refused.
+  with `~N`, `^N` or `@{N}`; ranges and `rev:path` forms are refused. A connected editor runs
+  `git` while it answers MCP's `scene_diff` with a `revision`, so a slow repository holds its
+  frame for that long.
 - The asset search (`redgem assets`, MCP `asset_search`) knows an asset's kind by its folder and
   its tags by the subfolders it sits in: a game has no tag files or other metadata, so nothing
   inside a file (a model's mesh names, a script's classes) is searched. It reads at most 10,000
-  files. `api` covers the engine's classes only, not the game's own behaviours: read the game's
+  files of each kind, and says nothing when a folder had more. `api` covers the engine's classes only, not the game's own behaviours: read the game's
   scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded

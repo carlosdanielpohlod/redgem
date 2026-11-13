@@ -26,7 +26,7 @@ namespace {
 const fs::path kPlatformer = REDGEM_PLATFORMER_DIR;
 // Git does not look for a repository above the folders this names (the test's temp folder).
 constexpr const char* kGitCeiling = "GIT_CEILING_DIRECTORIES";
-constexpr const char* kGitOutput = "redgem_scene_revision_git.txt";
+constexpr const char* kGitOutputSuffix = "_git.txt";
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
 
@@ -34,9 +34,26 @@ bool has(const std::string& text, const std::string& part) { return text.find(pa
 bool git(const fs::path& folder, std::vector<std::string> words) {
   words.insert(words.begin(), {"git", "-C", folder.string(), "-c", "user.name=RedGemTests", "-c",
                                "user.email=tests@example.invalid", "-c", "commit.gpgsign=false"});
-  const ProcessEnd end = run_to_end(words, fs::temp_directory_path() / kGitOutput);
+  const fs::path output = folder.parent_path() / (folder.filename().string() + kGitOutputSuffix);
+  const ProcessEnd end = run_to_end(words, output);
+  fs::remove(output);
   return end.started && end.exited && end.code == kExitSuccess;
 }
+
+// Git looks for no repository above the temp folder while this lasts (one there must not be
+// taken for a game's).
+class CeilingAtTemp {
+ public:
+  CeilingAtTemp() : before_(platform::environment(kGitCeiling)) {
+    platform::set_environment(kGitCeiling, fs::temp_directory_path().string(), true);
+  }
+  ~CeilingAtTemp() { platform::set_environment(kGitCeiling, before_, true); }
+  CeilingAtTemp(const CeilingAtTemp&) = delete;
+  CeilingAtTemp& operator=(const CeilingAtTemp&) = delete;
+
+ private:
+  std::string before_;
+};
 
 // A copy of the platformer of the test's own, in a repository of its own when asked, with its
 // scene committed; gone with the test.
@@ -45,8 +62,6 @@ class GameCopy {
   GameCopy(const std::string& name, bool in_git) : dir_(fs::temp_directory_path() / ("redgem_scene_revision_" + name)) {
     fs::remove_all(dir_);
     fs::copy(kPlatformer, dir_, fs::copy_options::recursive);
-    // (A repository above the temp folder must not be taken for the game's.)
-    platform::set_environment(kGitCeiling, fs::temp_directory_path().string(), true);
     if (in_git) commit_scene();
   }
   ~GameCopy() {
@@ -66,6 +81,7 @@ class GameCopy {
     REQUIRE(git(dir_, {"commit", "-q", "-m", "first"}));
   }
 
+  CeilingAtTemp ceiling_;
   fs::path dir_;
 };
 
@@ -105,6 +121,19 @@ TEST_CASE("scene diff against a Git revision compares with the scene that commit
   REQUIRE(git(game.dir(), {"commit", "-q", "-a", "-m", "second"}));
   CHECK(has(scene_tool({"diff", game.dir(), "--against", "HEAD"}).out, "no object changes"));
   CHECK(has(scene_tool({"diff", game.dir(), "--against", "HEAD~1"}).out, "~ #7 Coin1"));
+  CHECK(has(scene_tool({"diff", game.dir(), "--revision", "HEAD~1"}).out, "~ #7 Coin1"));
+}
+
+TEST_CASE("scene diff --against takes a file that is there for an earlier save, whatever its name") {
+  const GameCopy game("backup", true);
+  const fs::path backup = fs::path(game.dir()) / "scene_backup";
+  fs::copy_file(game.scene(), backup);
+  REQUIRE(scene_tool({"set", game.dir(), "Coin1", "position=1,2,3"}).exit_code == kExitSuccess);
+  const ToolResult diff = scene_tool({"diff", game.dir(), "--against", backup.string()});
+  CHECK_MESSAGE(diff.exit_code == kExitSuccess, diff.err);
+  CHECK(has(diff.out, "~ #7 Coin1"));
+  CHECK(scene_tool({"diff", game.dir(), "--against", backup.string(), "--revision", "HEAD"}).exit_code == kExitUsage);
+  CHECK(scene_tool({"list", game.dir(), "--revision", "HEAD"}).exit_code == kExitUsage);
 }
 
 TEST_CASE("scene diff says when the revision or the repository is not there") {
@@ -134,4 +163,5 @@ TEST_CASE("MCP scene_diff takes a revision or an earlier save, one of them") {
   CHECK_THROWS_AS(mcp::invoke(options, "scene_diff", {{"revision", "--output=x"}}), std::invalid_argument);
   CHECK_THROWS_AS(mcp::invoke(options, "scene_diff", {{"against", "scripts/coin.rb"}}), std::invalid_argument);
   CHECK(mcp::invoke(options, "scene_diff", {{"revision", "no-such-branch"}})["isError"] == true);
+  CHECK_THROWS_AS(mcp::invoke(options, "asset_search", {{"query", "--help"}}), std::invalid_argument);
 }

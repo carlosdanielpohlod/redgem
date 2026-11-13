@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "core/command_line.hpp"
 #include "core/event_journal.hpp"
 #include "core/message_lines.hpp"
 #include "core/safe_path.hpp"
@@ -75,18 +76,18 @@ Words api_words(const Json& args) {
   return words;
 }
 
-// A .glb file inside the game, as `against` names it.
-std::string earlier_save(const Options& options, const Json& args) {
-  if (!names_scene_file(args["against"].get<std::string>()))
-    throw std::invalid_argument("against must name a .glb file");
-  return inside(options, args, "against");
+// What scene diff compares with: an earlier save inside the game, or the scene at a Git revision.
+Words baseline_words(const Options& options, const Json& args) {
+  check_diff_baseline(args);
+  if (args.contains("against")) return {"--against", inside(options, args, "against")};
+  return {"--revision", args["revision"].get<std::string>()};
 }
 
-// What scene diff compares with: an earlier save, or the scene at a Git revision.
-std::string baseline(const Options& options, const Json& args) {
-  check_diff_baseline(args);
-  if (args.contains("against")) return earlier_save(options, args);
-  return args["revision"].get<std::string>();
+// The words of a search, as one word of a command line: never one it would read as an option.
+std::string query_word(const Json& args) {
+  const std::string query = args["query"];
+  if (command_line::is_option(query)) throw std::invalid_argument("query cannot start with -");
+  return query;
 }
 
 const char* scene_action(const std::string& name) {
@@ -100,23 +101,22 @@ Words scene_command(const Options& options, const std::string& name, const Json&
   if (name == "scene_list" && !asked.contains("limit")) asked["limit"] = kDefaultListLimit;
   Words words = scene_words(options, asked, scene_action(name));
   for (const char* key : {"depth", "limit"}) option(words, asked, key);
-  if (name == "scene_diff") {
-    words.push_back("--against");
-    words.push_back(baseline(options, args));
-  }
+  if (name != "scene_diff") return words;
+  const Words baseline = baseline_words(options, args);
+  words.insert(words.end(), baseline.begin(), baseline.end());
   return words;
 }
 
 Words assets_words(const Options& options, const Json& args) {
   Words words{kAssetsCommand, options.game.string()};
-  if (args.contains("query")) words.push_back(args["query"]);
+  if (args.contains("query")) words.push_back(query_word(args));
   for (const char* key : {"kind", "tag", "limit"}) option(words, args, key);
   return words;
 }
 
 Words templates_words(const Json& args) {
   Words words{kTemplatesCommand};
-  if (args.contains("query")) words.push_back(args["query"]);
+  if (args.contains("query")) words.push_back(query_word(args));
   option(words, args, "limit");
   return words;
 }
@@ -257,6 +257,11 @@ namespace {
 bool names_bad_revision(const Json& args) {
   return args.contains("revision") && !valid_revision(args["revision"].get<std::string>());
 }
+
+// Whether scene_diff's arguments name an earlier save that is no scene file (.glb).
+bool names_bad_save(const Json& args) {
+  return args.contains("against") && !names_scene_file(args["against"].get<std::string>());
+}
 }  // namespace
 
 void check_diff_baseline(const Json& args) {
@@ -264,6 +269,7 @@ void check_diff_baseline(const Json& args) {
     throw std::invalid_argument("give one of against (an earlier .glb) or revision (a Git revision)");
   if (names_bad_revision(args))
     throw std::invalid_argument("revision is not a Git revision: " + args["revision"].get<std::string>());
+  if (names_bad_save(args)) throw std::invalid_argument("against must name a .glb file");
 }
 
 Json invoke(const Options& options, const std::string& name, const Json& args) {
