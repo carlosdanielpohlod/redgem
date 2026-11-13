@@ -8,11 +8,14 @@
 
 #include <mruby.h>
 #include <mruby/class.h>
+#include <mruby/irep.h>
+#include <mruby/opcode.h>
 #include <mruby/proc.h>
 #include <mruby/string.h>
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -54,8 +57,7 @@ constexpr const char* kInitializeMethod = "initialize";
 // What Ruby says of every class and module reachable from the top, nested ones included, each
 // under its path: "Class.method" for a method of its own called on it, "Class#method" for one of
 // its own called on its instances. And whether one of them has a method of its own or of a class
-// it comes from (Object and what is above it aside: those are Ruby's), what it is, and how a
-// method takes its arguments.
+// it comes from (Object and what is above it aside: those are Ruby's), and what it is.
 constexpr const char* kReflection = R"ruby(
   def __api_walk(space, name, seen, out)
     return if seen[space.object_id]
@@ -93,10 +95,6 @@ constexpr const char* kReflection = R"ruby(
 
     owner.superclass == Object ? "class" : "class < #{owner.superclass}"
   end
-
-  # A method's parameters as Proc#parameters says them, a word each: "req opt key key block". (The
-  # kinds only: mruby counts each kind exactly, and finds their names elsewhere.)
-  def __api_shape(parameters) = parameters.map { |kind, _name| kind.to_s }.join(" ")
 )ruby";
 
 std::string ruby_text(RubyVm& vm, const std::string& code) {
@@ -222,28 +220,40 @@ Shape documented_shape(const ApiMethod& method) {
   return shape;
 }
 
-// One of the words __api_shape says.
-void add_word_to_shape(Shape& shape, const std::string& word) {
-  if (word == "req") ++shape.required;
-  if (word == "opt") ++shape.optional;
-  if (word == "rest") shape.rest = true;
-  if (word == "key") ++shape.keywords;
-  if (word == "keyrest") shape.keyword_rest = true;
-  if (word == "block") shape.block = true;
-}
+// Why methods were left out of the comparison, and how many (said when too few are compared).
+std::map<std::string, std::size_t> left_out;
 
-// The proc Ruby runs for a method written in Ruby; nothing for one in C++ or one of mruby's own
-// (Class#new is a proc with no class, which Ruby cannot even ask its parameters). An alias's
-// proc leads to the method it names.
+// The proc Ruby runs for a method written in Ruby; nothing for one in C++. An alias's proc leads
+// to the method it names.
 bool is_written_in_cpp(const mrb_method_t& body) { return MRB_METHOD_UNDEF_P(body) || MRB_METHOD_CFUNC_P(body); }
 bool is_alias(const RProc* proc) { return proc != nullptr && MRB_PROC_ALIAS_P(proc); }
-bool is_ruby_proc(const RProc* proc) { return proc != nullptr && proc->c != nullptr && !MRB_PROC_CFUNC_P(proc); }
+bool is_ruby_proc(const RProc* proc) {
+  return proc != nullptr && !MRB_PROC_CFUNC_P(proc) && proc->body.irep != nullptr;
+}
 
 const RProc* ruby_proc(const mrb_method_t& body) {
   if (is_written_in_cpp(body)) return nullptr;
   const RProc* proc = MRB_METHOD_PROC(body);
   while (is_alias(proc)) proc = proc->upper;
+  if (!is_ruby_proc(proc)) ++left_out["not a Ruby proc"];
   return is_ruby_proc(proc) ? proc : nullptr;
+}
+
+// What a Ruby method's parameters are, from the instruction it starts with (as Proc#parameters
+// reads them; a method with none has no such instruction). A block's (not strict) are all optional.
+Shape proc_shape(const RProc* proc) {
+  Shape shape;
+  const mrb_irep* irep = proc->body.irep;
+  if (irep->ilen == 0 || irep->iseq[0] != OP_ENTER) return shape;
+  const mrb_aspec aspec = PEEK_W(irep->iseq + 1);
+  const std::size_t needed = MRB_ASPEC_REQ(aspec) + MRB_ASPEC_POST(aspec);
+  (MRB_PROC_STRICT_P(proc) ? shape.required : shape.optional) += needed;
+  shape.optional += MRB_ASPEC_OPT(aspec);
+  shape.rest = MRB_ASPEC_REST(aspec) != 0;
+  shape.keywords = MRB_ASPEC_KEY(aspec);
+  shape.keyword_rest = MRB_ASPEC_KDICT(aspec) != 0;
+  shape.block = MRB_ASPEC_BLOCK(aspec) != 0;
+  return shape;
 }
 
 bool is_class_new(const ApiMethod& method) { return method.on_class && method.name == kNewMethod; }
@@ -258,26 +268,20 @@ mrb_method_t method_body(mrb_state* mrb, mrb_value found, const ApiMethod& metho
 }
 
 // What Ruby says of a method's parameters; nothing for one written in C++, of which it cannot tell.
-// The kinds of a proc's parameters, as words: "req opt key block".
-std::string parameter_words(RubyVm& vm, const RProc* proc, const std::string& place) {
-  // (mrb_obj_value takes a void*; the proc is only read)
-  const RubyResult parameters = vm.call(mrb_obj_value(const_cast<RProc*>(proc)), "parameters");  // NOLINT
-  const std::string asked = place + ": " + parameters.error;
-  REQUIRE_MESSAGE(parameters.ok, asked);
-  const RubyResult words = vm.call(mrb_top_self(vm.state()), "__api_shape", {parameters.value});
-  REQUIRE_MESSAGE(words.ok, words.error);
-  return RSTRING_PTR(mrb_obj_as_string(vm.state(), words.value));
-}
-
 std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMethod& method) {
   const RubyResult found = vm.eval(owner.name, kTestFile);
   REQUIRE_MESSAGE(found.ok, found.error);
-  const RProc* proc = ruby_proc(method_body(vm.state(), found.value, method));
+  const mrb_method_t body = method_body(vm.state(), found.value, method);
+  if (is_written_in_cpp(body)) ++left_out["written in C++"];
+  const RProc* proc = ruby_proc(body);
   if (proc == nullptr) return std::nullopt;
-  Shape shape;
-  std::stringstream stream(parameter_words(vm, proc, owner.name + " " + method.name));
-  for (std::string word; stream >> word;) add_word_to_shape(shape, word);
-  return shape;
+  return proc_shape(proc);
+}
+
+std::string left_out_text() {
+  std::string text;
+  for (const auto& [why, count] : left_out) text += why + ": " + std::to_string(count) + "; ";
+  return text;
 }
 
 // Whether the keywords agree: as many, or, for a method that takes **, the reference may name more
@@ -357,7 +361,7 @@ TEST_CASE("the API reference gives the engine's Ruby methods the parameters they
       if (!mismatch.empty()) wrong.push_back(signature(owner, method) + " (" + mismatch + ")");
     }
   }
-  CHECK(checked >= kLeastRubyMethods);
+  CHECK_MESSAGE(checked >= kLeastRubyMethods, left_out_text());
   CHECK_MESSAGE(wrong.empty(), "docs/scripting/api.json says other parameters than the engine: " << joined(wrong));
 }
 
