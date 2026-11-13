@@ -390,5 +390,7 @@ TEST_CASE("a token that comes back before the host noticed the drop takes its pl
   held.table.settle();
   CHECK(held.host.peers() == std::vector<int>{kFirstGuest});
   CHECK(held.table.count(0, Kind::PeerLeft) == 0);
+  // The game hears it dropped and came back, as for a drop the host saw.
+  CHECK(held.table.count(0, Kind::Reconnecting) == 1);
   CHECK(held.table.count(0, Kind::Reconnected) == 1);
 }

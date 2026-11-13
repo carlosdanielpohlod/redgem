@@ -173,6 +173,7 @@ module Network
     # objects this machine should see again.
     def __scene_reset
       announce_scene_reset if online?
+      note_scene_reset_away
       @handlers = {}
       @listeners = {}
       @synced = {}

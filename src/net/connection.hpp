@@ -90,8 +90,8 @@ class Connection {
   // had said before that was taken.
   bool closed() const { return dropped_ || (gone_ && !incoming_.message_waiting()); }
   // Whether it closed without either side meaning to: the other side vanished (the network
-  // failed, or it went silent for too long), and was not let go nor said goodbye. What
-  // reconnecting is for.
+  // failed, it went silent for too long, or stopped taking what was sent to it), and was not let
+  // go for anything else nor said goodbye. What reconnecting is for.
   bool lost() const { return lost_ || (gone_ && !dropped_); }
   // Whether next_message has something to give without anything more arriving.
   bool message_waiting() const { return incoming_.message_waiting(); }
@@ -163,7 +163,7 @@ class Connection {
   bool heard_ = false;      // its first message was taken
   bool gone_ = false;
   bool dropped_ = false;
-  bool lost_ = false;  // let go for its silence: gone without a goodbye
+  bool lost_ = false;  // let go for its silence, or for not listening: gone without a goodbye
 };
 
 }  // namespace redgem::net

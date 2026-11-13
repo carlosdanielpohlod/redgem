@@ -108,8 +108,11 @@ the same pull request.
   state the game keeps has to be sent again by the game. A drop that neither side hears (no
   reset arrives, the other side just goes silent) is noticed only after 45 seconds of silence,
   so a shorter window covers only the drops that are heard (a network that changes, a router
-  that restarts). There is no transport resumption below TCP: each return is a new connection
-  and a new TLS handshake.
+  that restarts). Each side counts the window from when it noticed the drop: when the host
+  noticed long before the player did, the place may be gone by the time the player calls back
+  (it is turned away, and hears `on_lost`). A player who quits while reconnecting, between two
+  calls, cannot say goodbye: its place stays held until the window is over. There is no
+  transport resumption below TCP: each return is a new connection and a new TLS handshake.
 - There is no host migration: when the player hosting a game leaves or drops, the game ends for
   everyone. Hosting on a dedicated server avoids it.
 

@@ -147,7 +147,8 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
   outgoing_.insert(outgoing_.end(), message.begin(), message.end());
   since_said_ = 0.0f;
   if (outgoing_.size() > pending_limit_) {
-    close();  // it stopped listening: messages are not piled up for it forever
+    close();       // it stopped listening: messages are not piled up for it forever
+    lost_ = true;  // (its network stalled, most likely: what reconnecting is for too)
     return;
   }
   flush();

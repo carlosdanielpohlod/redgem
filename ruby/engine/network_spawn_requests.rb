@@ -8,8 +8,17 @@ module Network
     end
 
     # Only the host knows every object spawned so far.
+    # (This machine's own objects are its own to know: back after a drop, the host's list may still
+    # hold one it removed meanwhile.)
     def receive_spawned(records, from)
-      records.each { |record| receive_spawn(record, from) } if host_listing?(records, from)
+      return unless host_listing?(records, from)
+
+      records.each { |record| receive_spawn(record, from) unless own_record?(record) }
+    end
+
+    def own_record?(record)
+      _key, _template, owner = record
+      record.is_a?(Array) && owner == id
     end
 
     def host_listing?(records, from) = from == HOST && records.is_a?(Array)

@@ -336,9 +336,10 @@ class NetworkSession {
   // Reconnecting, on the host (network_session_held.cpp).
   // A token for a newcomer let in, when places are held (empty otherwise).
   std::string token_for_newcomer() const;
-  // Whether the place of a link that closed is held: it was in the game with a token, and it was lost.
-  static bool place_held_for(const Link& link) {
-    return link.let_in() && !link.token.empty() && link.connection.lost();
+  // Whether the place of a link that closed is held: places are held, it was in the game with a
+  // token, and it was lost.
+  bool place_held_for(const Link& link) const {
+    return reconnect_window_ > 0.0f && link.let_in() && !link.token.empty() && link.connection.lost();
   }
   void hold_place(const Link& link, std::vector<NetworkEvent>& events);
   // Tells the others `peer` left, and the game.
@@ -347,10 +348,10 @@ class NetworkSession {
   // A newcomer that asks for a held place back with `token`.
   void resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events);
   // The place `token` gets back (held, or of a link still open the host has not seen drop yet,
-  // which is let go); one of peer 0 for none.
-  Held claim_place(const std::string& token);
+  // which is let go, the game hearing it dropped); one of peer 0 for none.
+  Held claim_place(const std::string& token, std::vector<NetworkEvent>& events);
   Held claim_held(const std::string& token);
-  Held claim_open(const std::string& token);
+  Held claim_open(const std::string& token, std::vector<NetworkEvent>& events);
   // Tells a machine back in its place who left while it was away (and who has their id now).
   void tell_departures(Link& link, const std::vector<int>& departed);
   // What a machine that got its place back is told: who else is here now, and its next token.

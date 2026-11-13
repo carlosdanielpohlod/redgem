@@ -37,7 +37,7 @@ void NetworkSession::expire_held_places(float seconds, std::vector<NetworkEvent>
 }
 
 void NetworkSession::resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events) {
-  const Held claimed = claim_place(token);
+  const Held claimed = claim_place(token, events);
   if (claimed.peer == 0) return refuse(link, kResumeRefused);
   link.peer = claimed.peer;
   link.token = token_for_newcomer();  // a token gets a place back once
@@ -58,10 +58,10 @@ void NetworkSession::tell_departures(Link& link, const std::vector<int>& departe
   }
 }
 
-NetworkSession::Held NetworkSession::claim_place(const std::string& token) {
+NetworkSession::Held NetworkSession::claim_place(const std::string& token, std::vector<NetworkEvent>& events) {
   if (reconnect_window_ <= 0.0f) return {};
   Held held = claim_held(token);
-  return held.peer != 0 ? held : claim_open(token);
+  return held.peer != 0 ? held : claim_open(token, events);
 }
 
 NetworkSession::Held NetworkSession::claim_held(const std::string& token) {
@@ -73,7 +73,7 @@ NetworkSession::Held NetworkSession::claim_held(const std::string& token) {
   return claimed;
 }
 
-NetworkSession::Held NetworkSession::claim_open(const std::string& token) {
+NetworkSession::Held NetworkSession::claim_open(const std::string& token, std::vector<NetworkEvent>& events) {
   // Its old connection is still open here (this side has not noticed the drop yet): it is let go
   // without a goodbye, the place going on through the new one. (A newcomer has no token yet, and
   // an empty token is nobody's.)
@@ -84,6 +84,8 @@ NetworkSession::Held NetworkSession::claim_open(const std::string& token) {
   found->peer = 0;
   found->token.clear();
   found->connection.close();
+  // (The game hears it dropped, as for a drop seen here, right before it hears it is back.)
+  events.push_back(NetworkEvent::of(NetworkEvent::Kind::Reconnecting, claimed.peer));
   return claimed;
 }
 

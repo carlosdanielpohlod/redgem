@@ -68,6 +68,7 @@ module Network
     def forget_spawned(key, entry)
       @spawned.delete(key)
       __deliver(DESPAWN, [key], :all) if shared_by_me?(entry[:owner])
+      note_despawned_away(key, entry[:owner])
     end
   end
 end

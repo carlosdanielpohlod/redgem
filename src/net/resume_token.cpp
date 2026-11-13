@@ -24,13 +24,21 @@ std::string hexadecimal(const std::array<unsigned char, kResumeTokenBytes>& byte
   return digits;
 }
 
+// The generator tokens are drawn from: one per thread (a dedicated server's rooms run on several),
+// seeded once; null when it could not be.
+TlsRandom* token_random() {
+  thread_local TlsRandom random;
+  thread_local const bool seeded = random.seed(kTokenPersonalization) == 0;
+  return seeded ? &random : nullptr;
+}
+
 }  // namespace
 
 std::string new_resume_token() {
-  TlsRandom random;
+  TlsRandom* random = token_random();
   std::array<unsigned char, kResumeTokenBytes> bytes{};
-  if (random.seed(kTokenPersonalization) != 0) return {};
-  if (TlsRandom::generate(&random, bytes.data(), bytes.size()) != 0) return {};
+  if (random == nullptr) return {};
+  if (TlsRandom::generate(random, bytes.data(), bytes.size()) != 0) return {};
   return hexadecimal(bytes);
 }
 
