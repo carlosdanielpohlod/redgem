@@ -148,8 +148,9 @@ class Engine {
 
   // Starting up, in this order (the first scene is in place by then).
   void initialize();
-  // The scene, its animations and its bodies, which collide as game.json's layers say.
-  void build_world(const CollisionLayers& layers);
+  // The scene, its animations and its bodies, which collide as game.json's layers say; and how
+  // its navigation grid is baked.
+  void build_world(const GameSettings& settings);
   // Bakes the running scene's navigation grid now, and logs what it cost.
   void bake_navigation();
   void open_presenter(const GameSettings& settings);
@@ -174,6 +175,8 @@ class Engine {
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void connect_effects();
+  // The scene, its bodies and its navigation, for the scripts.
+  void connect_world();
   void connect_saves();
   void select_save_slot(const std::string& name);
   void fill_context(const GameSettings& settings);

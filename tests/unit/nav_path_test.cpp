@@ -25,13 +25,12 @@ constexpr float kTolerance = 1e-4f;
 constexpr char kGround = '.';
 constexpr char kStep = '-';
 constexpr char kLedge = '^';
-constexpr char kNothing = '#';
 
 std::vector<float> column_from(char mark) {
   if (mark == kGround) return {0.0f};
   if (mark == kStep) return {kStepHeight};
   if (mark == kLedge) return {kLedgeHeight};
-  return {};
+  return {};  // '#': nothing to stand on
 }
 
 // A grid drawn row by row (z), a mark a column (x): '.' ground, '-' a step up, '^' a ledge higher

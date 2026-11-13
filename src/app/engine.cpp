@@ -93,8 +93,7 @@ void Engine::initialize() {
   const GameIdentityReading identity = begin_loading();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
   warn_of_unusable(manifest);
-  navigation_.configure(manifest.settings.navigation);
-  build_world(manifest.settings.collision_layers);
+  build_world(manifest.settings);
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
@@ -107,8 +106,9 @@ void Engine::initialize() {
   network_watch_.restart();  // the network's time starts with the game, not with its loading
 }
 
-void Engine::build_world(const CollisionLayers& layers) {
-  collision_layers_ = layers;
+void Engine::build_world(const GameSettings& settings) {
+  collision_layers_ = settings.collision_layers;
+  navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());
@@ -227,6 +227,13 @@ void Engine::connect_effects() {
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
 
+void Engine::connect_world() {
+  context_.scene = &scene_;
+  context_.physics = physics_.get();
+  context_.navigation = &navigation_;
+  context_.bake_navigation = [this] { bake_navigation(); };
+}
+
 void Engine::fill_context(const GameSettings& settings) {
   connect_saves();
   connect_effects();
@@ -234,11 +241,8 @@ void Engine::fill_context(const GameSettings& settings) {
   context_.discovery = &discovery_;
   context_.http = &http_;
   describe_game(context_, settings);
-  context_.scene = &scene_;
   context_.audio = &audio();
-  context_.physics = physics_.get();
-  context_.navigation = &navigation_;
-  context_.bake_navigation = [this] { bake_navigation(); };
+  connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
   context_.profiler = &profiler_;
