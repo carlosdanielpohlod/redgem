@@ -54,20 +54,27 @@ void Renderer::Impl::write_frame_texels(const Scene& scene) {
 
 std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone) {
   const auto slot = static_cast<std::size_t>(object.id);
-  const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
   render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
   look.sway = object.sways ? render_math::kSways : render_math::kStill;
   if (temporal.on) note_fresh_record(scene, object, look.first_bone, pose ? pose->bones : 0);
-  render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
-                                 : render_math::sight_of(bounds, worlds[slot]);
-  seen.sphere.radius += mesh_wave_height(object.mesh) + water_ripple_bound(water_ripples, scene.handle(object.id));
+  const render_math::Sight seen = reach_of(scene, object, pose);
   // A skinned mesh is placed by its bones alone (glTF ignores its node's placement): it is never
   // taken as mirrored (see KNOWN_LIMITATIONS).
   const bool mirrored = !pose && mirrors(worlds[slot]);
   sights[slot] = ObjectSight{write_record(slot, look), seen,    object.mesh, object.visible_from, object.visible_to,
                              object.cast_shadow,       mirrored};
   return pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone;
+}
+
+render_math::Sight Renderer::Impl::reach_of(const Scene& scene, const GameObject& object,
+                                            const std::optional<SkeletonPose>& pose) const {
+  const auto slot = static_cast<std::size_t>(object.id);
+  const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
+  render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
+                                 : render_math::sight_of(bounds, worlds[slot]);
+  seen.sphere.radius += mesh_wave_height(object.mesh) + water_ripple_bound(water_ripples, scene.handle(object.id));
+  return seen;
 }
 
 bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {

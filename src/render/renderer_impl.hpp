@@ -432,6 +432,10 @@ struct Renderer::Impl {
   // One object's record and sight, and its bones from texel `next_bone` on. Returns where the
   // next skeleton's bones go.
   std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Where the object is seen to reach: its mesh's bounds placed by it (or by its skeleton's pose),
+  // with room for the waves and ripples that move its vertices.
+  render_math::Sight reach_of(const Scene& scene, const GameObject& object,
+                              const std::optional<render_detail::SkeletonPose>& pose) const;
   // Writes the record of the object in `slot`, unless it was written from the same last frame.
   bool write_record(std::size_t slot, const render_math::InstanceLook& look);
   // Writes an object's bones from texel `first` on: where each of its joints is now, times the
