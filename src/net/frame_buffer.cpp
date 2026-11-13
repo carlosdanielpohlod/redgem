@@ -36,6 +36,19 @@ std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& message) {
 void FrameBuffer::compact() {
   bytes_.erase(bytes_.begin(), bytes_.begin() + static_cast<std::ptrdiff_t>(taken_));
   taken_ = 0;
+  if (oversized()) shrink();
+}
+
+bool FrameBuffer::oversized() const {
+  return bytes_.capacity() > kRetainedFrameBytes && bytes_.size() * kShrinkRatio < bytes_.capacity();
+}
+
+// (A copy is the only shrink the standard promises: shrink_to_fit may keep the memory.)
+void FrameBuffer::shrink() {
+  std::vector<std::uint8_t> kept;
+  kept.reserve(std::max(kRetainedFrameBytes, bytes_.size()));
+  kept.assign(bytes_.begin(), bytes_.end());
+  bytes_.swap(kept);
 }
 
 void FrameBuffer::append(const std::uint8_t* bytes, std::size_t count) {
@@ -57,7 +70,7 @@ std::optional<std::string> FrameBuffer::next() {
   const std::size_t length = announced_length(bytes_, taken_);
   if (length > kMaxFrameBytes) {
     broken_ = true;
-    bytes_.clear();
+    std::vector<std::uint8_t>().swap(bytes_);  // nothing more is read: all its memory goes back
     taken_ = 0;
     return std::nullopt;
   }
