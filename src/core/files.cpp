@@ -28,6 +28,7 @@ std::optional<std::string> read_text_file(const std::filesystem::path& path, std
 bool write_text_file(const std::filesystem::path& path, const std::string& text, std::string& error) {
   std::ofstream out(path, std::ios::binary | std::ios::trunc);
   if (out) out.write(text.data(), static_cast<std::streamsize>(text.size()));
+  out.close();  // (what the disk did not take shows here, once the last of it is flushed)
   if (out) return true;
   error = "cannot write " + path.string();
   return false;

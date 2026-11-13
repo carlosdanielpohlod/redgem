@@ -14,7 +14,7 @@ void RelayServer::accept_newcomers() {
   for (; taken == IoStatus::Ok; taken = listener_.accept(guest)) {
     if (!room_for(guest.peer_address())) continue;  // hung up on
     auto member = std::make_unique<Member>();
-    member->connection = Connection::accepted(std::move(guest), kMaxPendingPerServed);
+    member->connection = Connection::accepted(std::move(guest), kMaxPendingPerServed, identity_);
     members_.push_back(std::move(member));
   }
   // Someone is waiting and the system has no connection to give: asked again after a rest.

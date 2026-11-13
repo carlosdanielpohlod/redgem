@@ -31,8 +31,10 @@ class Lobby {
  public:
   // Listens on `port` (0 picks a free one, see port()), letting one address hold at most
   // `connections_per_address` machines, waiting here and in the rooms. False with `error` when it
-  // cannot.
-  bool open(std::uint16_t port, std::string& error, int connections_per_address = kDefaultConnectionsPerAddress);
+  // cannot. With an `identity` every connection is encrypted, the server proving itself with it
+  // (a GameServer always has one); without, they are plaintext, for the engine's protocol tests.
+  bool open(std::uint16_t port, std::string& error, int connections_per_address = kDefaultConnectionsPerAddress,
+            std::shared_ptr<const TlsIdentity> identity = nullptr);
   std::uint16_t port() const { return port_; }
   // Takes newcomers in and hears them out: whoever said which room it wants comes back, to be
   // placed. `in_rooms` says how many from an address the rooms hold already.
@@ -63,6 +65,7 @@ class Lobby {
 
   Socket listener_;
   std::uint16_t port_ = 0;
+  std::shared_ptr<const TlsIdentity> identity_;  // null: plaintext
   std::vector<Newcomer> newcomers_;
   CodeGuessers guessers_;
   int connections_per_address_ = kDefaultConnectionsPerAddress;

@@ -20,7 +20,7 @@ void NetworkSession::accept_newcomers() {
     // (Too many waiting already: the newcomer is hung up on.)
     if (!room_to_wait(guest.peer_address())) continue;
     // Let in when it says hello (see admit), if the game has room.
-    links_.push_back({Connection::accepted(std::move(guest)), 0});
+    links_.push_back({Connection::accepted(std::move(guest), kMaxPendingBytes, identity_), 0});
   }
 }
 

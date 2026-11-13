@@ -13,6 +13,9 @@ namespace redgem::command_line {
 
 inline constexpr const char* kHelpOption = "--help";
 inline constexpr const char* kShortHelpOption = "-h";
+// What a server program (redgem-relay, redgem-server) is asked to only print the fingerprint of
+// its TLS identity with.
+inline constexpr const char* kFingerprintOption = "--fingerprint";
 
 // Whether a word asks for the program's usage.
 bool asks_for_help(const std::string& word);

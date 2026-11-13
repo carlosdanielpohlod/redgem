@@ -6,6 +6,7 @@
 #include <mruby.h>
 
 #include <cstdint>
+#include <string>
 
 #include <nlohmann/json.hpp>
 
@@ -14,6 +15,7 @@ namespace redgem {
 namespace net {
 class NetworkSession;
 class LanDiscovery;
+class TlsTrust;
 }  // namespace net
 
 // A RuntimeError for a script run outside a game, which has neither.
@@ -26,6 +28,13 @@ std::uint16_t port_arg(mrb_state* mrb, mrb_int port);
 // What a join carries for the game joined to decide on (auth:): null for nil; an ArgumentError for
 // anything but a hash within the limits (network_approval_bindings.cpp).
 nlohmann::json auth_arg(mrb_state* mrb, mrb_value auth);
+// How a join checks the machine that answers it (network_security_bindings.cpp): against
+// `fingerprint` (a whole fingerprint or a host's code; null when the script gave none: then
+// against game.json's "servers" for that address and port, or not at all). Every join is
+// encrypted. An ArgumentError for a fingerprint that is neither.
+net::TlsTrust trust_arg(mrb_state* mrb, const char* fingerprint, const std::string& address, std::uint16_t port);
+// What a game hosted here proves itself with: Network.fingerprint, Network.host_code.
+void install_network_security_bindings(RClass* network_module, mrb_state* mrb);
 // Connection approval: Network.__approval, Network.__decide (network_approval_bindings.cpp).
 void install_network_approval_bindings(RClass* network_module, mrb_state* mrb);
 // Network.search and what it finds (network_search_bindings.cpp).

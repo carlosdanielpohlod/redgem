@@ -291,6 +291,8 @@ not a promise of how it will be closed.
 
 ### Security
 
+- The TLS private key of a relay, a server or a hosted game is in memory as PEM text while it
+  starts, and those copies are freed without being wiped first.
 - On a dedicated server, a game's plain `http://` reaches anything on the server's own private
   networks (only the clouds' known metadata addresses are refused).
 - On Windows a server's save database takes its folder's permissions: it is kept to its owner
@@ -300,8 +302,9 @@ not a promise of how it will be closed.
 - An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
   checking that a build made it.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
-  the relay and server integration tests), the socket layer or the TLS stream on its own (only
-  through requests); no test of a TLS name that does not match its certificate, nor of a server
+  the relay and server integration tests), the socket layer or the web requests' TLS stream on
+  its own (only through requests; game connections' TLS is tested over loopback sockets only);
+  no test of a TLS name that does not match its certificate, nor of a server
   sending interim (1xx) answers for ever.
 
 ### Shipping
@@ -354,8 +357,28 @@ not a promise of how it will be closed.
 
 ### Multiplayer
 
-- Game connections are not encrypted. A dropped player cannot reconnect, and when the host of a
-  hosted game leaves, the game ends for everyone (dedicated servers do not have this problem).
+- A dropped player cannot reconnect, and when the host of a hosted game leaves, the game ends for
+  everyone (dedicated servers do not have this problem).
+- Game connections are encrypted, but who answers is checked only when the game gives its
+  fingerprint (`fingerprint:`, or `"servers"` in `game.json`): without one, someone who can
+  redirect the players' traffic can stand in for the host, the relay or the server. Nothing
+  remembers a fingerprint seen once (no trust on first use).
+- A player hosting is checked by a 10-digit code (40 bits of its fingerprint), not the whole
+  fingerprint (64 digits, too long to read out loud): an attacker who can redirect the traffic
+  and spends about 2^40 certificate generations while that game is open could match it. A short
+  code is taken for any address joined directly, a dedicated server's too, where an attacker has
+  all the time it wants: give a server its whole fingerprint (a room takes nothing less).
+- Through a relay, the connections are encrypted to the relay, not from player to player: the
+  relay reads what the players of its rooms say.
+- No certificate rotation or revocation: a relay or server that loses its data folder (or its key)
+  gets a new fingerprint, and games that pinned the old one refuse it until they are updated.
+  Its certificate is self-signed, valid until 2099, and not checked against any authority.
+- A TLS handshake costs the relay and the server some CPU (an ECDHE key exchange and an ECDSA
+  signature): a flood of handshakes is limited only by the connections each address may hold.
+- Finding games on the local network (`Network.search`) is not authenticated: any machine there
+  can announce a game.
+- Plaintext is kept only inside the engine, for its own tests of the protocol: a game, the relay
+  and the server have no way to turn encryption off.
 - Clients own the positions of their objects and decide their own collisions: a server cannot
   check movement, so a modified client can move anywhere.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct

@@ -31,13 +31,23 @@ below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-ro
 | `--rooms` | 8 | Rooms open at once, up to 64 |
 | `--threads` | The machine's cores | Threads the rooms run on, up to 64: each room has one of its own while there are no more rooms than threads |
 | `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |
-| `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.sqlite3`), for every room and every run |
+| `--data` | `<game>-data` beside the game's folder | Where the game's `Save` (`save.sqlite3`) and the server's TLS identity are kept, for every room and every run |
+| `--fingerprint` | | Prints the server's fingerprint (making its identity in `--data` if there is none yet) and exits |
 | `--status-port` | None | A port that answers how busy the server is, as JSON (see [Status](#status)); 0 picks a free one |
 | `--status-bind` | `127.0.0.1` | The address the status port listens on, in numbers |
 | `--status-log` | None | Writes the status to the log every so many seconds |
 
 It writes what happens to its output (rooms opened and closed, how many players) and stops
 cleanly on Ctrl+C or `SIGTERM`: every room is closed and its players are told.
+
+Every connection is encrypted. The first time it starts, the server makes a TLS identity of its own
+in its data folder (`tls-certificate.pem`, and `tls-private-key.pem`, readable by its owner only)
+and prints its **fingerprint** each time it starts. Put that fingerprint in the game (`"servers"`
+in `game.json`, or `Network.join(address, fingerprint: "...")`, see
+[Multiplayer](scripting/multiplayer.md#encrypted-connections)), so that players connect to this
+server and to no other. Keep the data folder: a new identity is a new fingerprint, and games that
+pinned the old one refuse the server until they are updated. A certificate of your own may be put
+there instead (both files, PEM, the key unencrypted).
 
 A room is light (a platformer room takes 1 to 2 MB of memory and a few percent of one core), but
 every room runs the whole game, so `--rooms` is what sizes the machine. Each room runs on a thread
@@ -110,8 +120,9 @@ docker run -d --restart unless-stopped -p 7777:7777 -v my-game-data:/data my-gam
 
 `GAME` is the game's folder, relative to the repository. `docker compose up server` does the same
 for the platformer (`GAME=path/to/game docker compose up server` for another). The container runs
-as an unprivileged user and writes only to `/data`, where the game's saves are kept (a volume, so
-that they outlive the container).
+as an unprivileged user and writes only to `/data`, where the game's saves and its TLS identity are
+kept (a volume, so that they outlive the container; `docker run --rm -v my-game-data:/data
+my-game-server --fingerprint` shows the fingerprint).
 
 ## Put it on the internet
 
@@ -168,6 +179,7 @@ or by copying the folder while the server is stopped.
 The server faces the internet. It keeps every limit a hosted game and the relay have (message
 sizes, how much each player may send, connections per address, spawned objects), lets go of
 machines that stay silent and of players who say nothing to the game for five minutes (a game
-left paused counts), and keeps out addresses that guess at room codes. Messages are not encrypted.
+left paused counts), and keeps out addresses that guess at room codes. Its connections are
+encrypted, and a handshake not over in 3 seconds is let go.
 Players are let in without asking unless the game decides who plays: see
 [Online services](scripting/online-services.md#letting-players-in).
