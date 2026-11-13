@@ -24,13 +24,13 @@ agent::McpServer live_server(EditorApp& editor, const tools::EditorBridge& bridg
 
 }  // namespace
 
-AgentHooks agent_hooks(std::unique_ptr<tools::EditorBridge>& bridge) {
+AgentHooks agent_hooks(std::unique_ptr<tools::EditorBridge>& bridge, bool ruby_eval) {
   AgentHooks hooks;
   hooks.client_version = REDGEM_VERSION;
   hooks.sessions_file = agent::sessions_file();
   hooks.reopen_last_session = true;
-  hooks.tool_servers = [&bridge](EditorApp& editor, std::string& error) -> std::vector<agent::McpServer> {
-    if (!bridge) bridge = enable_editor_bridge(editor);
+  hooks.tool_servers = [&bridge, ruby_eval](EditorApp& editor, std::string& error) -> std::vector<agent::McpServer> {
+    if (!bridge) bridge = enable_editor_bridge(editor, {}, ruby_eval);
     if (bridge) return {live_server(editor, *bridge)};
     error = tr("project.agent.no_bridge");
     return {};

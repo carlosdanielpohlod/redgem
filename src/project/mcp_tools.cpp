@@ -13,6 +13,7 @@
 #include "project/mcp_game_tools.hpp"
 #include "project/tool_commands.hpp"
 #include "project/editor_bridge.hpp"
+#include "project/ruby_eval.hpp"
 
 namespace redgem::tools::mcp {
 namespace {
@@ -159,8 +160,12 @@ Json native_result(const Options& options, const std::string& name, const Json& 
 }
 // The tools a connected editor answers, about its unsaved document and its own process.
 bool answered_live(const std::string& name) {
-  return name == "editor" || name == "events" || name == "game_query" || name.rfind("scene_", 0) == 0;
+  return name == "editor" || name == "events" || name == "game_query" || name.rfind("scene_", 0) == 0 ||
+         is_ruby_eval_tool(name);
 }
+
+// The tools nothing but a running editor can answer: the saved files have no answer to them.
+bool editor_only(const std::string& name) { return name == "editor" || is_ruby_eval_tool(name); }
 
 constexpr const char* kNoEditor =
     "no editor of this game is running with its bridge; start one with `redgem <game> --editor-bridge`";
@@ -210,7 +215,7 @@ Json discovered(const Options& options, const std::string& name, const Json& arg
     if (attempt.reply) return *attempt.reply;
     remember(file, attempt.miss);
   }
-  if (name == "editor") return tool_result(kNoEditor, true);
+  if (editor_only(name)) return tool_result(kNoEditor, true);
   return from_files(native_result(options, name, args));
 }
 }  // namespace

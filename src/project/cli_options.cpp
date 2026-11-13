@@ -18,6 +18,9 @@ namespace {
 constexpr const char* kVersionOption = "--version";
 constexpr const char* kPlayOption = "--play";
 constexpr const char* kEditorBridgeOption = "--editor-bridge";
+#if defined(REDGEM_RUBY_EVAL)
+constexpr const char* kRubyEvalOption = "--ruby-eval";
+#endif
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kBundleOption = "--bundle";
@@ -50,6 +53,14 @@ void read_editor_bridge(Reading& reading) {
   choose(reading, RunMode::Editor);
   reading.result.options.editor_bridge = true;
 }
+
+#if defined(REDGEM_RUBY_EVAL)
+// (The bridge is what the evaluation is asked through.)
+void read_ruby_eval(Reading& reading) {
+  read_editor_bridge(reading);
+  reading.result.options.ruby_eval = true;
+}
+#endif
 
 void read_template(Reading& reading) {
   const auto name = value(reading);
@@ -134,6 +145,9 @@ constexpr Option kOptions[] = {
     {kVersionOption, read_version},
     {kPlayOption, read_play},
     {kEditorBridgeOption, read_editor_bridge},
+#if defined(REDGEM_RUBY_EVAL)
+    {kRubyEvalOption, read_ruby_eval},
+#endif
     {kTemplateOption, read_template},
     {kTargetOption, read_target},
     {kBundleOption, read_bundle},

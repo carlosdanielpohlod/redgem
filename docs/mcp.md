@@ -158,7 +158,7 @@ runtime, not the edited document); it refuses `frames` there, so pause and `step
 While editing, it reports that the editor is not playing; it does not fall back to the saved
 files, which may differ from the open document. `api`, `game_run`, `game_check` and
 `game_shot` remain ordinary CLI tools: they read saved files rather than the unsaved editor scene.
-Arbitrary live eval is not exposed.
+Evaluating Ruby in the playing game is a separate opt-in (below).
 
 The bridge binds only to IPv4 loopback and requires a random credential on every request, with
 the game directory checked at both ends. Its connection file stays outside the repository and
@@ -177,6 +177,37 @@ crashed editor's port therefore receives only that nonce. Until that proof, a fa
 editor took the call; after it, any failure (a timeout, or a reset after the request went out)
 fails the call. It is never retried elsewhere or applied to the files, because the edit may
 already have happened.
+
+## Ruby eval in the playing game
+
+A development build of `redgem` (one built with its tests, as from source: the CMake option
+`REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`) can evaluate Ruby inside the game an editor
+plays. Release builds, and so the downloads, leave it out entirely: no option, no tool, none of
+its code. Start the editor with it:
+
+```sh
+redgem /path/to/game --ruby-eval
+```
+
+`--ruby-eval` enables the bridge (as `--editor-bridge` does) and prints a line
+`ruby eval token: <64 hex digits>`, new each time the editor starts. Connected to an editor, the
+MCP server lists `game_eval`, which takes that `token` and `code`:
+
+```json
+{"token": "<the printed token>", "code": "Scene.find('Player').transform.position"}
+```
+
+The answer is the result's `inspect`, or the exception with its backtrace (the snippet's lines
+are `(game_eval):<line>`). The code runs at the top level of the game's interpreter, between two
+frames, so it sees and changes what the game's scripts see: the game is not reset afterwards.
+It runs on the game's script budget, capped at two seconds: code that never returns ends with a
+`ScriptTimeout`, as any script call would. Code is limited to 16 KiB, and the answer is cut at
+8 KiB with a notice, as any tool's text (see below).
+
+It is refused, without running anything, when the token is missing or wrong, when the editor was
+not started with `--ruby-eval` (the error says how to start it), and while the editor is editing
+rather than playing (start the game with `editor` `action=play`). Read-only mode leaves the tool
+out. The bridge's protections apply as well: IPv4 loopback only, and the connection's credential.
 
 ## Bounded results
 

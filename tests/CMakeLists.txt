@@ -233,6 +233,10 @@ add_executable(redgem_tests
   integration/agent_connection_test.cpp)
 # (zlib: the tests compress the answers their web servers send.)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest redgem_zlib)
+# (The editor's Ruby evaluation is in development builds only, and so are its tests.)
+if(REDGEM_RUBY_EVAL)
+  target_sources(redgem_tests PRIVATE integration/ruby_eval_test.cpp)
+endif()
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)
@@ -310,6 +314,20 @@ add_test(NAME app.check_catches_test_code
 # (Matched on its message: a script that did not run must not count as "it failed as expected".)
 set_tests_properties(app.check_catches_test_code PROPERTIES
   PASS_REGULAR_EXPRESSION "test code in .*redgem-test: \"SystemTest\"")
+
+# The player and the game server never have the editor's Ruby evaluation; nor has redgem in a
+# release build (REDGEM_RUBY_EVAL off: the release workflow runs the same script on it).
+add_test(NAME app.ships_no_ruby_eval
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_ruby_eval.sh
+                 $<TARGET_FILE:redgem_player> $<TARGET_FILE:redgem_server>)
+if(REDGEM_RUBY_EVAL)
+  # Guards the check itself: redgem, built with the evaluation here, must fail it.
+  add_test(NAME app.check_catches_ruby_eval
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_ruby_eval.sh $<TARGET_FILE:redgem>)
+  # (Matched on its message: a script that did not run must not count as "it failed as expected".)
+  set_tests_properties(app.check_catches_ruby_eval PROPERTIES
+    PASS_REGULAR_EXPRESSION "ruby eval in [^\n]*redgem: \"game_eval\".*ruby eval in [^\n]*redgem: \"--ruby-eval\".*ruby eval in [^\n]*redgem: \"ruby eval token\"")
+endif()
 
 # The program games ship as has none of the tools games are made with in it (no editor, no project
 # hub, no templates, no packer of phone apps, no relay), and the relay has nothing that draws.

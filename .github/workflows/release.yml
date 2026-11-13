@@ -179,6 +179,11 @@ jobs:
           path: .ccache
           key: ccache-ubuntu22-linux-${{ github.run_id }}
 
+      # A release build leaves out the editor's Ruby evaluation (REDGEM_RUBY_EVAL follows the
+      # tests, which are off here): none of its texts may be in what goes out.
+      - name: Check that the programs have no Ruby evaluation
+        run: tests/ships_no_ruby_eval.sh build/src/redgem build/src/redgem-player build/src/redgem-server
+
       - name: Keep the libraries' sources
         if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
