@@ -126,3 +126,81 @@ end
 
 A `class` or `module` line at the top of the file (not indented) loads that class from the game's
 scripts first, so the line reopens the game's `Fighter` instead of making a new, empty one.
+
+## The tests a new game comes with
+
+The `third-person`, `top-down` and `menu-only` templates come with tests of their own, in the new
+game's `tests/` folder: system tests that walk the hero, jump, turn the camera, walk to a spot or
+go through the menus, and unit tests of the scripts' arithmetic. They pass as the game is made:
+
+```bash
+./build/src/redgem new my_game --template third-person
+./build/src/redgem check my_game --run-tests
+```
+
+Keep them passing as you change the game, change them when you change what they check, and add
+your own next to them.
+
+## Running the tests on every push
+
+Every new game comes with a GitHub Actions workflow, `.github/workflows/test.yml`, that runs its
+check and its tests on GitHub's machines on pushes to main and on pull requests. It downloads the latest
+RedGem for Linux (the `redgem-linux-x86_64.tar.gz` of the latest release) and runs
+`redgem check --run-tests` on the game; the run fails when a script does not compile, a scene
+names a file that is not there, or a test fails. Put the game's folder in a repository on GitHub,
+with the game at its top, and push: nothing else is needed. For a game in a folder of a bigger
+repository, move the file to that repository's `.github/workflows/` and set `GAME_DIR` to the
+game's folder. To copy it into a game made before it existed, this is the whole file:
+
+```yaml
+# Tests the game on GitHub's machines, on pushes to main and on pull requests: downloads the
+# latest RedGem for Linux, looks the game over and runs its tests (tests/*_test.rb), as
+# `redgem check . --run-tests` does on your own machine. The run fails when a script does not
+# compile, a scene names a file that is not there, or a test fails.
+#
+# It came with the game (`redgem new`): see "Testing your game" in the RedGem manual. GitHub runs
+# it from .github/workflows/ at the top of the repository. If the game is in a folder of the
+# repository, move this file up there and set GAME_DIR to that folder.
+name: Game tests
+
+# (A push to a pull request's branch runs it as the pull request: once, not twice. Name your
+# default branch here if it is not main.)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Check and test the game
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GAME_DIR: .
+      # The latest release. To stay on one version, name it: .../releases/download/v0.5.0/...
+      REDGEM_DOWNLOAD: https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download RedGem
+        run: |
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/redgem.tar.gz" "${REDGEM_DOWNLOAD}"
+          tar -xzf "${RUNNER_TEMP}/redgem.tar.gz" -C "${RUNNER_TEMP}"
+
+      # (System tests run with no window: no display is needed.)
+      - name: Check the game and run its tests
+        run: |
+          "${RUNNER_TEMP}/redgem/bin/redgem" check "${GAME_DIR}" --run-tests
+```
+
+It runs the system tests with no window, so it needs no display, and their `t.screenshot` calls
+take no pictures. To keep a game on one version of RedGem, name that version in `REDGEM_DOWNLOAD`
+instead of `latest` (for example
+`https://github.com/carlosdanielpohlod/redgem/releases/download/v0.5.0/redgem-linux-x86_64.tar.gz`).
+A game whose scripts use what only a newer RedGem has fails on an older one: until a release
+carries this version of the templates, a game made from them with a RedGem built from source
+needs that build in its workflow instead of the download.
