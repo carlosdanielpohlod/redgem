@@ -38,6 +38,17 @@ class GameObject
 
   def tag?(value) = tag == value.to_s
 
+  # Puts it under another object (nil: at the root of the scene), where it stays in the world: from
+  # then on it moves with its new parent. An object cannot go under itself or what it carries.
+  #   gun.parent = hand
+  def parent=(parent)
+    set_parent(parent)
+  end
+
+  # Like parent=; keep_world: false keeps its local transform instead, so it lands where it was
+  # relative to its old parent, now relative to the new one. Returns the parent.
+  def set_parent(parent, keep_world: true) = __set_parent(parent, keep_world)
+
   def behaviours = @behaviours.dup
 
   # The first behaviour of this object that is a `klass`.

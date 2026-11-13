@@ -198,6 +198,8 @@ add_executable(redgem_tests
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
   integration/camera_helpers_test.cpp
+  integration/camera_switch_test.cpp
+  integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
   integration/animation_events_api_test.cpp
