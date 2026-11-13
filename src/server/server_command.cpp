@@ -37,7 +37,7 @@ constexpr NumberOption kOptions[] = {
     {"--per-address", 1, net::kMostConnectionsPerAddress,
      [](ServerSettings& settings, int machines) { settings.connections_per_address = machines; }},
     {"--threads", 1, kMostThreads, [](ServerSettings& settings, int threads) { settings.threads = threads; }},
-    {"--status-port", 0, command_line::kLargestPort,
+    {"--status-port", 0, kLargestPort,
      [](ServerSettings& settings, int port) { settings.status.port = static_cast<std::uint16_t>(port); }},
     {"--status-log", 1, kMostStatusLogSeconds,
      [](ServerSettings& settings, int seconds) { settings.status.log_every_seconds = seconds; }},
