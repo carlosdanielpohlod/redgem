@@ -114,9 +114,9 @@ class Engine {
   // Runs until the presenter has nowhere left to show the game or a script quits, each frame as
   // long as the presenter says the last one took. Returns the exit code.
   int run();
-  // Copies a prefab (or any object) into the running game with physics and scripts. `world`
-  // overrides the copy's position/rotation. Returns the new root object.
-  ObjectId spawn(ObjectId source, const std::optional<Transform>& world, bool physics = true);
+  // Copies a prefab (or any object) into the running game with physics and scripts, as the request
+  // says (see SpawnRequest). Returns the new root object.
+  ObjectId spawn(const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   void frame(float frame_seconds);
@@ -201,6 +201,8 @@ class Engine {
   // Puts a newly loaded scene, with its bodies, in place of the running one.
   void replace_world(SceneDesc desc);
   void place_spawned(ObjectId id, const std::optional<Transform>& world);
+  // Names, places and parents a new copy as its request says, before its bodies and scripts.
+  void shape_spawned(ObjectId id, const SpawnRequest& request);
 
   // The parts of a frame, in the order frame() runs them.
   void prepare_frame();

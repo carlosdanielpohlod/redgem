@@ -76,11 +76,18 @@ void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {
   scene_.set_world_transform(id, placed);
 }
 
-ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
-  if (!scene_.is_alive(source)) return kNoObject;
-  const std::vector<ObjectId> created = scene_.clone(source);
-  place_spawned(created.front(), world);
-  if (physics) {
+void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
+  if (!request.name.empty()) scene_.at(id).name = request.name;
+  place_spawned(id, request.world);
+  // (After it is placed: the place asked for is in the world, and parenting keeps it there.)
+  if (scene_.is_alive(request.parent)) scene_.set_parent(id, request.parent, true);
+}
+
+ObjectId Engine::spawn(const SpawnRequest& request) {
+  if (!scene_.is_alive(request.source)) return kNoObject;
+  const std::vector<ObjectId> created = scene_.clone(request.source);
+  shape_spawned(created.front(), request);
+  if (request.physics) {
     for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);

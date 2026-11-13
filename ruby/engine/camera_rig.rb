@@ -3,14 +3,15 @@ module Camera
   # camera's own, put on it the first time one of them is called. Each frame it moves the camera
   # after what it follows or orbits, and gives the renderer its shake: a shake only moves what the
   # camera shows, never the camera, so nothing a script reads or writes of it ever drifts. A camera
-  # that is no longer the main one stops, and lets its shake go.
+  # that is no longer the main one (Camera.main =) stays where it is and lets its shake go; its
+  # follow or orbit waits, and takes up again when the game is seen through it once more.
   class Rig < Behaviour
     attr_accessor :motion
 
     def shake = @shake ||= Shake.new
 
     def update(dt)
-      return let_go unless main?
+      return rest unless main?
 
       @motion = nil if @motion&.lost?
       @motion&.update(transform, dt, Time.unscaled_delta)
@@ -22,8 +23,7 @@ module Camera
 
     def main? = game_object == Camera.main
 
-    def let_go
-      @motion = nil
+    def rest
       shake.stop
       show_shake
     end

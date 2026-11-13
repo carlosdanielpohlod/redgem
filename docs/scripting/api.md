@@ -97,6 +97,8 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `visible = value`: shows or hides it
 - `behaviours`: its behaviours
 - `parent`: the object it is under, or nil
+- `parent = object`: puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries
+- `set_parent(object, keep_world: true)`: like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent
 - `children`: the objects under it
 - `transform`: its Transform
 - `character`: its CharacterController, or nil
@@ -183,7 +185,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find!(name)`: find that stops with a clear error when the object is missing
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
-- `Scene.spawn(template, position: nil, rotation: nil, physics: true)`: copies a prefab = true template, with its physics and scripts; returns the copy
+- `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
 
 ## SceneScript
 
@@ -355,7 +357,10 @@ Wheel meshes must have their rotation applied (the axle along X). `drive`'s inpu
 
 The camera the game is seen through, and what it does on its own: follow, orbit, shake. See [gameplay.md#follow-orbit-and-shake-the-camera](gameplay.md#follow-orbit-and-shake-the-camera).
 
-- `Camera.main`: the object holding the camera
+- `Camera.main`: the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first
+- `Camera.main = camera`: sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
+- `Camera.cut_to(camera, fade: 0)`: cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
+- `Camera.cutting?`: whether a cut with a fade is still playing
 - `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
 - `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
