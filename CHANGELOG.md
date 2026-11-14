@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Loading a level without a freeze**: after `Game.load_scene_async` reads a level, the engine
+  makes it ready over the next frames while the loading screen keeps drawing: pictures are
+  decoded on the background reader, physics bodies are made in batches of about 4 ms a frame,
+  and textures and meshes go to the graphics card about 8 MiB a frame. The swap happens once all
+  of it is ready, and every script of the new level starts in that frame, so each sees the whole
+  level on its first update. Offline fixed-step runs (`--record`, `redgem run`) still make the
+  level ready all at once, in the same frame as before.
+
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden

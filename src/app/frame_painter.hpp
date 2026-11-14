@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 
 #include "app/presenter.hpp"
@@ -22,6 +23,10 @@ class FramePainter {
   // over it (see DisplaySettings::render_scale): the world, then the interface and touch controls.
   void paint_world(const FrameView& view, const RenderTexture2D* output);
   void paint_flat(const FrameView& view, const RenderTexture2D* output = nullptr);
+  // Readies the assets of the scene the game will show under `generation` (see
+  // Presenter::prepare_scene); what it readied for another generation is dropped first.
+  bool prepare(const SceneDesc& desc, int generation, std::size_t bytes);
+  void drop_prepared();
   // Says the renderer already holds the assets of this generation of the game's scene (the editor
   // plays the scene it was drawing): they are not uploaded again.
   void assume_uploaded(int scene_generation) { uploaded_generation_ = scene_generation; }
@@ -32,9 +37,12 @@ class FramePainter {
 
  private:
   void follow_game(const FrameView& view);
+  // Uploads the scene of a generation it has not drawn yet, taking what was readied for it.
+  void take_scene(const FrameView& view);
 
   Renderer& renderer_;
   int uploaded_generation_ = kNothingUploaded;
+  int prepared_generation_ = kNothingUploaded;
   std::filesystem::path images_dir_;
 };
 

@@ -284,6 +284,14 @@ struct Renderer::Impl {
   std::vector<float> morph_deltas;                // every part's shape-key deltas, as morph_texture holds them
   unsigned int morph_texture = 0;
   std::size_t morph_texture_floats = 0;  // of morph_deltas when the texture was last made
+  // What Renderer::stage readied of the scene to be shown next, the first ones of its images and
+  // meshes, while this one's are still drawn; the next upload takes them.
+  struct StagedAssets {
+    std::vector<Texture2D> textures;
+    std::vector<std::vector<GpuPrimitive>> meshes;
+    std::vector<float> morph_deltas;  // of the staged meshes' parts
+  };
+  StagedAssets staged;
   Mesh sky_mesh{};
   Material sky_material{};
   Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
@@ -417,6 +425,15 @@ struct Renderer::Impl {
   void bind_textures(Material& material, const MaterialDesc& source) const;
   void release_assets();
   void release_meshes();
+  // A scene image as a texture: from its decoded pixels when it has them.
+  static Texture2D scene_picture(const SceneDesc& desc, std::size_t image);
+  // Stages the next image or mesh of `desc` (see staged); returns roughly how many bytes it sent.
+  std::size_t stage_next(const SceneDesc& desc);
+  bool staged_all(const SceneDesc& desc) const;
+  bool staged_fits(const SceneDesc& desc) const;  // none of them is past what `desc` has
+  // Makes the staged assets this scene's own (after release_assets).
+  void adopt_staged(const SceneDesc& desc);
+  void release_staged();
 
   // --- Texts and pictures (renderer_pictures.cpp) -----------------------------------------------
 

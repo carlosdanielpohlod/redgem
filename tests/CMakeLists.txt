@@ -13,6 +13,7 @@ add_executable(redgem_tests
   unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
+  unit/frame_budget_test.cpp
   unit/clock_test.cpp
   unit/log_test.cpp
   unit/event_journal_test.cpp
@@ -208,6 +209,7 @@ add_executable(redgem_tests
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
+  integration/scene_activation_test.cpp
   integration/ui_input_test.cpp
   integration/camera_helpers_test.cpp
   integration/camera_switch_test.cpp
@@ -578,6 +580,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/debug_draw_render_test.cpp
                render_system/profile_overlay_render_test.cpp
                render_system/async_scene_render_test.cpp
+               render_system/staged_upload_render_test.cpp
                render_system/specular_brdf_render_test.cpp
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp

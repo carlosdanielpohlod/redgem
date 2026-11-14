@@ -60,8 +60,19 @@ void Renderer::upload(const SceneDesc& desc) {
   impl_->reset_water_ripples();
   impl_->faces_captured = 0;  // do not reflect the previous scene while the new one is captured
   ++impl_->scene_uploads;     // nor mix its frames into the new one's
+  impl_->adopt_staged(desc);
   sync(desc);
 }
+
+bool Renderer::stage(const SceneDesc& desc, std::size_t bytes) {
+  for (std::size_t sent = 0; sent < bytes;) {
+    if (impl_->staged_all(desc)) return true;
+    sent += impl_->stage_next(desc);
+  }
+  return impl_->staged_all(desc);
+}
+
+void Renderer::drop_staged() { impl_->release_staged(); }
 
 void Renderer::sync(const SceneDesc& desc) {
   impl_->upload_new_textures(desc);

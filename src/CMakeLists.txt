@@ -186,6 +186,7 @@ redgem_add_library(redgem_core
   core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
+  core/frame_budget.cpp
   core/frame_profiler.cpp
   core/stopwatch.cpp
   core/clock.cpp)
@@ -516,6 +517,7 @@ redgem_add_library(redgem_runtime
   app/engine_scenes.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
+  app/scene_activation.cpp
   app/scene_bodies.cpp
   app/scene_water.cpp
   app/scene_files.cpp

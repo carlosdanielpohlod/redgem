@@ -161,6 +161,7 @@ void Engine::present() {
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
                        shows_profile_stats(context_), &debug_draw_});
+  forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
 }
 
 int Engine::run() {

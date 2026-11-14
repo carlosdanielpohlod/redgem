@@ -34,6 +34,15 @@ struct ImageData {
   std::string file_extension;         // file-type hint for the image decoder
 };
 
+// A scene's picture decoded to 8-bit RGBA rows, top row first.
+struct DecodedPicture {
+  int width = 0;
+  int height = 0;
+  std::vector<std::uint8_t> rgba{};
+
+  bool empty() const { return rgba.empty(); }
+};
+
 enum class AlphaMode { Opaque, Mask, Blend };
 
 // A transparent dielectric coating above the base material (KHR_materials_clearcoat).
@@ -234,6 +243,10 @@ struct SceneDesc {
   std::vector<MeshDesc> meshes;
   std::vector<MaterialDesc> materials;
   std::vector<ImageData> images;
+  // Per image, when the scene was read in the background for a game that draws it: decoding there
+  // spares the frames of the loading screen. Empty otherwise, and once the pictures are on the
+  // graphics card.
+  std::vector<DecodedPicture> decoded_images;
   std::vector<SkinDesc> skins;
   std::vector<AnimationDesc> animations;
 
