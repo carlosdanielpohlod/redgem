@@ -147,18 +147,6 @@ mrb_value run_describe(mrb_state* mrb, void* userdata) {
 
 constexpr const char* kTimeoutClass = "ScriptTimeout";  // what a call that ran past its budget ends with
 
-// Counts a call from C++ against the budget for as long as it lasts.
-class BudgetedCall {
- public:
-  explicit BudgetedCall(ScriptBudget& budget) : budget_(budget) { budget_.begin_call(); }
-  ~BudgetedCall() { budget_.end_call(); }
-  BudgetedCall(const BudgetedCall&) = delete;
-  BudgetedCall& operator=(const BudgetedCall&) = delete;
-
- private:
-  ScriptBudget& budget_;
-};
-
 // The error a call that runs too long ends with. Not a StandardError: a bare `rescue` does not
 // take it for one of the script's own. (Rooted: a script removing the constant cannot free it.)
 RClass* define_timeout_class(mrb_state* mrb) {
@@ -189,7 +177,7 @@ std::string RubyVm::describe_exception(mrb_value exception) {
   std::string text;
   DescribeRequest request{exception, &text};
   // (Protected, and on a budget of its own: an exception's own inspect may raise, or never return.)
-  const BudgetedCall budgeted(budget_);
+  const BudgetCall budgeted(budget_);
   mrb_protect_error(mrb_, run_describe, &request, &failed);
   const bool described = !failed && !text.empty();
   return described ? text : "unknown Ruby error";
@@ -200,7 +188,7 @@ RubyResult RubyVm::run_protected(mrb_protect_error_func* body, void* request) {
   mrb_bool failed = false;
   RubyResult result;
   {
-    const BudgetedCall budgeted(budget_);
+    const BudgetCall budgeted(budget_);
     result.value = mrb_protect_error(mrb_, body, request, &failed);
   }
   if (failed) return failed_result(result.value, body == run_eval);
@@ -223,7 +211,7 @@ void RubyVm::finish_reload_failure() {
   if (!reload_ownership_) return;
   ObservationRequest request{reload_ownership_.get(), false};
   mrb_bool failed = false;
-  const BudgetedCall budgeted(budget_);
+  const BudgetCall budgeted(budget_);
   mrb_protect_error(mrb_, run_observation, &request, &failed);
   if (failed) reload_ownership_->invalidate();
 }
