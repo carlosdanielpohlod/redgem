@@ -135,9 +135,15 @@ void NetworkSession::forget_game_state() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();
-  poses_ = PoseBaselines();
   held_.clear();
   rejoin_ = Rejoin();
+  forget_objects();
+}
+
+void NetworkSession::forget_objects() {
+  poses_ = PoseBaselines();
+  movement_.clear();
+  diverged_.clear();
 }
 
 void NetworkSession::say_bye() {
@@ -154,6 +160,7 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   std::vector<NetworkEvent> events;
   if (offline()) return events;
   events.swap(pending_events_);
+  movement_.advance(seconds);
   tend_newcomers(seconds);
   on_the_way(seconds, events);
   // By index: handling a message may add nothing to links_, but keep it obvious. (And any of
@@ -209,6 +216,7 @@ void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
   if (gone == peers_.end()) return;  // nobody the game heard of
   peers_.erase(gone, peers_.end());
   poses_.heard.forget(peer);
+  forget_movement_of(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer));
 }
 

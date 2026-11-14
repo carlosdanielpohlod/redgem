@@ -206,10 +206,17 @@ struct AnimationChannel {
   std::vector<float> values;
 };
 
+// A named moment of a clip authored with it (a footstep, a hit frame), read from the glTF.
+struct AnimationMarker {
+  std::string name;
+  float at = 0.0f;  // normalized: 0 is the clip's start, 1 its end
+};
+
 struct AnimationDesc {
   std::string name;
   float duration = 0.0f;  // seconds
   std::vector<AnimationChannel> channels;
+  std::vector<AnimationMarker> markers;  // in no particular order
 };
 
 struct NodeDesc {
