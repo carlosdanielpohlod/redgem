@@ -11,6 +11,8 @@
 namespace redgem {
 
 // The Ruby scripts open in the editor, one tab each (like a code editor's open files).
+std::filesystem::path project_script_source(const std::filesystem::path& root, const std::filesystem::path& source);
+
 class ScriptWorkspace {
  public:
   explicit ScriptWorkspace(std::filesystem::path scripts_dir) : scripts_dir_(std::move(scripts_dir)) {}
@@ -19,6 +21,7 @@ class ScriptWorkspace {
   // Opens a script in a new tab, or brings its tab to the front if it is already open.
   // Returns the tab, or nullptr with `error` set.
   ScriptEditor* open(const std::string& file_name, std::string& error);
+  bool open_at(const std::filesystem::path& source, std::size_t line, std::string& error);
   ScriptEditor* find(const std::string& file_name);
   const std::vector<std::unique_ptr<ScriptEditor>>& tabs() const { return tabs_; }
   // Closes a tab, dropping unsaved changes (the UI asks first).

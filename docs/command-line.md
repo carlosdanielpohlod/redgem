@@ -87,6 +87,7 @@ renames and reparenting. New objects get hexadecimal identities: take them from 
 | `redgem scene set <game> <object> key=value...` | changes the object and saves the scene |
 | `redgem scene add <game> <name> [--from <object>] [--parent <object>] [key=value...]` | adds an empty object, or a copy of another (with its children), and saves |
 | `redgem scene remove <game> <object>` | removes the object and its children, and saves |
+| `redgem scene compact <game>` | rewrites the scene with repeated data written once and without data no object uses, and says how many bytes it left out |
 | `redgem scene diff <game> --against <before.glb>` | compares the current scene with an earlier save, without changing either file |
 | `redgem scene diff <game> --revision <revision>` | compares the current scene with the scene a Git revision saved (`HEAD`, `HEAD~1`, `main`, a commit hash); `--against <revision>` does the same |
 
