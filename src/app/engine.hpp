@@ -236,6 +236,8 @@ class Engine {
   void finish_scene_load(LoadResult loaded);
 
   void fixed_step(float dt);
+  // Before a physics step: the water notes bodies that appeared or jumped, and holds up what floats.
+  void prepare_water();
   // Whether a contact is between two objects that are both still there to hear of it.
   bool both_alive(const ContactEvent& event) const;
   void process_destroyed();

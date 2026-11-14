@@ -152,3 +152,13 @@ TEST_CASE("a mesh collider stays on what does not move and becomes a box on what
   CHECK(lift.collider == ColliderShape::Box);
   CHECK(lift.warnings.size() == 1);
 }
+
+TEST_CASE("a body's density says how it floats, half as dense as water unless said") {
+  CHECK(body_config_from_props({{"body", std::string("dynamic")}}).density == doctest::Approx(kDefaultBodyDensity));
+  const BodyConfig stone = body_config_from_props({{"body", std::string("dynamic")}, {"density", 2500.0}});
+  CHECK(stone.density == doctest::Approx(2500.0f));
+  CHECK(stone.warnings.empty());
+  const BodyConfig wrong = body_config_from_props({{"body", std::string("dynamic")}, {"density", -3.0}});
+  CHECK(wrong.density == doctest::Approx(kDefaultBodyDensity));
+  CHECK(wrong.warnings.size() == 1);
+}

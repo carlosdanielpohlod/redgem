@@ -1,5 +1,8 @@
 #include "app/frame_painter.hpp"
 
+#include "app/scene_water.hpp"
+#include "render/render_math.hpp"
+
 namespace redgem {
 
 void FramePainter::follow_game(const FrameView& view) {
@@ -22,8 +25,14 @@ void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {
 
 void FramePainter::paint_world(const FrameView& view, const RenderTexture2D* output) {
   follow_game(view);
-  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles, view.water_ripples,
-                       view.debug_draw);
+  const Camera3D camera = renderer_.scene_camera(view.scene);
+  renderer_.set_underwater(underwater_of(view, camera));
+  renderer_.draw_world(view.scene, camera, output, &view.particles, view.water_ripples, view.debug_draw);
+}
+
+UnderwaterView FramePainter::underwater_of(const FrameView& view, const Camera3D& camera) {
+  if (view.water_surfaces == nullptr) return {};
+  return underwater_view(*view.water_surfaces, render_math::to_vec3(camera.position));
 }
 
 // What is flat goes over the finished picture: the game's interface, then a touch screen's controls.

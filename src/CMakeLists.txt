@@ -314,12 +314,14 @@ redgem_add_library(redgem_runtime
   scene/particle_look.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
+  scene/water_volume.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -402,6 +404,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -460,6 +463,7 @@ redgem_add_library(redgem_runtime
   render/renderer_see_through.cpp
   render/renderer_water.cpp
   render/water_ripple_packet.cpp
+  render/underwater.cpp
   render/renderer_water_ripples.cpp
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp

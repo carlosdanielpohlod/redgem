@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "physics/buoyancy.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/property.hpp"
@@ -18,6 +19,9 @@ struct BodyConfig {
   ColliderShape collider = ColliderShape::Box;
   bool trigger = false;
   float mass = 0.0f;
+  // Kilograms per cubic meter, as a whole: what water does to it (physics/buoyancy.hpp). Less
+  // than water's 1000 floats, more sinks.
+  float density = kDefaultBodyDensity;
   // A collision layer's name (physics/collision_layers.hpp); one the game lacks means the default
   // layer (bodies::create warns of it).
   std::string layer = kDefaultLayerName;

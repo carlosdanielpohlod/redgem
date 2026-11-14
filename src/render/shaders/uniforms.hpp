@@ -121,6 +121,9 @@ inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
 inline constexpr const char* kMotionBlur = "motionBlur";
+inline constexpr const char* kUnderwater = "underwater";
+inline constexpr const char* kUnderwaterAbsorption = "underwaterAbsorption";
+inline constexpr const char* kDepthTexture = "depthTexture";
 inline constexpr const char* kGradeTime = kTime;  // the tone mapping shader names its clock the same
 
 // The most point lights that light a surface at once: MAX_POINT_LIGHTS in the shaders, defined

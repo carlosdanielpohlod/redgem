@@ -140,7 +140,7 @@ void Engine::fixed_step(float dt) {
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
+  prepare_water();
   bodies::push_poses(scene_, *physics_);
   physics_->step(dt);
   bodies::pull_poses(scene_, *physics_);
@@ -152,6 +152,11 @@ void Engine::fixed_step(float dt) {
   context_.time.elapsed += dt;
 }
 
+void Engine::prepare_water() {
+  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
+  apply_scene_buoyancy(water_, scene_, scene_desc_, *physics_);
+}
+
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
   append_debug_labels(context_, debug_draw_);
@@ -160,7 +165,7 @@ void Engine::present() {
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
-                       shows_profile_stats(context_), &debug_draw_});
+                       shows_profile_stats(context_), &debug_draw_, &water_.surfaces()});
 }
 
 int Engine::run() {

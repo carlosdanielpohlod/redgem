@@ -19,6 +19,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
@@ -305,6 +306,16 @@ Where the characters a game moves can walk, and the way from one place to anothe
 - `Navigation.stats`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
 
 The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## Water
+
+Where the scene's water is: the height of its surface, and how deep a point is under it. See [gameplay.md#float-in-water](gameplay.md#float-in-water).
+
+- `Water.height_at(x, z)`: the height of the water surface over that point of the ground, or nil where there is no water
+- `Water.depth_at(point)`: how far below the water surface a point is in meters (negative above it), or nil where there is no water
+- `Water.under?(point)`: whether a point is below the water surface
+
+Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
 
 ## CharacterController
 

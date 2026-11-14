@@ -10,6 +10,16 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
+  displace and drags as they move, so bodies bob, settle and flat ones right themselves. The new
+  `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep a body
+  floats; denser than water's 1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, fading in as the camera goes under the waves so crossing the surface
+  never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

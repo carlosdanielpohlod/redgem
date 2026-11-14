@@ -6,6 +6,8 @@ namespace redgem::shaders {
 
 // HDR scene + bloom -> exposure, filmic tone mapping (ACES fit), vignette, gamma.
 // Alpha carries the luma, which the anti-aliasing pass reads.
+// Under water (underwater > 0) the picture wobbles a little and fades with distance into the
+// water's own color, what its absorption leaves of the light (render/underwater.hpp).
 inline constexpr const char* kCompositeFragment = R"GLSL(
 #version 330
 in vec2 fragTexCoord;
@@ -22,6 +24,11 @@ uniform float grain;         // film grain strength
 uniform float aberration;    // color fringing toward the corners
 uniform float motionBlur;    // 0..1: streaks away from the center, as when moving fast
 uniform float time;
+uniform float underwater;            // 0 above the water, 1 under it, between while crossing
+uniform vec3 underwaterAbsorption;   // per meter
+uniform sampler2D depthTexture;      // the scene's depth, to know how much water each pixel is seen through
+uniform float nearPlane;
+uniform float farPlane;
 out vec4 finalColor;
 const float GAMMA = 2.2;
 const int BLUR_TAPS = 10;
@@ -44,7 +51,31 @@ const float EDGE_DISTANCE = 2.0;      // distances from the middle are counted s
 const float NOISE_MIDDLE = 0.5;       // noise is 0..1: around this it darkens as often as it lightens
 const vec2 NOISE_DIRECTION = vec2(12.9898, 78.233);  // the usual one-line hash: a sine too fast to follow
 const float NOISE_SCALE = 43758.5453;
+const float WOBBLE_REACH = 0.004;     // of the picture: how far under water bends it
+const float WOBBLE_FREQUENCY = 23.0;  // ripples across the picture
+const float WOBBLE_SPEED = 1.7;       // radians per second
+const float FOG_SCALE = 2.0;          // particles in the water scatter as much again as it absorbs
+const float FOG_COLOR_DEPTH = 4.0;    // meters of water the light reaching the camera came through
+const float FOG_BRIGHTNESS = 0.35;    // linear light of the water's own color
 float noise(vec2 at) { return fract(sin(dot(at, NOISE_DIRECTION)) * NOISE_SCALE); }
+
+vec2 underwaterWobble(vec2 at) {
+  vec2 phase = at.yx * WOBBLE_FREQUENCY + vec2(time * WOBBLE_SPEED);
+  return vec2(sin(phase.x), cos(phase.y)) * WOBBLE_REACH * underwater;
+}
+
+// How far from the camera the surface a pixel shows is, in meters (the far plane for the sky).
+float viewDistance(vec2 at) {
+  float ndc = texture(depthTexture, at).r * 2.0 - 1.0;
+  return 2.0 * nearPlane * farPlane / (farPlane + nearPlane - ndc * (farPlane - nearPlane));
+}
+
+vec3 underwaterFog(vec3 scene, vec2 at) {
+  if (underwater <= 0.0) return scene;
+  vec3 through = exp(-underwaterAbsorption * viewDistance(at) * FOG_SCALE);
+  vec3 water = exp(-underwaterAbsorption * FOG_COLOR_DEPTH) * FOG_BRIGHTNESS;
+  return mix(scene, scene * through + water * (1.0 - through), underwater);
+}
 
 // The lit scene at a point, with the lens's color fringes: red and blue land a little apart.
 vec3 lens(vec2 at, vec2 fromMiddle) {
@@ -53,8 +84,9 @@ vec3 lens(vec2 at, vec2 fromMiddle) {
 }
 
 void main() {
-  vec2 fromMiddle = fragTexCoord - MIDDLE;
-  vec3 scene = lens(fragTexCoord, fromMiddle);
+  vec2 at = fragTexCoord + underwaterWobble(fragTexCoord);
+  vec2 fromMiddle = at - MIDDLE;
+  vec3 scene = lens(at, fromMiddle);
   if (motionBlur > 0.0) {
     // Speed: everything streaks away from where the camera is heading, more toward the edges.
     float streak = motionBlur * BLUR_REACH * smoothstep(BLUR_CLEAR_RADIUS, 1.0, length(fromMiddle) * EDGE_DISTANCE);
@@ -62,12 +94,13 @@ void main() {
     // as fine noise instead of bands.
     float start = noise(gl_FragCoord.xy + fract(time) * NOISE_DRIFT);
     for (int tap = 1; tap < BLUR_TAPS; tap++) {
-      scene += lens(fragTexCoord - fromMiddle * streak * ((float(tap) - start) / float(BLUR_TAPS - 1)), fromMiddle);
+      scene += lens(at - fromMiddle * streak * ((float(tap) - start) / float(BLUR_TAPS - 1)), fromMiddle);
     }
     scene /= float(BLUR_TAPS);
   }
-  scene *= mix(1.0, texture(occlusionTexture, fragTexCoord).r, occlusionAmount);
-  vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure;
+  scene *= mix(1.0, texture(occlusionTexture, at).r, occlusionAmount);
+  scene = underwaterFog(scene, at);
+  vec3 color = (scene + texture(bloomTexture, at).rgb * bloomStrength) * exposure;
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
   float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);
