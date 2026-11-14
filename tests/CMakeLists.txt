@@ -2,6 +2,8 @@ add_executable(redgem_tests
   test_main.cpp
   unit/math_test.cpp
   unit/collision_layers_test.cpp
+  unit/nav_settings_test.cpp
+  unit/nav_path_test.cpp
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
@@ -174,6 +176,8 @@ add_executable(redgem_tests
   integration/physics_world_test.cpp
   integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
+  integration/navigation_bake_test.cpp
+  integration/navigation_api_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
