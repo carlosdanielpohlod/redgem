@@ -61,7 +61,8 @@ class EvalBudget {
 };
 
 std::string string_of(mrb_value value) {
-  if (!mrb_string_p(value)) return kNotAString;
+  const bool is_text = mrb_string_p(value);
+  if (!is_text) return kNotAString;
   return {RSTRING_PTR(value), static_cast<std::size_t>(RSTRING_LEN(value))};
 }
 

@@ -18,18 +18,29 @@ struct HttpClient::Job {
 
   // Carries the request out on a thread of its own, which holds the job (throws std::system_error
   // when the system has no thread left).
-  static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url,
-                    std::shared_ptr<const TrustStore> trust) {
-    std::thread([job, request = std::move(request), url = std::move(url), trust = std::move(trust)] {
-      run_engine_thread([&] { job->carry_out(request, url, trust); });
+  static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url, const HttpClient& client) {
+    std::thread([job, request = std::move(request), url = std::move(url), trust = client.trust_,
+                 clock = client.clock_] {
+      run_engine_thread([&] { job->carry_out(request, url, trust, *clock); });
     }).detach();
   }
 
-  void carry_out(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust) {
-    response = exchange(request, url, trust, cancelled);
+  void carry_out(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
+                 const Clock& clock) {
+    response = exchange(request, url, trust, cancelled, clock);
     done.store(true);
   }
 };
+
+namespace {
+
+// The program's steady clock, shared by nobody: it lasts as long as the program.
+std::shared_ptr<const Clock> shared_steady_clock() { return {std::shared_ptr<const Clock>(), &steady_clock()}; }
+
+}  // namespace
+
+HttpClient::HttpClient(std::shared_ptr<const TrustStore> trust, std::shared_ptr<const Clock> clock)
+    : trust_(std::move(trust)), clock_(clock ? std::move(clock) : shared_steady_clock()) {}
 
 HttpClient::~HttpClient() {
   // The threads hold their jobs themselves: they end on their own, with nobody to tell.
@@ -54,7 +65,7 @@ void HttpClient::launch(int id, HttpRequest request, Url url) {
   auto job = std::make_shared<Job>();
   job->id = id;
   try {
-    Job::start(job, std::move(request), std::move(url), trust_);
+    Job::start(job, std::move(request), std::move(url), *this);
     jobs_.push_back(std::move(job));
   } catch (const std::system_error&) {
     refused_.push_back({id, HttpResponse::failure("the system has no thread left to send the request on")});
