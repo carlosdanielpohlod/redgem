@@ -18,6 +18,26 @@ void preference_field(const char* key, float& value, float min, float max) {
                      ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic);
 }
 
+void draw_key_choice(FlyBindings& bindings, FlyDirection direction, Key key) {
+  if (!can_bind_fly_key(key)) return;
+  const bool selected = bindings.*direction == key;
+  if (ImGui::Selectable(fly_key_label(key).c_str(), selected)) rebind_fly_key(bindings, direction, key);
+  if (selected) ImGui::SetItemDefaultFocus();
+}
+
+void draw_fly_binding(FlyBindings& bindings, const FlyBindingField& field) {
+  ImGui::SetNextItemWidth(ui::scaled(kFieldWidth));
+  const auto label = fly_key_label(bindings.*field.direction);
+  if (!ImGui::BeginCombo(tr(field.label), label.c_str())) return;
+  for (const Key key : all_keys()) draw_key_choice(bindings, field.direction, key);
+  ImGui::EndCombo();
+}
+
+void draw_fly_bindings(FlyBindings& bindings) {
+  ImGui::SeparatorText(tr("editor.preferences.fly_keys"));
+  for (const auto& field : kFlyBindingFields) draw_fly_binding(bindings, field);
+}
+
 void draw_fields(EditorPreferences& values) {
   preference_field("editor.preferences.fly", values.fly_speed, kMinFlySpeed, kMaxFlySpeed);
   preference_field("editor.preferences.translate", values.translate_snap, kMinSnapStep, kMaxSnapStep);
@@ -51,6 +71,7 @@ void EditorApp::draw_preferences_dialog() {
   }
   if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   draw_fields(edited_preferences_);
+  draw_fly_bindings(edited_preferences_.fly_bindings);
   draw_preferences_actions();
   ImGui::EndPopup();
 }

@@ -49,13 +49,19 @@ constexpr const char* kShortcuts[][kShortcutColumns] = {
     {kKeysBottomPanel, "editor.shortcuts.bottom_panel"},
 };
 
-void draw_shortcuts_table() {
+const char* shortcut_keys(const char* key, const FlyBindings& bindings) {
+  if (std::string_view(key) != "editor.keys.fly") return tr(key);
+  static FilledTexts fly("editor.keys.fly", "keys");
+  return fly.with(fly_binding_labels(bindings));
+}
+
+void draw_shortcuts_table(const FlyBindings& bindings) {
   if (!ImGui::BeginTable(kShortcutsTableId, kShortcutColumns, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV))
     return;
   for (const auto& [keys, action] : kShortcuts) {
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    ImGui::TextColored(ui::accent_color(), "%s", tr(keys));
+    ImGui::TextColored(ui::accent_color(), "%s", shortcut_keys(keys, bindings));
     ImGui::TableNextColumn();
     ImGui::TextUnformatted(tr(action));
   }
@@ -187,7 +193,7 @@ void EditorApp::draw_shortcuts_dialog() {
     shortcuts_open_ = false;
   }
   if (!ImGui::BeginPopupModal(shortcuts_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-  draw_shortcuts_table();
+  draw_shortcuts_table(preferences_.fly_bindings);
   if (ImGui::Button(tr("editor.shortcuts.close"))) ImGui::CloseCurrentPopup();
   ImGui::EndPopup();
 }

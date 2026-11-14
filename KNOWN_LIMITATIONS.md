@@ -222,7 +222,7 @@ not a promise of how it will be closed.
   synchronous, limited to 64 MiB and embedded GLB buffers, and needs the original scene to remain
   loadable when reopening. Linked images keep their existing paths; scripts and external assets
   are not backed up. See [scene recovery](docs/editor.md#scene-recovery).
-- No animation preview or configurable editor key bindings; dark theme only.
+- No animation preview. Only fly camera movement keys can be rebound; dark theme only.
 - Automatic monitor scaling applies to editor text and spacing. The scene preview renders at
   logical viewport resolution, and there is no manual scale override.
 

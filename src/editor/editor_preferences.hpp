@@ -4,6 +4,7 @@
 #include <string>
 
 #include "editor/editor_config.hpp"
+#include "editor/editor_fly_bindings.hpp"
 
 namespace redgem {
 
@@ -18,6 +19,7 @@ struct EditorPreferences {
   float translate_snap = editor_config::kTranslateSnap;
   float rotate_snap = editor_config::kRotateSnapDegrees;
   float scale_snap = editor_config::kScaleSnap;
+  FlyBindings fly_bindings{};
 };
 
 std::filesystem::path editor_preferences_file();
