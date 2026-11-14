@@ -254,3 +254,16 @@ TEST_CASE("every face of a chain keeps its glyph cache bounded") {
   }
   CHECK(atlas_of(fonts, "mono", kFullBlock) != 0);
 }
+
+TEST_CASE("a letter no face of a chain has shows the built-in question mark without growing its atlas") {
+  RenderStage stage;
+  ChainFiles files;
+  GameFonts fonts;
+  fonts.set_directory(files.folder);
+  const int letters_before = fonts.get("", "A").glyphCount;
+  const auto pieces = fonts.layout("latin:mono", "\xf4\x8f\xbf\xbf", kChainTextPixels, 0.0f);
+  REQUIRE(pieces.size() == 1);
+  REQUIRE(pieces[0].font != nullptr);  // drawn, not taken for a line break
+  CHECK(pieces[0].font->glyphCount == letters_before);
+  CHECK(GetGlyphInfo(*pieces[0].font, kUnsupported).value == kQuestion);
+}

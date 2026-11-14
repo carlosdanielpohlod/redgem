@@ -2,7 +2,9 @@
 
 #include <raylib.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -56,7 +58,8 @@ class GameFonts {
   static bool can_draw(const Face& face, int codepoint);
   void read_face(Face& face, const std::string& name);
   void read_coverage(Face& face, const std::string& name);
-  std::vector<FontPiece> pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs);
+  std::vector<FontPiece> pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs,
+                                const std::function<bool(std::size_t, int)>& has_glyph);
   bool add_letters(Face& face, const std::string& text);
   bool add_letter(Face& face, int codepoint);
   void rebuild(Face& face);

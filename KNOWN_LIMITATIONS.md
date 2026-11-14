@@ -267,13 +267,16 @@ not a promise of how it will be closed.
   their isolated forms (not joined), Indic scripts without their conjuncts or reordered vowels, and
   there are no ligatures or kerning. Right-to-left text is put in its order on screen
   (the Unicode Bidirectional Algorithm, with SheenBidi) one line at a time; the line breaks
-  `UI.wrap` chooses are made before that ordering, and a right-to-left line is still placed by its
-  left edge (use `align: :right`). Texts over 64 KB are drawn as written.
+  `UI.wrap` chooses are made before that ordering, and each wrapped line goes the way of its own
+  first strong letter, so a line of a right-to-left paragraph that starts with a number or a Latin
+  word is laid out left to right. A right-to-left line is still placed by its left edge (use
+  `align: :right`). Texts over 64 KB are drawn as written.
 - The built-in font supports its own glyphs; other scripts, such as CJK, need a game-provided font,
   and a fallback chain (`UI.font = [:latin, :cjk, :emoji]`) of at most four game faces, then the
   built-in one, draws each letter with the first face that has it. Color emoji faces (bitmap or
   color tables) are not drawn: only outline (monochrome) emoji faces. Each face caches at most 2048
-  codepoints; four named game fonts can be cached at once, with at most 32 MB per font file.
+  codepoints; four named game fonts can be cached at once, with at most 32 MB per font file. The
+  faces of a chain are placed by the top of their line, not lined up on one baseline.
   Glyphs no face of the chain has (or that a full face has no room for) show as the built-in
   face's question mark.
 
