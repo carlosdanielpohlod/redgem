@@ -1,9 +1,9 @@
 #include "net/rooms/relay_program.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <iostream>
 
+#include "core/clock.hpp"
 #include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
@@ -86,11 +86,12 @@ void report_rooms(const RelayServer& relay, std::size_t& rooms) {
 }
 
 [[noreturn]] void serve_until_stopped(RelayServer& relay, stun::UdpStunServer& stun) {
+  const Clock& clock = steady_clock();
   std::size_t rooms = 0;
-  auto before = std::chrono::steady_clock::now();
+  double before = clock.now();
   for (;;) {
-    const auto now = std::chrono::steady_clock::now();
-    serve_relay_once(relay, std::chrono::duration<float>(now - before).count());
+    const double now = clock.now();
+    serve_relay_once(relay, static_cast<float>(now - before));
     stun.poll();
     before = now;
     report_rooms(relay, rooms);
@@ -151,9 +152,9 @@ RelayCommand parse_relay_command(const std::vector<std::string>& args) {
   return command;
 }
 
-void serve_relay_once(RelayServer& relay, float seconds) {
+bool serve_relay_once(RelayServer& relay, float seconds) {
   relay.poll(seconds);
-  relay.wait(kRelayWakeSeconds);
+  return relay.wait(kRelayWakeSeconds);
 }
 
 int run_relay_program(const std::vector<std::string>& args) {

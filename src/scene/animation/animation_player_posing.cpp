@@ -8,7 +8,7 @@
 namespace redgem {
 namespace {
 
-constexpr std::uint64_t kAnimationPaths = 3;  // translation, rotation, scale
+constexpr std::uint64_t kAnimationPaths = 4;  // translation, rotation, scale, weights
 
 // What tells one animated part of one object from every other.
 std::uint64_t part_key(ObjectId object, AnimationPath path) {
@@ -95,6 +95,7 @@ PoseOptions AnimationPlayer::character_options(ObjectId character, float weight,
   options.before = [this, &scene, weight](ObjectId object, AnimationPath path, Transform& local) {
     before_posing(scene, object, path, local, weight);
   };
+  options.before_weighing = [this, weight](GameObject& object) { before_weighing(object, weight); };
   return options;
 }
 
@@ -105,6 +106,11 @@ void AnimationPlayer::before_posing(const Scene& scene, ObjectId object, Animati
   } else {
     posed_.insert(part_key(object, path));
   }
+}
+
+void AnimationPlayer::before_weighing(GameObject& object, float weight) {
+  const bool first_this_frame = posed_.insert(part_key(object.id, AnimationPath::Weights)).second;
+  if (first_this_frame && weight < kWhole) object.morph_weights = object.morph_rest;
 }
 
 void AnimationPlayer::steady_base(const Scene& scene, ObjectId object, AnimationPath path, Transform& local) {

@@ -11,6 +11,7 @@
 #include "core/log.hpp"
 #include "render/mesh_builder.hpp"
 #include "render/mesh_pieces.hpp"
+#include "render/morph_shapes.hpp"
 #include "render/render_config.hpp"
 #include "render/texture_loading.hpp"
 #include "scene/scene_config.hpp"
@@ -37,8 +38,15 @@ void upload_joints(Mesh& mesh, const std::vector<std::uint16_t>& joints) {
   rlDisableVertexArray();
 }
 
-// One piece of a mesh, on the graphics card. A piece that cannot be drawn is reported and left out.
-std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t number, const std::string& mesh_name) {
+// Whether a piece has shape keys the morph texels had no room for.
+bool lost_shape_keys(const PrimitiveDesc& piece, const GpuPrimitive& part) {
+  return !piece.targets.empty() && part.morph_first < 0.0f;
+}
+
+// One piece of a mesh, on the graphics card, its shape keys' deltas added to `morph_deltas`. A
+// piece that cannot be drawn is reported and left out.
+std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t number, const std::string& mesh_name,
+                                         std::vector<float>& morph_deltas) {
   std::string error;
   std::optional<Mesh> mesh = build_mesh(piece, error);
   if (!mesh) {
@@ -48,14 +56,17 @@ std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t
   UploadMesh(&*mesh, false);
   const std::vector<std::uint16_t> joints = skin_joints(piece);
   if (!joints.empty()) upload_joints(*mesh, joints);
-  return GpuPrimitive{*mesh, piece.material, number, !joints.empty()};
+  GpuPrimitive part{*mesh, piece.material, number, !joints.empty()};
+  part.morph_first = render_math::append_morph_deltas(morph_deltas, piece, render_math::kMaxTexels);
+  if (lost_shape_keys(piece, part)) log::warning("mesh '" + mesh_name + "': too many shape keys to draw, left out");
+  return part;
 }
 
 // Keep the source primitive identity when a large primitive becomes several GPU pieces.
 void append_gpu_primitive(std::vector<GpuPrimitive>& parts, const PrimitiveDesc& source, std::size_t original,
-                          const std::string& name, std::size_t& number) {
+                          const std::string& name, std::size_t& number, std::vector<float>& morph_deltas) {
   for (const auto& piece : split_primitive(source, config::kMaxVerticesPerMesh)) {
-    auto uploaded = upload_piece(piece, number++, name);
+    auto uploaded = upload_piece(piece, number++, name, morph_deltas);
     if (!uploaded) continue;
     uploaded->primitive = original;
     parts.push_back(*uploaded);
@@ -63,11 +74,11 @@ void append_gpu_primitive(std::vector<GpuPrimitive>& parts, const PrimitiveDesc&
 }
 
 // The parts of a mesh, on the graphics card.
-std::vector<GpuPrimitive> upload_mesh(const MeshDesc& mesh_desc) {
+std::vector<GpuPrimitive> upload_mesh(const MeshDesc& mesh_desc, std::vector<float>& morph_deltas) {
   std::vector<GpuPrimitive> primitives;
   std::size_t number = 0;
   for (std::size_t index = 0; index < mesh_desc.primitives.size(); ++index) {
-    append_gpu_primitive(primitives, mesh_desc.primitives[index], index, mesh_desc.name, number);
+    append_gpu_primitive(primitives, mesh_desc.primitives[index], index, mesh_desc.name, number, morph_deltas);
   }
   return primitives;
 }
@@ -157,9 +168,21 @@ void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
 
 void Renderer::Impl::upload_new_meshes(const SceneDesc& desc) {
   for (std::size_t m = meshes.size(); m < desc.meshes.size(); ++m) {
-    meshes.push_back(upload_mesh(desc.meshes[m]));
-    mesh_bounds.push_back(desc.meshes[m].bounds);
+    meshes.push_back(upload_mesh(desc.meshes[m], morph_deltas));
+    mesh_bounds.push_back(render_math::drawn_bounds(desc.meshes[m]));
   }
+  if (morph_deltas.size() != morph_texture_floats) remake_morph_texture();
+}
+
+void Renderer::Impl::remake_morph_texture() {
+  if (morph_texture != 0) rlUnloadTexture(morph_texture);
+  const std::size_t row_floats = static_cast<std::size_t>(render_math::kTexelsPerRow) * render_math::kFloatsPerTexel;
+  const std::size_t rows = (morph_deltas.size() + row_floats - 1) / row_floats;
+  std::vector<float> whole_rows = morph_deltas;
+  whole_rows.resize(rows * row_floats);  // (a texture is whole rows)
+  morph_texture = rlLoadTexture(whole_rows.data(), render_math::kTexelsPerRow, static_cast<int>(rows),
+                                render_math::kTexelFormat, render_math::kTexelLevels);
+  morph_texture_floats = morph_deltas.size();
 }
 
 void Renderer::Impl::release_assets() {
@@ -183,6 +206,10 @@ void Renderer::Impl::release_meshes() {
   }
   meshes.clear();
   mesh_bounds.clear();
+  if (morph_texture != 0) rlUnloadTexture(morph_texture);
+  morph_texture = 0;
+  morph_deltas.clear();
+  morph_texture_floats = 0;
   see_through_meshes.clear();
   any_see_through = false;
 }
