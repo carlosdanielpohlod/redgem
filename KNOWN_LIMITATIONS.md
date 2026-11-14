@@ -211,8 +211,7 @@ not a promise of how it will be closed.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
-  existing blocks keep their old code. The script editor has no autocomplete, and console
-  backtraces do not jump to their lines.
+  existing blocks keep their old code. The script editor has no autocomplete.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
 - Scene recovery writes a separate copy at safe editing boundaries about once a minute. It is
