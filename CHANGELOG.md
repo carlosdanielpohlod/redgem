@@ -330,6 +330,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
 - **A program on Linux opens as many windows, one after another, as it likes**: closing a window
   unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
   storage of a library loaded again, so after about a hundred windows in one process the driver
