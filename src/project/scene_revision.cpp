@@ -42,6 +42,8 @@ constexpr std::string_view kRange = "..";
 constexpr const char* kAnswerFile = "git.txt";
 constexpr const char* kBlobFile = "blob.txt";
 constexpr const char* kSceneAtRevision = "revision.glb";
+constexpr const char* kShowErrors = "show.txt";  // what git says while it writes that scene
+constexpr const char* kInWorkTree = "true";      // what git answers kInsideWorkTree in one
 constexpr const char* kTrailingSpace = " \t\r\n";
 constexpr const char* kCurrentFolder = ".";
 
@@ -68,6 +70,13 @@ ProcessEnd git(const fs::path& folder, std::vector<std::string> words, const fs:
   return run_to_end(words, output);
 }
 
+// The same with what git prints as errors written to `errors`, apart from its output.
+ProcessEnd git_apart(const fs::path& folder, std::vector<std::string> words, const fs::path& output,
+                     const fs::path& errors) {
+  words.insert(words.begin(), {kGit, kFolderFlag, folder.string()});
+  return run_to_end(words, output, errors);
+}
+
 // What git said in `output`, without the line end it closes with.
 std::string git_said(const fs::path& output) {
   std::string error;
@@ -76,8 +85,14 @@ std::string git_said(const fs::path& output) {
   return said;
 }
 
+// The last line of what git said: after any warning, what it was asked for.
+std::string last_line(const std::string& said) { return said.substr(said.find_last_of(kLineEnd) + 1); }
+
+// Whether `folder` is in a repository's work tree (not merely in its .git folder, or a bare one).
 bool inside_repository(const fs::path& folder, const ScratchFolder& scratch) {
-  return ended_well(git(folder, {kRevParse, kInsideWorkTree}, scratch.path() / kAnswerFile));
+  const fs::path answer = scratch.path() / kAnswerFile;
+  if (!ended_well(git(folder, {kRevParse, kInsideWorkTree}, answer))) return false;
+  return last_line(git_said(answer)) == kInWorkTree;
 }
 
 // The folder git is run in: the scene file's.
@@ -93,9 +108,6 @@ ToolResult no_revision(const std::string& revision, const fs::path& scene_file, 
 std::string revision_file(const std::string& revision, const fs::path& scene_file) {
   return revision + kRevisionFileSeparator + kFromHere + scene_file.filename().generic_string();
 }
-
-// The last line of what git said: after any warning, the object name it was asked for.
-std::string last_line(const std::string& said) { return said.substr(said.find_last_of(kLineEnd) + 1); }
 
 bool object_name(const std::string& name) {
   const bool sized = name.size() >= kShortestObjectName;
@@ -132,13 +144,16 @@ bool valid_revision(const std::string& revision) {
 ToolResult compare_scene_revision(const SceneDesc& current, const std::string& name, const fs::path& scene_file,
                                   const std::string& revision, std::size_t limit) {
   if (!valid_revision(revision)) return failed(tr("project.scene.bad_revision", {{"revision", revision}}), kExitUsage);
+  if (!scene_file.has_filename()) return failed(tr("project.scene.never_saved"));
   const ScratchFolder scratch;  // (gone, with what git wrote in it, when this ends)
   const fs::path folder = folder_of(scene_file);
   if (!inside_repository(folder, scratch)) return failed(tr("project.scene.not_in_git", {{"folder", folder.string()}}));
   const auto blob = blob_at(folder, revision, scene_file, scratch.path() / kBlobFile);
   if (!blob) return no_revision(revision, scene_file, scratch.path() / kBlobFile);
+  // (Its errors apart: a warning in the scene's bytes would make it no scene.)
   const fs::path before = scratch.path() / kSceneAtRevision;
-  if (!ended_well(git(folder, {kShow, *blob}, before))) return no_revision(revision, scene_file, before);
+  const fs::path errors = scratch.path() / kShowErrors;
+  if (!ended_well(git_apart(folder, {kShow, *blob}, before, errors))) return no_revision(revision, scene_file, errors);
   return compare_scene_file(current, name, before, limit);
 }
 

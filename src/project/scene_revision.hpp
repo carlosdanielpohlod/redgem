@@ -2,9 +2,8 @@
 
 // A scene compared with the same scene as Git keeps it at a revision (`redgem scene diff <game>
 // --against HEAD~1`): `git rev-parse --verify <revision>:<file>` names the file's blob at that
-// revision, `git show <blob>` reads it (a full object name, which Git warns of nothing about, so
-// nothing but the scene is written), and it is compared, by persistent #id, as an earlier save
-// would be (scene_diff.hpp).
+// revision, `git show <blob>` reads it (its errors kept apart, so that nothing but the scene is
+// written), and it is compared, by persistent #id, as an earlier save would be (scene_diff.hpp).
 
 #include <cstddef>
 #include <filesystem>

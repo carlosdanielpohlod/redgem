@@ -14,6 +14,7 @@
 #include "core/platform.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_command.hpp"
+#include "project/scene_diff.hpp"
 #include "project/scene_revision.hpp"
 #include "project/tool_commands.hpp"
 
@@ -147,6 +148,18 @@ TEST_CASE("scene diff says when the revision or the repository is not there") {
   const ToolResult outside = scene_tool({"diff", loose.dir(), "--against", "HEAD"});
   CHECK(outside.exit_code == kExitFailure);
   CHECK(has(outside.err, "is in no Git repository"));
+}
+
+TEST_CASE("a scene never saved, or one in a repository's own .git folder, has no revision to compare with") {
+  const GameCopy committed("not_a_work_tree", true);
+  const SceneDesc nothing;
+  const ToolResult unsaved = compare_scene_revision(nothing, "main", fs::path(), "HEAD", kDefaultDiffLines);
+  CHECK(unsaved.exit_code == kExitFailure);
+  CHECK(has(unsaved.err, "has not been saved yet"));
+  const fs::path in_git_folder = fs::path(committed.dir()) / ".git" / "scene.glb";
+  const ToolResult in_git = compare_scene_revision(nothing, "main", in_git_folder, "HEAD", kDefaultDiffLines);
+  CHECK(in_git.exit_code == kExitFailure);
+  CHECK(has(in_git.err, "is in no Git repository"));
 }
 
 TEST_CASE("MCP scene_diff takes a revision or an earlier save, one of them") {

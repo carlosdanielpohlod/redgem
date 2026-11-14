@@ -218,6 +218,7 @@
   "project.scene.no_scene": "the game has no scene {scene}; its scenes are: {scenes}",
   "project.scene.not_an_assignment": "{word} is not key=value; the keys are: {keys}",
   "project.scene.nothing_to_set": "nothing to set: add key=value words (position=1,2,3 prop.speed=2 script+=Door)",
+  "project.scene.never_saved": "the scene has not been saved yet: no Git revision holds it",
   "project.scene.not_in_git": "{folder} is in no Git repository (or git is not on the PATH): a Git revision can be compared with only in a game kept in Git",
   "project.scene.only_equals": "{key} takes = only (not += or -=)",
   "project.scene.out_of_reach": "{key} takes numbers from -{largest} to {largest}, not {value}",
