@@ -17,7 +17,7 @@ class LlmsTxtTest(unittest.TestCase):
     def test_every_page_of_the_navigation_is_listed_with_its_description(self):
         index = llms_txt.index_text(self.manual)
         self.assertIn("## Scripting in Ruby", index)
-        api_page = "https://carlosdanielpohlod.github.io/redgem-site/manual/scripting/api/"
+        api_page = "https://www.redgem-engine.org/manual/scripting/api/"
         self.assertIn(f"- [API reference]({api_page}): ", index)
         for page in self.manual.pages:
             self.assertIn(f"[{page.title}](", index)
@@ -35,7 +35,7 @@ class LlmsTxtTest(unittest.TestCase):
     def test_the_full_text_is_every_page_without_its_front_matter(self):
         full = llms_txt.full_text(self.manual)
         self.assertNotIn("\ndescription: ", full)
-        self.assertIn("Page: https://carlosdanielpohlod.github.io/redgem-site/manual/command-line/", full)
+        self.assertIn("Page: https://www.redgem-engine.org/manual/command-line/", full)
         self.assertEqual(full.count("\nPage: "), len(self.manual.pages))
 
     def test_a_page_without_a_description_is_described_by_its_first_sentence(self):

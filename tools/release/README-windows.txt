@@ -17,7 +17,7 @@ Also here:
   redgem-relay.exe    the meeting point for multiplayer games over the internet
   redgem-server.exe   runs a game on a server, for players to join
 
-The manual: https://carlosdanielpohlod.github.io/redgem-site/manual/
+The manual: https://www.redgem-engine.org/manual/
 
 RedGem is MIT licensed (LICENSE). It is built on open source projects, listed with their
 licenses in THIRD_PARTY_LICENSES.md.
