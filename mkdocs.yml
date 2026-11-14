@@ -1,6 +1,6 @@
 site_name: RedGem 3D Engine
 site_description: The manual of RedGem, a 3D game engine where games are written in Ruby.
-site_url: https://carlosdanielpohlod.github.io/redgem-site/manual/
+site_url: https://www.redgem-engine.org/manual/
 docs_dir: docs
 theme:
   name: material
