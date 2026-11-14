@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -144,4 +146,42 @@ TEST_CASE("skeletons, vertex weights and animations are loaded") {
   const LoadResult rigid = load_gltf_scene(fixture("hierarchy.glb"));
   CHECK(rigid.scene.skins.empty());
   CHECK(rigid.scene.animations.empty());
+}
+
+TEST_CASE("a clip's markers are read from the redgem_events property of its extras") {
+  constexpr std::size_t kFloats = 8;  // two key times, then two positions
+  const std::array<float, kFloats> keys{0, 1, 0, 0, 0, 1, 0, 0};
+  const std::filesystem::path file =
+      std::filesystem::temp_directory_path() / ("redgem-markers-" + make_scene_id() + ".glb");
+  GlbFile glb;
+  glb.bin.resize(sizeof(keys));
+  std::memcpy(glb.bin.data(), keys.data(), sizeof(keys));
+  glb.json = nlohmann::json::parse(R"({
+    "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}],
+    "nodes": [{"name": "Hips"}],
+    "buffers": [{"byteLength": 32}],
+    "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 8}, {"buffer": 0, "byteOffset": 8, "byteLength": 24}],
+    "accessors": [
+      {"bufferView": 0, "componentType": 5126, "count": 2, "type": "SCALAR", "min": [0], "max": [1]},
+      {"bufferView": 1, "componentType": 5126, "count": 2, "type": "VEC3"}],
+    "animations": [{
+      "name": "Walk",
+      "channels": [{"sampler": 0, "target": {"node": 0, "path": "translation"}}],
+      "samplers": [{"input": 0, "output": 1}],
+      "extras": {"redgem_events": "footstep@0.25, footstep@0.75, oops@2"}}]})");
+  std::string error;
+  REQUIRE_MESSAGE(write_glb(file, glb, error), error);
+  const LoadResult result = load_gltf_scene(file.string());
+  std::filesystem::remove(file);
+  REQUIRE_MESSAGE(result.ok, result.error);
+  REQUIRE(result.scene.animations.size() == 1);
+  const std::vector<AnimationMarker>& markers = result.scene.animations[0].markers;
+  REQUIRE(markers.size() == 2);
+  CHECK(markers[0].name == "footstep");
+  CHECK(markers[0].at == doctest::Approx(0.25f));
+  CHECK(markers[1].at == doctest::Approx(0.75f));
+  const bool warned = std::any_of(result.warnings.begin(), result.warnings.end(), [](const std::string& warning) {
+    return warning.find("oops@2") != std::string::npos;
+  });
+  CHECK(warned);
 }

@@ -23,6 +23,7 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Vehicle/VehicleConstraint.h>
 
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -52,6 +53,7 @@ struct Record {
   Transform pose;
   bool has_target = false;
   Vec3 desired_move;
+  Vec3 pending_displacement;  // characters: root motion, gone through in the next step
   std::optional<float> pending_jump;
   std::set<ObjectId> overlaps;  // triggers only
 };
@@ -78,7 +80,7 @@ inline bool is_movable_body(const Record* record) { return has_body(record) && r
 
 class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterContactListener {
  public:
-  World(Vec3 gravity, const CollisionLayers& layers);
+  World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodies);
   ~World() override;
 
   std::optional<std::string> add_object(const BodyDesc& desc) override;
@@ -97,6 +99,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void set_velocity(ObjectId object, Vec3 velocity) override;
   void add_impulse(ObjectId object, Vec3 impulse) override;
   void set_character_move(ObjectId object, Vec3 horizontal_velocity) override;
+  void add_character_displacement(ObjectId object, Vec3 offset) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
@@ -184,7 +187,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
 
   // Rigid bodies.
   void create_body(const BodyDesc& desc, const ShapeInfo& info, Record& record);
-  // The world holds config::kMaxBodies bodies already: the object is left without one, said once.
+  // The world holds all the bodies it was sized for already: the object is left without one, said once.
   void tell_bodies_full();
   void release_body(Record& record);
   void teleport_body(Record& record, const Transform& world);
@@ -237,6 +240,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   BroadPhaseLayers broad_phase_layers_;
   ObjectVsBroadPhase object_vs_broad_phase_;
   ObjectPairs object_pairs_{layers_};
+  BodyCapacity capacity_;  // (before what is sized by it)
   JPH::TempAllocatorImpl temp_allocator_;
   JPH::JobSystemSingleThreaded job_system_;
   JPH::PhysicsSystem system_;

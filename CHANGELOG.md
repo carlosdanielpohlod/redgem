@@ -24,6 +24,28 @@ until 1.0, a release may change what games rely on (see
   and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
   how much.
 
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
 - **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
   of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
   pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
@@ -314,6 +336,12 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries opening a window loads now stay
+  loaded until the program ends. A system test opens, draws in and closes 300 windows in one
+  process.
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).
