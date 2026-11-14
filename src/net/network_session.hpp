@@ -139,6 +139,10 @@ class NetworkSession {
   // turned away with `reason` (cut to kMaxReasonBytes). False when there is nobody to decide on any
   // more: the newcomer left, was decided on already, or the time to decide ran out.
   bool decide(int ticket, bool accepted, const std::string& reason = {});
+  // Lets `peer` go from the game hosted here (one that took too long to load a level): its
+  // connection closes, and everyone hears that it left. In a room this machine opened on a relay,
+  // the relay is asked to. False when this machine does not host, or for nobody in the game.
+  bool dismiss(int peer);
   // Reconnecting, on the machine hosting (directly, or a dedicated server's room): a machine whose
   // connection drops keeps its place and id for `seconds` (at most kMostReconnectWindowSeconds; 0,
   // the default, turns it off), and gets them back by calling again with the token its welcome
@@ -309,6 +313,8 @@ class NetworkSession {
   // and is not asking already.
   bool new_asker(int peer) const;
   bool decide_in_room(int ticket, bool accepted, const std::string& reason);
+  // Whether `peer` is another machine in the game hosted here, one it can let go.
+  bool can_dismiss(int peer) const { return hosting() && peer != kHostId && knows(peer); }
   void send_verdict(int peer, bool accepted, const std::string& reason = {});
   void wait_for_room_decisions(float seconds);
   // Someone left the room, or gave up waiting to be let in.

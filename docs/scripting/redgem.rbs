@@ -787,17 +787,17 @@ end
 
 # The game itself.
 module Game
-  # switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive
-  def self.load_scene: (String | Symbol name) -> void
-  # queues a background scene read; the old world survives failed reads and cancellation
-  def self.load_scene_async: (String | Symbol name) -> void
+  # switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive. In a network game only the host may, and every machine changes level with it (false elsewhere)
+  def self.load_scene: (String | Symbol name) -> (bool | nil)
+  # queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)
+  def self.load_scene_async: (String | Symbol name) -> (bool | nil)
   # a scene request is queued or being read
   def self.loading?: () -> bool
   # the requested scene name, or nil
   def self.loading_scene: () -> (String | nil)
   # the last asynchronous read error, or nil; cleared by the next load request
   def self.loading_error: () -> (String | nil)
-  # cancels a pending asynchronous request; returns whether one was pending
+  # cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)
   def self.cancel_scene_load: () -> bool
   # draws the loading screen each frame with unscaled delta; no block restores the default
   def self.on_loading: () ?{ (Float) -> void } -> void
@@ -1097,6 +1097,16 @@ module Network
   def self.identity: (Integer peer) -> untyped
   # a peer's name
   def self.player_name: (Integer peer) -> (String | nil)
+  # the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call
+  def self.on_level_loading: () { (String) -> void } -> void
+  # every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call
+  def self.on_level_ready: () { (String) -> void } -> void
+  # the machines are between two levels: loading, or waiting for each other
+  def self.changing_level?: () -> bool
+  # seconds the host, once it has a new level, waits for the others to have it (30); later ones are let go
+  def self.level_timeout: () -> Float
+  # sets it
+  def self.level_timeout=: (Numeric seconds) -> Float
   # spawns a copy on every machine
   def self.spawn: (String template, ?owner: Integer, ?position: Vector3 | nil, ?rotation: Vector3 | nil) -> (GameObject | nil)
   # lets guests spawn those templates
