@@ -771,12 +771,18 @@ module Debug
   def self.stats_visible=: (bool visible) -> bool
   # a snapshot with samples, fps and latest/mean/peak timings in milliseconds
   def self.frame_stats: () -> Hash[Symbol, untyped]
-  # clears statistics and discards any unfinished measurement
+  # clears statistics, the scripts' profile and any unfinished measurement
   def self.reset_frame_stats: () -> void
+  # the scripts' methods the sampling profiler caught most often running their own code: hashes of name, self, total, self_percent and total_percent
+  def self.script_profile: (?Integer count) -> Array[Hash[Symbol, String | Integer | Float]]
+  # writes the whole scripts' profile as tab-separated columns to script_profile.tsv in the game's data folder; returns the file's path
+  def self.export_script_profile: () -> String
   # draws a world-space line for this frame; returns whether it was accepted
   def self.line: (Vector3 from, Vector3 to, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
   # draws an axis-aligned wire box with full nonnegative size for this frame; returns whether it was accepted
   def self.box: (Vector3 center, Vector3 size, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
+  # draws text centered where the main camera shows the world point `at` for this frame; returns whether it was accepted
+  def self.label: (untyped text, at: Vector3, ?color: RedGem::color, ?alpha: Integer, ?size: Integer) -> bool
 end
 
 # The game itself.
