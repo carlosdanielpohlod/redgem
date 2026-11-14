@@ -8,6 +8,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "core/game_files.hpp"
 #include "editor/document/scene_document.hpp"
 #include "test_support.hpp"
 
@@ -740,8 +741,12 @@ TEST_CASE("Ruby two dimensional animation graphs require a parameter pair") {
   CHECK(fails(*engine, "Animation::Graph.new(initial: :move).blend_2d(:move, parameters: [:x], clips: [])"));
 }
 
-TEST_CASE("Ruby spawns a rigid prefab file with its children and shares its mesh assets") {
+TEST_CASE("Ruby spawns a nested rigid prefab from an archive and shares its mesh assets") {
   const TempSave temporary;
+  struct UnmountGame {
+    ~UnmountGame() { game_files::unmount(); }
+  };
+  const UnmountGame unmount;
   const auto folder = temporary.dir / config::kPrefabsDirName;
   std::filesystem::create_directories(folder);
   auto prefab = SceneDocument::create_empty(folder / "crate.glb");
@@ -749,6 +754,22 @@ TEST_CASE("Ruby spawns a rigid prefab file with its children and shares its mesh
   prefab.add_primitive(PrimitiveShape::Cube, "Lid", {}, root);
   std::string error;
   REQUIRE_MESSAGE(prefab.save(error), error);
+  const auto outer_file = folder / "outer.glb";
+  auto outer = SceneDocument::create_empty(outer_file);
+  const int placement = outer.add_empty("LinkedCrate");
+  outer.set_prop(placement, props::kPrefabFile, std::string("prefabs/crate.glb"));
+  REQUIRE_MESSAGE(outer.save(error), error);
+  {
+    const auto archive_file = temporary.dir / "built.rgpak";
+    const std::vector<ArchiveInput> inputs = {
+        archive_input_from_file("prefabs/outer.glb", outer_file),
+        archive_input_from_file("prefabs/crate.glb", folder / "crate.glb")};
+    REQUIRE_MESSAGE(write_game_archive(archive_file, inputs, ArchiveCompression::None, error), error);
+    auto archive = GameArchive::open(archive_file, error);
+    REQUIRE_MESSAGE(archive.has_value(), error);
+    std::filesystem::remove_all(folder);
+    game_files::mount(temporary.dir, std::move(*archive));
+  }
 
   const auto scene = small_scene();
   EngineOptions options;
@@ -758,8 +779,8 @@ TEST_CASE("Ruby spawns a rigid prefab file with its children and shares its mesh
   auto started = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(started));
   auto engine = gameplay_engine(std::move(std::get<std::unique_ptr<Engine>>(started)));
-  CHECK(ruby(*engine, "Scene.spawn_prefab('crate.glb', name: 'First', physics: false).name") == "First");
-  CHECK(ruby(*engine, "Scene.spawn_prefab('crate.glb', name: 'Second', physics: false).name") == "Second");
+  CHECK(ruby(*engine, "Scene.spawn_prefab('outer.glb', name: 'First', physics: false).name") == "First");
+  CHECK(ruby(*engine, "Scene.spawn_prefab('outer.glb', name: 'Second', physics: false).name") == "Second");
   const auto& world = engine->scene();
   const auto first = world.find("First");
   const auto second = world.find("Second");
