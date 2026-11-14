@@ -29,6 +29,11 @@ bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pa
          render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 
+// Whether a view draws an object (see `seen`) and its winding is the one asked for.
+bool seen_wound(const ObjectSight& sight, const render_math::View& view, bool depth_pass, bool mirrored) {
+  return sight.mirrored == mirrored && seen(sight, view, depth_pass);
+}
+
 // Whether the picture's samples smooth a material's cut-out edges (alpha to coverage): one cut out
 // by a cutoff, not a dithered one or one mixed with what is behind it.
 bool smooths_edges(const render_math::AlphaTest& test) {
@@ -146,6 +151,7 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
       depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
       depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
+  face_forward(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
@@ -153,16 +159,31 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
 
 void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {
   batches.start();
-  for (std::size_t slot = 0; slot < sights.size(); ++slot) {
-    if (seen(sights[slot], view, depth_pass)) batches.add(sights[slot].mesh, scattered_records + slot);
-  }
+  // The unmirrored objects first, then the mirrored ones (each in the order they come): copies of
+  // a mesh mirrored every other one still make two batches, and the winding turns once a pass.
+  gather_wound(view, depth_pass, false);
+  gather_wound(view, depth_pass, true);
   gather_scattered(view, depth_pass);
+}
+
+void Renderer::Impl::gather_wound(const render_math::View& view, bool depth_pass, bool mirrored) {
+  for (std::size_t slot = 0; slot < sights.size(); ++slot) {
+    const ObjectSight& sight = sights[slot];
+    if (seen_wound(sight, view, depth_pass, mirrored)) batches.add(sight.mesh, scattered_records + slot, mirrored);
+  }
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {
   const InstanceRun run{slots.id, first + batch.first, batch.count};
+  face_by_winding(batch.mirrored, pass);
   for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(batch.mesh)])
     draw_primitive(primitive, run, pass);
+}
+
+void Renderer::Impl::face_by_winding(bool mirrored, ObjectPass& pass) {
+  if (pass.mirrored == mirrored) return;
+  set_clockwise_front_faces(mirrored);
+  pass.mirrored = mirrored;
 }
 
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {

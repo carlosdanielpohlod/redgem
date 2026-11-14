@@ -22,7 +22,12 @@ Transform combine(const Transform& parent_world, const Transform& child_local);
 // Local transform that produces `world` under `parent_world`. Inverse of combine().
 Transform relative_to(const Transform& parent_world, const Transform& world);
 
-// Splits a column-major 4x4 TRS matrix (glTF / OpenGL layout) into a Transform (no shear).
+// Splits a column-major 4x4 TRS matrix (glTF / OpenGL layout) into a Transform (no shear). A
+// mirroring matrix (negative determinant) comes out with a negative x scale.
 Transform transform_from_matrix(const float* column_major);
+
+// Whether a placement mirrors what it places (an odd number of negative scales: the determinant of
+// its matrix is negative), which turns the winding of its triangles the other way round.
+inline bool mirrors(const Transform& t) { return t.scale.x * t.scale.y * t.scale.z < 0.0f; }
 
 }  // namespace redgem
