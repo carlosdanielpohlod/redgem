@@ -62,7 +62,8 @@ bool resized(const TemporalView& before, const TemporalView& now) {
 bool camera_cut(const TemporalView& before, const TemporalView& now) {
   const bool moved_far = length(now.position - before.position) > kCutDistance;
   const bool turned_far = dot(now.forward, before.forward) < kCutTurnCosine;
-  return moved_far || turned_far || zoomed(before.fov_y, now.fov_y);
+  const bool switched = before.viewer != now.viewer;
+  return switched || moved_far || turned_far || zoomed(before.fov_y, now.fov_y);
 }
 
 bool keeps_history(const TemporalView& before, const TemporalView& now) {

@@ -19,6 +19,18 @@ void Engine::make_bodies() {
   physics_ = create_jolt_physics_world(gravity(), collision_layers_);
   bodies::create_all({scene_, scene_desc_}, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
+  navigation_.forget();  // the grid was the old scene's
+  if (navigation_.settings().bake_on_load) bake_navigation();
+}
+
+void Engine::bake_navigation() {
+  physics_->optimize_broad_phase();  // the bake's many rays and overlaps search it
+  const NavBakeReport& report = navigation_.bake(*physics_);
+  log::info("navigation: baked " + std::to_string(report.cells) + " walkable cells of " +
+            std::to_string(report.columns) + " columns in " + std::to_string(report.milliseconds) + " ms");
+  if (!report.cells_enlarged) return;
+  log::warning("navigation: the level is too large for its cell size; cells of " + std::to_string(report.cell_size) +
+               " m are used instead");
 }
 
 void Engine::switch_scene_if_asked() {
@@ -64,11 +76,18 @@ void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {
   scene_.set_world_transform(id, placed);
 }
 
-ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
-  if (!scene_.is_alive(source)) return kNoObject;
-  const std::vector<ObjectId> created = scene_.clone(source);
-  place_spawned(created.front(), world);
-  if (physics) {
+void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
+  if (!request.name.empty()) scene_.at(id).name = request.name;
+  place_spawned(id, request.world);
+  // (After it is placed: the place asked for is in the world, and parenting keeps it there.)
+  if (scene_.is_alive(request.parent)) scene_.set_parent(id, request.parent, true);
+}
+
+ObjectId Engine::spawn(const SpawnRequest& request) {
+  if (!scene_.is_alive(request.source)) return kNoObject;
+  const std::vector<ObjectId> created = scene_.clone(request.source);
+  shape_spawned(created.front(), request);
+  if (request.physics) {
     for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);

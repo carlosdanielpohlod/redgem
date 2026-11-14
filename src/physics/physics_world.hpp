@@ -200,6 +200,19 @@ class PhysicsWorld {
   // What a shape at `center` overlaps (distance from the center to each point).
   virtual std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const = 0;
 
+  // The level alone: its static bodies (floors, walls, terrain), on every layer, as navigation
+  // bakes them. Every surface a ray crosses, nearest first, at most config::kMaxQueryHits of them
+  // (a body may be crossed more than once: each floor of a building made as one mesh; a solid
+  // shape where the ray goes in). And whether a shape at `center` overlaps any of them.
+  virtual std::vector<RaycastHit> static_surfaces(Vec3 origin, Vec3 direction, float max_distance) const = 0;
+  virtual bool overlaps_static(const QueryShape& shape, Vec3 center) const = 0;
+  // The box around the static bodies, in world space, as their colliders are (not valid when there
+  // are none).
+  virtual Bounds static_bounds() const = 0;
+  // Rebuilds the tree queries search, which adding bodies one by one leaves unbalanced: for a burst
+  // of queries (a navigation bake) right after a scene's bodies were made.
+  virtual void optimize_broad_phase() = 0;
+
   // Joints, between rigid bodies (at least one of them dynamic: one between bodies that have all
   // been made kinematic since holds nothing until one is dynamic again). A joint goes when either
   // of its objects does, and breaks (goes, and is told broken) when pulled or twisted harder than
