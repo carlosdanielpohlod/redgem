@@ -27,7 +27,9 @@ TEST_CASE("a right-to-left word inside a left-to-right line is reversed in place
 }
 
 TEST_CASE("a right-to-left line keeps its Latin words and numbers readable, in right-to-left order") {
-  CHECK(visual_order(std::string(kShalom) + " abc 123") == std::string("123 abc ") + kShalomDrawn);
+  CHECK(visual_order(std::string(kShalom) + " 123") == std::string("123 ") + kShalomDrawn);
+  // (Digits after a Latin word belong to it: "abc 123" stays together, left to right.)
+  CHECK(visual_order(std::string(kShalom) + " abc 123") == std::string("abc 123 ") + kShalomDrawn);
 }
 
 TEST_CASE("brackets in right-to-left text are mirrored") {
