@@ -11,6 +11,7 @@
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/display_settings.hpp"
 #include "render/hud.hpp"
 #include "script/script_config.hpp"
@@ -96,6 +97,8 @@ struct ScriptContext {
   bool keyboard_visible = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // Camera.auto_exposure and the others: what the game changes of the scene's auto exposure.
+  AutoExposureOverrides auto_exposure;
   // How the player chose the game to be shown and heard (Settings): what is in use now.
   DisplaySettings display;
   // What puts a change of `display` into effect (the window, the renderer's quality, the volume),

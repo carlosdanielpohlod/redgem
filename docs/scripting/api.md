@@ -367,6 +367,14 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.fov = degrees`: sets the field of view
 - `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
 - `Camera.motion_blur = amount`: sets it
+- `Camera.auto_exposure`: whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides
+- `Camera.auto_exposure = on`: turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene
+- `Camera.exposure_compensation`: EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides
+- `Camera.exposure_compensation = ev`: sets it, -16 to 16; nil gives it back to the scene
+- `Camera.exposure_range`: [darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides
+- `Camera.exposure_range = range`: sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene
+- `Camera.exposure_speed`: [up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides
+- `Camera.exposure_speed = speeds`: sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene
 - `Camera.follow(target, offset: [0, 3, 6], relative: false, smoothing: 0.15, look_at: true, look_height: 1.0, avoid_walls: true, dead_zone: 0, snap: true)`: follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
 - `Camera.orbit(target, distance: 6, yaw: 0, pitch: 20, distances: 1..30, pitches: -80..80, smoothing: 0.08, input: true, height: 1.0, avoid_walls: true)`: orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
 - `Camera.stop_following`: stops following or orbiting; the camera stays where it is

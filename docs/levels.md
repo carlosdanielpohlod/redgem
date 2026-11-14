@@ -44,6 +44,11 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `shadow_cascades`, `shadow_distance` | sun shadows over a large area: 1 to 4 maps, each farther from the camera, reaching `shadow_distance` meters (150 unless given) |
 | `shadow_softness` | how wide the sun is, in degrees: shadows grow softer the farther they fall from what casts them (the real sun is about 0.5; 0, the default, keeps every edge equally soft) |
 | `local_shadows` | how many point and spot lights may cast shadows at once, 0 to 4 (4 unless given; the player's quality may allow fewer): of the lights whose `cast_shadow` is on, those that matter most to the camera |
+| `auto_exposure` | `true` adapts the exposure to how bright the scene is, as eyes do: brighter in the dark, darker in bright light, over a moment (see "Auto exposure"; off unless given) |
+| `exposure_min_ev`, `exposure_max_ev` | the darkest and brightest scene auto exposure adapts to, in EV (doublings of brightness: 0 is a scene whose average is middle grey; -4 and 4 unless given) |
+| `exposure_speed_up`, `exposure_speed_down` | how fast it adapts, per second, when the scene got brighter and when it got darker (3 and 1 unless given: eyes adapt to light faster than to the dark) |
+| `exposure_compensation` | EV the adapted picture is brightened by (negative: darkened; 0 unless given) |
+| `foliage_translucency` | how much sunlight comes through leaves lit from behind, 0 to 1 (0.5 unless given): foliage between the camera and the sun glows with its own color |
 | `glow_limit` | the brightest glowing particles together make a pixel, in linear light (2 to 4 suits fire): many flames or sparks over each other come near it and keep their color instead of washing out to white (0, the default, sets no limit) |
 
 Without one, scenes get a clear day. Other things worth knowing: the 16 point and spot lights
@@ -92,7 +97,19 @@ at the price of a slight grain.
 **Wind.** Textured cut-out and blended materials are foliage: drawn on both sides, and swaying
 with the environment's `wind`. An object whose foliage must stay still gives itself `sway =
 false`; objects moved by a skeleton (characters, and so their hair) do not sway unless they say
-`sway = true`. Copies scattered from an object sway as it does.
+`sway = true`. Copies scattered from an object sway as it does. Foliage between the camera and
+the sun lets some of its light through (the environment's `foliage_translucency`), most of it
+looking straight into the sun, held back where something shades the leaf from the sun.
+
+**Auto exposure.** With `auto_exposure = true`, each frame the graphics card measures the
+picture's average brightness (of the log of each pixel's, so that a few very bright pixels do not
+darken everything) and the exposure moves toward what shows that average as middle grey, within
+`exposure_min_ev` and `exposure_max_ev`: walking out of a dark cave, the daylight is blinding for
+a moment, then settles. The environment's `exposure` still multiplies the result, and
+`exposure_compensation` brightens or darkens what it settles on. A cut to another camera, or a
+new scene, starts settled. Scripts can change each setting for the game's camera:
+`Camera.auto_exposure`, `Camera.exposure_compensation`, `Camera.exposure_range` and
+`Camera.exposure_speed` (see the API reference).
 
 Glossy surfaces reflect their surroundings: the engine keeps capturing the scene around the camera
 (one cube face per frame) and uses it for reflections and ambient light.

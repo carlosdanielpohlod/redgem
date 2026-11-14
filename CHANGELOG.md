@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
@@ -183,6 +196,9 @@ until 1.0, a release may change what games rely on (see
   `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
 
 ### Changed
+
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
 
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of

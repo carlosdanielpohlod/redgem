@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "render/auto_exposure.hpp"
 #include "render/hud.hpp"
 #include "render/window.hpp"
 #include "scene/particles.hpp"
@@ -31,6 +32,8 @@ struct FrameView {
   const std::vector<HudItem>& hud;
   const ParticleSystem& particles;
   float motion_blur = 0.0f;  // Camera.motion_blur: 0 (none) to 1
+  // What the game's camera changes of the scene's auto exposure (Camera.auto_exposure and the others).
+  AutoExposureOverrides auto_exposure;
   // A touch screen's stick and buttons; none elsewhere.
   // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const std::vector<ControlCircle>& controls;

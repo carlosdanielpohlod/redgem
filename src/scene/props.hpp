@@ -107,6 +107,17 @@ inline constexpr const char* kTemporalAntialias =
     "temporal";  // with the frames before (Environment::temporal_antialias)
 // The brightest glowing particles together make a pixel (see Environment::glow_limit).
 inline constexpr const char* kGlowLimit = "glow_limit";
+// Auto exposure (see render/auto_exposure.hpp): whether it is on, the darkest and brightest scene
+// brightness it adapts to (EV), how fast per second when the scene got brighter and darker, and
+// the EV the adapted picture is brightened by.
+inline constexpr const char* kAutoExposure = "auto_exposure";
+inline constexpr const char* kExposureMinEv = "exposure_min_ev";
+inline constexpr const char* kExposureMaxEv = "exposure_max_ev";
+inline constexpr const char* kExposureSpeedUp = "exposure_speed_up";
+inline constexpr const char* kExposureSpeedDown = "exposure_speed_down";
+inline constexpr const char* kExposureCompensation = "exposure_compensation";
+// How much sunlight comes through leaves lit from behind (foliage materials), 0 to 1.
+inline constexpr const char* kFoliageTranslucency = "foliage_translucency";
 }  // namespace environment
 
 }  // namespace redgem::props

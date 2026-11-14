@@ -74,6 +74,7 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
     {&LitUniforms::skinned, shaders::kSkinned},
     {&LitUniforms::wind, shaders::kWindAmount},
+    {&LitUniforms::foliage_translucency, shaders::kFoliageTranslucency},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
     {&LitUniforms::frame_texels, shaders::kFrameTexels},
     {&LitUniforms::reflection_map, shaders::kReflectionMap},

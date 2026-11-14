@@ -69,6 +69,7 @@ struct LitUniforms {
   int noise_shift = kNoLocation;
   int skinned = kNoLocation;
   int wind = kNoLocation;
+  int foliage_translucency = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
   int frame_texels = kNoLocation;
   int reflection_map = kNoLocation;

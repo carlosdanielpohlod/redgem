@@ -4,6 +4,8 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <optional>
+
 #include "app/engine.hpp"
 #include "input/touch_controls.hpp"
 #include "core/config.hpp"
@@ -21,12 +23,14 @@ constexpr float kFrameSeconds = 0.25f;
 constexpr int kFramesUntilClosed = 3;
 constexpr int kBurst = 5;
 constexpr float kBlur = 0.4f;
+constexpr float kCompensation = 1.5f;  // EV
 
 // A copy of what a frame said, kept after the frame is gone.
 struct SeenFrame {
   std::vector<HudItem> hud;
   int particles = 0;
   float motion_blur = 0.0f;
+  AutoExposureOverrides auto_exposure;
   std::vector<ControlCircle> controls;
   int scene_generation = 0;
   std::size_t meshes = 0;
@@ -41,9 +45,9 @@ class RecordingPresenter final : public Presenter {
   int text_width(const std::string& text, int) const override { return static_cast<int>(text.size()) * kLetterWidth; }
   void capture_cursor(bool wanted) override { cursor_wanted.push_back(wanted); }
   void present(const FrameView& view) override {
-    frames.push_back({view.hud, static_cast<int>(view.particles.particles().size()), view.motion_blur, view.controls,
-                      view.scene_generation, view.scene_desc.meshes.size(), view.scene.alive_ids().size(),
-                      view.images_dir});
+    frames.push_back({view.hud, static_cast<int>(view.particles.particles().size()), view.motion_blur,
+                      view.auto_exposure, view.controls, view.scene_generation, view.scene_desc.meshes.size(),
+                      view.scene.alive_ids().size(), view.images_dir});
   }
   bool open() const override {
     return frames_until_closed < 0 || static_cast<int>(frames.size()) < frames_until_closed;
@@ -107,6 +111,7 @@ TEST_CASE("the presenter is handed each frame of the game: what scripts drew, pa
   ruby(*engine, kPainter);
   ruby(*engine, "Particles.burst(Vector3.new(0, 1, 0), count: " + std::to_string(kBurst) + ", life: 60.0)");
   ruby(*engine, "Camera.motion_blur = " + std::to_string(kBlur));
+  ruby(*engine, "Camera.auto_exposure = true; Camera.exposure_compensation = " + std::to_string(kCompensation));
   frame(*engine);
   frame(*engine);
   REQUIRE(presenter.frames.size() == 2);
@@ -117,7 +122,11 @@ TEST_CASE("the presenter is handed each frame of the game: what scripts drew, pa
   CHECK(seen.hud[1].kind == HudItem::Kind::Rect);
   CHECK(seen.particles == kBurst);
   CHECK(seen.motion_blur == doctest::Approx(kBlur));
-  CHECK(seen.controls.empty());  // no touch screen
+  CHECK(seen.auto_exposure.enabled == std::optional<bool>(true));
+  REQUIRE(seen.auto_exposure.compensation.has_value());
+  CHECK(*seen.auto_exposure.compensation == doctest::Approx(kCompensation));
+  CHECK_FALSE(seen.auto_exposure.min_ev.has_value());  // the rest follows the scene
+  CHECK(seen.controls.empty());                        // no touch screen
   CHECK(seen.objects == engine->scene().alive_ids().size());
   CHECK(seen.meshes > 0);
   CHECK(seen.images_dir == std::filesystem::path(fixture("games/sandbox")) / config::kImagesDirName);

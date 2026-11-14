@@ -52,6 +52,10 @@ AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass) {
   return test;
 }
 
+float translucency_of(const MaterialDesc& material, float foliage_translucency) {
+  return foliage(material) ? foliage_translucency : kNoTranslucency;
+}
+
 bool drawn_see_through(const MaterialDesc& material) {
   return material.water.enabled || (blended(material) && !material.dithered);
 }

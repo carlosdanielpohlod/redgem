@@ -147,6 +147,8 @@ void Renderer::Impl::load_fixed_targets() {
   // Around the horizon the panorama wraps; at the poles it must not (up would blend with down).
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_S, RL_TEXTURE_WRAP_REPEAT);
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_T, RL_TEXTURE_WRAP_CLAMP);
+  luminance = load_target(render_math::kLuminanceSide, render_math::kLuminanceSide, kHdrFormat, false);
+  for (RenderTexture2D& exposure : exposures) exposure = load_target(kExposureSide, kExposureSide, kHdrFormat, false);
 }
 
 void Renderer::Impl::ensure_targets(int width, int height, int asked) {
@@ -235,7 +237,8 @@ void Renderer::Impl::release_targets() {
 void Renderer::Impl::release_fixed_targets() {
   unload_depth_target(shadow);
   unload_depth_target(local_shadow);
-  for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output}) unload(*target);
+  for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output, &luminance}) unload(*target);
+  for (RenderTexture2D& exposure : exposures) unload(exposure);
 }
 
 }  // namespace redgem

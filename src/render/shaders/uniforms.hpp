@@ -116,6 +116,21 @@ inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
 inline constexpr const char* kMotionBlur = "motionBlur";
+// Auto exposure (see shaders/exposure.hpp).
+inline constexpr const char* kCellSize = "cellSize";
+inline constexpr const char* kLuminanceTexture = "luminanceTexture";
+inline constexpr const char* kLuminanceSide = "luminanceSide";
+inline constexpr const char* kMinEv = "minEv";
+inline constexpr const char* kMaxEv = "maxEv";
+inline constexpr const char* kSpeedUp = "speedUp";
+inline constexpr const char* kSpeedDown = "speedDown";
+inline constexpr const char* kAdaptSeconds = "adaptSeconds";
+inline constexpr const char* kStartAnew = "startAnew";
+inline constexpr const char* kExposureTexture = "exposureTexture";
+inline constexpr const char* kAutoExposure = "autoExposure";
+inline constexpr const char* kExposureCompensation = "exposureCompensation";
+// Sunlight through leaves lit from behind (lit_foliage.hpp).
+inline constexpr const char* kFoliageTranslucency = "foliageTranslucency";
 inline constexpr const char* kGradeTime = kTime;  // the tone mapping shader names its clock the same
 
 // The most point lights that light a surface at once: MAX_POINT_LIGHTS in the shaders, defined

@@ -4,7 +4,8 @@
 
 namespace redgem::shaders {
 
-// HDR scene + bloom -> exposure, filmic tone mapping (ACES fit), vignette, gamma.
+// HDR scene + bloom -> exposure (the environment's, times the adapted one when auto exposure is on:
+// see exposure.hpp), filmic tone mapping (ACES fit), vignette, gamma.
 // Alpha carries the luma, which the anti-aliasing pass reads.
 inline constexpr const char* kCompositeFragment = R"GLSL(
 #version 330
@@ -15,6 +16,9 @@ uniform float bloomStrength;
 uniform sampler2D occlusionTexture;  // ambient occlusion: 1 = open
 uniform float occlusionAmount;
 uniform float exposure;
+uniform sampler2D exposureTexture;   // auto exposure: the brightness adapted to (EV, in red)
+uniform float autoExposure;          // on: the picture is exposed for that brightness
+uniform float exposureCompensation;  // EV the adapted picture is brightened by
 uniform float vignette;
 uniform float contrast;      // 1 = unchanged
 uniform float saturation;    // 1 = unchanged
@@ -24,6 +28,7 @@ uniform float motionBlur;    // 0..1: streaks away from the center, as when movi
 uniform float time;
 out vec4 finalColor;
 const float GAMMA = 2.2;
+const float SWITCH_ON = 0.5;
 const int BLUR_TAPS = 10;
 const float BLUR_REACH = 0.07;        // of the way to the center, at full motion blur
 const float BLUR_CLEAR_RADIUS = 0.3;  // the middle of the picture stays sharp
@@ -46,6 +51,12 @@ const vec2 NOISE_DIRECTION = vec2(12.9898, 78.233);  // the usual one-line hash:
 const float NOISE_SCALE = 43758.5453;
 float noise(vec2 at) { return fract(sin(dot(at, NOISE_DIRECTION)) * NOISE_SCALE); }
 
+// What auto exposure multiplies the picture's light by (render_math::exposure_scale): 1 when off.
+float adaptedScale() {
+  if (autoExposure < SWITCH_ON) return 1.0;
+  return exp2(exposureCompensation - texture(exposureTexture, MIDDLE).r);
+}
+
 // The lit scene at a point, with the lens's color fringes: red and blue land a little apart.
 vec3 lens(vec2 at, vec2 fromMiddle) {
   vec2 fringe = fromMiddle * aberration * ABERRATION_REACH;
@@ -67,7 +78,7 @@ void main() {
     scene /= float(BLUR_TAPS);
   }
   scene *= mix(1.0, texture(occlusionTexture, fragTexCoord).r, occlusionAmount);
-  vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure;
+  vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure * adaptedScale();
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
   float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);

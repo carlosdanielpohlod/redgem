@@ -100,6 +100,7 @@ void Renderer::Impl::send_surface(const MaterialDesc& factors) {
   send(shader, lit_uniforms.roughness, factors.roughness);
   send(shader, lit_uniforms.emissive, to_raylib(factors.emissive));
   send(shader, lit_uniforms.has_emissive_map, on_with(factors.emissive_image));
+  send(shader, lit_uniforms.foliage_translucency, render_math::translucency_of(factors, foliage_translucency));
 }
 
 void Renderer::Impl::send_clearcoat(const ClearcoatDesc& coat) {

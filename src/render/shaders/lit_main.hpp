@@ -45,6 +45,7 @@ void main() {
 
   vec3 toSun = normalize(-sunDirection);
   vec3 color = shadeSurface(n, v, toSun, sunColor * PI, albedo, f0, rough, metal) * sunVisibility(fragPosition, flatNormal, toSun);
+  color += throughLeaf(flatNormal, v, toSun, albedo);
   for (int i = 0; i < pointLightCount; ++i) {
     vec3 toLight = pointLightPositions[i] - fragPosition;
     float distance = length(toLight);

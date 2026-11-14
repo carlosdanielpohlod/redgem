@@ -385,6 +385,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scene_bindings.cpp
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
+  script/bindings/exposure_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/physics_args.cpp
   script/bindings/physics_query_bindings.cpp
@@ -473,6 +474,7 @@ redgem_add_library(redgem_runtime
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
+  render/auto_exposure.cpp
   render/scene_lights.cpp
   render/local_shadows.cpp
   render/renderer_local_shadows.cpp

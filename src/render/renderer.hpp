@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "render/auto_exposure.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
 #include "scene/particles.hpp"
@@ -63,6 +64,9 @@ class Renderer {
   void draw_hud(const std::vector<HudItem>& hud);
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
+  // What the game's camera changes of the scene's auto exposure (see Camera.auto_exposure in Ruby):
+  // what it leaves empty follows the scene's environment.
+  void set_auto_exposure(const AutoExposureOverrides& overrides);
   // The most the scene's environment and its scattered copies get of what they ask for (the
   // player's quality); everything unless said.
   void set_quality(const QualityCaps& caps);

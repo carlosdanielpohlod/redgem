@@ -1336,6 +1336,54 @@
           "about": "sets it"
         },
         {
+          "name": "auto_exposure",
+          "static": true,
+          "about": "whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides"
+        },
+        {
+          "name": "auto_exposure=",
+          "static": true,
+          "args": "on",
+          "about": "turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene",
+          "example": "Camera.auto_exposure = true"
+        },
+        {
+          "name": "exposure_compensation",
+          "static": true,
+          "about": "EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides"
+        },
+        {
+          "name": "exposure_compensation=",
+          "static": true,
+          "args": "ev",
+          "about": "sets it, -16 to 16; nil gives it back to the scene",
+          "example": "Camera.exposure_compensation = -0.5"
+        },
+        {
+          "name": "exposure_range",
+          "static": true,
+          "about": "[darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides"
+        },
+        {
+          "name": "exposure_range=",
+          "static": true,
+          "args": "range",
+          "about": "sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene",
+          "example": "Camera.exposure_range = [-6, 2]"
+        },
+        {
+          "name": "exposure_speed",
+          "static": true,
+          "about": "[up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides"
+        },
+        {
+          "name": "exposure_speed=",
+          "static": true,
+          "args": "speeds",
+          "about": "sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene",
+          "example": "Camera.exposure_speed = [3, 1]"
+        },
+        {
           "name": "follow",
           "static": true,
           "args": "target, offset: [0, 3, 6], relative: false, smoothing: 0.15, look_at: true, look_height: 1.0, avoid_walls: true, dead_zone: 0, snap: true",
