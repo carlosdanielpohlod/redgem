@@ -5,7 +5,9 @@
 // the number of its record (instance_records.hpp); a batch is a run of those numbers. Copies are
 // drawn in the order they come, as one by one: surfaces that lie on each other (a window on a
 // wall) are drawn over each other as before. Linked copies come one after the other in a level
-// (Tree, Tree.001...), and so do scattered ones. No window and no graphics card needed, so it can
+// (Tree, Tree.001...), and so do scattered ones. Mirrored copies (see `mirrors` in
+// scene/transform.hpp) are batched apart, as their triangles wind the other way: a pass turns its
+// winding only where a run of mirrored copies starts or ends. No window and no graphics card needed, so it can
 // be tested.
 
 #include <cstddef>
@@ -18,6 +20,7 @@ struct InstanceBatch {
   int mesh = 0;
   std::size_t first = 0;
   std::size_t count = 0;
+  bool mirrored = false;  // copies whose placement mirrors them: drawn with clockwise front faces
 };
 
 class InstanceBatches {
@@ -25,8 +28,8 @@ class InstanceBatches {
   // Starts a pass: what the last one gathered goes, the room it took stays (a frame allocates
   // nothing once its passes have run).
   void start();
-  // A copy of mesh `mesh`, whose record is number `record`.
-  void add(int mesh, std::size_t record);
+  // A copy of mesh `mesh`, whose record is number `record`; `mirrored` when its placement mirrors it.
+  void add(int mesh, std::size_t record, bool mirrored = false);
   // `count` copies of `mesh` whose records follow each other from number `first` on.
   void add_run(int mesh, std::size_t first, std::size_t count);
 
@@ -35,9 +38,9 @@ class InstanceBatches {
   const std::vector<InstanceBatch>& batches() const { return batches_; }
 
  private:
-  // The batch the next copy of `mesh` goes in: the last one when it is of that mesh, a new one
-  // otherwise.
-  InstanceBatch& batch_for(int mesh);
+  // The batch the next copy of `mesh` goes in: the last one when it is of that mesh and mirrored
+  // alike, a new one otherwise.
+  InstanceBatch& batch_for(int mesh, bool mirrored);
 
   std::vector<float> slots_;
   std::vector<InstanceBatch> batches_;

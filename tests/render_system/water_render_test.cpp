@@ -95,7 +95,7 @@ NodeDesc plane_node(const char* name, int mesh, float height) {
   return node;
 }
 MeshDesc plane_mesh(int material) {
-  MeshDesc mesh{"Water plane", {make_primitive(PrimitiveShape::Plane)}, {}};
+  MeshDesc mesh{"Water plane", {make_primitive(PrimitiveShape::Plane)}, {}, {}, {}};
   mesh.primitives.front().material = material;
   for (std::size_t i = 0; i < mesh.primitives.front().positions.size(); i += kCoordinates)
     mesh.bounds.include(vec3_from(&mesh.primitives.front().positions[i]));

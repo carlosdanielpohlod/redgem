@@ -4,7 +4,8 @@
 // (texel_rows.hpp), kTexelsPerInstance of them from the instance's number times that on:
 //   texels 0-3  where it is: its model matrix, a column each
 //   texels 4-6  how its normals turn: the columns of its normal matrix; the first one's fourth float
-//               is how much the wind sways it (1, or 0 for one that does not sway)
+//               is how much the wind sways it (1, or 0 for one that does not sway), the second
+//               one's where the shape keys it shows are (kNoMorphs: none; see morph_shapes.hpp)
 //   texel  7    its tint (red, green, blue), and where its skeleton's first bone is (kNoBones: none)
 //   texel  8    how a scattered copy fades: the distances it is drawn from and to, the meters it
 //               fades over at their ends (0: it does not), and how much it is lit as facing up
@@ -16,6 +17,7 @@
 #include <cstddef>
 
 #include "core/math.hpp"
+#include "render/morph_shapes.hpp"
 #include "render/texel_rows.hpp"
 
 namespace redgem::render_math {
@@ -24,6 +26,7 @@ inline constexpr int kTexelsPerInstance = 9;
 inline constexpr int kNormalTexel = 4;  // where a record's normal matrix starts
 inline constexpr int kLookTexel = 7;    // where its tint and first bone are
 inline constexpr int kCopyTexel = 8;    // where how it fades is
+inline constexpr int kMorphTexel = 5;   // the normal matrix's second column, whose fourth float has room
 
 inline constexpr float kSways = 1.0f;
 inline constexpr float kStill = 0.0f;
@@ -38,6 +41,9 @@ struct InstanceLook {
   float fade = 0.0f;
   float upward = 0.0f;
   float sway = kSways;  // how much the wind sways it (any copy)
+  // Where the shape keys it shows are (none: kNoMorphs). Last, so the copies made field by field
+  // above (renderer_scatter.cpp) keep their order.
+  float first_morph = kNoMorphs;
 };
 
 // The first texel of instance `number`'s record.

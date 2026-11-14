@@ -7,6 +7,8 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <set>
+#include <string>
 #include <variant>
 
 #include <nlohmann/json.hpp>
@@ -772,6 +774,57 @@ TEST_CASE("a duplicated character has its own skeleton, also after the original 
   CHECK(joint_names(loaded.scene, "Arm") == std::vector<std::string>{"Lower", "Upper"});
   CHECK(joint_names(loaded.scene, "Arm.001") == std::vector<std::string>{"Lower.001", "Upper.001"});
   std::filesystem::remove(out);
+}
+
+namespace {
+
+// The names of the nodes the fixture's Wave clip moves.
+std::set<std::string> moved_by_wave(const SceneDesc& scene) {
+  const auto wave = std::find_if(scene.animations.begin(), scene.animations.end(),
+                                 [](const AnimationDesc& clip) { return clip.name == "Wave"; });
+  REQUIRE(wave != scene.animations.end());
+  std::set<std::string> names;
+  for (const AnimationChannel& channel : wave->channels) {
+    if (channel.node != kNoIndex) names.insert(scene.nodes[channel.node].name);
+  }
+  return names;
+}
+
+}  // namespace
+
+TEST_CASE("a duplicated character plays the clips of the original instead of keeping its pose") {
+  auto opened = SceneDocument::open(fixture("skinned.glb"));
+  SceneDocument doc = std::move(std::get<SceneDocument>(opened));
+  const std::set<std::string> originals{"Lower", "Upper"};
+  const std::set<std::string> with_copies{"Lower", "Lower.001", "Upper", "Upper.001"};
+  REQUIRE(moved_by_wave(doc.desc()) == originals);
+
+  doc.duplicate(doc.desc().find_node("Rig"));
+  CHECK(moved_by_wave(doc.desc()) == with_copies);
+
+  const std::filesystem::path out = temp_copy_path("duplicated_clip");
+  std::string error;
+  REQUIRE_MESSAGE(doc.save_as(out, error), error);
+  LoadResult loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  CHECK(moved_by_wave(loaded.scene) == with_copies);
+
+  // Undone, the copies are gone and so are their channels, also from the saved file.
+  REQUIRE(doc.undo());
+  CHECK(moved_by_wave(doc.desc()) == originals);
+  REQUIRE_MESSAGE(doc.save_as(out, error), error);
+  loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  CHECK(moved_by_wave(loaded.scene) == originals);
+  std::filesystem::remove(out);
+}
+
+TEST_CASE("a duplicated animated root stays where it was put while what is under it plays the clip") {
+  auto opened = SceneDocument::open(fixture("skinned.glb"));
+  SceneDocument doc = std::move(std::get<SceneDocument>(opened));
+  // Lower is a bone the clip moves, with Upper under it.
+  doc.duplicate(doc.desc().find_node("Lower"));
+  CHECK(moved_by_wave(doc.desc()) == std::set<std::string>{"Lower", "Upper", "Upper.001"});
 }
 
 TEST_CASE("a brush stroke on a saved document stays undoable and unsaved once released") {
