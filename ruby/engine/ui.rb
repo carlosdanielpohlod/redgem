@@ -1,7 +1,17 @@
 # Drawing over the game: HUDs and menus. Everything here is "immediate": call it every frame from
-# a behaviour's update, and it is drawn that frame. Positions are in pixels from the top-left
-# corner; UI.width and UI.height are the size of what the game is drawn in. With an anchor (see
-# ui_layout.rb), x and y are offsets from a corner, an edge's middle or the middle of the screen.
+# a behaviour's update, and it is drawn that frame. Positions are from the top-left corner; UI.width
+# and UI.height are the size of what the game is drawn in. With an anchor (see ui_layout.rb), x and
+# y are offsets from a corner, an edge's middle or the middle of the screen.
+#
+# Every position and size (of a box, a text, a margin, an anchor's offset) is in units of the
+# screen the game lays its interface out for: game.json's "ui": {"reference": [1920, 1080],
+# "match": "height"} (its own window, its height matched, unless it says). On another screen a
+# unit is UI.scale pixels: the screen's height over the reference's ("width": its width over the
+# reference's; "fit": the smaller of the two), times the player's Settings.ui_scale. So a HUD
+# takes the same share of the screen at 720p and at 4K, and its texts are drawn, sharp, at the
+# pixels they take. UI.width and UI.height are the screen in units (with a height matched,
+# UI.height is the reference's); UI.pixel_width and UI.pixel_height are its pixels. UI.mouse_x
+# and UI.mouse_y are where the pointer is, in units, which is where clicks and taps land.
 #
 #   UI.text("Score: #{@score}", x: 20, y: 20, size: 28, color: :gold)
 #   UI.text("Lives: #{@lives}", anchor: :top_right, x: -20, y: 20)
@@ -31,12 +41,16 @@ module UI
   BUTTON_RADIUS = 10
   BUTTON_TEXT_SHARE = 0.42   # text height as a share of the button's height
   FIELD_MAX_LENGTH = 64
-  FIELD_PADDING = 14         # pixels between a text field's edge and its text
+  FIELD_PADDING = 14         # units between a text field's edge and its text
   FIELD_CARET = "_".freeze
   SECRET_LETTER = "*".freeze  # what a secret text field shows for each letter
   CONTINUATION_MASK = 0xC0
   CONTINUATION_BITS = 0x80
   PRESSED_SHADE = 0.8        # a held button is this much darker
+
+  # Where the pointer (the mouse, a finger) is, in units of the interface.
+  def self.mouse_x = Input.mouse_x / scale
+  def self.mouse_y = Input.mouse_y / scale
 
   # A color [r, g, b] darkened to a share of its brightness.
   def self.shade(color, share) = rgb(color).map { |channel| (channel * share).to_i }
@@ -68,7 +82,7 @@ module UI
 
   def self.text_width(text, size: DEFAULT_SIZE) = __text_width(text.to_s, size.to_i)
 
-  # A filled rectangle; radius rounds its corners (pixels).
+  # A filled rectangle; radius rounds its corners (units).
   def self.rect(x:, y:, width:, height:, color: :black, alpha: OPAQUE, radius: 0, anchor: nil)
     box = placed(anchor, x, y, width, height)
     __rect(*box.values_at(:x, :y, :width, :height).map(&:to_i), *rgb(color), alpha.to_i, radius.to_f)

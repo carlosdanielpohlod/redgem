@@ -58,13 +58,13 @@ class Interactable < Behaviour
     I18n.t(prompt)
   end
 
-  def range = @range || Interactable.number(prop(:range, RANGE), :range)
+  def range = @range ||= Interactable.number(prop(:range, RANGE), :range)
 
   def range=(meters)
     @range = Interactable.number(meters, :range)
   end
 
-  def priority = @priority || Interactable.number(prop(:priority, PRIORITY), :priority, below_zero: true)
+  def priority = @priority ||= Interactable.number(prop(:priority, PRIORITY), :priority, below_zero: true)
 
   def priority=(value)
     @priority = Interactable.number(value, :priority, below_zero: true)
@@ -76,8 +76,8 @@ class Interactable < Behaviour
   def angle
     return @angle if @angle_set
 
-    given = prop(:angle)
-    given && Interactable.number(given, :angle)
+    self.angle = prop(:angle)
+    @angle
   end
 
   def angle=(degrees)

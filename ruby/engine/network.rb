@@ -37,6 +37,14 @@
 # A message carries nil, true/false, numbers, texts, Vector3, and arrays and hashes of those.
 # Messages arrive whole and in the order they were sent. What Network.on and the on_... calls
 # register lasts until the next level is loaded.
+#
+# A player whose connection drops for a moment can get back in, with the same id, when the game
+# hosting it says so (directly, or on a dedicated server; not in a room on a relay):
+#
+#   Network.reconnect_window = 20           # on the host: seconds a dropped player's place is held
+#   Network.on_reconnecting { |peer| ... }  # its connection dropped (on the host: someone's did)
+#   Network.on_reconnected { |peer| ... }   # it is back in its place
+#   Network.on_lost { |reason| ... }        # it could not get back in time: the game is gone
 module Network
   DEFAULT_PORT = 7777
   DEFAULT_RELAY_PORT = 7778
@@ -54,8 +62,8 @@ module Network
   SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
   DESPAWN = "$despawn".freeze    # objects that are gone: their keys
   RESEND = "$resend".freeze      # to the host: send the spawned objects again (after loading a level)
-  INTERACT = "$interact".freeze  # to the host: a client's hero uses something: [actor key, target key]
   CORRECT = "$correct".freeze    # from the host: where an object of ours is believed to be: [key, position]
+  INTERACT = "$interact".freeze  # to the host: a client's hero uses something: [actor key, target key]
   # Conversations and GameVariables (see network_dialogues.rb).
   TALK = "$talk".freeze            # host to a client: talk: [dialogue, actor key, speaker key or nil]
   STEP = "$step".freeze            # client to host: [dialogue, from node, choice index or nil, to node or nil]
@@ -66,19 +74,23 @@ module Network
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned,
-    DESPAWN => :receive_despawn, RESEND => :receive_resend, INTERACT => :receive_interact,
-    CORRECT => :receive_correction, TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at,
+    DESPAWN => :receive_despawn, RESEND => :receive_resend, CORRECT => :receive_correction,
+    INTERACT => :receive_interact, TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at,
     TALK_LEFT => :receive_talk_left, VARIABLE => :receive_variable, VARIABLES => :receive_variables
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
     connected: %i[enter_game], joined: %i[greet tell_variables], left: %i[remove_objects_of],
-    disconnected: %i[keep_only_my_objects]
+    disconnected: %i[keep_only_my_objects], reconnected: %i[welcome_back tell_variables],
+    lost: %i[keep_only_my_objects]
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
   AFTERWARDS = {
-    left: %i[forget_player forget_talks_of], disconnected: %i[forget_players forget_all_talks]
+    left: %i[forget_player forget_talks_of], disconnected: %i[forget_players forget_all_talks],
+    lost: %i[forget_players forget_all_talks]
   }.freeze
+  # The events whose handlers get why, instead of a peer.
+  REASONED = %i[failed lost].freeze
 
   # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
   # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)
@@ -138,9 +150,9 @@ module Network
     end
 
     def leave
-      was_online = online?
+      was_in_game = __in_game?
       __leave
-      __event(:disconnected, 0, "", nil) if was_online
+      __event(:disconnected, 0, "", nil) if was_in_game
     end
 
     # Sends a message. False when it could not be sent (offline, or nobody with that id).
@@ -159,6 +171,9 @@ module Network
     def on_disconnect(&block) = listen(:disconnected, block)  # the game is gone
     def on_join(&block) = listen(:joined, block)              # |peer| someone arrived
     def on_leave(&block) = listen(:left, block)               # |peer| someone left
+    def on_reconnecting(&block) = listen(:reconnecting, block) # |peer| a connection dropped: the place is held
+    def on_reconnected(&block) = listen(:reconnected, block)   # |peer| it is back in its place, with its id
+    def on_lost(&block) = listen(:lost, block)                 # |reason| this machine could not get back in
 
     # Called by the engine for everything that happens on the network.
     def __event(kind, peer, name, data, ticket = 0)
@@ -173,11 +188,16 @@ module Network
     # objects this machine should see again.
     def __scene_reset
       announce_scene_reset if online?
+      note_scene_reset_away
       @handlers = {}
       @listeners = {}
       @synced = {}
       @spawned = {}
     end
+
+    # Whether this machine is in a game: online, or reconnecting to it (its place and id are held,
+    # and the others' objects are still theirs).
+    def __in_game? = online? || reconnecting?
 
     # Sends any message, the engine's own included (emit is the one for games).
     def __deliver(name, data, to)
@@ -197,9 +217,10 @@ module Network
       AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
     end
 
-    # What the handlers of an event get: the peer, or why a join failed (nil when nobody said).
+    # What the handlers of an event get: the peer, or why a join failed or this machine could not
+    # get back in (nil when nobody said).
     def told_about(kind, peer, name)
-      return peer unless kind == :failed
+      return peer unless REASONED.include?(kind)
 
       name.to_s.empty? ? nil : name
     end

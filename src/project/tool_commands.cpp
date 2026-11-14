@@ -7,6 +7,7 @@
 #include "project/check_command.hpp"
 #include "project/run_command.hpp"
 #include "project/scene_command.hpp"
+#include "project/search_command.hpp"
 #include "project/shot_command.hpp"
 #include "project/symbolize_command.hpp"
 
@@ -20,8 +21,10 @@ struct NamedTool {
   Tool run;
 };
 constexpr NamedTool kTools[] = {
-    {kSceneCommand, run_scene_command}, {kRunCommand, run_run_command}, {kShotCommand, run_shot_command},
-    {kCheckCommand, run_check_command}, {kApiCommand, run_api_command}, {kSymbolizeCommand, run_symbolize_command},
+    {kSceneCommand, run_scene_command},   {kRunCommand, run_run_command},
+    {kShotCommand, run_shot_command},     {kCheckCommand, run_check_command},
+    {kApiCommand, run_api_command},       {kSymbolizeCommand, run_symbolize_command},
+    {kAssetsCommand, run_assets_command}, {kTemplatesCommand, run_templates_command},
 };
 
 }  // namespace

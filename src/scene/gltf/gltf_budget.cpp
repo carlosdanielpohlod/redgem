@@ -6,6 +6,7 @@
 
 #include "core/game_files.hpp"
 #include "core/image_header.hpp"
+#include "core/ktx2_header.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 
 namespace redgem::gltf_budget {
@@ -81,12 +82,19 @@ std::uint64_t scene_bytes(const cgltf_data& data, const std::filesystem::path& f
 
 namespace {
 
+// The size a picture that will be decoded says it has: a KTX2 one (whose levels are never larger
+// than RGBA8 ones) or any other kind the decoder reads.
+std::optional<ImageSize> picture_size(const std::vector<std::uint8_t>& encoded) {
+  if (const auto ktx2 = read_ktx2_header(encoded.data(), encoded.size())) return ktx2->size;
+  const auto image = EncodedImage::read(encoded.data(), encoded.size());
+  return image ? std::optional<ImageSize>(image->dimensions()) : std::nullopt;
+}
+
 // What a picture takes once decoded; nothing for one that will not be decoded.
 std::uint64_t decoded_size(const ImageData& image) {
-  const auto encoded = EncodedImage::read(image.encoded.data(), image.encoded.size());
-  if (!encoded) return 0;
-  const ImageSize size = encoded->dimensions();
-  return std::uint64_t{size.width} * size.height * kBytesPerPixel;
+  const std::optional<ImageSize> size = picture_size(image.encoded);
+  if (!size) return 0;
+  return std::uint64_t{size->width} * size->height * kBytesPerPixel;
 }
 
 }  // namespace

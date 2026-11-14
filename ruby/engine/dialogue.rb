@@ -62,6 +62,10 @@ module Dialogue
       __here(script, actor, speaker, deciding: true)
     end
 
+    # Whether this machine's player is in a conversation, or left one this frame: the press that
+    # ended it is not also a use of what is in front of the hero (see Interactor).
+    def busy? = !@current.nil? || @ended_frame == Time.frame
+
     # Ends the conversation this machine's player is in.
     def stop = @current&.stop
 
@@ -101,7 +105,7 @@ module Dialogue
 
     # Called by a conversation as it moves on and ends.
     def __shown(event, conversation)
-      @current = nil if event == :end && @current.equal?(conversation)
+      ended(conversation) if event == :end && @current.equal?(conversation)
       tell(event, conversation)
     end
 
@@ -116,6 +120,12 @@ module Dialogue
     end
 
     private
+
+    def ended(conversation)
+      @current = nil
+      @ended_frame = Time.frame
+      conversation
+    end
 
     def tell(event, *values) = (@handlers[event] || []).dup.each { |block| block.call(*values) }
 

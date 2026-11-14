@@ -17,8 +17,9 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Input`](#input) | Keyboard, mouse, gamepad and touch, read every frame. |
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
-| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
+| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
@@ -28,6 +29,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
 | [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
 | [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
+| [`Animation::Event`](#animationevent) | What the block of an animation event is given (animation.on). |
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
@@ -66,6 +68,8 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_interact(actor)`: an actor used this object (it has an Interactable; on the host in a game over the network)
 - `on_focus(actor)`: this object became what an actor's interaction prompt is for
 - `on_blur(actor)`: it stopped being what that prompt is for
+- `Behaviour.persist(*fields)`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
+- `Behaviour.persisted_fields`: what persist named, in this class and those above it
 - `game_object`: the object this behaviour is attached to
 - `name`: the object's name
 - `transform`: the object's Transform
@@ -97,6 +101,7 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `tag`: its tag property
 - `tag?(value)`: whether its tag is value
 - `props`: its custom properties
+- `joint`: the Joint it came with in the scene (its Joint component, set up in the editor), or nil
 - `alive?`: false once it was destroyed
 - `destroy`: removes it at the end of the step
 - `visible`: whether it is drawn
@@ -246,6 +251,8 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.gamepad_down?(button)`: whether a gamepad button (:a, :b, :x, :y...) is held
 - `Input.gamepad_pressed?(button)`: whether a gamepad button went down this frame
 - `Input.gamepad_released?(button)`: whether a gamepad button went up this frame
+- `Input.rumble?`: whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)
+- `Input.rumble(pad, strength, seconds)`: rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)
 - `Input.text`: what was typed this frame
 - `Input.touch_controls = on`: shows the on-screen stick and buttons of a phone
 - `Input.touch_controls?`: whether they are shown
@@ -283,7 +290,7 @@ Questions to the physics world: rays, moving shapes and shapes in place. See [ga
 
 ## Joint
 
-What holds two bodies together, or one to the world (made by Physics.joint). See [gameplay.md](gameplay.md).
+What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). See [gameplay.md](gameplay.md).
 
 - `kind`: :fixed, :hinge, :slider, :point or :distance
 - `object`: the object it holds
@@ -312,6 +319,16 @@ Where the characters a game moves can walk, and the way from one place to anothe
 - `Navigation.stats`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
 
 The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## Water
+
+Where the scene's water is: the height of its surface, and how deep a point is under it. See [gameplay.md#float-in-water](gameplay.md#float-in-water).
+
+- `Water.height_at(x, z)`: the height of the water surface over that point of the ground, or nil where there is no water
+- `Water.depth_at(point)`: how far below the water surface a point is in meters (negative above it), or nil where there is no water
+- `Water.under?(point)`: whether a point is below the water surface
+
+Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
 
 ## CharacterController
 
@@ -370,8 +387,8 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.main = camera`: sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
 - `Camera.cut_to(camera, fade: 0)`: cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
 - `Camera.cutting?`: whether a cut with a fade is still playing
-- `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
-- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
+- `Camera.screen_ray(x, y)`: [origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)
+- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
 - `Camera.fov = degrees`: sets the field of view
 - `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
@@ -423,7 +440,7 @@ The scene's own animations (exported from Blender), by name. See [animation.md](
 
 game_object.animation (animation in a behaviour): an object's own clips. See [animation.md](animation.md).
 
-- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`: plays a clip, fading from the last one
+- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil)`: plays a clip, fading from the last one; root_motion: true lets the clip move the object
 - `mix(name, weight: 1.0, loop: true, speed: 1.0)`: plays a clip over the one playing
 - `unmix`: stops the clip mixed over
 - `pause`: pauses its clips
@@ -434,6 +451,11 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `use(graph)`: installs an Animation::Graph
 - `set(parameter, value)`: sets a parameter of the graph
 - `state`: the graph's state, or nil
+- `on(clip, at: nil, seconds: nil, &block)`: calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+- `on_marker(name, &block)`: calls the block each time a clip passes a marker of that name authored in Blender
+- `off(listener)`: stops calling a block that on or on_marker returned
+- `root_motion = on`: whether all its clips move the object by their root's horizontal motion and turning
+- `root_motion?`: whether all its clips move the object
 
 ## Animation::Graph
 
@@ -444,6 +466,15 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 - `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
 - `blend_2d(name, parameters:, clips:, loop: true, speed: 1.0)`: a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
 - `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
+
+## Animation::Event
+
+What the block of an animation event is given (animation.on). See [animation.md#events](animation.md#events).
+
+- `game_object`: the object that listened
+- `clip`: the clip's name
+- `name`: the marker's name, or nil for a moment the script named
+- `at`: where in the clip, from 0 (its start) to 1 (its end)
 
 ## Audio
 
@@ -475,9 +506,15 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.button(label, x:, y:, width:, height:, anchor: nil)`: draws a button; true the frame it is clicked
 - `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:, anchor: nil)`: a field to type in; returns the new value
 - `UI.keyboard_visible?`: whether a phone's on-screen keyboard covers the bottom of the screen
-- `UI.width`: the width of the screen, in pixels
-- `UI.height`: the height of the screen, in pixels
-- `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)
+- `UI.width`: the width of the screen, in the interface's units (UI.scale pixels each)
+- `UI.height`: the height of the screen, in the interface's units: the reference's height when it is matched
+- `UI.pixel_width`: the width of the screen, in pixels
+- `UI.pixel_height`: the height of the screen, in pixels
+- `UI.scale`: the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json "ui") times Settings.ui_scale
+- `UI.reference`: [width, height] of the screen the interface is laid out for (game.json "ui": its "reference", or the game's window)
+- `UI.mouse_x`: where the pointer is across the screen, in the interface's units
+- `UI.mouse_y`: where the pointer is down the screen, in the interface's units
+- `UI.text_width(str, size:)`: how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)
 - `UI.wrap(str, width:, size:)`: the lines a text wraps to at word boundaries, none wider than width
 - `UI.text_height(str, size:, width: nil)`: how tall a text is drawn, in pixels (wrapped to width, when given)
 - `UI.line_height(size)`: pixels from a line's top to the next one's at a text size
@@ -568,13 +605,17 @@ reported through `Game.loading_error` and the event log. At most eight backgroun
 outstanding across the process, using one shared reader; a full queue fails without changing the
 world. Cancelling an active read discards its result; it does not interrupt the file parser.
 
-Only file reading and glTF parsing happen on the worker. Physics creation, script setup, texture
-decoding and GPU upload still happen on the owning thread and may hitch during activation. The
-old and incoming scene coexist in memory during reading. Fixed-step offline runs (including
-recordings and scripted replays) wait for the reader before advancing, then show exactly one
-loading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the
-background reader even in fixed-step mode; activation still runs on the server loop and can stall
-other rooms sharing that loop. Closing the process waits for an active parser to return.
+File reading, glTF parsing and, for a game shown in a window, picture decoding happen on the
+worker. The scene read is then made ready over the next loading frames while the old one is still
+shown: its physics bodies are made in batches of about 4 ms a frame, its textures and meshes go to
+the graphics card about 8 MiB a frame, and the swap happens once all of it is ready. Every script
+of the new scene starts in that one frame, so a behaviour's first update sees the complete level.
+Creating the scene's objects, its water and its navigation bake still take one frame each. The old
+and incoming scene coexist in memory until the swap. Fixed-step offline runs (including
+recordings and scripted replays) wait for the reader before advancing, then make the scene ready
+all at once after exactly one loading frame, so completion depends neither on thread scheduling
+nor on the real clock. Networked runs and dedicated-server rooms keep the background reader and
+the spread activation even in fixed-step mode; a dedicated server's rooms share their loop. Closing the process waits for an active parser to return.
 
 ## Settings
 
@@ -589,6 +630,8 @@ How the player chose the game to be shown and heard; a change takes effect at on
 - `Settings.resolutions`: the sizes the monitor offers: [[w, h], ...]
 - `Settings.render_scale`: the share of the window's size the world is drawn at (0.5 to 2)
 - `Settings.render_scale = scale`: changes it
+- `Settings.ui_scale`: how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it
+- `Settings.ui_scale = scale`: changes it
 - `Settings.vsync`: whether frames wait for the screen
 - `Settings.vsync = on`: changes it
 - `Settings.fps_cap`: frames a second at most; nil for none
@@ -686,8 +729,13 @@ What the game keeps between runs. See [online-services.md#saving-on-a-server](on
 - `Save.slot`: the selected save slot name; default keeps the existing save file
 - `Save.slot = name`: selects a named slot for this engine; default restores the original store
 - `Save.slots`: sorted names of persisted slots and slots opened in this run, including default
+- `Save.version`: the version of the saved data this game writes, or nil
+- `Save.version = number`: declares that version (1 or more): older slots are migrated, newer ones refused
+- `Save.migrate(from:, &block)`: the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one
+- `Save.checkpoint(key = :checkpoint)`: keeps this scene's spawned objects whose behaviours persist fields; returns how many
+- `Save.restore_checkpoint(key = :checkpoint)`: spawns them again in place of the current ones; returns the new copies
 
-Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata.
+Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Each slot records the Save.version that wrote it: the first use of a slot (or Save.slot =) runs the migration hooks it needs, in order, and writes the result back at once; a slot from a newer game, or one a hook raised on, is left untouched and every use of it raises a RuntimeError saying why (Save.slot = then keeps the previous slot). A slot written before the game declared a version counts as version 1.
 
 ## HTTP
 
@@ -732,6 +780,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.leave`: leaves the game
 - `Network.online?`: whether this machine is in a game
 - `Network.connecting?`: whether a join is on its way
+- `Network.reconnecting?`: whether this machine's connection dropped and it is getting back in
+- `Network.reconnect_window`: seconds the game hosted here holds a dropped player's place (0: none)
+- `Network.reconnect_window = seconds`: holds a dropped player's place and id that long, up to 300 (0 turns it off)
 - `Network.host?`: whether this machine hosts
 - `Network.server?`: whether this machine is a dedicated server
 - `Network.id`: this machine's peer id
@@ -757,6 +808,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.on_join(&block)`: someone arrived: |peer|
 - `Network.on_leave(&block)`: someone left: |peer|
 - `Network.on_fail(&block)`: a join did not work out: |reason|
+- `Network.on_reconnecting(&block)`: a connection dropped and its place is held: |peer|
+- `Network.on_reconnected(&block)`: a dropped machine is back in its place: |peer|
+- `Network.on_lost(&block)`: this machine could not get back in time: |reason|
 - `Network.authenticate(&block)`: decides who gets in: |peer, auth, decide|
 - `Network.identity(peer)`: who a peer was accepted as
 - `Network.player_name(peer)`: a peer's name
@@ -819,4 +873,4 @@ Who uses what: the choice of a target, uses, and the game's handlers; over the n
 
 ## Notes
 
-Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
+Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
