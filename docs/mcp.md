@@ -28,7 +28,9 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `scene_list` | Lists objects, taking optional `scene`, `limit` (default 50, `0` for all) and `depth`. |
 | `scene_get` | Reads one `object` by persistent `#id`, unique name or hierarchy path. |
 | `scene_edit` | Takes `action` (`set`, `add`, `remove`), `object` and optional `assignments` (`key=value` strings), `from`, `parent`, `scene`. Removal requires `confirm: true`. Saves the scene file. |
-| `scene_diff` | Compares with an earlier scene file named by `against`, inside the game. |
+| `scene_diff` | Compares with an earlier scene file named by `against` (a `.glb` inside the game), or with the scene as a Git `revision` saved it (`HEAD`, `HEAD~1`, `main`, a commit hash). Takes one of the two. |
+| `asset_search` | Finds the game's assets by the words of `query` in their name or folder, best match first: a line each with the kind and the path. `kind` keeps one kind (`model`, `texture`, `sound`, `script`, `prefab`: the folders `models/`, `images/`, `sounds/`, `scripts/`, `prefabs/`), `tag` the assets inside a subfolder of that name; `limit` defaults to 20 (`0` for all). |
+| `template_search` | Finds the templates new games start from by the words of `query` in their name or description. |
 | `game_run` | Plays headlessly with `frames` (default 60, maximum 600), `seed`, `input`, `assert`, `until`, `print`, `every`, `scene`. `input` replays keys, the mouse, gamepads and touch (see [Repeating a headless session](assistants.md#repeating-a-headless-session)). |
 | `game_check` | Checks scripts, scenes and assets; does not run the game's test files. |
 | `game_shot` | Returns a PNG picture of the saved game at `at` seconds (default 1), `width` pixels wide (default 512, 16:9), optionally through another `camera`. |
@@ -69,7 +71,8 @@ Invalid arguments come back as tool errors (`isError: true`) naming the argument
 accepts, such as `frames: must be at most 600, not 601`, so the model can correct the call.
 Unknown or disabled tools remain JSON-RPC errors.
 
-`--read-only` exposes only `scene_list`, `scene_get`, `scene_diff`, `api` and `events`; the
+`--read-only` exposes only `scene_list`, `scene_get`, `scene_diff`, `asset_search`,
+`template_search`, `api` and `events`; the
 `game_*` tools execute the game's scripts and are disabled. It also
 rejects calls to disabled tools, even if the client remembers an earlier tool list. For a smaller
 surface, add an exact comma-separated allow list:
@@ -85,7 +88,8 @@ process. Input replay and comparison files must be regular files inside it, with
 links. These restrictions protect tooling paths; they do not sandbox native game code.
 
 Without `--editor`, edits go through the file-based scene commands. Close the editor while
-editing its files this way. Keep an earlier save and inspect `scene_diff` after an edit.
+editing its files this way. Keep an earlier save and inspect `scene_diff` after an edit, or, in a
+game kept in Git, compare with the last commit (`revision: "HEAD"`).
 `from` is available only in file mode; `parent` also works when adding a live empty object.
 With `--editor auto`, check `editor` `status` to know whether calls reach an editor.
 
