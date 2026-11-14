@@ -125,6 +125,7 @@ class EditorApp {
   void stop();
   void toggle_pause();
   void save();
+  void open_preferences() { preferences_requested_ = true; }
   // Restores the offered recovery copy as dirty work; the original stays untouched.
   bool recover_scene();
   // The game's scenes, by the names scripts load them with ("main" is scene.glb). Opens another
@@ -298,7 +299,8 @@ class EditorApp {
   void draw_viewport_hint(bool playing);
   void use_viewport_tools();
   // The brush is on, and a terrain is selected.
-  bool sculpting() const;
+  bool using_terrain_brush() const;
+  void apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds);
   void use_brush();
   bool stroke_ends(bool brushing) const { return !brushing && stroke_started_; }
   void draw_gizmo();
@@ -330,6 +332,10 @@ class EditorApp {
   void apply_gizmo_drag(const Transform& pivot);
   void update_title();
   void draw_dialogs();
+  void draw_preferences_dialog();
+  void draw_preferences_actions();
+  void apply_preferences(const EditorPreferences& values);
+  void save_preferences();
   bool can_autosave_scene() const;
   void autosave_scene();
   void draw_recovery_dialog();
@@ -380,6 +386,10 @@ class EditorApp {
   std::optional<std::string> pending_split_;  // window name of a script tab to split off
   unsigned int center_dock_ = 0;              // where the Scene and new script tabs start
   unsigned int script_dock_ = 0;              // dock of the last focused script tab
+  EditorPreferences preferences_;
+  EditorPreferences edited_preferences_;
+  std::string preferences_error_;
+  bool preferences_requested_ = false;
   EditorCamera camera_;
   GatedInputSource game_input_;
   Gizmo gizmo_;

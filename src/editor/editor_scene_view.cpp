@@ -122,8 +122,9 @@ void EditorApp::draw_viewport_hint(bool playing) {
   const SceneViewport& view = *viewport_;
   const bool terrain_selected = session_->is_terrain(session_->selection());
   const Hint& shown = kViewportHints[static_cast<int>(
-      editor_logic::viewport_hint({playing, view.focused, terrain_selected, terrain_tool_.sculpting}))];
-  const char* hint = ui::icon_label(shown.icon, shown.text);
+      editor_logic::viewport_hint({playing, view.focused, terrain_selected, using_terrain_brush()}))];
+  const bool paint_hint = !playing && terrain_selected && terrain_tool_.painting;
+  const char* hint = ui::icon_label(shown.icon, paint_hint ? "editor.inspector.terrain.paint_help" : shown.text);
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
       editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y, ui::scaled(1));

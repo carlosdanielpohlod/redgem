@@ -94,6 +94,7 @@ add_executable(redgem_tests
   unit/inspector_typing_test.cpp
   unit/ui_widgets_test.cpp
   unit/editor_camera_test.cpp
+  unit/editor_preferences_test.cpp
   unit/gated_input_source_test.cpp
   unit/gizmo_test.cpp
   unit/scene_overlays_test.cpp
@@ -158,6 +159,8 @@ add_executable(redgem_tests
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
   unit/byte_allowance_test.cpp
+  unit/movement_validator_test.cpp
+  unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp
   unit/stun_probe_test.cpp
@@ -228,6 +231,7 @@ add_executable(redgem_tests
   integration/http_client_test.cpp
   integration/http_game_test.cpp
   integration/network_session_test.cpp
+  integration/movement_validation_test.cpp
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp

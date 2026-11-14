@@ -169,7 +169,7 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
-- Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
+- Terrain is one 100 m square with vertex tint painting and one material, no texture-layer painting,
   no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
   is an ordinary mesh.
 
@@ -207,7 +207,7 @@ not a promise of how it will be closed.
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
-  script cannot spawn a prefab file by its path (only a placement in the scene), and a running
+  scripted prefab imports are synchronous and support rigid hierarchies only, and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
   descendant-only animation; it does not replace the original selection with a reference or
   overwrite an existing source file. (Loading, nesting, root overrides, previews, placement from
@@ -222,10 +222,9 @@ not a promise of how it will be closed.
   synchronous, limited to 64 MiB and embedded GLB buffers, and needs the original scene to remain
   loadable when reopening. Linked images keep their existing paths; scripts and external assets
   are not backed up. See [scene recovery](docs/editor.md#scene-recovery).
-- No animation preview; no preferences
-  beyond the graphics card (key bindings, camera speed, snap sizes); dark theme only.
-- Automatic monitor scaling applies to editor text and spacing. The scene preview renders at
-  logical viewport resolution, and there is no manual scale override.
+- No animation preview. Only fly camera movement keys can be rebound; dark theme only.
+- The scene preview renders at logical viewport resolution. The editor has a manual interface
+  scale, while the project hub uses automatic monitor scaling.
 
 ### What a shipped game offers its players
 
@@ -429,8 +428,18 @@ not a promise of how it will be closed.
   can announce a game.
 - Plaintext is kept only inside the engine, for its own tests of the protocol: a game, the relay
   and the server have no way to turn encryption off.
-- Clients own the positions of their objects and decide their own collisions: a server cannot
-  check movement, so a modified client can move anywhere.
+- Clients own the positions of their objects and decide their own collisions. Movement
+  validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
+  lets the host or a dedicated server refuse moves faster or further than the game's limits, but
+  it checks positions only: not rotations, animations, collisions (walking through a wall within
+  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  teleport distance hold for every object of the game, and a kicked machine is not told why. In a
+  room on a relay, nothing is checked (the relay passes poses on). An object destroyed and made
+  again under the same key is checked from where it was until the host makes its copy again, so a
+  pose of it that arrives first is corrected (a spawned object gets a new key, and is not). A
+  violation is counted once a second at most, so a connection slower than that may count one
+  correction twice. A correction moves the owner's
+  transform; a physics body or character controller on it follows only if it follows the transform.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
   connection through home routers yet. The engine has the pieces, not the path through them: the
   relay answers STUN on its UDP port (a game can learn the public address its router gives it),

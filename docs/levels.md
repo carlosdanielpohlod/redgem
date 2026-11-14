@@ -257,6 +257,10 @@ comes selected with the brush on: mountains, holes and plateaus are a drag of th
 *Radius* is the size of the brush in meters, *Strength* how fast it works. Each stroke is one
 undo step. Untick Sculpt to select and move objects again.
 
+Turn on **Paint** in the Terrain card, choose **Paint color**, and drag over the ground to tint
+it. White restores the material's original color. Each stroke is an undo step, and the tint saves
+with the scene as vertex colors. Brush detail follows the terrain grid.
+
 The terrain's collider follows its shape, so characters walk and things roll on the hills you
 make. Its color and roughness are in the Mesh card, like any object's. A terrain is made and
 shaped in the editor; one re-exported from Blender is an ordinary mesh.
