@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "core/clock.hpp"
 #include "net/http/http_request.hpp"
 #include "net/http/http_trust.hpp"
 #include "net/http/http_url.hpp"
@@ -23,8 +24,9 @@ struct HttpResult {
 // soon after, and nobody hears of them.
 class HttpClient {
  public:
-  // Secure answers are checked against `trust`; the system's authorities when null.
-  explicit HttpClient(std::shared_ptr<const TrustStore> trust = nullptr) : trust_(std::move(trust)) {}
+  // Secure answers are checked against `trust`; the system's authorities when null. Timeouts are
+  // kept on `clock`, the steady clock when null (shared: a request's thread may outlive the client).
+  explicit HttpClient(std::shared_ptr<const TrustStore> trust = nullptr, std::shared_ptr<const Clock> clock = nullptr);
   ~HttpClient();
   HttpClient(const HttpClient&) = delete;
   HttpClient& operator=(const HttpClient&) = delete;
@@ -45,6 +47,7 @@ class HttpClient {
   void launch(int id, HttpRequest request, Url url);
 
   std::shared_ptr<const TrustStore> trust_;
+  std::shared_ptr<const Clock> clock_;
   std::vector<std::shared_ptr<Job>> jobs_;
   std::vector<HttpResult> refused_;  // answered at once: for the next poll
   int next_id_ = 1;
