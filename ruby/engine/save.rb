@@ -186,7 +186,7 @@ module Save
     made = hook.call(values)
     raise TypeError, "Save.migrate(from: #{from}) must return the new values as a Hash" unless made.is_a?(Hash)
 
-    made.each_with_object({}) { |(key, value), strings| strings[key.to_s] = value }
+    made.transform_keys(&:to_s)
   end
 
   def self.__refuse(why)
