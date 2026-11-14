@@ -5,6 +5,7 @@
 #   Audio.stop(hum)
 #   Audio.play(:line_042, group: :voice)                     # the player's voice volume applies
 #   Audio.music(:night, fade: 2.0)                           # crossfades from the track playing
+#   Audio.ducking(volume: 0.25)                              # the music goes lower under voices
 module Audio
   FULL_VOLUME = 1.0
   NORMAL_PITCH = 1.0
@@ -13,6 +14,12 @@ module Audio
   # What a sound is mixed in, unless it says (group: :music, :effects or :voice): each group has
   # the player's volume of its own (Settings.music_volume...).
   DEFAULT_GROUP = :effects
+  # While a sound of the :voice group plays, the music group goes down to this share of its volume
+  # over DUCK_ATTACK seconds, and comes back over DUCK_RELEASE seconds once no voice plays.
+  DUCKED_VOLUME = 0.4
+  DUCK_ATTACK = 0.15
+  DUCK_RELEASE = 0.6
+  NO_DUCKING = 1.0
 
   # A sound with no place in the world. Returns its handle (for stop, playing? and set), or nil
   # when the sound file does not exist or 64 sounds already play.
@@ -30,6 +37,12 @@ module Audio
   # file does not exist: the track playing goes on.
   def self.music(name, loop: true, volume: DEFAULT_MUSIC_VOLUME, fade: NO_FADE)
     __music(name, loop ? true : false, volume.to_f, fade.to_f)
+  end
+
+  # How the music (its tracks and the sounds of the :music group) goes down while someone speaks.
+  # volume: NO_DUCKING turns it off. The game's ducking ends with it.
+  def self.ducking(volume: DUCKED_VOLUME, attack: DUCK_ATTACK, release: DUCK_RELEASE)
+    __ducking(volume.to_f, attack.to_f, release.to_f)
   end
 
   def self.stop_music(fade: NO_FADE)

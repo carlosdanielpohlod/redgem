@@ -350,6 +350,7 @@ redgem_add_library(redgem_runtime
   navigation/nav_queries.cpp
   navigation/navigation.cpp
   audio/audio.cpp
+  audio/ducking.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp

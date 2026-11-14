@@ -94,6 +94,11 @@ class SoundPool {
   bool set_levels(SoundSourceId id, const SoundLevels& levels);
   // The volume every sound of the group is heard at, times its own.
   void set_group_volume(MixGroup group, float volume);
+  // A gain the engine puts over a group, apart from the player's volume: the music ducked under a
+  // voice.
+  void set_group_gain(MixGroup group, float gain);
+  // Whether any sound of the group still plays.
+  bool group_playing(MixGroup group) const;
   bool playing(SoundSourceId id) const;
   bool stop(SoundSourceId id);
   void clear();
@@ -106,6 +111,7 @@ class SoundPool {
   SoundDriver& driver_;
   AudioListener listener_;
   GroupVolumes group_volumes_ = kFullGroupVolumes;
+  GroupVolumes group_gains_ = kFullGroupVolumes;
   std::map<SoundSourceId, SpatialSound> sounds_;
   std::uint64_t next_ = 1;  // never reuse handles, including across game changes
 };

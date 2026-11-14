@@ -35,6 +35,13 @@ class AudioTest < RedGemTest::Case
     assert_raises(ArgumentError) { Audio.stop_music(fade: -1) }
   end
 
+  def test_a_ducking_out_of_range_is_refused
+    assert_raises(ArgumentError) { Audio.ducking(volume: 1.5) }
+    assert_raises(ArgumentError) { Audio.ducking(volume: -0.1) }
+    assert_raises(ArgumentError) { Audio.ducking(attack: -1) }
+    assert_raises(ArgumentError) { Audio.ducking(release: -1) }
+  end
+
   def test_music_without_a_file_does_not_play_and_stopping_no_music_is_harmless
     refute Audio.music(NOT_A_SOUND, fade: 1)
     assert_nil Audio.stop_music(fade: 1)

@@ -88,6 +88,17 @@ mrb_value audio_set_volume(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, volume);
 }
 
+// Audio.__ducking(volume, attack, release): how the music goes down under a voice.
+mrb_value audio_ducking(mrb_state* mrb, mrb_value) {
+  mrb_float volume = 0.0, attack = 0.0, release = 0.0;
+  mrb_get_args(mrb, "fff", &volume, &attack, &release);
+  MusicDucking ducking;
+  ducking.volume = static_cast<float>(from_to(mrb, volume, kSilent, kNoDucking, "Audio.ducking's volume"));
+  ducking.attack_seconds = static_cast<float>(at_least(mrb, attack, kNoFade, "Audio.ducking's attack"));
+  ducking.release_seconds = static_cast<float>(at_least(mrb, release, kNoFade, "Audio.ducking's release"));
+  return mrb_bool_value(audio(mrb).set_music_ducking(ducking));
+}
+
 enum SpatialOption { Volume, Pitch, ReferenceDistance, MaxDistance, Loop, Group, SpatialOptionCount };
 constexpr mrb_int kMaximumSourceId = std::numeric_limits<std::int32_t>::max();
 struct SpatialArguments {
@@ -206,6 +217,7 @@ void install_audio_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "music_pitch=", audio_set_music_pitch, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "music_volume=", audio_set_music_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, audio_module, "__ducking", audio_ducking, MRB_ARGS_REQ(3));
 }
 
 }  // namespace redgem
