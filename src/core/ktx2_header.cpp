@@ -129,6 +129,11 @@ bool plausible(const Ktx2Header& header) {
   return within_image_limits(header.size) && header.levels <= full_chain(header.size);
 }
 
+// Whether the file's sections and every level its header lists lie inside it.
+bool stored_inside(const std::uint8_t* data, std::size_t size, const Ktx2Header& header) {
+  return sections_inside(data, size) && levels_inside(data, size, header);
+}
+
 }  // namespace
 
 bool starts_as_ktx2(const std::uint8_t* data, std::size_t size) {
@@ -143,8 +148,7 @@ std::optional<Ktx2Header> read_ktx2_header(const std::uint8_t* data, std::size_t
   if (!drawable_kind(data)) return std::nullopt;
   const Ktx2Header header = claimed_header(data);
   if (!plausible(header)) return std::nullopt;
-  if (!sections_inside(data, size)) return std::nullopt;
-  if (!levels_inside(data, size, header)) return std::nullopt;
+  if (!stored_inside(data, size, header)) return std::nullopt;
   return header;
 }
 

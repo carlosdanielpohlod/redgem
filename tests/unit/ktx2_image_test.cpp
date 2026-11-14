@@ -123,6 +123,10 @@ struct Ktx2Scene {
     std::filesystem::copy_file(test::fixture("images/sniff.png"), folder / "fallback.png");
   }
   ~Ktx2Scene() { std::filesystem::remove_all(folder); }
+  void write_picture(const std::vector<std::uint8_t>& bytes) const {
+    std::ofstream file(folder / "picture.ktx2", std::ios::binary | std::ios::trunc);
+    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  }
   LoadResult load(const json& doc) const {
     const auto file = folder / "scene.gltf";
     std::ofstream(file) << doc.dump();
@@ -297,18 +301,26 @@ TEST_CASE("glTF KHR_texture_basisu shows its KTX2 picture over the plain fallbac
 TEST_CASE("a KTX2 picture the engine cannot read leaves the texture its fallback, when it has one") {
   Ktx2Scene scene;
   auto broken = ktx2_bytes(kAlphaFixture);
-  SUBCASE("refused by its header") { broken[kFaceCountAt] = kCubeFaces; }
-  SUBCASE("refused by the transcoder") { broken = not_basis_data(broken); }
-  std::ofstream file(scene.folder / "picture.ktx2", std::ios::binary | std::ios::trunc);
-  file.write(reinterpret_cast<const char*>(broken.data()), static_cast<std::streamsize>(broken.size()));
-  file.close();
   auto doc = basisu_scene();
   int shown = kFallbackImage;
-  SUBCASE("with a plain fallback") {}
-  SUBCASE("with nothing else to show") {
-    doc["textures"][0].erase("source");
-    shown = kKtx2Image;
+  // Each refusal is tried with and without a fallback: the choices are nested, since doctest runs
+  // one sibling subcase per pass.
+  const auto choose_fallback = [&doc, &shown] {
+    SUBCASE("with a plain fallback") {}
+    SUBCASE("with nothing else to show") {
+      doc["textures"][0].erase("source");
+      shown = kKtx2Image;
+    }
+  };
+  SUBCASE("refused by its header") {
+    broken[kFaceCountAt] = kCubeFaces;
+    choose_fallback();
   }
+  SUBCASE("refused by the transcoder") {
+    broken = not_basis_data(broken);
+    choose_fallback();
+  }
+  scene.write_picture(broken);
   const auto loaded = scene.load(doc);
   REQUIRE_MESSAGE(loaded.ok, loaded.error);
   REQUIRE(loaded.scene.materials.size() == 1);
