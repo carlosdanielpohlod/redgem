@@ -71,6 +71,21 @@
           "about": "the object is being destroyed"
         },
         {
+          "name": "on_interact",
+          "args": "actor",
+          "about": "an actor used this object (it has an Interactable; on the host in a game over the network)"
+        },
+        {
+          "name": "on_focus",
+          "args": "actor",
+          "about": "this object became what an actor's interaction prompt is for"
+        },
+        {
+          "name": "on_blur",
+          "args": "actor",
+          "about": "it stopped being what that prompt is for"
+        },
+        {
           "name": "game_object",
           "about": "the object this behaviour is attached to"
         },
@@ -2943,6 +2958,7 @@
         }
       ],
       "internal": [
+        "number",
         "on_destroy",
         "registered",
         "start"
@@ -2996,13 +3012,13 @@
         {
           "name": "best_for",
           "static": true,
-          "args": "actor, candidates = Interactable.all",
-          "about": "the Interactable an actor would use now, or nil"
+          "args": "actor, candidates = Interactable.all, lenient: false",
+          "about": "the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)"
         },
         {
           "name": "reachable?",
           "static": true,
-          "args": "actor, target, slack = 0.0",
+          "args": "actor, target, lenient: false",
           "about": "whether an actor can use a target now: enabled, in range, in front, in sight"
         },
         {

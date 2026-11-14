@@ -24,18 +24,28 @@ end
 
 # What a scene object answers that interaction asks.
 class StandInObject
-  attr_reader :name, :transform, :behaviours
+  attr_reader :name, :transform, :behaviours, :children
+  attr_accessor :parent, :alive
 
   def initialize(name, position, forward = Vector3.forward)
     @name = name
     @transform = StandInTransform.new(position, forward)
     @behaviours = []
+    @children = []
+    @alive = true
   end
 
-  def alive? = true
+  def alive? = @alive
   def props = {}
   def get_component(klass) = @behaviours.find { |behaviour| behaviour.is_a?(klass) }
   def __add_behaviour(behaviour) = @behaviours << behaviour
+  def __notify(callback, actor) = @behaviours.each { |behaviour| behaviour.__send__(callback, actor) }
+
+  def carry(child)
+    child.parent = self
+    @children << child
+    child
+  end
 end
 
 # Writes down what it hears.
@@ -135,7 +145,21 @@ class InteractionTest < RedGemTest::Case
     target = interactable("Door", ahead(NEAR))
     Physics.in_the_way = { object: target.game_object, distance: NEAR * 0.9 }
     picks target, [target]
-    assert @actor.equal?(Physics.ignored), "the actor does not hide what it looks at"
+    assert_equal [@actor], Physics.ignored, "the actor does not hide what it looks at"
+  end
+
+  def test_what_is_under_the_target_is_the_target
+    target = interactable("Guard", ahead(NEAR))
+    body = target.game_object.carry(StandInObject.new("GuardBody", ahead(NEAR)))
+    Physics.in_the_way = { object: body, distance: NEAR / 2 }
+    picks target, [target], "a character's collider on a child"
+  end
+
+  def test_what_the_actor_carries_hides_nothing
+    sword = @actor.carry(StandInObject.new("Sword", ahead(NEAR / 4)))
+    target = interactable("Door", ahead(NEAR))
+    Interaction.best_for(@actor, [target])
+    assert_equal [@actor, sword], Physics.ignored
   end
 
   def test_a_disabled_target_is_never_picked
@@ -166,6 +190,31 @@ class InteractionTest < RedGemTest::Case
     refute Interaction.interact(@actor, StandInObject.new("Rock", ahead(NEAR))), "nothing to use on it"
   end
 
+  def test_the_host_allows_a_client_a_little_more
+    target = interactable("Lever", ahead(Interactable::RANGE + Interaction::NETWORK_SLACK / 2), angle: NARROW)
+    picks nil, [target]
+    assert Interaction.best_for(@actor, [target], lenient: true).equal?(target)
+    @actor.transform.forward = Vector3.back
+    assert_nil Interaction.best_for(@actor, [target], lenient: true), "turned away is too far still"
+  end
+
+  def test_the_host_uses_the_one_in_reach_of_those_with_the_name_asked
+    far = interactable("Chest", ahead(FAR))
+    near = interactable("Chest", ahead(NEAR))
+    recorders = [far, near].map { |target| recorder_on(target) }
+    assert Interaction.__asked(@actor, [far.game_object, near.game_object])
+    assert_equal [[], [[:interact, @actor]]], recorders.map(&:heard)
+    refute Interaction.__asked(@actor, [far.game_object]), "out of reach, even with the slack"
+  end
+
+  def test_settings_that_are_no_numbers_raise_as_they_are_set
+    target = interactable("Sign", ahead(NEAR))
+    assert_raises(ArgumentError) { target.range = -1 }
+    assert_raises(ArgumentError) { target.angle = "wide" }
+    assert_raises(ArgumentError) { target.priority = Float::NAN }
+    assert_raises(ArgumentError) { interactable("Sign", ahead(NEAR), angle: "wide").start }
+  end
+
   def test_the_events_are_named
     error = assert_raises(ArgumentError) { Interaction.on(:poke) { nil } }
     assert error.message.include?(":poke")
@@ -187,6 +236,16 @@ class InteractionTest < RedGemTest::Case
     target.enabled = false
     assert_nil interactor.tap { |looking| looking.update(FRAME) }.target
     assert_equal [[:focus, @actor], [:blur, @actor]], recorder.heard
+  end
+
+  def test_a_destroyed_target_hears_no_blur
+    target = interactable("Coin", ahead(NEAR)).tap(&:start)
+    recorder = recorder_on(target)
+    interactor = new_interactor(prompt: false)
+    interactor.update(FRAME)
+    target.game_object.alive = false
+    interactor.update(FRAME)
+    assert_equal [[:focus, @actor]], recorder.heard
   end
 
   def test_the_prompt_names_the_key

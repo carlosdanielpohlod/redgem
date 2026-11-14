@@ -17,6 +17,9 @@ class Door < Behaviour
   def on_collision_enter(other); end  # this object's body touched another
   def on_collision_exit(other); end
   def on_destroy; end
+  def on_interact(actor); end         # the player used it (it has an Interactable: see Interaction)
+  def on_focus(actor); end            # its prompt shows
+  def on_blur(actor); end             # ... and no longer does
 end
 ```
 

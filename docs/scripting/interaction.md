@@ -43,8 +43,9 @@ Every frame, the Interactor looks at the scene's Interactables and keeps those t
 2. **in range**: no further than `range` meters from the hero to the object;
 3. **in front**, when the Interactable has an `angle`: no more than that many degrees off the way
    the hero faces, measured across the ground;
-4. **in sight**: a ray from the hero to the object hits nothing else first. Triggers never block
-   it, and the object's own collider counts as reaching it.
+4. **in sight**: a ray from the hero's position to the object's hits nothing else first. Triggers
+   never block it, what the hero carries (the objects under it) is seen through, and the object's
+   own collider, or one of an object under it (a character's body), counts as reaching it.
 
 Of those, the one with the highest `priority` wins, then the nearest. That one is the **focus**:
 its behaviours hear `on_focus(actor)` when it becomes the focus, and `on_blur(actor)` when another
@@ -60,10 +61,8 @@ takes its place, it goes out of reach, or it is disabled.
 
 Each setting can also be a Blender custom property of the object, and each can change while
 playing: `interactable.enabled = false`, `interactable.range = 4.0`, `interactable.angle = nil`.
-
-A character's collider is usually its root object's, which is what the ray must reach. A target
-whose collider is on a child object is hidden by that child: put the Interactable on the object
-that has the collider.
+A range or an angle that is not a number from 0 up, or a priority that is not a number, raises an
+`ArgumentError` where it is set (from a setting or a property: as the Interactable starts).
 
 ## The prompt and the :interact action
 
@@ -103,7 +102,8 @@ Interaction.on(:focus) { |actor, target| Audio.play(:hover) }
 Interaction.on(:blur) { |actor, target| }
 ```
 
-The target's behaviours hear first, then the handlers. What `Interaction.on` registers lasts until
+The target's behaviours hear first, as the engine calls its own callbacks (one that raises is
+disabled and reported, and the others still hear), then the handlers. What `Interaction.on` registers lasts until
 the next level is loaded, as `Network.on` does: register it in a scene script's `setup`.
 
 A script can also use something itself, as the Interactor does when the key is pressed:
@@ -121,10 +121,12 @@ hero is not near.
 
 - The hero needs a `NetworkSync` that is its machine's (as every hero of a networked game has): the
   host knows it by that key, and believes only its owner.
-- The target is found on the host by its `NetworkSync` key when it has one, by its name otherwise,
-  and needs its Interactable on the host too: give every machine the same scene script.
-- The host sees a client's hero a moment late, so it lets the hero be 1 meter past the range
-  (`Interaction::NETWORK_SLACK`).
+- The target is found on the host by its `NetworkSync` key when it has one, by its name otherwise
+  (of several Interactables with that name, the one in the hero's reach), and needs its
+  Interactable on the host too: give every machine the same scene script.
+- The host sees a client's hero a moment late, so it lets the hero be 1 meter past the range and
+  30 degrees past the angle (`Interaction::NETWORK_SLACK`, `NETWORK_ANGLE_SLACK`). Its sight is
+  checked from where the host sees the hero, with no slack.
 - What the use does happens on the host. It tells the players what they need to see with
   `Network.emit` (the actor's owner is `actor.get_component(NetworkSync).owner`):
 

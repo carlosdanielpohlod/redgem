@@ -63,6 +63,9 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_collision_enter(other)`: this object's body touched another
 - `on_collision_exit(other)`: this object's body stopped touching another
 - `on_destroy`: the object is being destroyed
+- `on_interact(actor)`: an actor used this object (it has an Interactable; on the host in a game over the network)
+- `on_focus(actor)`: this object became what an actor's interaction prompt is for
+- `on_blur(actor)`: it stopped being what that prompt is for
 - `game_object`: the object this behaviour is attached to
 - `name`: the object's name
 - `transform`: the object's Transform
@@ -805,8 +808,8 @@ Who uses what: the choice of a target, uses, and the game's handlers; over the n
 
 - `Interaction.on(event, &block)`: |actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)
 - `Interaction.interact(actor, target)`: the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client
-- `Interaction.best_for(actor, candidates = Interactable.all)`: the Interactable an actor would use now, or nil
-- `Interaction.reachable?(actor, target, slack = 0.0)`: whether an actor can use a target now: enabled, in range, in front, in sight
+- `Interaction.best_for(actor, candidates = Interactable.all, lenient: false)`: the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)
+- `Interaction.reachable?(actor, target, lenient: false)`: whether an actor can use a target now: enabled, in range, in front, in sight
 - `Interaction.distance(actor, target)`: meters from an actor to a target
 - `Interaction.angle_to(actor, target)`: degrees between where the actor faces and where the target is, across the ground
 

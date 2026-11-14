@@ -59,6 +59,10 @@ void ScriptHost::invoke_on_object(ObjectId object, const char* method, std::init
   }
 }
 
+void ScriptHost::notify(ObjectId object, const std::string& method, mrb_value argument) {
+  invoke_on_object(object, method.c_str(), {argument});
+}
+
 void ScriptHost::start_pending() {
   for (std::size_t i = 0; i < behaviours_.size(); ++i) {
     if (behaviours_[i].started) continue;

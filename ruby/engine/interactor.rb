@@ -58,10 +58,13 @@ class Interactor < Behaviour
   def refocus(best)
     return if best.equal?(@target)
 
-    Interaction.__blurred(game_object, @target) if @target
+    Interaction.__blurred(game_object, @target) if still_there?(@target)
     @target = best
     Interaction.__focused(game_object, best) if best
   end
+
+  # A target that was not destroyed meanwhile (a destroyed one hears nothing more).
+  def still_there?(target) = !target.nil? && target.game_object.alive?
 
   # Draws the prompt; true when it was tapped.
   def draw_prompt

@@ -68,6 +68,10 @@ class ScriptHost {
   void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);
+  // Calls one of the callbacks scripts raise themselves (Interaction's on_interact...) with one
+  // argument on the object's running behaviours, as the engine calls its own: one that fails is
+  // disabled and reported, and the others still hear of it.
+  void notify(ObjectId object, const std::string& method, mrb_value argument);
   // Forgets the object's behaviours and its Ruby GameObject, which from then on stands for nothing.
   void detach(ObjectId object);
 
