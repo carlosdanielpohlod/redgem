@@ -50,4 +50,8 @@ std::optional<ToolLine> read_tool_line(const std::vector<std::string>& args, std
 // A number written whole: "12", "-3.5", "1e3". Nothing for anything else.
 std::optional<double> number_from(const std::string& text);
 
+// The count an option is given (a whole number, not below zero): `otherwise` without the
+// option, nothing when it is no count.
+std::optional<std::size_t> count_option(const ToolLine& line, const char* option, std::size_t otherwise);
+
 }  // namespace redgem::tools

@@ -12,6 +12,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
@@ -182,16 +184,22 @@ redgem_add_library(redgem_core
   core/game_files.cpp
   core/image_header.cpp
   core/webp_image.cpp
+  core/ktx2_header.cpp
+  core/ktx2_image.cpp
+  core/gpu_texture_formats.cpp
   core/float_image.cpp
   core/radiance_header.cpp
   core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
+  core/frame_budget.cpp
   core/frame_profiler.cpp
   core/stopwatch.cpp
   core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
+# (The Basis Universal transcoder: KTX2 textures, see core/ktx2_image.hpp.)
+target_link_libraries(redgem_core PRIVATE basisu_transcoder)
 # (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)
 target_link_libraries(redgem_core PRIVATE redgem_zlib)
 redgem_embed_texts(redgem_core core)
@@ -233,6 +241,9 @@ redgem_add_library(redgem_net
   net/network_session_approval.cpp
   net/network_session_room_approval.cpp
   net/network_session_poses.cpp
+  net/network_session_held.cpp
+  net/network_session_reconnect.cpp
+  net/resume_token.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp
@@ -320,13 +331,16 @@ redgem_add_library(redgem_runtime
   scene/particle_look.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
+  scene/water_volume.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/joint_config.cpp
   physics/body_limit.cpp
+  physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -411,6 +425,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -455,6 +470,7 @@ redgem_add_library(redgem_runtime
   render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
+  render/compressed_textures.cpp
   render/texture_loading.cpp
   render/debug_draw.cpp
   render/renderer_debug.cpp
@@ -470,6 +486,7 @@ redgem_add_library(redgem_runtime
   render/renderer_see_through.cpp
   render/renderer_water.cpp
   render/water_ripple_packet.cpp
+  render/underwater.cpp
   render/renderer_water_ripples.cpp
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
@@ -501,6 +518,7 @@ redgem_add_library(redgem_runtime
   render/gpu_select.cpp
   render/window.cpp
   render/display_settings.cpp
+  render/ui_scale.cpp
   render/quality.cpp
   render/font_rasterizer.cpp
   render/game_fonts.cpp
@@ -533,7 +551,9 @@ redgem_add_library(redgem_runtime
   app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
+  app/scene_activation.cpp
   app/scene_bodies.cpp
+  app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
   app/touch_circles.cpp
@@ -626,6 +646,7 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
+    editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp
@@ -633,6 +654,7 @@ if(NOT ANDROID)
     editor/gizmo.cpp
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
+    editor/joint_gizmo.cpp
     editor/scene_overlays_physics.cpp
     editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
@@ -673,6 +695,7 @@ if(NOT ANDROID)
     editor/ui/inspector_terrain.cpp
     editor/ui/inspector_scripts.cpp
     editor/ui/inspector_physics.cpp
+    editor/ui/inspector_joint.cpp
     editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
     editor/ui/agent_panel.cpp
@@ -761,6 +784,9 @@ if(NOT ANDROID)
     project/closest_words.cpp
     project/scene_text.cpp
     project/scene_diff.cpp
+    project/scene_revision.cpp
+    project/asset_search.cpp
+    project/search_command.cpp
     project/scene_snapshot.cpp
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp

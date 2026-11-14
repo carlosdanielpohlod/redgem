@@ -136,6 +136,9 @@ inline constexpr const char* kAutoExposure = "autoExposure";
 inline constexpr const char* kExposureCompensation = "exposureCompensation";
 // Sunlight through leaves lit from behind (lit_foliage.hpp).
 inline constexpr const char* kFoliageTranslucency = "foliageTranslucency";
+inline constexpr const char* kUnderwater = "underwater";
+inline constexpr const char* kUnderwaterAbsorption = "underwaterAbsorption";
+inline constexpr const char* kDepthTexture = "depthTexture";
 inline constexpr const char* kGradeTime = kTime;  // the tone mapping shader names its clock the same
 
 // The most point lights that light a surface at once: MAX_POINT_LIGHTS in the shaders, defined

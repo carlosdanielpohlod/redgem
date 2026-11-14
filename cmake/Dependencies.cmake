@@ -160,6 +160,18 @@ FetchContent_Declare(libwebp
   URL https://codeload.github.com/webmproject/libwebp/tar.gz/${REDGEM_WEBP_COMMIT}
   URL_HASH SHA256=${REDGEM_WEBP_SHA256})
 
+# --- Basis Universal (KTX2 textures, KHR_texture_basisu): only its transcoder is built ---------
+# Its encoder, tools, web demos and test pictures are deleted once the archive is unpacked: the
+# engine never builds them, and the sources the build keeps stay small.
+set(REDGEM_BASISU_COMMIT "21fb6e242b1e425a7557c5655bb1b475f71933ca") # v2_0_3
+set(REDGEM_BASISU_SHA256 "4109cc260a4ec07510478132174965d5d8c68fd53ad178f111222940e39f4cb9")
+set(REDGEM_BASISU_UNUSED bin contrib encoder encoder_lib example example_capi example_transcoding OpenCL python
+                         shader_deblocking test_files webgl)
+FetchContent_Declare(basis_universal
+  URL https://codeload.github.com/BinomialLLC/basis_universal/tar.gz/${REDGEM_BASISU_COMMIT}
+  URL_HASH SHA256=${REDGEM_BASISU_SHA256}
+  PATCH_COMMAND ${CMAKE_COMMAND} -E rm -rf ${REDGEM_BASISU_UNUSED})
+
 # --- SQLite (where a dedicated server keeps its game's saves; one C file, in the public domain) ----
 # Only where the server is built: a game on a phone keeps its saves in a file.
 if(NOT ANDROID)
@@ -210,7 +222,7 @@ if(WIN32)
   target_compile_options(Jolt PUBLIC "SHELL:-include type_traits")
 endif()
 # These ship no (usable) CMake project: only fetch their sources.
-foreach(dep imgui rlimgui imguizmo zlib)
+foreach(dep imgui rlimgui imguizmo zlib basis_universal)
   FetchContent_GetProperties(${dep})
   if(NOT ${dep}_POPULATED)
     FetchContent_Populate(${dep})
@@ -245,6 +257,18 @@ add_library(redgem_zlib STATIC
   ${zlib_SOURCE_DIR}/zutil.c)
 target_include_directories(redgem_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
 target_compile_definitions(redgem_zlib PUBLIC Z_PREFIX ZLIB_CONST)
+
+# What turns a KTX2 picture's Basis data into what the graphics card takes (see
+# core/ktx2_image.hpp), with the Zstandard decoder its UASTC files are compressed with.
+add_library(basisu_transcoder STATIC
+  ${basis_universal_SOURCE_DIR}/transcoder/basisu_transcoder.cpp
+  ${basis_universal_SOURCE_DIR}/zstd/zstddeclib.c)
+target_include_directories(basisu_transcoder SYSTEM PUBLIC ${basis_universal_SOURCE_DIR}/transcoder)
+target_compile_definitions(basisu_transcoder PUBLIC BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1)
+# Its headers call std::terminate without including <exception>, which some standard libraries
+# (the Windows toolchain's) do not bring in through others. Its own sources get it here; the one
+# engine file that includes them (core/ktx2_image.cpp) includes <exception> first.
+target_compile_options(basisu_transcoder PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include exception>")
 
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")

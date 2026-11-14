@@ -102,7 +102,11 @@ std::unique_ptr<Engine> game_on(const TempGame& game, const SceneDesc& scene, Pr
   options.save_file = game.dir / "save.json";
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
-  return std::move(std::get<std::unique_ptr<Engine>>(created));
+  auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
+  // A unit of the interface is a pixel here, whatever the screen: these tests are about the camera
+  // (tests/integration/ui_scale_test.cpp is about the interface's units).
+  engine->script_context().ui_reference = UiReference{};
+  return engine;
 }
 
 // Whether the camera sees from its own place: no shake moves what it shows.

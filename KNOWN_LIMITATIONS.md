@@ -66,8 +66,14 @@ the same pull request.
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback, shore foam and local impact/wake ripples
-  from physical bodies. It has no underwater camera mode, fluid simulation,
-  buoyancy, breaking waves or planar reflections. Shore foam estimates horizontal distance
+  from physical bodies, buoyancy and an underwater camera look. It has no fluid simulation,
+  breaking waves or planar reflections, and no cheaper view of coasts far away (both follow-ups).
+  Buoyancy samples each body's collider box (spheres and capsules too) as 2 × 2 columns against
+  the calm surface: waves do not lift bodies, characters do not swim, and `density` is a custom
+  property only (no script setter yet). Water fills a column down to the next surface below or
+  forever: a dry tunnel under a lake counts as under water. The underwater look is
+  one blend for the whole picture: a camera half through the surface sees no waterline across the
+  screen, the surface itself is not drawn from below, and there are no caustics or light shafts. Shore foam estimates horizontal distance
   to the intersection of visible bottom and water tangent planes, with filtered pores and partial transmission.
   It is a local screen-space approximation, not a global shoreline-distance field. Missing geometry,
   depth discontinuities and nearly parallel planes suppress coverage; curved shores can deviate
@@ -77,8 +83,19 @@ the same pull request.
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
-  be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
-  ordinary pixels; it does not provide GPU texture compression.
+  be Radiance `.hdr`). Animated WebP is not read. WebP is decoded on the CPU and uploaded as
+  ordinary pixels. Scene textures may also be KTX2 (Basis Universal ETC1S or UASTC, through
+  `KHR_texture_basisu`): they stay compressed on the card (BC1/BC3, ASTC 4x4 or ETC1/ETC2) only
+  when the file carries its mipmaps; one without goes up as RGBA8. BC7 is not used (the
+  higher-quality desktop target for UASTC: BC3 is used instead), nor are HDR Basis data, KTX2
+  arrays and cube maps, or KTX2 files that hold other formats than Basis data. KTX2 is
+  transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
+  textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
+  pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too. The
+  scene memory budget counts a KTX2 picture at its RGBA8 size even when it goes up compressed
+  (4 to 8 times smaller). The KTX2 transcoder is opened once per KTX2 texture as the scene is
+  read (to fall back when it refuses the data), and again when it is uploaded.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and
@@ -134,6 +151,21 @@ the same pull request.
   game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
   the game has to raise these (`--per-address`, `--rooms-per-address`,
   `Network.host(waiting_per_address:)`).
+- Reconnecting (`Network.reconnect_window`) works in games hosted directly and on a dedicated
+  server, not in rooms on a relay (the relay holds no place: a player whose connection drops
+  there leaves the game). Messages sent to a player while it was away are lost, not replayed,
+  and objects spawned and removed meanwhile are set right only for `Network.spawn`'s own: other
+  state the game keeps has to be sent again by the game. A drop that neither side hears (no
+  reset arrives, the other side just goes silent) is noticed only after 45 seconds of silence,
+  so a shorter window covers only the drops that are heard (a network that changes, a router
+  that restarts). Each side counts the window from when it noticed the drop: when the host
+  noticed long before the player did, the place may be gone by the time the player calls back
+  (it is turned away, and hears `on_lost`). A player who quits while reconnecting cannot say
+  goodbye (between two calls nobody hears it, and a call on its way is not a goodbye): its place
+  stays held until the window is over. There is no
+  transport resumption below TCP: each return is a new connection and a new TLS handshake.
+- There is no host migration: when the player hosting a game leaves or drops, the game ends for
+  everyone. Hosting on a dedicated server avoids it.
 
 ## Web requests (HTTP)
 
@@ -144,8 +176,9 @@ the same pull request.
   `Proxy-Authorization` are dropped: other headers a game sets (an `X-Api-Key`) go along. Pass
   `redirects: false` to see the redirect and decide.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
-  for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
-  thread ends on its own).
+  for can outlast its timeout by that long. A game that ends gives its requests up, hangs up
+  their connections and joins their threads, 2 seconds at most: a request still looking its name
+  up then is left behind, its thread ending on its own once the lookup does.
 - On Windows the certificates come from the system's ROOT store, which Windows fills on demand:
   an authority no program on the machine has used yet may be missing. Not tried on a real Windows
   machine, nor on a real Android device (whose system certificates the engine reads).
@@ -255,19 +288,23 @@ not a promise of how it will be closed.
 
 ### What a shipped game offers its players
 
-- The menu's controls page binds one key and one button to a row: rebinding a cell replaces all it
-  had, so a second key for one action comes only from a game's script (`Input.bind`). It lists
-  every action and axis the game declared. Gamepads cannot rumble (neither the
-  desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
+- The menu's controls page has two cells of keys and two of buttons on a row: a third key for one
+  action comes only from a game's script (`Input.bind`), and shows in the row's second cell, which
+  rebinding replaces whole. Keys are listed before mouse buttons, whatever cell caught them. It
+  lists every action and axis the game declared. Gamepads cannot rumble (raylib 5.5 has no
+  vibration on desktops nor on Android): `Input.rumble` is a hook that does nothing and
+  `Input.rumble?` is false. A capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
 - Text fields take single key presses: there is no input-method composition, so languages typed
   through a composition window cannot be entered even with a game font that draws them.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
-  hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
-  by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
-  no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
-  one height.
+  hyphenation, no line-breaking rules of scripts written without spaces). Sizes scale with the
+  screen from one reference screen (game.json's `"ui"`) and one player multiplier
+  (`Settings.ui_scale`): there are no per-screen layouts (a phone held upright gets the same
+  layout, only its height matched), and the touch screen's stick and buttons follow the screen's
+  height but not the player's multiplier. There is no layout engine (rows, columns, stacks) and no
+  scroll region for anything other than rows of one height.
 - On Android the on-screen keyboard types the letters that have a key of their own on it (with
   Shift, digits and signs). Letters a keyboard sends as a whole text (some accented letters, emoji,
   words written by swiping or picked from suggestions on some keyboards) do not arrive.
@@ -296,6 +333,10 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
+- A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
+  one whose other end is in another scene, or was deleted, is not made (the log says so). The
+  editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
+- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
@@ -307,6 +348,19 @@ not a promise of how it will be closed.
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
+- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
+  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
+  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
+  longer needs.
+- `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
+  migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
+  no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
+  timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
+  hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
+- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
+  migrate it one after another. A room writing a key of that slot at the moment another room
+  writes the migrated values can make that migration fail as busy: the slot is then refused for
+  the migrating room's run, and migrated on its next first use.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
@@ -315,10 +369,14 @@ not a promise of how it will be closed.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
-- `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
-  worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
-  upload still block the owning thread at activation. Old and new scenes coexist in memory.
-  Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
+- `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
+  a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
+  creating the scene's objects, its water and its navigation bake still take one frame each, and
+  the editor's Play view uploads the new scene's textures and meshes in the frame it first shows
+  it. Old and new scenes, their physics worlds included, coexist in memory until the swap, and
+  the new one's decoded pictures are all held at once until they are on the graphics card.
+  Offline fixed-step runs intentionally wait for the reader and activate all at once, for
+  reproducible activation frames.
 - `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
   world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
   GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
@@ -405,8 +463,8 @@ not a promise of how it will be closed.
 ### Engineering
 
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
-- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
-  most on phones.
+- Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
+  Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
   that open no window, not the system tests; the coverage report is of those tests too, and no
   share of it is required. The load test and the benchmarks print numbers but fail on none.
@@ -414,7 +472,12 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About forty unit and integration tests wait on the real clock, a source of rare timing failures.
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
@@ -424,8 +487,12 @@ not a promise of how it will be closed.
   is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
   then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
   runs while another room clears the save writes its key back afterwards.
-- The threads of web requests are detached: one still running at exit may outlive the program's
-  static objects.
+- A web request still busy 2 seconds after its game ended is left behind: one looking its
+  server's name up (the system's lookup cannot be interrupted), or, on a slow device, loading the
+  system's certificates or decompressing a large answer. If the program exits meanwhile, its
+  thread may outlive the program's static objects. Ending the game waits those 2 seconds then,
+  which on a dedicated server holds up the other rooms of its thread. Every request that is
+  waiting on the network ends at once.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
   shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
   reflections march up to 32 steps, and the shore foam's distance is computed for every water
@@ -433,8 +500,9 @@ not a promise of how it will be closed.
 
 ### Multiplayer
 
-- A dropped player cannot reconnect, and when the host of a hosted game leaves, the game ends for
-  everyone (dedicated servers do not have this problem).
+- A dropped player can reconnect only when the host holds places (`Network.reconnect_window`),
+  and when the host of a hosted game leaves or drops, the game ends for everyone (there is no
+  host migration; dedicated servers do not have this problem).
 - Game connections are encrypted, but who answers is checked only when the game gives its
   fingerprint (`fingerprint:`, or `"servers"` in `game.json`): without one, someone who can
   redirect the players' traffic can stand in for the host, the relay or the server. Nothing
@@ -502,7 +570,8 @@ not a promise of how it will be closed.
 
 ### Working with AI assistants
 
-What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`), the MCP
+What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`,
+`assets`, `templates`), the MCP
 tools (`redgem mcp`), the editor's Agent panel, the `AGENTS.md` guide of new games and `llms.txt`;
 see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not there yet:
 
@@ -510,10 +579,18 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   gestures and the on-screen touch controls of a phone are not replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or
   its connected editor, using a process-local `since` cursor.
-- `redgem scene diff` compares loaded object content against an earlier scene file, but does
-  not read a revision directly from Git or compare unused assets and unsupported glTF data.
-- A search of the game's assets and of the templates. `api` covers the engine's classes only, not
-  the game's own behaviours: read the game's scripts for those.
+- `redgem scene diff` compares loaded object content against an earlier scene file or the scene
+  a Git revision saved (`--against HEAD~1`), but does not compare unused assets or unsupported
+  glTF data. A revision is read with `git show`, so it needs `git` on the `PATH`; a scene kept in
+  Git LFS reads as its pointer file there, not as a scene. A revision is a branch, tag or commit
+  with `~N`, `^N` or `@{N}`; ranges and `rev:path` forms are refused. A connected editor runs
+  `git` while it answers MCP's `scene_diff` with a `revision`, so a slow repository holds its
+  frame for that long.
+- The asset search (`redgem assets`, MCP `asset_search`) knows an asset's kind by its folder and
+  its tags by the subfolders it sits in: a game has no tag files or other metadata, so nothing
+  inside a file (a model's mesh names, a script's classes) is searched. It reads at most 10,000
+  files of each kind, and says nothing when a folder had more. `api` covers the engine's classes only, not the game's own behaviours: read the game's
+  scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
   viewport images, runtime queries and event history. Live add creates empty objects only;

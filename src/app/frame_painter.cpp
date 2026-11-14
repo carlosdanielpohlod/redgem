@@ -1,12 +1,23 @@
 #include "app/frame_painter.hpp"
 
+#include "app/scene_water.hpp"
+#include "render/render_math.hpp"
+
 namespace redgem {
 
+bool FramePainter::prepare(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget) {
+  return renderer_.stage(desc, generation, bytes, budget);
+}
+
+void FramePainter::drop_prepared() { renderer_.drop_staged(); }
+
+void FramePainter::take_scene(const FrameView& view) {
+  renderer_.upload(view.scene_desc, view.scene_generation);  // (with what was readied for it)
+  uploaded_generation_ = view.scene_generation;
+}
+
 void FramePainter::follow_game(const FrameView& view) {
-  if (view.scene_generation != uploaded_generation_) {
-    renderer_.upload(view.scene_desc);
-    uploaded_generation_ = view.scene_generation;
-  }
+  if (view.scene_generation != uploaded_generation_) take_scene(view);
   // (Naming the folder again would drop the pictures already loaded from it.)
   if (view.images_dir != images_dir_) {
     images_dir_ = view.images_dir;
@@ -23,8 +34,14 @@ void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {
 
 void FramePainter::paint_world(const FrameView& view, const RenderTexture2D* output) {
   follow_game(view);
-  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles, view.water_ripples,
-                       view.debug_draw);
+  const Camera3D camera = renderer_.scene_camera(view.scene);
+  renderer_.set_underwater(underwater_of(view, camera));
+  renderer_.draw_world(view.scene, camera, output, &view.particles, view.water_ripples, view.debug_draw);
+}
+
+UnderwaterView FramePainter::underwater_of(const FrameView& view, const Camera3D& camera) {
+  if (view.water_surfaces == nullptr) return {};
+  return underwater_view(*view.water_surfaces, render_math::to_vec3(camera.position));
 }
 
 // What is flat goes over the finished picture: the game's interface, then a touch screen's controls.

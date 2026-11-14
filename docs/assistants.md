@@ -48,6 +48,8 @@ Every one answers in a few lines and ends; each says more with `--help`. See
 | Does it play | `redgem run . --seconds 5`: each script error once, with its file and line |
 | What it looks like | `redgem shot . shot.png --at 2`: a small picture of that moment |
 | What a class can do | `redgem api`, `redgem api Transform`, `redgem api --search raycast` |
+| Which file it is | `redgem assets . orc --kind model` (models, textures, sounds, scripts, prefabs, best match first) |
+| What changed since a commit | `redgem scene diff . --against HEAD` (any Git revision: `HEAD~1`, `main`) |
 
 Scenes are changed through the same code the editor saves them with, so an edit made from the
 command line is saved exactly as the editor would save it. Objects are named by a short id
@@ -197,6 +199,8 @@ editing it. Identical names in different scenes do not identify the same object.
 
 Before editing a scene, keep a copy of its `.glb`. Afterwards, use
 `redgem scene diff . --against /path/to/before.glb` to inspect the changes by persistent identity.
+In a game kept in Git, no copy is needed: `redgem scene diff . --against HEAD` compares with the
+last commit, and any other revision (`HEAD~3`, `main`, a commit hash) works the same way.
 It reports object additions, removals and changed fields without writing either file. `--scene`
 chooses another scene and `--limit` caps the details; see [the command line](command-line.md).
 
