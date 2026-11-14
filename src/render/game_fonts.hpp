@@ -14,7 +14,7 @@ namespace redgem {
 
 // Glyphs requested by UI text, with bounded font files and atlases. GPU resources outlive queued text.
 // Each face has an atlas for each of a few raster sizes: a text is drawn from the smallest one at
-// least as tall as it is (the largest, above all of them), so it is never stretched to its size.
+// least as tall as it is (the largest, above all of them), so it is not stretched to its size.
 class GameFonts {
  public:
   ~GameFonts() { clear(); }
@@ -49,6 +49,7 @@ class GameFonts {
   File& file(const std::string& name);
   bool no_room_for_file(const std::string& name) const;
   Face* nearest_atlas(const std::string& name, int pixels);
+  Face& kept_atlas(const std::string& name, int pixels);
   void read_file(File& file, const std::string& name) const;
   const Font& fallback(const std::string& name, const std::string& text, int pixels);
   bool add_letters(Face& face, const std::string& text);

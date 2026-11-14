@@ -17,8 +17,9 @@ namespace redgem {
 namespace {
 
 // The raster sizes a face's atlases are made at, each half as tall again as the last: a text is
-// drawn from the smallest at least as tall as it is, never shrunk by more than that.
-constexpr int kRasterSizes[] = {16, 24, 36, 54, GameFonts::kDefaultPixels, 108, 144, 216};
+// drawn from the smallest at least as tall as it is, never shrunk by more than that. (Past the
+// largest, it is stretched: an atlas any taller would not fit every graphics card's textures.)
+constexpr int kRasterSizes[] = {16, 24, 36, 54, GameFonts::kDefaultPixels, 108, 144};
 constexpr int kFirstLetter = 32;
 constexpr int kLastInitialLetter = 255;
 constexpr std::size_t kMaxFontFaces = 5;     // built-in face and four game fonts (each at any raster size)
@@ -63,9 +64,14 @@ Font rasterize_face(const std::vector<std::uint8_t>& bytes, const std::set<int>&
                             static_cast<int>(letters.size()));
 }
 
-// Whether a raster size is nearer `pixels` than the best one found yet (any is, before there is one).
+// Whether a raster size suits text `pixels` tall better than the best one found yet (any does,
+// before there is one): one at least as tall beats one shorter (which would stretch its letters);
+// then the nearer.
 bool nearer(int raster, const int* best, int pixels) {
-  return best == nullptr || std::abs(raster - pixels) < std::abs(*best - pixels);
+  if (best == nullptr) return true;
+  const bool tall_enough = raster >= pixels;
+  if (tall_enough != (*best >= pixels)) return tall_enough;
+  return std::abs(raster - pixels) < std::abs(*best - pixels);
 }
 
 }  // namespace
@@ -109,6 +115,13 @@ GameFonts::Face* GameFonts::nearest_atlas(const std::string& name, int pixels) {
   }
   return nearest;
 }
+// With every atlas taken: the face's own that suits the size best, or the built-in face's (a new
+// one only when the built-in face has none at all).
+GameFonts::Face& GameFonts::kept_atlas(const std::string& name, int pixels) {
+  Face* kept = nearest_atlas(name, pixels);
+  if (kept == nullptr) kept = nearest_atlas("", pixels);
+  return kept ? *kept : add_face("", pixels);
+}
 GameFonts::Face& GameFonts::face(const std::string& name, int pixels) {
   if (files_.empty()) file("");  // the built-in face is always the first kept
   const auto found = faces_.find({name, pixels});
@@ -118,8 +131,7 @@ GameFonts::Face& GameFonts::face(const std::string& name, int pixels) {
     full_ = true;
     return face("", pixels);
   }
-  Face* nearest = faces_.size() >= kMaxFontAtlases ? nearest_atlas(name, pixels) : nullptr;
-  return nearest ? *nearest : add_face(name, pixels);
+  return faces_.size() >= kMaxFontAtlases ? kept_atlas(name, pixels) : add_face(name, pixels);
 }
 bool GameFonts::add_letter(Face& face, int codepoint) {
   if (codepoint < kFirstLetter) return false;
