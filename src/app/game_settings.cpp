@@ -186,11 +186,19 @@ void read_ui(const nlohmann::json& json, GameManifest& manifest) {
   read_ui_match(section, manifest);
 }
 
-// The sections of game.json that each say about one part of the game.
+void read_movement(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(net::kMovementSectionKey)) return;
+  net::MovementRulesReading reading = net::movement_rules_from_json(json[net::kMovementSectionKey]);
+  manifest.settings.movement = reading.rules;
+  manifest.movement_warnings = std::move(reading.warnings);
+}
+
+// game.json's sections, each with the warnings of what it says that cannot be used.
 void read_sections(const nlohmann::json& json, GameManifest& manifest) {
   read_physics(json, manifest);
   read_servers(json, manifest);
   read_navigation(json, manifest);
+  read_movement(json, manifest);
   read_ui(json, manifest);
 }
 
