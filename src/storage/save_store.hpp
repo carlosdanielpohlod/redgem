@@ -3,12 +3,21 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
 namespace redgem {
+
+// Thrown by a store whose writes of a key wait for each other (a dedicated server's) when a write
+// made from inside an update of another key waited too long for this one: the script is told,
+// never left to believe the value was written.
+class SaveKeyBusy : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
 
 // What a game keeps between runs (Save in Ruby): named values (numbers, texts, true/false, and
 // arrays and hashes of them). Whole numbers come back as whole numbers, however they were written
@@ -33,7 +42,8 @@ class SaveStore {
   virtual std::vector<std::string> keys() = 0;
   // Reads a key, makes a new value of it and writes that, with nothing else read or written in
   // between: on a dedicated server, no other room's change to the key gets lost. What `change`
-  // throws leaves the key as it was. False when it could not be written.
+  // throws leaves the key as it was. False when it could not be written. A dedicated server's
+  // set, remove and update may throw SaveKeyBusy (see server/key_locks.hpp).
   virtual bool update(const std::string& key, const Change& change) = 0;
   // Where the values are kept, for what is said when they cannot be written.
   virtual std::string where() const = 0;

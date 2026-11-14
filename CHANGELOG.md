@@ -17,6 +17,14 @@ until 1.0, a release may change what games rely on (see
   file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
   encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
 
+- **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
+  Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
+  public address and port its router gives it from the relay it already uses, with no third
+  party (`compose.yaml` publishes UDP 7778 too). Inside the engine, `net/stun/` reads and writes
+  those messages (with a fuzz target, `stun`), probes a STUN server without ever waiting, and
+  chooses a route to a host: its direct addresses first, each for three seconds, then the relay.
+  No game uses these yet: KNOWN_LIMITATIONS.md says what is left and where the ceiling is.
+
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden
@@ -234,6 +242,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
+  side by side instead of waiting for each other's blocks, and writes of the same key still wait,
+  so no change is lost. A block that writes a second key another room is updating waits at most
+  250 ms, then raises an error instead of writing, so two rooms can never wait for each other
+  forever.
+- **A connection's receive buffer gives memory back** after a large message, down to 64 KiB, once
+  what it holds uses less than a quarter of it.
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
   this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
@@ -280,6 +295,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
+  removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
+  the file or console line runs, or at the end of the frame for a change made inside a method).
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
