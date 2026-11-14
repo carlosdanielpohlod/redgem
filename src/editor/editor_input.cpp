@@ -13,7 +13,7 @@ namespace {
 
 using namespace keyboard;
 
-// WASD fly the camera while Ctrl or the right mouse button is held.
+// Gizmo shortcuts stay out of flying and other modified shortcuts.
 bool keys_fly_camera() { return ctrl_down() || IsMouseButtonDown(MOUSE_BUTTON_RIGHT); }
 
 }  // namespace
@@ -72,7 +72,7 @@ void EditorApp::update_camera() {
     const Vector2 delta = GetMouseDelta();
     input.look_x = delta.x;
     input.look_y = delta.y;
-    steer(input, fly_keys());
+    steer(input, fly_keys(preferences_.fly_bindings));
   }
   camera_.update(input);
 }

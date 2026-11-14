@@ -19,6 +19,18 @@ until 1.0, a release may change what games rely on (see
   `on_blur(actor)`, and the game `Interaction.on(:interact) { |actor, target| }`. Over the network
   a client's use is asked of the host, which checks range and line of sight again and runs it there.
   See the manual's Interaction page.
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
@@ -244,6 +256,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
+  links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
   side by side instead of waiting for each other's blocks, and writes of the same key still wait,
   so no change is lost. A block that writes a second key another room is updating waits at most

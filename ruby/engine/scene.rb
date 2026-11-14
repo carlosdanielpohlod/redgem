@@ -16,4 +16,9 @@ module Scene
   def self.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)
     __spawn(template, position, rotation, physics, name, parent)
   end
+
+  # Instantiates a rigid GLB named relative to prefabs/.
+  def self.spawn_prefab(file, position: nil, rotation: nil, physics: true, name: nil, parent: nil)
+    __spawn_prefab(file, position, rotation, physics, name, parent)
+  end
 end
