@@ -102,6 +102,7 @@ TEST_CASE("engine work known to be long is forgiven on the given clock, up to a 
   static_assert(kLongWorkBudgets < config::kScriptForgivenBudgets);
   CHECK(clocked.vm.eval("long_work; :done", "once.rb").ok);
   // Past the budgets a call is forgiven, it is stopped as it comes back from the work.
-  static_assert(2 * kLongWorkBudgets > config::kScriptForgivenBudgets + 1);
+  constexpr int kTimesWorked = 2;
+  static_assert(kTimesWorked * kLongWorkBudgets > config::kScriptForgivenBudgets + 1);
   CHECK(timed_out(clocked.vm.eval("long_work; long_work; :done", "twice.rb")));
 }

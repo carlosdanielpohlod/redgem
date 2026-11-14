@@ -309,17 +309,18 @@ TEST_CASE("a running game's scripts are on the budget game.json gives them") {
 }
 
 TEST_CASE("an interpreter has no budget until given one, and each call gets all of it") {
-  const TestDeadline deadline("interpreter");
   test::FakeClock clock;
-  {
-    RubyVm vm;
-    CHECK(vm.budget().count() == 0);
-    vm.set_budget(kTestBudget);
-    const test::ScriptTicks ticks(vm, clock, kTickSeconds);
-    // Calls that each take most of the budget on the test's clock, longer than it together, all
-    // finish.
-    for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval("3.times { tick }; :done", "most.rb").ok);
-  }
+  RubyVm vm;
+  CHECK(vm.budget().count() == 0);
+  vm.set_budget(kTestBudget);
+  const test::ScriptTicks ticks(vm, clock, kTickSeconds);
+  // Calls that each take most of the budget on the test's clock, longer than it together, all
+  // finish.
+  for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval("3.times { tick }; :done", "most.rb").ok);
+}
+
+TEST_CASE("an interpreter's call that never returns is stopped, even one stuck saying what it raised") {
+  const TestDeadline deadline("interpreter");
   RubyVm vm;
   vm.set_budget(kTestBudget);
   const RubyResult stuck = vm.eval("loop {}", "stuck.rb");

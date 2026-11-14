@@ -30,10 +30,12 @@ constexpr double kMillisecondsPerSecond = 1000.0;
 // alone, and two of them (a save and the backup of the one before) under the budgets a call is
 // forgiven.
 constexpr double kSlowWriteBudgets = 1.5;
-static_assert(2 * kSlowWriteBudgets < config::kScriptForgivenBudgets);
+constexpr int kFilesPerWrite = 2;
+static_assert(kFilesPerWrite * kSlowWriteBudgets < config::kScriptForgivenBudgets);
 // Real time a call goes on after it saved: many looks of the watchdog, which would have stopped it
 // by then had the write been its time.
-constexpr double kWatchedSeconds = 20 * config::kScriptWatchRetryMs / kMillisecondsPerSecond;
+constexpr int kWatchdogLooks = 20;
+constexpr double kWatchedSeconds = kWatchdogLooks * config::kScriptWatchRetryMs / kMillisecondsPerSecond;
 constexpr int kTicksPerBudget = 4;
 
 double budget_seconds = 0.0;  // the game's
