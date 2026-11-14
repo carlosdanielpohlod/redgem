@@ -9,7 +9,8 @@
 # Settings: pad (the player whose :interact it reads: 0 unless said), prompt (false draws no
 # prompt: the game draws its own from `target`). While a menu is open (Time.scale = 0) it neither
 # looks nor shows, and while the player is in a conversation (and on the frame one ends: the
-# press that ended it uses nothing) it has nothing in focus. On another machine's hero, and on a dedicated server, it does nothing.
+# press that ended it uses nothing) it has nothing in focus. On another machine's hero, and on a
+# dedicated server, it does nothing.
 class Interactor < Behaviour
   PROMPT_HEIGHT = 52      # pixels
   PROMPT_PADDING = 24     # pixels beside the prompt's text
@@ -20,7 +21,7 @@ class Interactor < Behaviour
   attr_reader :target
 
   def update(dt)
-    return refocus(nil) unless played? && !Dialogue.busy?
+    return refocus(nil) unless looking?
     return if dt.zero?  # a menu is open: the focus waits for it to close
 
     refocus(Interaction.best_for(game_object))
@@ -43,6 +44,9 @@ class Interactor < Behaviour
   end
 
   private
+
+  # Whether it picks a target now: this machine plays the object, and its player is not talking.
+  def looking? = played? && !Dialogue.busy?
 
   # This machine plays the object: not another's hero, nor a dedicated server's stand-in.
   def played? = !Network.server? && get_component(NetworkSync)&.mine? != false
