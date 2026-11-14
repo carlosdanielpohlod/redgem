@@ -332,6 +332,20 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
+- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
+  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
+  between the actor's and the target's positions (a target whose position is inside the ground or
+  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
+  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
+  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
+  the on-screen controls being turned on). Over the network the host runs every use, checking
+  sight from the hero's late pose: a client hears of what it did only through the game's own
+  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
+  them to an action of its own rebinds one.
+- A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
+  one whose other end is in another scene, or was deleted, is not made (the log says so). The
+  editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
+- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
@@ -364,10 +378,14 @@ not a promise of how it will be closed.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
-- `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
-  worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
-  upload still block the owning thread at activation. Old and new scenes coexist in memory.
-  Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
+- `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
+  a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
+  creating the scene's objects, its water and its navigation bake still take one frame each, and
+  the editor's Play view uploads the new scene's textures and meshes in the frame it first shows
+  it. Old and new scenes, their physics worlds included, coexist in memory until the swap, and
+  the new one's decoded pictures are all held at once until they are on the graphics card.
+  Offline fixed-step runs intentionally wait for the reader and activate all at once, for
+  reproducible activation frames.
 - `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
   world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
   GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
@@ -463,7 +481,12 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About forty unit and integration tests wait on the real clock, a source of rare timing failures.
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
@@ -539,6 +562,11 @@ not a promise of how it will be closed.
   a broadcast or multicast address, little to bounce traffic with. Behind something that proxies
   UDP (Docker's userland proxy, rootless Docker), the relay sees the proxy's address and names
   that instead of the player's.
+- A change of level is the host's alone, one at a time, and waits for every machine
+  (`Network.level_timeout`) before anyone plays: there is no streaming of levels or seamless
+  travel, and the players load the whole level. A game's own messages (`Network.emit`) are not
+  held across a change: one sent as it starts reaches handlers of whichever level the receiver has
+  by then.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,
@@ -548,9 +576,12 @@ not a promise of how it will be closed.
 
 - No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
   across.
-- The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md` and `redgem api`)
-  is checked against the engine's classes and methods, but written by hand: arguments are written
-  as text, with no types, and there are no stubs for code editors.
+- The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
+  and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
+  the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
+  and what any method returns is not checked against the engine, nor are the names of keywords.
+  The signatures cover the engine's API only: a game's own classes need signatures of their own
+  for a type checker, and a game made before them gets them with `redgem api --rbs`.
 - Templates are `empty` and `platformer` only; there is no example of running game tests in a
   game's own continuous integration.
 

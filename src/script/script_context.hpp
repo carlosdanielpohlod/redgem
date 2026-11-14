@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -60,6 +61,14 @@ struct TimeInfo {
   float unscaled_delta = 0.0f;
 };
 
+// A joint an object of the scene came with (its Joint component), as GameObject#joint finds it.
+struct SceneJoint {
+  JointId id = kNoJoint;
+  JointKind kind = JointKind::Fixed;
+  ObjectHandle other;  // kNoHandle: the world
+};
+using SceneJoints = std::map<ObjectHandle, SceneJoint>;  // by the object it holds
+
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.
 class FrameProfiler;
 class DebugDrawBuffer;
@@ -74,6 +83,7 @@ struct ScriptContext {
   std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;
+  SceneJoints scene_joints;  // made with the scene's bodies, and with those of what is spawned
   InputState* input = nullptr;
   TimeInfo time;
   std::vector<HudItem> hud;  // cleared by the engine every rendered frame
@@ -156,6 +166,9 @@ struct ScriptContext {
   bool cancel_scene_load = false;
   std::string loading_scene;  // nonempty while the current world is frozen for a background read
   std::string loading_error;  // last failed read, retained until the next request
+  // The world is frozen as while loading, until every machine of a network game has the level it
+  // changes to (Game.__hold, from Network's level change).
+  bool level_held = false;
   std::function<bool(const std::string&)> scene_exists;
 };
 

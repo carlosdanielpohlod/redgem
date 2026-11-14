@@ -16,7 +16,7 @@ QUALITY_ROW = 5             # on the settings screen: mode, resolution, scale, v
 UI_SCALE_ROW = 6            # then the interface's size
 LARGER_UI = 1.25            # the size after the game's own (1.0), right of it
 CONTROLS_OPTION = 11        # after its eleven rows (seven of video, four volumes): the Controls button, then Back
-JUMP_ROW = 2                # on the controls page: the player's choice, then fire, jump, run...
+JUMP_ROW = 3                # on the controls page: the player's choice, then fire, interact, jump...
 JUMP = GameMenu::ControlsPage::Row.new(:jump, nil)
 FIRST_SLOT = 0              # a column's first cell, on a row of the controls page
 

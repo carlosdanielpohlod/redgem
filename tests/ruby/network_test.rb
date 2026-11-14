@@ -28,18 +28,13 @@ class NetworkTest < RedGemTest::Case
   ].freeze
 
   Said = Network::Said
-  Resends = Network::Resends
-  ASKER = 7             # a machine asking the host what is spawned
-  OTHER_ASKER = 8
-  NOON = 100.0          # seconds of game time
-  ONE_MORE = Resends::SECONDS_FOR_ONE   # what earns a machine another answer
-  LONG_AFTER = 3600.0
+  # Not a change of level as the host orders one.
+  WRONG_LEVELS = [
+    nil, [], [1], %w[1 level2], [1.5, "level2"], [1, ""], [1, :level2], [1, "level2", 3],
+    [1, "l" * (Network::Said::MAX_LEVEL_NAME_SIZE + 1)]
+  ].freeze
   # An id past what the engine keeps one in: cut down to fit, it would be everyone's (0).
   NO_MACHINES_ID = 2**32
-
-  def setup
-    [ASKER, OTHER_ASKER].each { |peer| Resends.forget(peer) }
-  end
 
   def test_toward_goes_part_of_the_way
     assert_in_delta 15.0, NetworkSync.toward(10.0, 20.0, HALF)
@@ -102,29 +97,15 @@ class NetworkTest < RedGemTest::Case
     WRONG_PLACEMENTS.each { |data| refute Said.placement?(data), "#{data.inspect} passed for a placement" }
   end
 
-  def test_a_machine_asking_what_is_spawned_is_answered_a_few_times_in_a_row
-    Resends::SAVED_UP.times { assert Resends.answer?(ASKER, NOON) }
-    refute Resends.answer?(ASKER, NOON), "one more than it had saved up"
-    assert Resends.answer?(OTHER_ASKER, NOON), "each machine has answers of its own"
+  def test_a_change_of_level_comes_as_its_number_and_the_levels_name
+    assert Said.level?([1, "level2"])
+    WRONG_LEVELS.each { |data| refute Said.level?(data), "#{data.inspect} passed for a change of level" }
   end
 
-  def test_a_machine_that_used_its_answers_up_earns_one_every_while
-    Resends::SAVED_UP.times { Resends.answer?(ASKER, NOON) }
-    refute Resends.answer?(ASKER, NOON + ONE_MORE * HALF)
-    assert Resends.answer?(ASKER, NOON + ONE_MORE), "asking too early did not put the next answer off"
-    refute Resends.answer?(ASKER, NOON + ONE_MORE)
-  end
-
-  def test_answers_are_only_saved_up_so_far
-    Resends.answer?(ASKER, NOON)
-    Resends::SAVED_UP.times { assert Resends.answer?(ASKER, LONG_AFTER) }
-    refute Resends.answer?(ASKER, LONG_AFTER)
-  end
-
-  def test_whoever_comes_next_under_an_id_starts_with_all_its_answers
-    Resends::SAVED_UP.times { Resends.answer?(ASKER, NOON) }
-    Resends.forget(ASKER)
-    assert Resends.answer?(ASKER, NOON)
+  def test_offline_no_level_change_holds_anything_back
+    refute Network.changing_level?
+    refute Network::Level.holds?(Network::SPAWN)
+    assert_in_delta Network::LEVEL_TIMEOUT, Network.level_timeout
   end
 
   def test_a_pose_may_carry_an_animation_within_what_one_can_be

@@ -67,6 +67,7 @@ bool is_placeable(const Scene& objects, ObjectId id) {
 
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
 Scene& scene(mrb_state* mrb) { return *context(mrb).scene; }
+ScriptBudget& script_budget(mrb_state* mrb) { return script_host(mrb).vm().budget_keeper(); }
 
 ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self) {
   const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));

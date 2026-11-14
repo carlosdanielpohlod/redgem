@@ -14,6 +14,7 @@ add_executable(redgem_tests
   unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
+  unit/frame_budget_test.cpp
   unit/clock_test.cpp
   unit/log_test.cpp
   unit/event_journal_test.cpp
@@ -54,6 +55,7 @@ add_executable(redgem_tests
   unit/ktx2_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
+  unit/joint_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
   unit/input_bindings_test.cpp
@@ -209,9 +211,12 @@ add_executable(redgem_tests
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
   integration/physics_joint_api_test.cpp
+  integration/scene_joints_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp
+  integration/script_budget_clock_test.cpp
+  integration/save_budget_test.cpp
   integration/crash_handling_test.cpp
   integration/engine_headless_test.cpp
   integration/scene_parts_test.cpp
@@ -229,6 +234,7 @@ add_executable(redgem_tests
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
+  integration/scene_activation_test.cpp
   integration/ui_input_test.cpp
   integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
@@ -259,6 +265,7 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_joints_test.cpp
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
   integration/game_project_test.cpp
@@ -267,6 +274,7 @@ add_executable(redgem_tests
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
+  integration/api_types_test.cpp
   integration/error_hints_test.cpp
   integration/agent_connection_test.cpp)
 # (zlib: the tests compress the answers their web servers send.)
@@ -623,6 +631,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/debug_draw_render_test.cpp
                render_system/profile_overlay_render_test.cpp
                render_system/async_scene_render_test.cpp
+               render_system/staged_upload_render_test.cpp
                render_system/specular_brdf_render_test.cpp
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp

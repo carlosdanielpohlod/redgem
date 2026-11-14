@@ -17,7 +17,8 @@ Input.down?(:e)                # any key: held
 Input.pressed?(:e)             # any key: went down this frame
 ```
 
-Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift). A game
+Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift), `:interact` (E,
+what an [Interactor](interaction.md) uses things with). A game
 declares its own and lets players change them: see [Controls](#controls).
 
 Keys go by these names:
@@ -40,8 +41,8 @@ and a game never sees it go down there.
 ## Read a gamepad
 
 A game written with axes and actions already works with a gamepad: the left stick moves
-`:horizontal` and `:vertical` (by as much as it is pushed), and A, X and B are `:jump`, `:fire`
-and `:run`. For the rest, ask the gamepad itself:
+`:horizontal` and `:vertical` (by as much as it is pushed), and A, X, B and Y are `:jump`, `:fire`,
+`:run` and `:interact`. For the rest, ask the gamepad itself:
 
 ```ruby
 Input.gamepad?                        # is one plugged in?
@@ -85,7 +86,7 @@ Input.rumble(0, 0.8, 0.2) if Input.rumble?   # the first player's gamepad, hard,
 
 A game names what its players do (actions, which are on or off, and axes, from -1 to 1) and says
 what triggers them. Scripts then read the names, never the keys, so players can change the keys.
-The built-in `:jump`, `:fire`, `:run`, `:horizontal` and `:vertical` are always there; a game adds
+The built-in `:jump`, `:fire`, `:run`, `:interact`, `:horizontal` and `:vertical` are always there; a game adds
 its own, or binds one of those anew, in the `input` section of its `game.json`:
 
 ```json
@@ -120,7 +121,7 @@ Input.define_action(:shoot, :f, mouse: [:left], buttons: [:right_bumper])
 Input.define_action(:next_weapon, "mouse:wheel_up", "pad:y")
 Input.define_axis(:steer, negative: [:a, "pad:dpad_left"], positive: {keys: [:d], buttons: [:dpad_right]},
                   pad_axis: :left_x)
-Input.actions                   # [:dash, :fire, :jump, :run]
+Input.actions                   # [:dash, :fire, :interact, :jump, :run]
 Input.action_released?(:dash)   # true on the frame the last of its keys and buttons lets go
 ```
 
@@ -331,6 +332,16 @@ end
 `:slider` lets one slide along an axis (`limits:` in meters), `:point` lets it turn every way (a
 ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons, or twisted
 harder than 500 newton meters (`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
+
+A joint can also come with the scene: set up in the editor's Joint card (or with `joint`
+properties in Blender, see [Levels](../levels.md)), it is made as the scene loads, and
+`game_object.joint` returns it:
+
+```ruby
+class Gate < Behaviour
+  def open = game_object.joint.motor(90, 200)                 # the hinge set up in the editor
+end
+```
 
 ## Collision layers
 
@@ -866,7 +877,9 @@ Game.load_scene_async("level2")
 Normal simulation pauses while the file is read; the loading screen, audio and network continue.
 Failure or cancellation preserves the current scene. Check `Game.loading_error` after the load
 ends to report a failure or retry. Successful activation removes the old loading callback.
-Physics, texture decoding and GPU upload can still cause an activation hitch; see
+The new scene is made ready over several frames while the loading screen keeps drawing (its
+bodies a few milliseconds a frame, its textures and meshes a few megabytes a frame); its scripts
+all start in the frame it takes the old one's place, so they see the whole level. See
 [the API's loading limits](api.md#game). Use `Game.load_scene` for the existing synchronous switch.
 
 ## A settings screen
@@ -955,7 +968,8 @@ Game.load_scene("level2")   # scenes/level2.glb; "main" is scene.glb
 ```
 
 The switch happens at the end of the frame. Ruby global variables survive it, which is the simple
-way to carry a score or lives from one level to the next.
+way to carry a score or lives from one level to the next. In a game played together, the host
+changes the level for every machine (see [Changing level together](multiplayer.md#changing-level-together)).
 
 ## Do something later, or over a while
 
