@@ -110,6 +110,9 @@ class Datagrams {
 
   // Opens on a port of this machine (0 for any free one). Several programs may share a port.
   static Datagrams open_on(std::uint16_t port, std::string& error);
+  // Opens on a port of this machine that nothing else may share, and that never sends to every
+  // machine nearby: for a server facing the internet (a relay's STUN answers).
+  static Datagrams open_alone(std::uint16_t port, std::string& error);
 
   bool valid() const { return handle_ != kNoHandle; }
   // Sends to one machine by its address in numbers, or to every machine on the local network
@@ -123,6 +126,8 @@ class Datagrams {
  private:
   static constexpr std::intptr_t kNoHandle = -1;
   explicit Datagrams(std::intptr_t handle) : handle_(handle) {}
+  // `datagrams` bound to `port`; closed, with `error` set, when the port cannot be had.
+  static Datagrams bound(Datagrams datagrams, std::uint16_t port, std::string& error);
 
   std::intptr_t handle_ = kNoHandle;
 };
