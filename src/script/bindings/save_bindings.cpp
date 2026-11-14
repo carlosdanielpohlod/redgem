@@ -6,11 +6,16 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
+#include <optional>
+#include <string>
+#include <vector>
+
 #include "storage/save_store.hpp"
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/bindings/message_values.hpp"
+#include "script/script_host.hpp"
 
 namespace redgem {
 namespace {
@@ -21,11 +26,20 @@ using namespace binding;
 
 SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save is only available while a game runs"); }
 
+// Reading and writing the disk (or a server's database) is the engine's time, not the script's.
+BudgetPause storage_time(mrb_state* mrb) { return BudgetPause(script_host(mrb).vm().budget_keeper()); }
+
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
   mrb_get_args(mrb, "o|o", &key, &fallback);
-  const auto value = save(mrb).get(to_name(mrb, key));
+  const auto name = to_name(mrb, key);
+  auto& store = save(mrb);
+  std::optional<nlohmann::json> value;
+  {
+    const auto pause = storage_time(mrb);
+    value = store.get(name);
+  }
   return value ? value_from(mrb, *value, HashKeys::Strings) : fallback;
 }
 
@@ -34,7 +48,10 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_value value;
   mrb_get_args(mrb, "oo", &key, &value);
   const nlohmann::json stored = json_from(mrb, value, kSaveHolder);
-  if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).where());
+  const auto name = to_name(mrb, key);
+  auto& store = save(mrb);
+  const auto pause = storage_time(mrb);
+  if (!store.set(name, stored)) log::warning("could not write " + store.where());
   return value;
 }
 
@@ -58,18 +75,29 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
 }
 
 mrb_value save_delete(mrb_state* mrb, mrb_value) {
-  save(mrb).remove(name_arg(mrb));
+  const auto name = name_arg(mrb);
+  auto& store = save(mrb);
+  const auto pause = storage_time(mrb);
+  store.remove(name);
   return mrb_nil_value();
 }
 
 mrb_value save_clear(mrb_state* mrb, mrb_value) {
-  save(mrb).clear();
+  auto& store = save(mrb);
+  const auto pause = storage_time(mrb);
+  store.clear();
   return mrb_nil_value();
 }
 
 mrb_value save_keys(mrb_state* mrb, mrb_value) {
+  auto& store = save(mrb);
+  std::vector<std::string> keys;
+  {
+    const auto pause = storage_time(mrb);
+    keys = store.keys();
+  }
   mrb_value names = mrb_ary_new(mrb);
-  for (const std::string& key : save(mrb).keys()) {
+  for (const std::string& key : keys) {
     mrb_ary_push(mrb, names, mrb_symbol_value(mrb_intern_cstr(mrb, key.c_str())));
   }
   return names;
@@ -82,8 +110,10 @@ mrb_value save_replace(mrb_state* mrb, mrb_value) {
   if (!values.is_object()) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps a whole slot as a Hash");
   SaveStore::Values replacing;
   for (auto entry = values.begin(); entry != values.end(); ++entry) replacing[entry.key()] = entry.value();
-  const bool written = save(mrb).replace(replacing);
-  if (!written) log::warning("could not write " + save(mrb).where());
+  auto& store = save(mrb);
+  const auto pause = storage_time(mrb);
+  const bool written = store.replace(replacing);
+  if (!written) log::warning("could not write " + store.where());
   return mrb_bool_value(written);
 }
 
