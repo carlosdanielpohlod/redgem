@@ -600,6 +600,8 @@ if(NOT ANDROID)
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
     editor/editor_camera.cpp
+    editor/editor_preferences.cpp
+    editor/editor_preferences_dialog.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp

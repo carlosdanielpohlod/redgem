@@ -71,6 +71,7 @@ void EditorApp::draw_dialogs() {
   draw_recovery_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();
+  draw_preferences_dialog();
 }
 
 void EditorApp::draw_unsaved_dialog() {

@@ -330,6 +330,10 @@ class EditorApp {
   void apply_gizmo_drag(const Transform& pivot);
   void update_title();
   void draw_dialogs();
+  void draw_preferences_dialog();
+  void draw_preferences_actions();
+  void apply_preferences(const EditorPreferences& values);
+  void save_preferences();
   bool can_autosave_scene() const;
   void autosave_scene();
   void draw_recovery_dialog();
@@ -380,6 +384,10 @@ class EditorApp {
   std::optional<std::string> pending_split_;  // window name of a script tab to split off
   unsigned int center_dock_ = 0;              // where the Scene and new script tabs start
   unsigned int script_dock_ = 0;              // dock of the last focused script tab
+  EditorPreferences preferences_;
+  EditorPreferences edited_preferences_;
+  std::string preferences_error_;
+  bool preferences_requested_ = false;
   EditorCamera camera_;
   GatedInputSource game_input_;
   Gizmo gizmo_;
