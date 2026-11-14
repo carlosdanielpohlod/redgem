@@ -2037,7 +2037,7 @@
           "name": "load_scene_async",
           "static": true,
           "args": "name",
-          "about": "queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene"
+          "about": "queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)"
         },
         {
           "name": "loading?",
@@ -2057,7 +2057,7 @@
         {
           "name": "cancel_scene_load",
           "static": true,
-          "about": "cancels a pending asynchronous request; returns whether one was pending"
+          "about": "cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)"
         },
         {
           "name": "on_loading",

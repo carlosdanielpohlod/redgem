@@ -61,6 +61,6 @@ void install_loading_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, game, "loading?", loading, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game, "loading_scene", loading_scene, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game, "loading_error", loading_error, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, game, "cancel_scene_load", cancel_loading, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, game, "__cancel_scene_load", cancel_loading, MRB_ARGS_NONE());
 }
 }  // namespace redgem

@@ -20,8 +20,12 @@ module Network
     # What waits to be sent and arrives to be dropped while the machines are between two levels:
     # what is said about the objects of one level, which the other does not have.
     HELD = [SYNC, SPAWN, SPAWNED, DESPAWN].freeze
+    # Why Game.load_scene changes nothing.
+    NOT_HOST = "only the host changes the level of a network game".freeze
+    BUSY = "the level is changing already".freeze
 
     @count = 0   # the changes the host started (each one's number)
+    @shown = []  # the newcomers shown what is spawned in the level the game plays (on the host)
 
     class << self
       attr_accessor :loading_handler, :ready_handler
@@ -36,23 +40,40 @@ module Network
 
       # The host asks for a level (Game.load_scene); true when the change started.
       def ask(name)
-        return refuse(name) unless Network.host?
+        return refuse(name, NOT_HOST) unless Network.host?
+        return refuse(name, BUSY) if changing?
+        raise ArgumentError, "no scene named #{name}" unless Game.__scene?(name)
 
         start(@count += 1, name)
         Network.__deliver(LEVEL, [@count, name], :all)
-        true
+        announce(name)
       end
 
       # The host said to load a level.
       def heard(change, name)
-        start(change, name)
-      rescue ArgumentError, TypeError => e
-        give_up(e.message)
+        announce(name) if started?(change, name)
       end
 
-      # The host tells a newcomer the level the game plays (or is changing to).
+      # The host tells a newcomer the level the game plays; during a change, the newcomer joins it.
       def welcome(peer)
-        Network.__deliver(LEVEL_PLAYED, [@count, @name || Game.scene_name], peer) if Network.host?
+        return unless Network.host?
+        return Network.__deliver(LEVEL, [@change, @name], peer) if changing?
+
+        Network.__deliver(LEVEL_PLAYED, [@count, Game.scene_name], peer)
+      end
+
+      # Whether a newcomer that has the level the game plays is to be shown what is spawned there
+      # (on the host): once per newcomer, however often it asks.
+      def shows?(change, peer)
+        return false unless unshown?(change, peer)
+
+        @shown << peer
+      end
+
+      # A machine left (on the host): it is waited for no longer, and whoever comes next under its id is new.
+      def forget(peer)
+        @waiting&.delete(peer)
+        @shown.delete(peer)
       end
 
       # This machine just joined a game that plays `name`: it loads that level unless it has it.
@@ -102,8 +123,22 @@ module Network
 
       private
 
-      def refuse(name)
-        Debug.warn("Game.load_scene(#{name.inspect}): only the host changes the level of a network game")
+      def refuse(name, why)
+        Debug.warn("Game.load_scene(#{name.inspect}): #{why}")
+        false
+      end
+
+      # Every machine hears of the change (the host's handler runs once the others were told).
+      def announce(name)
+        loading_handler&.call(name)
+        true
+      end
+
+      def started?(change, name)
+        start(change, name)
+        true
+      rescue ArgumentError, TypeError => e
+        give_up(e.message)
         false
       end
 
@@ -121,9 +156,12 @@ module Network
         @ready = []
         @waiting = Network.peers
         @held_back = []
+        @shown = []
         Game.__hold(true)
-        loading_handler&.call(@name)
       end
+
+      # Whether `peer` has the level the game plays, and was not shown what is spawned there yet.
+      def unshown?(change, peer) = played?(change) && !@shown.include?(peer)
 
       def failed? = !@arrived && !Game.loading?
       def here? = @arrived && !Game.loading?
@@ -205,7 +243,7 @@ module Network
     # A machine has the level: one the others wait for, or a newcomer, then shown what is spawned.
     def receive_level_ready(change, from)
       return unless host?
-      return Level.ready(change, from) unless Level.played?(change)
+      return Level.ready(change, from) unless Level.shows?(change, from)
 
       __deliver(LEVEL_GO, change, from)
       send_spawned_to(from)
@@ -213,6 +251,11 @@ module Network
 
     def receive_level_go(change, from)
       Level.go(change) if from == HOST
+    end
+
+    def forget_peer(peer)
+      forget_player(peer)
+      Level.forget(peer)
     end
 
     def forget_game(peer)

@@ -69,7 +69,7 @@ module Network
     connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
-  AFTERWARDS = { left: :forget_player, disconnected: :forget_game }.freeze
+  AFTERWARDS = { left: :forget_peer, disconnected: :forget_game }.freeze
 
   # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
   # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)

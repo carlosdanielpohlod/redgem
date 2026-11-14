@@ -317,10 +317,12 @@ end
 ```
 
 Only the host changes the level: elsewhere `Game.load_scene` changes nothing, warns, and returns
-`false`, and a level change that any other machine claims to order is ignored. A machine that
-joins is told the level the game plays and loads it (unless it has it already) before it sees
-what is spawned there. A machine that cannot load the level (its file is missing or broken) leaves
-the game; when that is the host, the game ends.
+`false`, and a level change that any other machine claims to order is ignored. One change goes on
+at a time (another asked meanwhile returns `false`), a name the game has no scene for raises at
+once, and `Game.cancel_scene_load` cancels nothing during a change. A machine that joins is told
+the level the game plays and loads it (unless it has it already) before it sees what is spawned
+there; one that joins during a change takes part in it. A machine that cannot load the level (its
+file is broken) leaves the game; when that is the host, the game ends.
 
 `Network.on_level_loading` and `Network.on_level_ready` last across levels, like
 `Network.authenticate`: each call replaces the handler before it (unlike `Network.on`, whose

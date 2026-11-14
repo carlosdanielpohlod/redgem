@@ -25,7 +25,6 @@ module Game
     # Switches to scenes/<name>.glb ("main" is scene.glb).
     def load_scene(name)
       return __load_scene(name) unless Network.online?
-      raise ArgumentError, "no scene named #{name}" unless __scene?(name.to_s)
 
       Network::Level.ask(name.to_s)
     end
@@ -34,6 +33,13 @@ module Game
       return __load_scene_async(name) unless Network.online?
 
       Network::Level.ask(name.to_s)
+    end
+
+    # A change of level with the others is not cancelled: false, as nothing was.
+    def cancel_scene_load
+      return false if Network.changing_level?
+
+      __cancel_scene_load
     end
   end
 end
