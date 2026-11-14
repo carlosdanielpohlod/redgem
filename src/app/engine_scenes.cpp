@@ -16,7 +16,7 @@ namespace redgem {
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
 void Engine::make_bodies() {
-  physics_ = create_jolt_physics_world(gravity(), collision_layers_);
+  physics_ = create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
   bodies::create_all({scene_, scene_desc_}, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   navigation_.forget();  // the grid was the old scene's

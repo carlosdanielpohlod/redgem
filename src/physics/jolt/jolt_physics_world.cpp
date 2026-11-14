@@ -24,12 +24,13 @@ bool can_take_layer(const Record* record, const CollisionLayers& layers, std::si
 
 }  // namespace
 
-World::World(Vec3 gravity, const CollisionLayers& layers)
+World::World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodies)
     : gravity_(gravity),
       layers_(layers),
-      temp_allocator_(config::kPhysicsTempAllocatorBytes),
+      capacity_(body_capacity(max_bodies)),
+      temp_allocator_(capacity_.scratch_bytes),
       job_system_(config::kMaxPhysicsJobs) {
-  system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs, config::kMaxContactConstraints,
+  system_.Init(capacity_.bodies, config::kNumBodyMutexes, capacity_.body_pairs, capacity_.contact_constraints,
                broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
   system_.SetGravity(to_jolt(gravity));
   system_.SetContactListener(this);
@@ -163,8 +164,9 @@ std::optional<Transform> World::simulated_pose(ObjectId object) const {
 
 }  // namespace jolt
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers) {
-  return std::make_unique<jolt::World>(gravity, layers);
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers,
+                                                        std::uint32_t max_bodies) {
+  return std::make_unique<jolt::World>(gravity, layers, max_bodies);
 }
 
 }  // namespace redgem

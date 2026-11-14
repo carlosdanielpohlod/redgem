@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -8,6 +9,7 @@
 #include "app/android/android_settings.hpp"
 #include "net/secure/server_pins.hpp"
 #include "navigation/nav_settings.hpp"
+#include "physics/body_limit.hpp"
 #include "physics/collision_layers.hpp"
 #include "render/display_settings.hpp"
 #include "script/script_config.hpp"
@@ -40,6 +42,9 @@ struct GameSettings {
   int script_budget_ms = config::kDefaultScriptBudgetMs;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
+  // How many bodies a scene's physics world holds at once (see physics/body_limit.hpp):
+  //   "physics": {"max_bodies": 16384}
+  std::uint32_t max_bodies = kDefaultMaxBodies;
   // The relays and dedicated servers the game knows by their fingerprints: the "servers" section
   // (see net/secure/server_pins.hpp). Joining one of them checks that it is the one.
   std::vector<net::ServerPin> servers;
@@ -67,6 +72,9 @@ struct GameManifest {
   std::string script_budget_error;
   // What is wrong with the "physics" section; each problem is left out, the rest is used.
   std::vector<std::string> physics_warnings;
+  // What is wrong with the "physics" section's "max_bodies"; empty when it can be used or the
+  // section has none. (The world holds kDefaultMaxBodies instead; `redgem check` refuses it.)
+  std::string max_bodies_error;
   // What is wrong with the "servers" section; each entry that cannot be used is left out.
   std::vector<std::string> servers_warnings;
   // What is wrong with the "navigation" section; each such setting keeps its default.

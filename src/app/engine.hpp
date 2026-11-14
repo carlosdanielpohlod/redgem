@@ -248,6 +248,7 @@ class Engine {
   SceneDesc scene_desc_;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
+  std::uint32_t max_bodies_ = kDefaultMaxBodies;  // game.json's: every scene's physics world holds as many
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
   Navigation navigation_;             // where characters walk in the running scene
   InputState input_;

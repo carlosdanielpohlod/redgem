@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core/config.hpp"
+#include "physics/body_limit.hpp"
 #include "physics/physics_config.hpp"
 #include "physics/physics_world.hpp"
 #include "test_support.hpp"
@@ -202,24 +203,47 @@ TEST_CASE("a mesh collider is made only of triangles that name the mesh's own ve
   CHECK(world->simulated_pose(kCrate)->position.y == doctest::Approx(kCrateHalfExtents.y).epsilon(kPositionTolerance));
 }
 
-TEST_CASE("past the bodies the world can hold, an object gets none, and that is said once, naming the limit") {
+namespace {
+
+// Fills a world of `limit` bodies (the ground is one of them) and a couple more: an object past
+// the limit gets none, and that is said once, naming the limit.
+void fill_past_the_limit(PhysicsWorld& world, std::uint32_t limit) {
   constexpr ObjectId kFirstBox = 100;
   constexpr float kBoxSpacing = 2.0f;  // apart: no two boxes touch
   constexpr int kBeyondTheLimit = 2;   // boxes added once the world is full
-  auto world = world_with_ground();    // (the ground is one of the bodies)
   const redgem::test::LogCapture log;
   const auto box_at = [](std::uint32_t index) {
     return body(kFirstBox + index, {{"collider", std::string("box")}}, {kBoxSpacing * index, 0, kBoxSpacing},
                 kCrateHalfExtents);
   };
-  const std::uint32_t boxes = config::kMaxBodies - 1 + kBeyondTheLimit;
-  for (std::uint32_t i = 0; i < boxes; ++i) REQUIRE_FALSE(world->add_object(box_at(i)));
+  const std::uint32_t boxes = limit - 1 + kBeyondTheLimit;
+  for (std::uint32_t i = 0; i < boxes; ++i) REQUIRE_FALSE(world.add_object(box_at(i)));
   CHECK(log.count(log::Level::Error) == 1);
-  CHECK(log.contains(std::to_string(config::kMaxBodies)));
+  CHECK(log.contains("holds " + std::to_string(limit) + " bodies"));
   const auto above = [](std::uint32_t index) { return Vec3{kBoxSpacing * index, kRayLength / 2, kBoxSpacing}; };
   // (The ground is ignored: under the first box, it would be hit whether the box has a body or not.)
-  CHECK(world->raycast(above(0), kDown, kRayLength, kGround));
-  CHECK_FALSE(world->raycast(above(boxes - 1), kDown, kRayLength, kGround));
+  CHECK(world.raycast(above(0), kDown, kRayLength, kGround));
+  CHECK(world.raycast(above(limit - 2), kDown, kRayLength, kGround));  // the last box that fit
+  CHECK_FALSE(world.raycast(above(boxes - 1), kDown, kRayLength, kGround));
+}
+
+std::unique_ptr<PhysicsWorld> world_of(std::uint32_t max_bodies) {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, max_bodies);
+  REQUIRE_FALSE(world->add_object(body(kGround, {{"collider", std::string("box")}}, {0, -0.5f, 0}, {20, 0.5f, 20})));
+  return world;
+}
+
+}  // namespace
+
+TEST_CASE("past the bodies the world can hold, an object gets none, and that is said once, naming the limit") {
+  fill_past_the_limit(*world_with_ground(), kDefaultMaxBodies);
+}
+
+TEST_CASE("a world holds as many bodies as the game asks for, and no more") {
+  constexpr std::uint32_t kFewBodies = 100;
+  constexpr std::uint32_t kManyBodies = kDefaultMaxBodies * 2;
+  fill_past_the_limit(*world_of(kFewBodies), kFewBodies);
+  fill_past_the_limit(*world_of(kManyBodies), kManyBodies);
 }
 
 TEST_CASE("a world of many thousand objects is taken apart in a moment, not in time for every pair of them") {

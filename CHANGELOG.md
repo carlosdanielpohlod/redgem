@@ -10,6 +10,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
+
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden

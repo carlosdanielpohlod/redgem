@@ -114,6 +114,9 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   CollisionLayersReading reading = collision_layers_from_json(json[kPhysicsKey]);
   manifest.settings.collision_layers = std::move(reading.layers);
   manifest.physics_warnings = std::move(reading.warnings);
+  const BodyLimitReading limit = body_limit_from_json(json[kPhysicsKey]);
+  manifest.settings.max_bodies = limit.max_bodies;
+  manifest.max_bodies_error = limit.error;
 }
 
 void read_servers(const nlohmann::json& json, GameManifest& manifest) {

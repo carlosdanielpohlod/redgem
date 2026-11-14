@@ -2,6 +2,7 @@ add_executable(redgem_tests
   test_main.cpp
   unit/math_test.cpp
   unit/collision_layers_test.cpp
+  unit/body_limit_test.cpp
   unit/nav_settings_test.cpp
   unit/nav_path_test.cpp
   unit/fixed_clock_test.cpp

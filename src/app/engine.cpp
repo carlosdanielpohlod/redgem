@@ -30,6 +30,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
+  if (!manifest.max_bodies_error.empty()) log::warning(manifest.max_bodies_error);
   for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
   for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
 }
@@ -108,6 +109,7 @@ void Engine::initialize() {
 
 void Engine::build_world(const GameSettings& settings) {
   collision_layers_ = settings.collision_layers;
+  max_bodies_ = settings.max_bodies;
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);

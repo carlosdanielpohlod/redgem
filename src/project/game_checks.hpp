@@ -1,6 +1,7 @@
 #pragma once
 
-// What `redgem check` looks at in a game's folder, without playing it: its scripts and its scenes.
+// What `redgem check` looks at in a game's folder, without playing it: its game.json, its scripts
+// and its scenes.
 
 #include <cstddef>
 #include <filesystem>
@@ -18,6 +19,9 @@ struct CheckReport {
   std::size_t scenes = 0;
   std::set<std::string> broken_scripts;  // those that do not compile (their class is not looked for)
 };
+
+// What game.json says that the game cannot use: a body limit out of bounds.
+void check_game_file(const std::filesystem::path& game_dir, CheckReport& report);
 
 // The scripts of a scripts folder (and the folders in it), as paths inside it ("enemies/slime.rb"),
 // sorted.
