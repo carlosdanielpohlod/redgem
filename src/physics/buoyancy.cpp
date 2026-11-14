@@ -11,6 +11,9 @@ constexpr float kColumnWidth = 1.0f / static_cast<float>(kBuoyancyColumnsPerSide
 constexpr std::size_t kAxes = 3;
 constexpr std::size_t kAxisX = 0;
 constexpr std::size_t kAxisY = 1;
+// The two axes across the columns, counted on from the upright one: x then z for an upright body.
+constexpr std::size_t kFirstAcross = 2;
+constexpr std::size_t kSecondAcross = 1;
 constexpr float kBoxStart = 0.0f;  // of the way along a box's axis: its minimum
 constexpr float kBoxEnd = 1.0f;    // its maximum
 
@@ -99,8 +102,8 @@ BuoyancyColumns buoyancy_columns(const BuoyancyBody& body) {
   const std::size_t up = upright_axis(body.world.rotation);
   BuoyancyColumns columns{};
   for (std::size_t i = 0; i < kBuoyancyColumns; ++i) {
-    Vec3 share = with_component(Vec3::zero(), (up + 2) % kAxes, cell_share(i / kBuoyancyColumnsPerSide));
-    share = with_component(share, (up + 1) % kAxes, cell_share(i % kBuoyancyColumnsPerSide));
+    Vec3 share = with_component(Vec3::zero(), (up + kFirstAcross) % kAxes, cell_share(i / kBuoyancyColumnsPerSide));
+    share = with_component(share, (up + kSecondAcross) % kAxes, cell_share(i % kBuoyancyColumnsPerSide));
     columns[i] = column_along(body, up, share);
   }
   return columns;
