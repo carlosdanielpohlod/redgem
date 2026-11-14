@@ -73,6 +73,7 @@ MorphTarget read_target(const cgltf_morph_target& source, std::size_t position_f
 
 std::vector<MorphTarget> read_targets(const cgltf_primitive& primitive, std::size_t position_floats) {
   std::vector<MorphTarget> targets;
+  targets.reserve(primitive.targets_count);
   for (cgltf_size t = 0; t < primitive.targets_count; ++t) {
     targets.push_back(read_target(primitive.targets[t], position_floats));
   }

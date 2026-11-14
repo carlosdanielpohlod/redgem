@@ -146,17 +146,21 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
   gather_copies(view, depth_pass);
   const std::size_t first = append_slots(slots, batches.slots());
-  ObjectPass objects{
-      begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
-      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
-      depth_pass ? MorphLocations{depth_uniforms.morph_first, depth_uniforms.morph_vertices}
-                 : MorphLocations{lit_uniforms.morph_first, lit_uniforms.morph_vertices},
-      depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
+  ObjectPass objects = object_pass(depth_pass, view);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
   face_forward(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
+}
+
+Renderer::Impl::ObjectPass Renderer::Impl::object_pass(bool depth_pass, const render_math::View& view) {
+  return ObjectPass{
+      begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
+      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
+      depth_pass ? MorphLocations{depth_uniforms.morph_first, depth_uniforms.morph_vertices}
+                 : MorphLocations{lit_uniforms.morph_first, lit_uniforms.morph_vertices},
+      depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
 }
 
 void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {

@@ -516,6 +516,8 @@ struct Renderer::Impl {
   // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
   // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
   std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
+  // The pass draw_objects draws with: the lit shader's, or the depth shader's for a shadow map.
+  ObjectPass object_pass(bool depth_pass, const render_math::View& view);
   // Gathers into `batches` what the view sees (in the shadow map's pass, what casts a shadow).
   void gather_copies(const render_math::View& view, bool depth_pass);
   // The objects of one winding (mirrored or not) the view sees, into `batches`.

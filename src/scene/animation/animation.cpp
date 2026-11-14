@@ -126,19 +126,12 @@ struct Playback {
 void pose(const AnimationChannel& channel, const Playback& playback, float time, Transform& local) {
   const float weight = playback.options.weight;
   const ChannelValue value = sample_channel(channel, clip_time(playback.clip, time, playback.options.loop));
-  switch (channel.path) {
-    case AnimationPath::Translation:
-      local.position = laid_over(local.position, vec3_from(value.data()), weight);
-      break;
-    case AnimationPath::Rotation:
-      local.rotation = laid_over(local.rotation, quat_from(value.data()), weight);
-      break;
-    case AnimationPath::Scale:
-      local.scale = laid_over(local.scale, vec3_from(value.data()), weight);
-      break;
-    case AnimationPath::Weights:
-      break;  // (not a placement: see weigh_shape_keys)
-  }
+  // (A weights channel is not a placement: see weigh_shape_keys.)
+  if (channel.path == AnimationPath::Translation)
+    local.position = laid_over(local.position, vec3_from(value.data()), weight);
+  if (channel.path == AnimationPath::Rotation)
+    local.rotation = laid_over(local.rotation, quat_from(value.data()), weight);
+  if (channel.path == AnimationPath::Scale) local.scale = laid_over(local.scale, vec3_from(value.data()), weight);
 }
 
 // A weights channel moves the object's shape keys, not its placement.

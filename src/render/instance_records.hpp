@@ -35,13 +35,15 @@ inline constexpr float kStill = 0.0f;
 struct InstanceLook {
   Vec3 tint = Vec3::one();
   float first_bone = kNoBones;
-  float first_morph = kNoMorphs;  // where the shape keys it shows are (none: kNoMorphs)
   // Scattered copies only (see ScatterSet).
   float visible_from = 0.0f;
   float visible_to = 0.0f;
   float fade = 0.0f;
   float upward = 0.0f;
   float sway = kSways;  // how much the wind sways it (any copy)
+  // Where the shape keys it shows are (none: kNoMorphs). Last, so the copies made field by field
+  // above (renderer_scatter.cpp) keep their order.
+  float first_morph = kNoMorphs;
 };
 
 // The first texel of instance `number`'s record.
