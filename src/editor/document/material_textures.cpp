@@ -65,20 +65,24 @@ std::optional<int> extension_source(const Json& texture, const char* extension) 
   return found == texture[kExtensions].end() ? std::nullopt : source_of(*found);
 }
 
-// The picture a texture shows, as the engine picks it: its KTX2 one (KHR_texture_basisu), its
-// WebP one (EXT_texture_webp), or its plain one.
-std::optional<int> shown_source(const Json& texture) {
-  if (const auto ktx2 = extension_source(texture, kBasisuTextureExtension)) return ktx2;
+// The picture a texture shows when its KTX2 one is not read: its WebP one, or its plain one.
+std::optional<int> fallback_source(const Json& texture) {
   if (const auto webp = extension_source(texture, kWebpTextureExtension)) return webp;
   return source_of(texture);
 }
 
-// Whether a texture says it shows `image` in any of the ways it may: its KTX2, WebP or plain
-// picture. (Which one the engine shows depends on whether it reads the KTX2 one, which the
-// document alone does not tell; a texture is the same picture whichever it shows.)
+// The picture a texture shows, as the engine picks it: its KTX2 one (KHR_texture_basisu), its
+// WebP one (EXT_texture_webp), or its plain one.
+std::optional<int> shown_source(const Json& texture) {
+  if (const auto ktx2 = extension_source(texture, kBasisuTextureExtension)) return ktx2;
+  return fallback_source(texture);
+}
+
+// Whether a texture may show `image`: its KTX2 picture, or the one it falls back on. (Which one the
+// engine shows depends on whether it reads the KTX2 one, which the document alone does not tell; a
+// texture is the same picture whichever it shows. A WebP texture's plain picture is never shown.)
 bool has_source(const Json& texture, int image) {
-  const std::optional<int> sources[] = {extension_source(texture, kBasisuTextureExtension),
-                                        extension_source(texture, kWebpTextureExtension), source_of(texture)};
+  const std::optional<int> sources[] = {extension_source(texture, kBasisuTextureExtension), fallback_source(texture)};
   return std::find(std::begin(sources), std::end(sources), std::optional<int>{image}) != std::end(sources);
 }
 
@@ -120,9 +124,16 @@ bool reusable(const Json& doc, int texture, int image) {
   return has_source(doc[kTextures][texture], image) && plain_sampling(doc, texture);
 }
 
-// Whether a texture shows its picture through EXT_texture_webp.
-bool shows_webp(const Json& texture) {
-  return has_object(texture, kExtensions) && texture[kExtensions].contains(kWebpTextureExtension);
+// Whether a texture shows a picture through `extension`.
+bool shows_through(const Json& texture, const char* extension) {
+  return has_object(texture, kExtensions) && texture[kExtensions].contains(extension);
+}
+
+// Whether some texture of the document shows a picture through `extension`.
+bool used_by_a_texture(const Json& doc, const char* extension) {
+  const Json& textures = list_of(doc, kTextures);
+  return std::any_of(textures.begin(), textures.end(),
+                     [extension](const Json& texture) { return shows_through(texture, extension); });
 }
 
 // The slot's JSON pointed at the texture: its other fields (scale, texture coordinates, extensions)
@@ -203,11 +214,10 @@ int texture_showing(Json& doc, int image) {
   return textures;
 }
 
-void forget_unused_webp(Json& doc) {
-  for (const Json& texture : list_of(doc, kTextures)) {
-    if (shows_webp(texture)) return;
+void forget_unused_texture_extensions(Json& doc) {
+  for (const ExtensionPicture& kind : kExtensionPictures) {
+    if (!used_by_a_texture(doc, kind.extension)) remove_extension_used(doc, kind.extension);
   }
-  remove_extension_used(doc, kWebpTextureExtension);
 }
 
 // Points one slot of a material's JSON at `image`, or takes it out for kNoIndex.
