@@ -915,6 +915,15 @@ TEST_CASE("a machine that is not the host cannot change the level of a network g
   for (Engine* machine : {host, guest, &other}) {
     CHECK(ruby(*machine, "[Game.scene_name, Network.changing_level?, $changes].inspect") == "[\"main\", false, []]");
   }
+  // Nor have the host send it all that is spawned again, by saying again that it has the level.
+  ruby(*host, "Network.spawn('Ball')");
+  REQUIRE(lan.until([&] { return balls_spawned_on(*guest) == "1"; }));
+  ruby(*guest, "Scene.objects.select { |o| o.name == 'Ball' }.drop(1).each(&:destroy)");
+  lan.round();
+  ruby(*guest, "Network.__deliver(Network::LEVEL_READY, 0, :host)");
+  heard_out(lan, *guest, *host);
+  heard_out(lan, *host, *guest);
+  CHECK(balls_spawned_on(*guest) == "0");
 }
 
 TEST_CASE("in a room on a relay, the opener's game lets go a machine past the level's timeout") {
