@@ -10,6 +10,7 @@
 #include "editor/document/model_import.hpp"
 #include "editor/node_tree.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
@@ -30,6 +31,18 @@ std::optional<GlbFile> read_importable_glb(const std::filesystem::path& path, st
   if (!model_import::has_several_buffers(source->json)) return source;
   error = "models with several buffers are not supported (export a single .glb from Blender)";
   return std::nullopt;
+}
+
+// The pasted nodes' joints hold the pasted copies of what they held in `model`. (The pasted
+// nodes are those from `first` on, in the model's order.)
+void follow_pasted_joints(const SceneDesc& model, std::vector<NodeDesc>& nodes, int first) {
+  NewIdentities identities;
+  for (std::size_t i = 0; i < model.nodes.size(); ++i) {
+    identities[model.nodes[i].stable_id] = nodes[static_cast<std::size_t>(first) + i].stable_id;
+  }
+  for (std::size_t i = static_cast<std::size_t>(first); i < nodes.size(); ++i) {
+    follow_new_identities(nodes[i].props, identities);
+  }
 }
 
 }  // namespace
@@ -140,6 +153,7 @@ void SceneDocument::append_model_nodes(const SceneDesc& model, const model_impor
     desc_.nodes.push_back(std::move(node));
     if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
+  follow_pasted_joints(model, desc_.nodes, offsets.nodes);  // what was pasted together stays joined
   // The imported skeletons and animations point at the imported nodes (now further on in the list).
   const std::size_t first_animation = desc_.animations.size();
   for (const SkinDesc& skin : model.skins) desc_.skins.push_back(model_import::imported_skin(skin, offsets));

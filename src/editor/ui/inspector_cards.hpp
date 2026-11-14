@@ -31,6 +31,8 @@ void draw_terrain(PanelContext& context, int index);
 void draw_scripts(PanelContext& context, int index);
 void draw_physics(PanelContext& context, int index);
 void draw_group_collision_layer(EditorSession& session);
+// What holds the object to another one or to the world.
+void draw_joint(PanelContext& context, int index);
 // Wheels are children of a vehicle: shown on the child itself.
 void draw_wheel(EditorSession& session, int index);
 // The properties without a card of their own.
@@ -39,6 +41,7 @@ void draw_custom_props(PanelContext& context, int index);
 // What Add Component offers for each kind of component.
 void add_script_menu(PanelContext& context, int index);
 void add_body_menu(EditorSession& session, int index);
+void add_joint_menu(EditorSession& session, int index);
 void add_property_menu(PanelContext& context, int index);
 
 // Call before a held widget (a drag, a slider, a color picker) changes the selected object: the

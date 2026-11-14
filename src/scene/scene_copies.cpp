@@ -60,11 +60,18 @@ ObjectId Scene::add_copy(ObjectId original, ObjectId parent, ObjectId root) {
 }
 
 std::vector<ObjectId> Scene::clone(ObjectId source) {
+  std::vector<ObjectId> created;
+  for (const auto& [original, copy] : clone_pairs(source)) created.push_back(copy);
+  return created;
+}
+
+std::vector<CopyPair> Scene::clone_pairs(ObjectId source) {
   if (!is_alive(source)) return {};
   const Transform world = world_transform(source);
   const std::vector<CopyPair> copies = copy_subtree(source);
   objects_[copies.front().second].local = world;  // the root keeps its world placement
-  return with_copied_joints(copies);
+  with_copied_joints(copies);
+  return copies;
 }
 
 std::vector<CopyPair> Scene::copy_subtree(ObjectId source) {
@@ -82,13 +89,10 @@ std::vector<CopyPair> Scene::copy_subtree(ObjectId source) {
   return copies;
 }
 
-std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
-  std::vector<ObjectId> created;
+void Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
   for (const auto& [original, id] : copies) {
     for (ObjectHandle& joint : objects_[id].joints) joint = copied_joint(joint, copies);
-    created.push_back(id);
   }
-  return created;
 }
 
 ObjectHandle Scene::copied_joint(ObjectHandle joint, const std::vector<CopyPair>& copies) const {

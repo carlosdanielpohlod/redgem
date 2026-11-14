@@ -7,6 +7,7 @@
 
 #include "editor/document/gltf_json.hpp"
 #include "editor/node_tree.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
@@ -74,6 +75,14 @@ std::map<int, int> copied_sources(const std::vector<NodeDesc>& nodes, const std:
   return sources;
 }
 
+// The copies' joints hold the copies of what their originals' joints held. (The copies of
+// `source` are the nodes from `first` on, in its order.)
+void follow_copied_joints(std::vector<NodeDesc>& nodes, const std::vector<int>& source, std::size_t first) {
+  NewIdentities identities;
+  for (std::size_t i = 0; i < source.size(); ++i) identities[nodes[source[i]].stable_id] = nodes[first + i].stable_id;
+  for (std::size_t i = first; i < nodes.size(); ++i) follow_new_identities(nodes[i].props, identities);
+}
+
 }  // namespace
 
 int SceneDocument::duplicate(int index) { return duplicate(std::vector<int>{index}).front(); }
@@ -97,6 +106,7 @@ std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
 
 void SceneDocument::append_copies(const std::vector<int>& source, const std::vector<int>& copy_of) {
   std::vector<NodeDesc>& nodes = desc_.nodes;
+  const std::size_t first = nodes.size();
   for (const int original : source) {
     NodeDesc copy = nodes[original];
     copy.stable_id = fresh_id();
@@ -106,6 +116,7 @@ void SceneDocument::append_copies(const std::vector<int>& source, const std::vec
     for (int& child : copy.children) child = copy_of[child];
     nodes.push_back(std::move(copy));  // names stay unique because each copy is added before the next
   }
+  follow_copied_joints(nodes, source, first);
   attach_copied_roots(nodes, source, copy_of);
 }
 

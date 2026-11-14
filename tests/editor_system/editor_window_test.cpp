@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <future>
 #include <chrono>
@@ -25,6 +26,7 @@
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
 #include "scene/props.hpp"
+#include "physics/joint_config.hpp"
 #include "editor/editor_app.hpp"
 #include "project/project_hub.hpp"
 #include "editor/editor_config.hpp"
@@ -895,4 +897,43 @@ TEST_CASE("MCP controls real editor play and returns a bounded viewport image") 
   std::filesystem::create_directories(file.parent_path());
   CHECK(write_bytes_file(file, *bytes, error));
   app.set_frame_hook({});
+}
+
+TEST_CASE("a hinge added in the Inspector holds a lid that swings to its limit on Play") {
+  constexpr double kLimit = 45.0;     // degrees the lid may fall
+  constexpr float kLidHeight = 6.0f;  // meters above the spawn point, clear of the level
+  constexpr float kSettled = 0.1f;    // meters
+  const std::filesystem::path game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+
+  // Add Component > Joint > hinge on a dynamic cube, then the Joint card's anchor, axis and limits.
+  const Vec3 spot = app.spawn_point() + Vec3::up() * kLidHeight;
+  const ObjectId lid = session.create_primitive(PrimitiveShape::Cube, spot);
+  SceneDocument& doc = session.document();
+  doc.set_prop(lid, props::kBody, PropertyValue(std::string(props::kBodyDynamic)));
+  session.add_joint(lid, JointKind::Hinge);
+  doc.set_prop(lid, props::kJointAnchor[0], -0.5);
+  doc.set_prop(lid, props::kJointAxis[1], 0.0);
+  doc.set_prop(lid, props::kJointAxis[2], 1.0);
+  doc.set_prop(lid, props::kJointLow, -kLimit);
+  doc.set_prop(lid, props::kJointHigh, 0.0);
+  session.refresh_preview();
+  session.select(lid);
+  run(app, kFrameFrames);  // the Inspector shows its Joint card, the Scene view its hinge
+  take_picture(app, screenshot("editor_joint"));
+
+  const std::string name = doc.node(lid).name;
+  app.play();
+  REQUIRE(session.play_state() == PlayState::Playing);
+  run(app, kPlayFrames * 2);
+  const float drop = std::sin(degrees_to_radians(static_cast<float>(kLimit))) * 0.5f;
+  CHECK(std::fabs(y_of(session, name) - (spot.y - drop)) < kSettled);
+  app.stop();
+  CHECK(y_of(session, name) == doctest::Approx(spot.y));
+  CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
 }

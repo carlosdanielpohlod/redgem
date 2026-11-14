@@ -8,30 +8,13 @@
 #include <string>
 #include <utility>
 
+#include "physics/joint_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
 
 namespace redgem::binding {
 namespace {
 
-// What the kinds of joint are called in Ruby.
-struct JointName {
-  JointKind kind;
-  const char* name;
-};
-constexpr JointName kJointNames[] = {
-    {JointKind::Fixed, "fixed"}, {JointKind::Hinge, "hinge"},       {JointKind::Slider, "slider"},
-    {JointKind::Point, "point"}, {JointKind::Distance, "distance"},
-};
-
-constexpr mrb_int kLimitEnds = 2;             // [low, high]
-constexpr mrb_float kLongestSlide = 10000.0;  // meters a slider's limits may reach either way
-
-std::optional<JointKind> joint_named(const std::string& name) {
-  for (const JointName& known : kJointNames) {
-    if (name == known.name) return known.kind;
-  }
-  return std::nullopt;
-}
+constexpr mrb_int kLimitEnds = 2;  // [low, high]
 
 mrb_value option(mrb_state* mrb, mrb_value options, const char* key) {
   return mrb_hash_get(mrb, options, mrb_symbol_value(mrb_intern_cstr(mrb, key)));
@@ -126,7 +109,8 @@ void read_ends(mrb_state* mrb, mrb_value object, mrb_value other, mrb_value opti
 JointDesc joint_desc_arg(mrb_state* mrb, mrb_value kind, mrb_value object, mrb_value other, mrb_value options) {
   const std::string name = to_name(mrb, kind);
   JointDesc desc;
-  desc.kind = known(mrb, joint_named(name), "unknown joint '%s' (fixed, hinge, slider, point, distance)", name);
+  const std::string unknown = "unknown joint '%s' (" + joint_kind_list() + ")";
+  desc.kind = known(mrb, joint_kind_named(name), unknown.c_str(), name);
   read_ends(mrb, object, other, options, desc);
   read_axis(mrb, options, desc);
   read_limits(mrb, options, desc);

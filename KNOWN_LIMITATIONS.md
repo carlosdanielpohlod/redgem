@@ -270,7 +270,9 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- Joints are made from scripts only: a level cannot set one up in Blender or the editor.
+- A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
+  one whose other end is in another scene, or was deleted, is not made (the log says so). The
+  editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384

@@ -142,6 +142,15 @@ class EditorSession {
   void reparent_selection(ObjectId parent);
   // Adds a script file (scripts/<file>) to the object's script list.
   void attach_script(ObjectId id, const std::string& file);
+  // Gives the object a joint of that kind to the world (Add Component > Joint), or takes its joint
+  // away, one undo step each (editor_session_joints.cpp).
+  void add_joint(ObjectId id, JointKind kind);
+  // Changes the kind of its joint: what the old kind alone took goes (a hinge's limits in degrees
+  // are not a slider's in meters), its other end, anchor and break force stay.
+  void set_joint_kind(ObjectId id, JointKind kind);
+  void remove_joint(ObjectId id);
+  // Holds the object's joint to `other` (kNoObject: the world).
+  void set_joint_partner(ObjectId id, ObjectId other);
   void undo();
   void redo();
   // Writes the scene being edited back to its file.

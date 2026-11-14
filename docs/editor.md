@@ -28,8 +28,12 @@ icons):
   one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission
   and their pictures, see [Material pictures](#material-pictures)),
   Light (type, color, intensity, range and spot cones), Camera (field of view, clipping), one card per Ruby script,
-  Physics (body, trigger, collider, layer, mass), vehicle wheels and custom properties. **Add Component**
-  adds scripts (existing or new), a physics body, a trigger or a property. With several objects
+  Physics (body, trigger, collider, layer, mass), Joint (kind, the object it is connected to, anchor,
+  axis, limits, motor, a distance joint's lengths and spring, break force; see
+  [Levels](levels.md#editing-the-level-in-blender) for what each means), vehicle wheels and custom
+  properties. **Add Component** adds scripts (existing or new), a physics body, a trigger, a joint
+  or a property. The Scene view draws each joint: a ball at its anchor, its axis, its limits as an
+  arc and a line to what it holds to. With several objects
   selected it shows what they have in common: tag, visible, *Template* and the Transform, a dash
   where their values differ. An edit applies to all of them.
 * **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty

@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Joints set up in the editor**: Add Component > Joint gives an object a fixed, hinge, slider,
+  point or distance joint to another object (picked by name) or to the world, with its anchor,
+  axis, limits, motor, lengths, spring and break force, saved in the scene as the object's `joint`
+  properties (Blender can set them too). The joint is made as the scene loads, like one from
+  `Physics.joint`, and `GameObject#joint` returns it. The Scene view draws its anchor, its axis and
+  its limits as an arc. Undo, copy and paste, duplication, prefabs and `Scene.spawn` keep it, a
+  copy made with its other end holding to that end's copy.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "physics/body_config.hpp"
+#include "physics/joint_config.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/transform.hpp"
 
@@ -35,6 +36,20 @@ bool is_custom(const std::string& key);
 bool can_add_property(const PropertyMap& props, const std::string& key);
 // Whether an object shows the Vehicle wheel card: it is a wheel, or a child of a vehicle.
 bool wheel_card_shown(const std::optional<std::string>& parent_body, bool is_wheel);
+
+// --- Joints ------------------------------------------------------------------------------------
+
+// Whether the object has a Joint card.
+bool has_joint(const PropertyMap& props);
+// What Add Component > Joint gives an object: a joint of that kind to the world, at the object's
+// own origin (a distance joint hangs it from a point above it).
+PropertyMap new_joint_props(JointKind kind);
+// Whether a joint property stays when the joint's kind changes: its other end, anchor and break
+// force (what every kind takes, in the same units).
+bool kept_across_joint_kinds(const std::string& key);
+// What a joint's limits start as once turned on: a quarter turn either way for a hinge, a meter
+// either way for a slider.
+std::pair<float, float> default_joint_limits(JointKind kind);
 
 // --- Several objects at once ------------------------------------------------------------------
 

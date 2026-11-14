@@ -320,6 +320,16 @@ end
 ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons, or twisted
 harder than 500 newton meters (`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
 
+A joint can also come with the scene: set up in the editor's Joint card (or with `joint`
+properties in Blender, see [Levels](../levels.md)), it is made as the scene loads, and
+`game_object.joint` returns it:
+
+```ruby
+class Gate < Behaviour
+  def open = game_object.joint.motor(90, 200)                 # the hinge set up in the editor
+end
+```
+
 ## Collision layers
 
 Bullets that fly through pickups, ghosts that walk through walls: give each body a **layer** and
