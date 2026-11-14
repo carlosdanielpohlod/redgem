@@ -59,3 +59,26 @@ TEST_CASE("debug descriptions preserve world space, color and depth intent") {
   CHECK(buffer.items().front().second.z == 6.0f);
   CHECK_FALSE(buffer.items().front().depth_test);
 }
+TEST_CASE("debug labels need a finite point, a size in range and a short text, and are bounded") {
+  DebugDrawBuffer buffer;
+  DebugLabel label;
+  label.text = "spawn";
+  CHECK(buffer.append(label));
+  label.at.y = std::numeric_limits<float>::infinity();
+  CHECK_FALSE(buffer.append(label));
+  label = {};
+  label.size = kMaxDebugLabelSize + 1;
+  CHECK_FALSE(buffer.append(label));
+  label = {};
+  label.text.assign(kMaxDebugLabelBytes + 1, 'x');
+  CHECK_FALSE(buffer.append(label));
+  CHECK(buffer.labels().size() == 1);
+  label = {};
+  while (buffer.labels().size() < kMaxDebugLabels) REQUIRE(buffer.append(label));
+  CHECK_FALSE(buffer.append(label));
+  CHECK(buffer.dropped_labels() == 1);
+  CHECK(buffer.dropped() == 0);
+  buffer.clear();
+  CHECK(buffer.labels().empty());
+  CHECK(buffer.dropped_labels() == 0);
+}

@@ -10,6 +10,7 @@ name: Sanitizers
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -23,26 +24,41 @@ permissions:
   contents: read
 
 jobs:
+  # Which builds run. A pull request runs AddressSanitizer only, and all three with the full-ci
+  # label; main and runs started by hand always run all three. (The runners a repository gets at
+  # once are few, and every pull request push asks for them.)
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      builds: ${{ steps.pick.outputs.builds }}
+    steps:
+      - id: pick
+        env:
+          FULL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          # (Coverage is optimized: the tests of a flooded server measure time, and fail in an
+          # unoptimized build.)
+          BUILDS: >-
+            [
+              {"name": "ASan and UBSan", "kind": "address", "every_pull_request": true,
+               "configure": "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined"},
+              {"name": "TSan", "kind": "thread", "every_pull_request": false,
+               "configure": "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=thread"},
+              {"name": "Coverage", "kind": "coverage", "every_pull_request": false,
+               "configure": "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage -DCMAKE_SHARED_LINKER_FLAGS=--coverage"}
+            ]
+        run: |
+          echo "builds=$(jq -c --argjson full "${FULL}" 'map(select($full or .every_pull_request))' <<< "${BUILDS}")" >> "${GITHUB_OUTPUT}"
+
   test:
+    needs: plan
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: ASan and UBSan
-            kind: address
-            configure: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined
-          - name: TSan
-            kind: thread
-            configure: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=thread
-          # (Optimized: the tests of a flooded server measure time, and fail in an unoptimized build.)
-          - name: Coverage
-            kind: coverage
-            configure: >-
-              -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage
-              -DCMAKE_EXE_LINKER_FLAGS=--coverage -DCMAKE_SHARED_LINKER_FLAGS=--coverage
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G

@@ -8,6 +8,7 @@
 #include <optional>
 #include <unordered_map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "net/http/http_client.hpp"
@@ -19,6 +20,8 @@
 #include "script/script_context.hpp"
 
 namespace redgem {
+
+bool is_ruby_prelude_source(std::string_view source);
 
 // Runs the Ruby side of the game: loads scripts, instantiates behaviours and calls their callbacks.
 // Implemented in parts:
