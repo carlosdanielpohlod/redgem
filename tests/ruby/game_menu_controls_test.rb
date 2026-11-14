@@ -6,8 +6,13 @@ class << UI
   attr_accessor :pressed_now
   # The box the test clicks this frame ({x:, y:, width:, height:}), if any.
   attr_accessor :clicked_now
+  # The gamepad the test presses its buttons on (the first one when it says none).
+  attr_accessor :pressed_pad
 
-  def pressed_any?(controls) = (pressed_now || []).include?(controls)
+  def pressed_any?(controls, pad: Input::FIRST_PAD)
+    (pressed_now || []).include?(controls) && pad == (pressed_pad || Input::FIRST_PAD)
+  end
+
   def mouse_over?(**box) = clicked_now == box
   def clicked?(over) = over
 end

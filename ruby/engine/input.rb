@@ -31,15 +31,16 @@ module Input
 
   # Rumbles a player's gamepad at `strength` (0 to 1) for `seconds`. Does nothing for now (see
   # rumble?) and says so: false. A gamepad's number (checked as everywhere else), a strength or a
-  # time out of range is an error all the same.
+  # time out of range (an endless one too) is an error all the same.
   def self.rumble(pad, strength, seconds)
     raise ArgumentError, "rumble strength goes from 0 to 1" unless RUMBLE_STRENGTHS.cover?(strength)
-    raise ArgumentError, "rumble time is a number of seconds, not negative" unless __rumble_time?(seconds)
+    raise ArgumentError, "rumble time is a finite number of seconds, not negative" unless __rumble_time?(seconds)
 
     gamepad?(pad: pad) && rumble?
   end
 
-  def self.__rumble_time?(seconds) = seconds.is_a?(Numeric) && seconds >= 0
+  # A time a rumble can last: a number of seconds, not negative and not endless.
+  def self.__rumble_time?(seconds) = seconds.is_a?(Numeric) && seconds >= 0 && seconds.to_f.finite?
 
   # Input.define_action(:dash, keys: [:left_shift], buttons: [:b]), define_action(:fire, mouse:
   # [:left]), or define_action(:dash, :e, "pad:b"). Declaring a name again binds it anew.

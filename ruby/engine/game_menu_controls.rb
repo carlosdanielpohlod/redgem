@@ -169,8 +169,8 @@ class GameMenu < Behaviour
     def rebinding?(box, focused) = !@page.capturing? && UI.worked?(box, focused)
 
     # Whether the focused cell is cleared this frame (not while a capture waits: what it catches is
-    # its own).
-    def clearing?(focused) = focused && !@page.capturing? && UI.pressed_any?(CLEAR)
+    # its own), by a key or by Y on the shown player's own gamepad.
+    def clearing?(focused) = focused && !@page.capturing? && UI.pressed_any?(CLEAR, pad: @page.player)
 
     # A cell's text (`at`: its column and slot).
     def cell_text(row, at, box, conflict)

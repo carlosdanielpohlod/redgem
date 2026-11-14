@@ -95,5 +95,6 @@ class InputBindingsTest < RedGemTest::Case
     assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, -1) }
     assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, nil) }
     assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, Float::NAN) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, Float::INFINITY) }
   end
 end

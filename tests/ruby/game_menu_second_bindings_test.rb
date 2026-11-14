@@ -6,8 +6,13 @@
 class << UI
   # What the test presses this frame: [keys, gamepad buttons] pairs, as UI's constants name them.
   attr_accessor :pressed_now
+  # The gamepad the test presses its buttons on (the first one when it says none).
+  attr_accessor :pressed_pad
 
-  def pressed_any?(controls) = (pressed_now || []).include?(controls)
+  def pressed_any?(controls, pad: Input::FIRST_PAD)
+    (pressed_now || []).include?(controls) && pad == (pressed_pad || Input::FIRST_PAD)
+  end
+
   def mouse_over?(**_box) = false
 end
 
@@ -28,6 +33,7 @@ class GameMenuSecondBindingsTest < RedGemTest::Case
     Input.cancel_capture
     Input.reset_bindings
     UI.pressed_now = []
+    UI.pressed_pad = nil
   end
 
   def page = GameMenu::ControlsPage.new
@@ -167,6 +173,25 @@ class GameMenuSecondBindingsTest < RedGemTest::Case
     assert_equal ["key:space", "pad:a"], Input.bindings(:jump)
     [UI::LEFT, CLEAR].each { |control| pressing(control) { opened.update(0) } }
     assert_equal ["pad:a"], Input.bindings(:jump)
+  end
+
+  def test_a_shown_players_cell_is_cleared_by_their_own_gamepad
+    opened, controls = opened_page
+    controls.page.player = SECOND_PAD
+    on_jump(controls)
+    2.times { pressing(UI::RIGHT) { opened.update(0) } } # their first buttons' cell
+    clear_on(opened, Input::FIRST_PAD)
+    assert_equal ["pad:a"], Input.bindings(:jump, pad: SECOND_PAD)
+    clear_on(opened, SECOND_PAD)
+    assert_empty Input.bindings(:jump, pad: SECOND_PAD)
+  end
+
+  # Presses what clears a cell, its gamepad buttons on gamepad `pad`.
+  def clear_on(opened, pad)
+    UI.pressed_pad = pad
+    pressing(CLEAR) { opened.update(0) }
+  ensure
+    UI.pressed_pad = nil
   end
 
   def test_nothing_is_cleared_while_a_capture_waits

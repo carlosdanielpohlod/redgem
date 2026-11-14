@@ -18,6 +18,7 @@ class GameMenu < Behaviour
     BUTTONS = 1    # the cell of its gamepad buttons
     SLOTS = 2      # cells a column has on each row: the first binding, then the second and any more
     FIRST_SLOT = 0
+    SLOT_BINDINGS = 1   # how many bindings a cell holds, but the last (which holds the rest)
     WAITING_COLUMN = 1  # where `waiting` ([row, column, slot]) holds its column
     # A row's cells, left to right: [column, slot].
     CELLS = [KEYS, BUTTONS].flat_map { |column| (FIRST_SLOT...SLOTS).map { |slot| [column, slot].freeze } }.freeze
@@ -182,7 +183,7 @@ class GameMenu < Behaviour
     # the end).
     def put(now, slot, binding)
       wanted = now.dup
-      wanted[[slot, now.size].min, last_slot?(slot) ? now.size : 1] = [binding]
+      wanted[[slot, now.size].min, last_slot?(slot) ? now.size : SLOT_BINDINGS] = [binding]
       wanted
     end
 
