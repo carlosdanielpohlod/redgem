@@ -164,9 +164,6 @@ bool answered_live(const std::string& name) {
          is_ruby_eval_tool(name);
 }
 
-// The tools nothing but a running editor can answer: the saved files have no answer to them.
-bool editor_only(const std::string& name) { return name == "editor" || is_ruby_eval_tool(name); }
-
 constexpr const char* kNoEditor =
     "no editor of this game is running with its bridge; start one with `redgem <game> --editor-bridge`";
 // The first line of an answer the saved files gave because no editor took the call.
@@ -215,7 +212,10 @@ Json discovered(const Options& options, const std::string& name, const Json& arg
     if (attempt.reply) return *attempt.reply;
     remember(file, attempt.miss);
   }
-  if (editor_only(name)) return tool_result(kNoEditor, true);
+#if defined(REDGEM_RUBY_EVAL)
+  if (is_ruby_eval_tool(name)) return no_editor_for_ruby_eval();
+#endif
+  if (name == "editor") return tool_result(kNoEditor, true);
   return from_files(native_result(options, name, args));
 }
 }  // namespace

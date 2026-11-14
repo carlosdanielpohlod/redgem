@@ -261,6 +261,12 @@ jobs:
           tools/windows/build_runtime.sh
           cmake --build build-windows --target redgem redgem_relay redgem_server
 
+      # (As the Linux programs are checked: a release build has no Ruby evaluation.)
+      - name: Check that the Windows programs have no Ruby evaluation
+        run: >
+          tests/ships_no_ruby_eval.sh build-windows/src/redgem.exe build-windows/src/redgem-server.exe
+          build/src/runtimes/windows/redgem-player.exe
+
       - name: Restore the NDK
         uses: actions/cache/restore@v4
         with:

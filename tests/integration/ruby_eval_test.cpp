@@ -185,6 +185,19 @@ TEST_CASE("game_eval is listed only for a connected editor, as a tool that chang
   CHECK(listed(mcp::catalog(options), kRubyEvalTool) == nullptr);
 }
 
+TEST_CASE("with no editor running, game_eval says how to start one that has it") {
+  const fs::path root = fs::temp_directory_path() / "redgem-ruby-eval-no-editor";
+  fs::create_directories(root);
+  mcp::Options options;
+  options.game = REDGEM_PLATFORMER_DIR;
+  options.editor_connection = mcp::kDiscoverEditor;
+  options.bridge_root = root;
+  const Json answer = mcp::invoke(options, kRubyEvalTool, call(kToken, "1"));
+  CHECK(failed(answer));
+  CHECK(says(text_of(answer), "--ruby-eval"));
+  fs::remove_all(root);
+}
+
 TEST_CASE("over the bridge, game_eval runs in the playing game with the token, and only then") {
   Game game;
   const RubyEvalGate gate(kToken);

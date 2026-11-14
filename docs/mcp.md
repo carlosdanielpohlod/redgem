@@ -200,8 +200,9 @@ MCP server lists `game_eval`, which takes that `token` and `code`:
 The answer is the result's `inspect`, or the exception with its backtrace (the snippet's lines
 are `(game_eval):<line>`). The code runs at the top level of the game's interpreter, between two
 frames, so it sees and changes what the game's scripts see: the game is not reset afterwards.
-It runs on the game's script budget, capped at two seconds: code that never returns ends with a
-`ScriptTimeout`, as any script call would. Code is limited to 16 KiB, and the answer is cut at
+It runs on the game's script budget, capped at 0.4 seconds (so that it always answers before the
+bridge's five-second wait): code that never returns ends with a `ScriptTimeout`, as any script
+call would. The result's `inspect` runs within the same budget. Code is limited to 16 KiB, and the answer is cut at
 8 KiB with a notice, as any tool's text (see below).
 
 It is refused, without running anything, when the token is missing or wrong, when the editor was

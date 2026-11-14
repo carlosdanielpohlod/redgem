@@ -47,17 +47,21 @@ inline bool is_ruby_eval_tool(const std::string& name) {
 #if defined(REDGEM_RUBY_EVAL)
 // The most code one evaluation takes, in bytes.
 inline constexpr std::size_t kMostEvalCodeBytes = 16 * 1024;
-// The longest an evaluation runs: the game's script budget when it is shorter, this when it is
-// longer or the game has none. (The bridge's caller gives up after five seconds.)
-inline constexpr std::chrono::milliseconds kMostEvalBudget{2000};
+// The budget an evaluation runs on: the game's script budget when it is shorter, this when it is
+// longer or the game has none. Short, because the engine's own work inside it (spawning, say) is
+// forgiven up to config::kScriptForgivenBudgets more, and the bridge's caller gives up after
+// five seconds (ruby_eval.cpp checks that one evaluation, and the description of its error,
+// always end before).
+inline constexpr std::chrono::milliseconds kMostEvalBudget{400};
 
 struct EvalReply {
   bool ok = false;
   std::string text;  // the result inspected, or the error and its backtrace
 };
 
-// Evaluates `code` at the top level of the interpreter, on its budget (at most kMostEvalBudget,
-// its own set back after). (The tool's answer is cut as every tool's text is: mcp::tool_result.)
+// Evaluates `code` at the top level of the interpreter, and its result's inspect, in one call on
+// its budget (at most kMostEvalBudget, its own set back after). (The tool's answer is cut as every tool's text is:
+// mcp::tool_result.)
 EvalReply evaluate_ruby(RubyVm& vm, const std::string& code);
 
 // The tool as the MCP catalog lists it.
@@ -78,12 +82,12 @@ class RubyEvalGate {
 // A gate with a fresh random token, which it prints to `out` for the developer to hand on.
 std::shared_ptr<const RubyEvalGate> open_ruby_eval(std::ostream& out);
 
-// The interpreter of the game the editor plays, or null when it is editing.
-RubyVm* playing_vm(EditorSession& session);
-
 // The tool in an editor: through `gate` when it was started with --ruby-eval; without one (null),
 // a refusal saying how to turn it on.
 mcp::Json answer_ruby_eval(const RubyEvalGate* gate, EditorSession& session, const mcp::Json& args);
+
+// The answer to game_eval when no editor of the game is running.
+mcp::Json no_editor_for_ruby_eval();
 #endif
 
 }  // namespace redgem::tools
