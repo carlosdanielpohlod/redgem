@@ -128,11 +128,12 @@ bool lighter(const Step& a, const Step& b) {
 }
 
 // A clip mixed over a character fires its events while it shows enough of it, unless it is the
-// clip that leads already (whose events fire once).
+// clip that leads already (whose events fire once). Returns the layer when it fires, else null.
 template <typename Step>
-bool layer_fires(const std::optional<Step>& layer, const Step* main, float least) {
-  if (!layer.has_value() || layer->weight < least) return false;
-  return main == nullptr || main->clip != layer->clip;
+const Step* firing_layer(const std::optional<Step>& layer, const Step* main, float least) {
+  if (!layer.has_value() || layer->weight < least) return nullptr;
+  const bool leads_already = main != nullptr && main->clip == layer->clip;
+  return leads_already ? nullptr : &*layer;
 }
 
 }  // namespace
@@ -143,7 +144,8 @@ void AnimationPlayer::queue_events(const Scene& scene, ObjectId character, const
   const auto lead = std::max_element(steps.to.begin(), steps.to.end(), lighter<ClipStep>);  // the first of equals
   const ClipStep* main = lead != steps.to.end() ? &*lead : nullptr;
   if (main != nullptr) queue_step_events(found->second, *main);
-  if (layer_fires(steps.layer, main, kLayerEventWeight)) queue_step_events(found->second, *steps.layer);
+  const ClipStep* layer = firing_layer(steps.layer, main, kLayerEventWeight);
+  if (layer != nullptr) queue_step_events(found->second, *layer);
 }
 
 void AnimationPlayer::queue_step_events(const std::vector<Listener>& listeners, const ClipStep& step) {
@@ -151,6 +153,7 @@ void AnimationPlayer::queue_step_events(const std::vector<Listener>& listeners, 
   if (marks.empty()) return;
   const double duration = duration_of(step.clip);
   std::vector<double> seconds;
+  seconds.reserve(marks.size());
   for (const ListenedMark& mark : marks) seconds.push_back(static_cast<double>(mark.at) * duration);
   const ClipSpan span{step.span.from, unwrapped_end(step.span, duration), duration, step.loop};
   for (const std::size_t index : marks_passed(span, seconds)) {

@@ -32,6 +32,10 @@ bool has_cubic_spline_keys(const cgltf_animation_channel& channel) {
   return channel.sampler->interpolation == cgltf_interpolation_type_cubic_spline;
 }
 
+std::string refused_marker_warning(const std::string& clip_name, const std::string& entry) {
+  return "animation '" + clip_name + "': event '" + entry + "' is not name@time with a time from 0 to 1, skipped";
+}
+
 }  // namespace
 
 void GltfReader::load_animations() {
@@ -63,9 +67,7 @@ std::vector<AnimationMarker> GltfReader::load_markers(const cgltf_animation& ani
   const std::optional<std::string> listed = get_string(extras.properties, kAnimationEventsProperty);
   if (!listed) return {};
   ParsedMarkers parsed = parse_animation_markers(*listed);
-  for (const std::string& entry : parsed.refused) {
-    warn("animation '" + clip_name + "': event '" + entry + "' is not name@time with a time from 0 to 1, skipped");
-  }
+  for (const std::string& entry : parsed.refused) warn(refused_marker_warning(clip_name, entry));
   return std::move(parsed.markers);
 }
 

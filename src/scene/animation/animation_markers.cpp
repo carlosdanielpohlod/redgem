@@ -28,16 +28,15 @@ std::optional<float> number_in(const std::string& text) {
   return value;
 }
 
-bool names_a_moment(const std::string& name, const std::optional<float>& at) {
-  return !name.empty() && at.has_value() && within_the_clip(*at);
-}
+bool names_a_moment(const std::string& name, float at) { return !name.empty() && within_the_clip(at); }
 
 std::optional<AnimationMarker> marker_in(const std::string& entry) {
   const std::size_t sign = entry.rfind(kMarkerTimeSign);
   if (sign == std::string::npos) return std::nullopt;
   const std::string name = trimmed(entry.substr(0, sign));
   const std::optional<float> at = number_in(trimmed(entry.substr(sign + 1)));
-  if (!names_a_moment(name, at)) return std::nullopt;
+  if (!at.has_value()) return std::nullopt;
+  if (!names_a_moment(name, *at)) return std::nullopt;
   return AnimationMarker{name, *at};
 }
 
@@ -128,6 +127,7 @@ std::vector<std::size_t> marks_passed(const ClipSpan& span, const std::vector<do
     return forward ? a.position < b.position : a.position > b.position;
   });
   std::vector<std::size_t> order;
+  order.reserve(hits.size());
   for (const Hit& hit : hits) order.push_back(hit.mark);
   return order;
 }
