@@ -59,6 +59,8 @@ PROJECTS = [
     ("FreeType", "Decoding game-provided fonts; copyright © 1996–2026 The FreeType Project, "
      "all rights reserved (FreeType License)", "https://freetype.org",
      os.path.join(DEPS, "freetype-src", "docs", "FTL.TXT")),
+    ("SheenBidi", "Ordering right-to-left text (the Unicode Bidirectional Algorithm)",
+     "https://github.com/Tehreer/SheenBidi", os.path.join(DEPS, "sheenbidi-src", "LICENSE")),
     ("Basis Universal", "Transcoding KTX2 textures (only its transcoder is built in)",
      "https://github.com/BinomialLLC/basis_universal", os.path.join(DEPS, "basis_universal-src", "LICENSE")),
     ("Basis Universal notice", "The notice Basis Universal's Apache 2.0 license asks to pass along",

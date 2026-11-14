@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
+  letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
+  text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
+  Hebrew are drawn in their order on screen by the Unicode Bidirectional Algorithm (SheenBidi 2.9,
+  Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
+  vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
+  not joined yet (no shaping).
+
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
   connection that stays up. Each machine loads it in the background and waits, frozen, until all
