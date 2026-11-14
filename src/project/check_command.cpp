@@ -84,6 +84,7 @@ bool went_wrong(const CheckReport& report, const std::optional<TestsRun>& tests)
 
 ToolResult checked(const ToolLine& line) {
   CheckReport report;
+  check_game_file(line.words.front(), report);
   check_scripts(line.words.front(), report);
   check_scenes(line.words.front(), report);
   const std::optional<TestsRun> tests = tests_if_asked(line, report);

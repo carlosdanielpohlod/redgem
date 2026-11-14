@@ -31,5 +31,9 @@ struct ProcessEnd {
 // Runs `arguments` to their end with nothing on standard input and what they print, output and
 // errors alike, written to `output`. A crash of the program is its own, not its caller's.
 ProcessEnd run_to_end(const std::vector<std::string>& arguments, const std::filesystem::path& output);
+// The same with its errors written to `errors`, apart from its output (output that is a file's
+// bytes, which a warning must not get into).
+ProcessEnd run_to_end(const std::vector<std::string>& arguments, const std::filesystem::path& output,
+                      const std::filesystem::path& errors);
 
 }  // namespace redgem

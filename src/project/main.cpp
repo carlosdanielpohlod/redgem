@@ -30,7 +30,8 @@ namespace {
 
 int run_editor(const redgem::CliOptions& options) {
   // (The card is chosen once, before the first window: the hub and every editor opened from it use the same.)
-  return redgem::run_editor(options.game_dir, redgem::gpu_choice_for_run(options.gpu), options.editor_bridge);
+  return redgem::run_editor(options.game_dir, redgem::gpu_choice_for_run(options.gpu),
+                            {options.editor_bridge, options.ruby_eval});
 }
 
 int play_game(const redgem::CliOptions& options) {

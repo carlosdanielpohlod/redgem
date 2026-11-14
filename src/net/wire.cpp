@@ -34,6 +34,16 @@ nlohmann::json refusal_of_protocol(int theirs) { return {{kKind, kRefused}, {kVe
 
 nlohmann::json considering() { return {{kKind, kConsidering}, {kVersion, kProtocolVersion}}; }
 
+nlohmann::json resume_hello(const std::string& token) {
+  nlohmann::json said = hello();
+  said[kResume] = token;
+  return said;
+}
+
+nlohmann::json word(const char* kind) { return {{kKind, kind}}; }
+
+nlohmann::json word_about(const char* kind, int peer) { return {{kKind, kind}, {kFrom, peer}}; }
+
 std::string protocol_mismatch(int theirs) {
   return "this game runs protocol " + std::to_string(kProtocolVersion) + ", the other side " + std::to_string(theirs);
 }

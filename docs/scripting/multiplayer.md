@@ -218,6 +218,38 @@ An array or a hash holds at most 4096 things (in a message: `Save` keeps any num
 until the next level is loaded, so register them in a behaviour's `start` or a scene script's
 `setup`. Names starting with `$` are the engine's own.
 
+## Reconnecting after a drop
+
+A phone switching from Wi-Fi to mobile data, or a router restarting, drops a player's connection
+for a moment. The game hosting (directly, or on a dedicated server) can hold that player's place
+and id for a while, so that it gets back in as if nothing happened:
+
+```ruby
+# on the host (on a dedicated server: in a manager's start)
+Network.reconnect_window = 20   # seconds; 0 (the default) turns it off, 300 at most
+
+Network.on_reconnecting { |peer| show_banner("#{peer} lost the connection...") }  # on the host and on that machine
+Network.on_reconnected { |peer| hide_banner }   # back, with the same id
+Network.on_lost { |reason| go_to_menu(reason) } # on that machine: it could not get back in time
+```
+
+The machine whose connection dropped stays in the game (`Network.reconnecting?` is true,
+`Network.id` and `Network.peers` stay the same, the others' objects stay theirs, so
+`NetworkSync#mine?` is still false for them; nothing can be sent meanwhile) and calls the
+host again every second. Its welcome gave it a secret token, which is what gets the place back:
+a machine that does not have it is turned away, a token gets a place back once (each return
+gives a new one), and once the window is over the place is gone. The window is the one the
+player's welcome told: setting another one later counts for those let in afterwards. The others hear the player left
+(`on_leave`) only when the window is over; if it gets back first they hear nothing. A player
+who leaves (`Network.leave`) says so and holds no place; a host that leaves ends the game at once
+for everyone, as before.
+
+What was said while it was away is not replayed. When it is back, the host tells it the spawned
+objects as they are now (`Network.spawn`), it starts what it knows of the others' objects over,
+and the peers that came and went meanwhile arrive and leave (`on_join`, `on_leave`) on its
+machine. Messages of the game (`Network.emit`) sent meanwhile to it are lost, so keep what
+matters in state the host can send again (in an `on_reconnected` handler on the host).
+
 ## Objects in the same place everywhere
 
 A `NetworkSync` keeps an object where its **owner** has it: the owner's machine moves it as usual
@@ -291,6 +323,45 @@ machine can only spawn objects of its own: 64 at a time, 512 in the whole game. 
 Loading a level happens on one machine: its spawned objects go away everywhere, and it is shown
 the others' again. To change level together, send a message and load it on every machine.
 
+## Movement validation
+
+The machine that owns an object says where it is, so a changed copy of the game could say its
+hero runs ten times as fast or stands on the other side of the level. The host (a player's
+machine that hosts, or a dedicated server's room) can refuse to believe it: it checks every pose
+of the others' objects against how fast and how far one may move, and everyone, the host's own
+scripts included, sees an object that went past that where the host believes it is. Its owner is
+told and puts it back there (`Network::CORRECT`), and the violation is counted against its
+machine, which is let go after `kick_after` of them. It is off unless the game turns it on, in
+game.json:
+
+```json
+"movement_validation": {
+  "max_speed": 9.0,
+  "teleport_distance": 4.0,
+  "tolerance": 0.25,
+  "kick_after": 10,
+  "undo": false
+}
+```
+
+or from a script on the host, at any time (every key may be left out; no limits turns it off):
+
+```ruby
+Network.validate_movement(max_speed: 9.0, teleport_distance: 4.0, kick_after: 10) if Network.host?
+Network.movement_violations(peer)   # how many moves of that machine the host did not believe
+```
+
+`max_speed` is in meters a second; a move too fast goes as far as was allowed (`undo: true` puts
+it back where it was). `teleport_distance` is the most one pose (twenty a second) may move an
+object: a longer one is never believed. `tolerance` is the share of the limits a move may go past
+and still be believed, and half a second of movement at the top speed may arrive at once, so the
+network's jitter is never a violation. The poses that were already on their way when a correction
+went out count once. Set the limits above anything the game does on purpose (a dash, a launch pad):
+to move an object further, spawn it again (an object whose NetworkSync starts on the host starts
+where its owner next says), or let the host move it (the host's own objects are never checked).
+A machine's objects past 4096 that it has not moved for ten seconds are forgotten; while none are,
+the poses of its new ones are not used. In a room on a relay the relay passes poses on and checks nothing.
+
 ## Deciding things once
 
 Two machines must not both decide the same thing. The simple rule: each machine decides for the
@@ -329,4 +400,6 @@ target (lag compensation), so the shooter's machine should decide its own hits, 
 things once": fine for co-op and casual games, not for competitive shooters. Connections are
 encrypted, but who answers is checked only when the game gives its fingerprint (see "Encrypted
 connections"). Players are not authenticated unless the game hosting asks for it
-([Online services](online-services.md)), in a room on a relay too.
+([Online services](online-services.md)), in a room on a relay too. A room on a relay holds no
+place for a player whose connection dropped (see "Reconnecting after a drop"), and when the
+player hosting a game drops, the game ends: nobody else takes over as host.
