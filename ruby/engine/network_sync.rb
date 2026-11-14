@@ -11,10 +11,14 @@ module Network
       refuse_taken(key, sync)
       __untrack(sync)
       @synced[key] = sync
+      __forget_movement(key)   # a new object: the host checks its moves from where it next is
     end
 
     def __untrack(sync)
-      @synced.delete(sync.key) if @synced[sync.key].equal?(sync)
+      return unless @synced[sync.key].equal?(sync)
+
+      @synced.delete(sync.key)
+      __forget_movement(sync.key)
     end
 
     # Any destroyed object: if it was spawned on the network, it is no longer, whether or not its
@@ -153,6 +157,12 @@ class NetworkSync < Behaviour
     return take_animation(animation) unless @snapshots
 
     @snapshots.add(@position, @rotation, animation)
+  end
+
+  # The host did not believe a move of the object (Network.validate_movement): it is put back
+  # where the host believes it is. Only the owner's own object moves.
+  def __corrected(position)
+    transform.position = Vector3[*position] if mine?
   end
 
   private

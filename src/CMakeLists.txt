@@ -44,6 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
@@ -216,6 +217,8 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/movement_validator.cpp
+  net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
   net/secure/tls_identity.cpp
@@ -427,6 +430,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_state_bindings.cpp
   script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
+  script/bindings/network_movement_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp

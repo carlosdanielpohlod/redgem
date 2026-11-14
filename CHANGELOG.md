@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
