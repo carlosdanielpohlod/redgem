@@ -7,6 +7,9 @@
 #                              seeds (from the tests' fixtures) and every input that once crashed
 #                              it stay tested, as the ctest test fuzz.<name>
 set(REDGEM_FUZZ_CORPORA ${CMAKE_CURRENT_SOURCE_DIR}/corpus)
+# Every replay program, to build them alone (the sanitizer builds build only what their tests run,
+# and a target added here is then built there without naming it twice).
+add_custom_target(redgem_fuzz_replays)
 # Every fuzzer, to build them alone (run_fuzzers.sh runs them).
 if(REDGEM_FUZZ)
   add_custom_target(redgem_fuzz_targets)
@@ -23,6 +26,7 @@ endfunction()
 function(redgem_add_fuzz_target name library)
   redgem_fuzz_program(redgem_fuzz_${name}_replay ${name} ${library} ${CMAKE_CURRENT_SOURCE_DIR}/replay_main.cpp)
   add_test(NAME fuzz.${name} COMMAND redgem_fuzz_${name}_replay ${REDGEM_FUZZ_CORPORA}/${name})
+  add_dependencies(redgem_fuzz_replays redgem_fuzz_${name}_replay)
   if(REDGEM_FUZZ)
     redgem_fuzz_program(redgem_fuzz_${name} ${name} ${library})
     # (libFuzzer brings the program's main.)
