@@ -311,6 +311,19 @@ not a promise of how it will be closed.
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
+- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
+  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
+  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
+  longer needs.
+- `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
+  migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
+  no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
+  timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
+  hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
+- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
+  migrate it one after another. A room writing a key of that slot at the moment another room
+  writes the migrated values can make that migration fail as busy: the slot is then refused for
+  the migrating room's run, and migrated on its next first use.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that

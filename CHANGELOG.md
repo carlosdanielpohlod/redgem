@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
 - **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
   (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
   format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
