@@ -95,17 +95,26 @@
         },
         {
           "name": "on_interact",
-          "args": "actor",
+          "params": [
+            {"name": "actor", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "an actor used this object (it has an Interactable; on the host in a game over the network)"
         },
         {
           "name": "on_focus",
-          "args": "actor",
+          "params": [
+            {"name": "actor", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "this object became what an actor's interaction prompt is for"
         },
         {
           "name": "on_blur",
-          "args": "actor",
+          "params": [
+            {"name": "actor", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "it stopped being what that prompt is for"
         },
         {
@@ -5006,60 +5015,91 @@
     },
     {
       "name": "Interactable",
+      "kind": "class",
+      "superclass": "Behaviour",
       "about": "A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).",
       "methods": [
         {
           "name": "all",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Interactable]"},
           "about": "every Interactable of the scene"
         },
         {
           "name": "prompt",
+          "params": [],
+          "returns": {"type": "String | Symbol | nil"},
           "about": "the I18n key of its prompt, or nil for the engine's \"Interact\""
         },
         {
           "name": "prompt=",
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "String | Symbol | nil"}
+          ],
+          "returns": {"type": "String | Symbol | nil"},
           "about": "changes the prompt"
         },
         {
           "name": "prompt_text",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the prompt in the language in use"
         },
         {
           "name": "range",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "meters from the actor it can be used from (2 unless said)"
         },
         {
           "name": "range=",
-          "args": "meters",
+          "params": [
+            {"name": "meters", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes the range"
         },
         {
           "name": "priority",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "of those in reach, the highest wins (0 unless said)"
         },
         {
           "name": "priority=",
-          "args": "value",
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes the priority"
         },
         {
           "name": "enabled?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it can be picked"
         },
         {
           "name": "enabled=",
-          "args": "flag",
+          "params": [
+            {"name": "flag", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "false: never picked"
         },
         {
           "name": "angle",
+          "params": [],
+          "returns": {"type": "Float | nil"},
           "about": "degrees off the actor's forward it may be at; nil for any direction"
         },
         {
           "name": "angle=",
-          "args": "degrees",
+          "params": [
+            {"name": "degrees", "type": "Numeric | nil"}
+          ],
+          "returns": {"type": "Numeric | nil"},
           "about": "changes the angle (nil: any direction)"
         }
       ],
@@ -5073,23 +5113,34 @@
     },
     {
       "name": "Interactor",
+      "kind": "class",
+      "superclass": "Behaviour",
       "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
       "methods": [
         {
           "name": "target",
+          "params": [],
+          "returns": {"type": "Interactable | nil"},
           "about": "the Interactable in focus, or nil"
         },
         {
           "name": "use",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "uses what is in focus now; false when nothing is"
         },
         {
           "name": "pad",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the player whose :interact it reads (0 unless said)"
         },
         {
           "name": "prompt_label",
-          "args": "target",
+          "params": [
+            {"name": "target", "type": "Interactable"}
+          ],
+          "returns": {"type": "String"},
           "about": "what the prompt says for a target: \"[E] Open\""
         }
       ],
@@ -5101,42 +5152,69 @@
     },
     {
       "name": "Interaction",
+      "kind": "module",
       "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",
       "methods": [
         {
           "name": "on",
           "static": true,
-          "args": "event, &block",
+          "params": [
+            {"name": "event", "type": "Symbol"},
+            {"name": "block", "type": "^(GameObject, GameObject) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "|actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)"
         },
         {
           "name": "interact",
           "static": true,
-          "args": "actor, target",
+          "params": [
+            {"name": "actor", "type": "GameObject"},
+            {"name": "target", "type": "GameObject | Interactable"}
+          ],
+          "returns": {"type": "bool"},
           "about": "the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client"
         },
         {
           "name": "best_for",
           "static": true,
-          "args": "actor, candidates = Interactable.all, lenient: false",
+          "params": [
+            {"name": "actor", "type": "GameObject"},
+            {"name": "candidates", "type": "Array[Interactable]", "optional": true, "default": "Interactable.all"},
+            {"name": "lenient", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "Interactable | nil"},
           "about": "the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)"
         },
         {
           "name": "reachable?",
           "static": true,
-          "args": "actor, target, lenient: false",
+          "params": [
+            {"name": "actor", "type": "GameObject"},
+            {"name": "target", "type": "Interactable"},
+            {"name": "lenient", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether an actor can use a target now: enabled, in range, in front, in sight"
         },
         {
           "name": "distance",
           "static": true,
-          "args": "actor, target",
+          "params": [
+            {"name": "actor", "type": "GameObject"},
+            {"name": "target", "type": "GameObject | Interactable"}
+          ],
+          "returns": {"type": "Float"},
           "about": "meters from an actor to a target"
         },
         {
           "name": "angle_to",
           "static": true,
-          "args": "actor, target",
+          "params": [
+            {"name": "actor", "type": "GameObject"},
+            {"name": "target", "type": "GameObject | Interactable"}
+          ],
+          "returns": {"type": "Float"},
           "about": "degrees between where the actor faces and where the target is, across the ground"
         }
       ],
