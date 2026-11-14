@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 
 #include "core/command_line.hpp"
 #include "core/translations.hpp"
@@ -31,6 +32,12 @@ bool read_option(const std::vector<std::string>& args, std::size_t& next, const 
   if (!value) error = tr("project.tools.option_needs_value", {{"option", option}});
   if (value) line.values[option] = *value;
   return value.has_value();
+}
+
+// What a count must be: a whole number, not below zero.
+bool is_count(double number) {
+  const double end = std::ldexp(1.0, std::numeric_limits<std::size_t>::digits);
+  return number >= 0 && number < end && std::floor(number) == number;
 }
 
 // A negative number is a value, not an option.
@@ -72,6 +79,14 @@ std::optional<double> number_from(const std::string& text) {
   const bool whole_text = end == text.c_str() + text.size();
   if (!whole_text || !std::isfinite(number)) return std::nullopt;
   return number;
+}
+
+std::optional<std::size_t> count_option(const ToolLine& line, const char* option, std::size_t otherwise) {
+  const auto value = line.value(option);
+  if (!value) return otherwise;
+  const auto number = number_from(*value);
+  if (!number || !is_count(*number)) return std::nullopt;
+  return static_cast<std::size_t>(*number);
 }
 
 }  // namespace redgem::tools

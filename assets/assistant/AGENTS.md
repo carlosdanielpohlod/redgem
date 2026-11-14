@@ -15,6 +15,7 @@ https://www.redgem-engine.org/manual/ (`llms.txt` there indexes it).
 | `sounds/`, `images/`, `fonts/`, `models/` | sounds, pictures for the HUD and the sky, faces for UI.font, models to place |
 | `locales/<language>.json` | the texts players read (`I18n.t`) |
 | `game.json` | the game's id, title and window size |
+| `sig/redgem.rbs` | the scripting API's types (RBS), for editors and type checkers (`redgem api --rbs > sig/redgem.rbs` updates it) |
 
 ## Commands
 
@@ -24,6 +25,8 @@ redgem scene get . Player                  # everything about one object (or #5,
 redgem scene set . Coin1 position=1,2,3 prop.speed=2.5 script+=Spinner
 redgem scene add . Coin6 --from Coin1 position=4,1,0
 redgem scene remove . Coin6
+redgem scene diff . --against HEAD         # what changed in the scene since the last commit (any Git revision)
+redgem assets . orc --kind model           # find the game's files: model, texture, sound, script, prefab
 redgem check .                             # scripts compile, scenes read, attached scripts exist
 redgem check . --run-tests                 # ... and the tests in tests/ pass
 redgem run . --seconds 5                   # play with no window; prints each script error with file:line

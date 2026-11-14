@@ -28,6 +28,9 @@ constexpr const char* kRead = "SELECT value FROM saves WHERE key = ?1";
 constexpr const char* kWrite = "INSERT OR REPLACE INTO saves (key, value) VALUES (?1, ?2)";
 constexpr const char* kRemove = "DELETE FROM saves WHERE key = ?1";
 constexpr const char* kClear = "DELETE FROM saves";
+constexpr const char* kBegin = "BEGIN IMMEDIATE";
+constexpr const char* kCommit = "COMMIT";
+constexpr const char* kRollback = "ROLLBACK";
 // (Only rows that hold a value: one written by something else than the server is none.)
 constexpr const char* kKeys = "SELECT key FROM saves WHERE json_valid(value) ORDER BY key";
 // Where the statements above take their values (?1, ?2), and give them back.
@@ -161,6 +164,37 @@ bool SaveDatabase::update(const std::string& key, const Change& change) {
   // set inside takes it again on the same thread.)
   const KeyLocks::Hold updating = key_locks_.hold(kSaveItself, key);
   return set(key, change(get(key)));
+}
+
+bool SaveDatabase::in_transaction(const std::function<bool()>& work) {
+  const std::lock_guard<std::recursive_mutex> hold(lock_);
+  if (!executed(database_, kBegin)) return false;
+  bool done = false;
+  try {
+    done = work();
+  } catch (...) {
+    executed(database_, kRollback);
+    throw;
+  }
+  // (A COMMIT that fails leaves the transaction open: it is rolled back, never left to the next write.)
+  if (done && executed(database_, kCommit)) return true;
+  executed(database_, kRollback);
+  return false;
+}
+
+// (Straight to the table, without the keys' locks: set takes a key's lock before lock_, and taking
+// them under lock_ here would be the other way round. The version key's update keeps migrations
+// of the save apart.)
+bool SaveDatabase::replace(const Values& values) {
+  return in_transaction([&] {
+    bool written = executed(database_, kClear);
+    for (const auto& [key, value] : values) {
+      if (value.is_null()) continue;
+      const std::string text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+      written = written && write_.use().bind(kKeyPlace, key).bind(kValuePlace, text).run();
+    }
+    return written;
+  });
 }
 
 }  // namespace redgem::server
