@@ -111,6 +111,7 @@ struct ObjectSight {
   float visible_from = 0.0f;
   float visible_to = 0.0f;
   bool cast_shadow = true;
+  bool mirrored = false;  // its placement mirrors it (see `mirrors` in scene/transform.hpp)
 };
 
 // Whether what casts a shadow or not (`cast_shadow`) is drawn in a pass: the shadow map's pass
@@ -145,6 +146,7 @@ struct ObjectPass {
   render_math::View view;
   int last_material = kNoMaterialYet;
   bool last_two_sided = false;
+  bool mirrored = false;  // the winding the pass is drawing with: clockwise front faces when true
 };
 
 // What of the scattered copies a quality draws (see QualityCaps): a share of them, so far.
@@ -516,8 +518,14 @@ struct Renderer::Impl {
   std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
   // Gathers into `batches` what the view sees (in the shadow map's pass, what casts a shadow).
   void gather_copies(const render_math::View& view, bool depth_pass);
+  // The objects of one winding (mirrored or not) the view sees, into `batches`.
+  void gather_wound(const render_math::View& view, bool depth_pass, bool mirrored);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
+  // Turns the pass's winding for mirrored copies (or back), only when it changes.
+  static void face_by_winding(bool mirrored, ObjectPass& pass);
+  // Every pass ends with front faces counter-clockwise, as the rest of the frame draws them.
+  static void face_forward(ObjectPass& pass) { face_by_winding(false, pass); }
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 

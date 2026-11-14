@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "render/instance_records.hpp"
+#include "scene/transform.hpp"
 
 namespace redgem {
 namespace {
@@ -59,8 +60,11 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const std::size_t next = write_morphs(object, pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone, look);
   if (temporal.on) note_fresh_record(scene, object, look, pose ? pose->bones : 0);
   const render_math::Sight seen = reach_of(scene, object, pose);
-  sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to,
-                             object.cast_shadow};
+  // A skinned mesh is placed by its bones alone (glTF ignores its node's placement): it is never
+  // taken as mirrored (see KNOWN_LIMITATIONS).
+  const bool mirrored = !pose && mirrors(worlds[slot]);
+  sights[slot] = ObjectSight{write_record(slot, look), seen,    object.mesh, object.visible_from, object.visible_to,
+                             object.cast_shadow,       mirrored};
   return next;
 }
 

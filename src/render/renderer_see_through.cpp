@@ -31,6 +31,7 @@ void Renderer::Impl::draw_see_through(std::size_t first, Vec3 viewer) {
   rlSetBlendMode(RL_BLEND_ALPHA);
   rlDisableDepthMask();
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
+  face_forward(pass);
   rlEnableDepthMask();
   end_mesh_pass();
 }
@@ -65,7 +66,8 @@ void Renderer::Impl::add_see_through(const render_math::InstanceBatch& batch, st
     const auto record = static_cast<std::size_t>(records[batch.first + copy]);
     if (record < scattered_records) break;
     const Vec3 middle = sights[record - scattered_records].sight.sphere.center;
-    see_through.push_back({distance_squared(middle, viewer), batch.mesh, first + batch.first + copy, 1});
+    see_through.push_back(
+        {distance_squared(middle, viewer), batch.mesh, first + batch.first + copy, 1, batch.mirrored});
   }
   const render_math::GatheredRun scattered{batch.mesh, batch.first + copy, batch.count - copy, first};
   render_math::add_see_through_cells(see_through, records, scatter_layouts, scattered, viewer);
@@ -73,6 +75,7 @@ void Renderer::Impl::add_see_through(const render_math::InstanceBatch& batch, st
 
 void Renderer::Impl::draw_see_through_copies(const render_math::SeeThroughDraw& draw, ObjectPass& pass) {
   const InstanceRun run{slots.id, draw.first, draw.count};
+  face_by_winding(draw.mirrored, pass);
   for (const GpuPrimitive& part : meshes[static_cast<std::size_t>(draw.mesh)]) {
     if (!render_math::drawn_see_through(factors_of(part.material))) continue;
     if (factors_of(part.material).water.enabled)

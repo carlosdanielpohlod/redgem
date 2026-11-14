@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Mirrored objects**: an object placed with a negative scale on one axis (or three), as
+  Blender's mirror leaves it, is drawn the right way out in every pass (the lit picture, the
+  sun's shadow cascades, the point and spot shadow atlas, motion vectors and see-through
+  surfaces). Mirrored copies of a mesh are batched apart, so the winding changes only between
+  runs of them. A node given as a mirroring matrix is read with a negative x scale.
+
+- **Duplicated characters animate**: duplicating an object in the editor copies the channels of
+  every clip that moves it onto the copy, so a duplicated character plays the original's clips
+  (Wave, Walk...) instead of standing in the pose it was copied in; the copy itself stays where
+  it is put. Undoing the duplicate drops them again.
+
 - **Shape keys (morph targets)**: a mesh's shape keys are read from glTF with their names, starting
   weights, position and normal deltas, and clips' `weights` channels play them. The vertex shader
   applies them as it does bones: every part's deltas in one float texture and, per drawn copy,
