@@ -35,9 +35,9 @@ SceneDesc ponds() {
   water.water.wave_height = kWaves;
   water.water.absorption = kRedAbsorption;
   desc.materials = {water, MaterialDesc{}};
-  desc.meshes = {MeshDesc{"Pond", {quad(-5.0f, 5.0f, kPondHeight, 0)}, {}},
-                 MeshDesc{"Pool", {quad(0.0f, 5.0f, kPoolHeight, 0)}, {}},
-                 MeshDesc{"Slab", {quad(10.0f, 20.0f, 0.0f, 1)}, {}}};
+  desc.meshes = {MeshDesc{"Pond", {quad(-5.0f, 5.0f, kPondHeight, 0)}, {}, {}, {}},
+                 MeshDesc{"Pool", {quad(0.0f, 5.0f, kPoolHeight, 0)}, {}, {}, {}},
+                 MeshDesc{"Slab", {quad(10.0f, 20.0f, 0.0f, 1)}, {}, {}, {}}};
   for (int mesh = 0; mesh < 3; ++mesh) {
     NodeDesc node;
     node.name = desc.meshes[static_cast<std::size_t>(mesh)].name;
