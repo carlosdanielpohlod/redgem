@@ -83,7 +83,7 @@ class Player < Behaviour
 
   # The spot of the ground under the mouse (a wall's side, or the mouse over the sky, is none).
   def pick_destination
-    origin, direction = Camera.screen_ray(Input.mouse_x, Input.mouse_y)
+    origin, direction = Camera.screen_ray(UI.mouse_x, UI.mouse_y)
     return if origin.nil? # no screen to click on
 
     hit = Physics.raycast(origin, direction, ignore: game_object)

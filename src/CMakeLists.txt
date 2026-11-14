@@ -490,6 +490,7 @@ redgem_add_library(redgem_runtime
   render/gpu_select.cpp
   render/window.cpp
   render/display_settings.cpp
+  render/ui_scale.cpp
   render/quality.cpp
   render/font_rasterizer.cpp
   render/game_fonts.cpp

@@ -8,6 +8,7 @@ class SettingsTest < RedGemTest::Case
     Settings.render_scale = 1.0
     Settings.vsync = true
     Settings.fps_cap = 60
+    Settings.ui_scale = 1.0
   end
 
   def test_a_player_who_chose_nothing_gets_a_window_at_the_engines_pace
@@ -42,6 +43,18 @@ class SettingsTest < RedGemTest::Case
     assert_in_delta 2.0, Settings.render_scale
     Settings.render_scale = 0.1
     assert_in_delta 0.5, Settings.render_scale
+  end
+
+  # (With no screen to scale to, a unit of the interface is a pixel times the player's scale.)
+  def test_the_interface_scale_is_held_from_half_to_twice_and_multiplies_the_interfaces
+    assert_in_delta 1.0, UI.scale
+    Settings.ui_scale = 1.5
+    assert_in_delta 1.5, Settings.ui_scale
+    assert_in_delta 1.5, UI.scale
+    Settings.ui_scale = 3
+    assert_in_delta 2.0, Settings.ui_scale
+    Settings.ui_scale = 0.1
+    assert_in_delta 0.5, Settings.ui_scale
   end
 
   def test_no_frame_cap_reads_as_nil

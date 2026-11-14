@@ -1313,13 +1313,13 @@
           "name": "screen_ray",
           "static": true,
           "args": "x, y",
-          "about": "[origin, direction] through a pixel of the screen"
+          "about": "[origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)"
         },
         {
           "name": "world_to_screen",
           "static": true,
           "args": "point",
-          "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera",
+          "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera",
           "example": "x, y = Camera.world_to_screen(enemy.transform.position + Vector3.up * 2)"
         },
         {
@@ -1738,18 +1738,48 @@
         {
           "name": "width",
           "static": true,
-          "about": "the width of the screen, in pixels"
+          "about": "the width of the screen, in the interface's units (UI.scale pixels each)"
         },
         {
           "name": "height",
           "static": true,
+          "about": "the height of the screen, in the interface's units: the reference's height when it is matched"
+        },
+        {
+          "name": "pixel_width",
+          "static": true,
+          "about": "the width of the screen, in pixels"
+        },
+        {
+          "name": "pixel_height",
+          "static": true,
           "about": "the height of the screen, in pixels"
+        },
+        {
+          "name": "scale",
+          "static": true,
+          "about": "the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json \"ui\") times Settings.ui_scale"
+        },
+        {
+          "name": "reference",
+          "static": true,
+          "about": "[width, height] of the screen the interface is laid out for (game.json \"ui\": its \"reference\", or the game's window)"
+        },
+        {
+          "name": "mouse_x",
+          "static": true,
+          "about": "where the pointer is across the screen, in the interface's units"
+        },
+        {
+          "name": "mouse_y",
+          "static": true,
+          "about": "where the pointer is down the screen, in the interface's units"
         },
         {
           "name": "text_width",
           "static": true,
           "args": "str, size:",
-          "about": "how wide a text is, in pixels (in the face selected)"
+          "about": "how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)"
         },
         {
           "name": "wrap",
@@ -2146,6 +2176,18 @@
           "static": true,
           "args": "scale",
           "about": "changes it"
+        },
+        {
+          "name": "ui_scale",
+          "static": true,
+          "about": "how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it"
+        },
+        {
+          "name": "ui_scale=",
+          "static": true,
+          "args": "scale",
+          "about": "changes it",
+          "example": "Settings.ui_scale = 1.25"
         },
         {
           "name": "vsync",

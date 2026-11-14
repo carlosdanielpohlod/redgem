@@ -52,7 +52,7 @@ runs in. They are only there while `redgem-test` plays it.
 | `t.wait(frames)` | Lets the game run |
 | `t.hold(:w, :a, frames: 60)` | Holds keys for that long |
 | `t.press(:space)` | Taps a key |
-| `t.move_mouse(x, y)`, `t.click(x, y)` | Moves the mouse; clicks there with the left button |
+| `t.move_mouse(x, y)`, `t.click(x, y)` | Moves the mouse to a point in UI units (where `UI` drew it, what `Camera.world_to_screen` says); clicks there with the left button |
 | `t.type("Ana")` | Types a text (what `Input.text` and `UI.text_field` read) |
 | `t.tilt(:left_y, -1.0, frames: 60)` | Pushes a gamepad stick (or pulls a trigger) for that long |
 | `t.press_button(:a)`, `t.hold_button(:a, frames: 30)` | Taps or holds gamepad buttons |

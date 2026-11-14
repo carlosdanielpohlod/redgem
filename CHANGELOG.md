@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **An interface that scales with the screen**: every size, position, margin and font size `UI`
+  takes is in units of a reference screen the game names in `game.json`
+  (`"ui": {"reference": [1920, 1080], "match": "height"}`, or `"width"` or `"fit"`; the game's own
+  window, its height matched, when it names none). `UI.scale` says how many pixels a unit takes,
+  so a HUD keeps its share of the screen at 720p, at 4K and in a small window, and texts are
+  drawn sharp from letters made near the pixels they take (a few raster sizes per face) instead of
+  being stretched. `UI.width` and `UI.height` are in units; `UI.pixel_width`, `UI.pixel_height`,
+  `UI.reference`, `UI.mouse_x` and `UI.mouse_y` are new, clicks and taps land on what is drawn at
+  any size, and `Camera.world_to_screen` and `Camera.screen_ray` are in units too. Players make
+  the interface bigger or smaller with `Settings.ui_scale` (0.5 to 2, the settings screen's
+  "Interface size"), kept with the other settings. `GameMenu` uses the same scale instead of its
+  own, so it now grows on large screens; it already takes the screen's height, so a larger
+  interface size grows a game's HUD, and the menu shrinks to fit a short or narrow screen.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

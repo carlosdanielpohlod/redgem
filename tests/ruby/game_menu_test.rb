@@ -136,7 +136,7 @@ class GameMenuTest < RedGemTest::Case
 
   def test_the_settings_screen_has_a_row_for_each_setting_and_a_back_button
     settings = menu.screens[:settings]
-    assert_equal 10, settings.rows # six of video, then the master volume and three groups'
+    assert_equal 11, settings.rows # seven of video (the interface size last), then the master volume and three groups'
     assert_equal %w[Controls Back], settings.options.map(&:first)
     assert_equal "Settings", settings.heading
     assert settings.space_above.positive?

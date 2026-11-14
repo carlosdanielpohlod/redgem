@@ -238,10 +238,12 @@ not a promise of how it will be closed.
 - Text fields take single key presses: there is no input-method composition, so languages typed
   through a composition window cannot be entered even with a game font that draws them.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
-  hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
-  by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
-  no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
-  one height.
+  hyphenation, no line-breaking rules of scripts written without spaces). Sizes scale with the
+  screen from one reference screen (game.json's `"ui"`) and one player multiplier
+  (`Settings.ui_scale`): there are no per-screen layouts (a phone held upright gets the same
+  layout, only its height matched), and the touch screen's stick and buttons follow the screen's
+  height but not the player's multiplier. There is no layout engine (rows, columns, stacks) and no
+  scroll region for anything other than rows of one height.
 - On Android the on-screen keyboard types the letters that have a key of their own on it (with
   Shift, digits and signs). Letters a keyboard sends as a whole text (some accented letters, emoji,
   words written by swiping or picked from suggestions on some keyboards) do not arrive.

@@ -22,7 +22,7 @@ module UI
   CONFIRM = [%i[enter], %i[a]].freeze
   GAMEPAD_CONFIRM = [[], %i[a]].freeze  # where Enter belongs to a text being typed
   FOCUS_COLOR = :gold
-  FOCUS_RING = 3            # pixels the ring around a focused widget shows past it
+  FOCUS_RING = 3            # units the ring around a focused widget shows past it
   SLIDER_STEP = 0.05        # a slider's step unless said
   SLIDER_SHARE = 0.45       # how much of its row a slider's track takes, on the right
   SLIDER_TRACK_COLOR = :gray
@@ -135,7 +135,7 @@ module UI
 
   # The value the pointer points at along a track.
   def self.slider_at(track, min, max)
-    share = (Input.mouse_x - track[:x]).to_f / track[:width]
+    share = (UI.mouse_x - track[:x]).to_f / track[:width]
     min + share.clamp(0.0, 1.0) * (max - min)
   end
 

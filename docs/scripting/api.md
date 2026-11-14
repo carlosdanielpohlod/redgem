@@ -363,8 +363,8 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.main = camera`: sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
 - `Camera.cut_to(camera, fade: 0)`: cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
 - `Camera.cutting?`: whether a cut with a fade is still playing
-- `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
-- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
+- `Camera.screen_ray(x, y)`: [origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)
+- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
 - `Camera.fov = degrees`: sets the field of view
 - `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
@@ -468,9 +468,15 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.button(label, x:, y:, width:, height:, anchor: nil)`: draws a button; true the frame it is clicked
 - `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:, anchor: nil)`: a field to type in; returns the new value
 - `UI.keyboard_visible?`: whether a phone's on-screen keyboard covers the bottom of the screen
-- `UI.width`: the width of the screen, in pixels
-- `UI.height`: the height of the screen, in pixels
-- `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)
+- `UI.width`: the width of the screen, in the interface's units (UI.scale pixels each)
+- `UI.height`: the height of the screen, in the interface's units: the reference's height when it is matched
+- `UI.pixel_width`: the width of the screen, in pixels
+- `UI.pixel_height`: the height of the screen, in pixels
+- `UI.scale`: the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json "ui") times Settings.ui_scale
+- `UI.reference`: [width, height] of the screen the interface is laid out for (game.json "ui": its "reference", or the game's window)
+- `UI.mouse_x`: where the pointer is across the screen, in the interface's units
+- `UI.mouse_y`: where the pointer is down the screen, in the interface's units
+- `UI.text_width(str, size:)`: how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)
 - `UI.wrap(str, width:, size:)`: the lines a text wraps to at word boundaries, none wider than width
 - `UI.text_height(str, size:, width: nil)`: how tall a text is drawn, in pixels (wrapped to width, when given)
 - `UI.line_height(size)`: pixels from a line's top to the next one's at a text size
@@ -582,6 +588,8 @@ How the player chose the game to be shown and heard; a change takes effect at on
 - `Settings.resolutions`: the sizes the monitor offers: [[w, h], ...]
 - `Settings.render_scale`: the share of the window's size the world is drawn at (0.5 to 2)
 - `Settings.render_scale = scale`: changes it
+- `Settings.ui_scale`: how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it
+- `Settings.ui_scale = scale`: changes it
 - `Settings.vsync`: whether frames wait for the screen
 - `Settings.vsync = on`: changes it
 - `Settings.fps_cap`: frames a second at most; nil for none

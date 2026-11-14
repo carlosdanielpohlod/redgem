@@ -3,7 +3,9 @@
 #include <rlgl.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstddef>
+#include <iterator>
 #include <utility>
 
 #include "core/log.hpp"
@@ -14,10 +16,13 @@
 namespace redgem {
 namespace {
 
-constexpr int kFontPixels = 72;  // same raster size as the built-in UI font
+// The raster sizes a face's atlases are made at, each half as tall again as the last: a text is
+// drawn from the smallest at least as tall as it is, never shrunk by more than that.
+constexpr int kRasterSizes[] = {16, 24, 36, 54, GameFonts::kDefaultPixels, 108, 144, 216};
 constexpr int kFirstLetter = 32;
 constexpr int kLastInitialLetter = 255;
-constexpr std::size_t kMaxFontFaces = 5;  // built-in face and four game fonts
+constexpr std::size_t kMaxFontFaces = 5;     // built-in face and four game fonts (each at any raster size)
+constexpr std::size_t kMaxFontAtlases = 16;  // past it, a face is drawn from the nearest atlas it has
 constexpr std::size_t kMaxFontLetters = 2048;
 constexpr std::size_t kMaxFontBytes = 32u * 1024u * 1024u;
 constexpr const char* kFontExtensions[] = {"", ".ttf", ".otf"};
@@ -50,34 +55,71 @@ void prepare_atlas(Font& font) {
   GenTextureMipmaps(&font.texture);
   SetTextureFilter(font.texture, TEXTURE_FILTER_TRILINEAR);
 }
-Font rasterize_face(const std::vector<std::uint8_t>& bytes, const std::set<int>& codes) {
-  if (!bytes.empty()) return rasterize_game_font(bytes, codes, kFontPixels);
+Font rasterize_face(const std::vector<std::uint8_t>& bytes, const std::set<int>& codes, int pixels) {
+  if (!bytes.empty()) return rasterize_game_font(bytes, codes, pixels);
   const EmbeddedFile embedded = embedded_ui_font();
   std::vector<int> letters(codes.begin(), codes.end());
-  return LoadFontFromMemory(kFontType, embedded.data, embedded.size, kFontPixels, letters.data(),
+  return LoadFontFromMemory(kFontType, embedded.data, embedded.size, pixels, letters.data(),
                             static_cast<int>(letters.size()));
+}
+
+// Whether a raster size is nearer `pixels` than the best one found yet (any is, before there is one).
+bool nearer(int raster, const int* best, int pixels) {
+  return best == nullptr || std::abs(raster - pixels) < std::abs(*best - pixels);
 }
 
 }  // namespace
 
-void GameFonts::read_face(Face& face, const std::string& name) {
-  if (name.empty()) return;
-  face.bytes = read_font(directory_, name);
-  face.failed = face.bytes.empty();
-  if (face.failed) log::warning("font '" + printable(name) + "' is missing or unreadable; using the built-in font");
+int GameFonts::raster_pixels(int pixels) {
+  for (const int size : kRasterSizes) {
+    if (size >= pixels) return size;
+  }
+  return std::end(kRasterSizes)[-1];
 }
-GameFonts::Face& GameFonts::face(const std::string& name) {
-  const auto found = faces_.find(name);
+void GameFonts::read_file(File& file, const std::string& name) const {
+  if (name.empty()) return;
+  file.bytes = read_font(directory_, name);
+  file.failed = file.bytes.empty();
+  if (file.failed) log::warning("font '" + printable(name) + "' is missing or unreadable; using the built-in font");
+}
+GameFonts::File& GameFonts::file(const std::string& name) {
+  const auto found = files_.find(name);
+  if (found != files_.end()) return found->second;
+  File& added = files_[name];
+  read_file(added, name);
+  return added;
+}
+GameFonts::Face& GameFonts::add_face(const std::string& name, int pixels) {
+  Face& added = faces_[{name, pixels}];
+  added.file = &file(name);
+  added.pixels = pixels;
+  added.failed = added.file->failed;
+  for (int code = kFirstLetter; code <= kLastInitialLetter; ++code) added.letters.insert(code);
+  return added;
+}
+bool GameFonts::no_room_for_file(const std::string& name) const {
+  return files_.count(name) == 0 && files_.size() >= kMaxFontFaces;
+}
+// The atlas of the face `name` whose raster size is nearest `pixels`; null when it has none.
+GameFonts::Face* GameFonts::nearest_atlas(const std::string& name, int pixels) {
+  Face* nearest = nullptr;
+  for (auto& [key, kept] : faces_) {
+    if (key.first != name) continue;
+    if (nearer(key.second, nearest ? &nearest->pixels : nullptr, pixels)) nearest = &kept;
+  }
+  return nearest;
+}
+GameFonts::Face& GameFonts::face(const std::string& name, int pixels) {
+  if (files_.empty()) file("");  // the built-in face is always the first kept
+  const auto found = faces_.find({name, pixels});
   if (found != faces_.end()) return found->second;
-  if (faces_.size() >= kMaxFontFaces) {
+  if (no_room_for_file(name)) {
     if (!full_) log::warning("UI font cache is full; using the built-in font");
     full_ = true;
-    return face("");
+    return face("", pixels);
   }
-  Face& added = faces_[name];
-  for (int code = kFirstLetter; code <= kLastInitialLetter; ++code) added.letters.insert(code);
-  read_face(added, name);
-  return added;
+  Face* nearest = faces_.size() >= kMaxFontAtlases ? nearest_atlas(name, pixels) : nullptr;
+  return nearest ? *nearest : add_face(name, pixels);
 }
 bool GameFonts::add_letter(Face& face, int codepoint) {
   if (codepoint < kFirstLetter) return false;
@@ -110,7 +152,7 @@ void GameFonts::release_face(Face& face) {
   face.owned = false;
 }
 void GameFonts::rebuild(Face& face) {
-  Font font = rasterize_face(face.bytes, face.letters);
+  Font font = rasterize_face(face.file->bytes, face.letters, face.pixels);
   if (usable_font(font)) prepare_atlas(font);
   release_face(face);
   face.font = font;
@@ -122,15 +164,17 @@ void GameFonts::rebuild(Face& face) {
     return;
   }
 }
-const Font& GameFonts::get(const std::string& name, const std::string& text) {
-  if (faces_.empty()) face("");
-  Face& selected = face(name);
-  if (selected.failed) return name.empty() ? selected.font : get("", text);
+const Font& GameFonts::fallback(const std::string& name, const std::string& text, int pixels) {
+  return name.empty() ? face(name, raster_pixels(pixels)).font : get("", text, pixels);
+}
+const Font& GameFonts::get(const std::string& name, const std::string& text, int pixels) {
+  Face& selected = face(name, raster_pixels(pixels));
+  if (selected.failed) return fallback(name, text, pixels);
   const bool changed = add_letters(selected, text);
   if (changed || selected.font.texture.id == 0) rebuild(selected);
   if (selected.failed && !name.empty()) {
     log::warning("font '" + printable(name) + "' could not be decoded; using the built-in font");
-    return get("", text);
+    return get("", text, pixels);
   }
   return selected.font;
 }
@@ -141,8 +185,9 @@ void GameFonts::set_directory(const std::filesystem::path& directory) {
   full_ = false;
 }
 void GameFonts::clear() {
-  for (auto& [name, face] : faces_) release_face(face);
+  for (auto& [key, face] : faces_) release_face(face);
   faces_.clear();
+  files_.clear();
   full_ = false;
 }
 
