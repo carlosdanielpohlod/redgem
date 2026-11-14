@@ -1,0 +1,109 @@
+# The engine's benchmarks and a load test of the dedicated server, held to the ceilings of
+# tests/bench/thresholds.json (see docs/contributing.md, Benchmarks). A job of its own, beside the
+# Linux one: it builds only what it runs (the benchmarks, the server and the load test), from the
+# Linux job's compiler cache. Its results are kept as the run's bench-results artifact, to compare
+# runs over time; the job fails only when a result clearly passes its ceiling.
+name: Benchmarks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to a pull request's branch makes the run of the older one pointless; every run on
+# main is kept, for the results it leaves.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    # A pull request runs this only with the full-ci label; main and nightly runs always do.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+    name: Benchmarks (Linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+      RESULTS: bench-results
+      # Samples per benchmark, and the server load test: rooms, bots in each, seconds played.
+      BENCH_RUNS: "30"
+      LOAD_ROOMS: "4"
+      LOAD_PLAYERS_PER_ROOM: "4"
+      LOAD_SECONDS: "20"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates xz-utils bison ccache \
+            libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libasound2-dev
+          echo "/usr/lib/ccache" >> "${GITHUB_PATH}"
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      # The Linux job's cache, read only: the same configuration compiles the same objects.
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.run_id }}
+          restore-keys: ccache-linux-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON
+          -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+
+      - name: Build
+        id: build
+        run: |
+          ccache --zero-stats
+          cmake --build build --target redgem_bench redgem_server redgem_server_load
+          ccache --show-stats
+
+      - name: Benchmarks
+        run: ./build/tests/redgem_bench --runs "${BENCH_RUNS}" --out "${RESULTS}/bench.json"
+
+      # Alone on the machine, after the benchmarks: nothing else takes the processor it measures.
+      - name: Server load test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >
+          tests/load/run_server_load.sh build/src/redgem-server build/tests/redgem_server_load games/platformer
+          "${LOAD_ROOMS}" "${LOAD_PLAYERS_PER_ROOM}" "${LOAD_SECONDS}" --out "${RESULTS}/load.json"
+
+      - name: Keep the results
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: ${{ env.RESULTS }}
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Check the thresholds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >
+          python3 -I tools/bench/check_thresholds.py --thresholds tests/bench/thresholds.json
+          --summary "${GITHUB_STEP_SUMMARY}" ${RESULTS}/*.json

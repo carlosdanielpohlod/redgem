@@ -87,7 +87,12 @@ Test fixtures are regenerated with
 
 ## Continuous integration
 
-Every pull request runs these workflows (`.github/workflows/`), side by side:
+Every push to main runs these workflows (`.github/workflows/`), side by side. A pull request runs
+Linux, Windows, Android and AddressSanitizer only: the runners a repository gets at once are few,
+and every push to every pull request asks for them. Add the `full-ci` label to a pull request to
+run the rest on it too (macOS, ThreadSanitizer, coverage, benchmarks and fuzzing), for a change
+that touches what only they see (threads, Mac code, a parser, a hot loop). Whatever a pull request
+skipped still runs on main after the merge.
 
 * **Linux** (`linux.yml`): the build, every test (the system tests in windows drawn by Mesa's
   software renderer on a virtual display) and every linter.
@@ -104,7 +109,10 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
   `coverage` artifact. The system tests are not run there: drawn by a software renderer, they
   would take hours with sanitizers on.
 
-* **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on a pull request, ten minutes
+* **Benchmarks** (`bench.yml`): the benchmarks and the server load test below, on Linux, in a job
+  of its own that builds only what it runs. It fails when a result clearly passes its ceiling.
+
+* **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on main and on a `full-ci` pull request, ten minutes
   each every night.
 
 * **Release** (`release.yml`): only on a `release-*` pull request, a pushed `v*` tag or a run
@@ -150,6 +158,41 @@ Each target's seeds are in `tests/fuzz/corpus/<target>/`, and every build replay
 crashes it, fix the code and add the input to the target's corpus: its replay keeps it tested. A
 new parser of untrusted input gets a target of its own (`redgem_add_fuzz_target` in
 `tests/fuzz/CMakeLists.txt`).
+
+### Benchmarks
+
+`redgem_bench` times the engine's hot paths that need no window and no graphics card: the script
+VM updating 1000 behaviours, a physics step of 400 falling boxes, loading and parsing the
+platformer's `scene.glb`, encoding and decoding a network frame (a full room's poses and a few game
+messages), writing and reading a JSON save, and parsing a chunked HTTP answer. Each benchmark
+takes repeated samples (microseconds per operation) and reports their median and 95th percentile.
+`redgem_server_load` fills a `redgem-server` with K rooms of bots that play for T seconds over
+loopback, and reads its [status port](dedicated-server.md#status) every second: the server's frame
+time (average and worst), bytes a second in and out, its processor time per tick, the clients it
+dropped and the rooms that never opened. Neither is built with the tests:
+
+```bash
+cmake --build build --target redgem_bench redgem_server redgem_server_load
+./build/tests/redgem_bench --out bench-results/bench.json        # --runs 30, --only physics
+tests/load/run_server_load.sh build/src/redgem-server build/tests/redgem_server_load games/platformer \
+  4 4 20 --out bench-results/load.json                           # rooms, bots per room, seconds
+python3 -I tools/bench/check_thresholds.py bench-results/*.json
+```
+
+Run them on an otherwise quiet machine: the numbers are the machine's as much as the engine's.
+Both print a table and write their results as JSON. `tools/bench/check_thresholds.py` holds them to
+the ceilings in `tests/bench/thresholds.json`: a value over its ceiling is a warning, and one over
+the ceiling plus the file's `tolerance` (a share of the ceiling) fails, as does a ceiling whose
+result is missing. The CI's `Benchmarks` workflow runs all three and keeps the results as the run's
+`bench-results` artifact (90 days), to compare runs over time.
+
+The ceilings are generous on purpose: GitHub's runners are shared, and a check that fails on noise
+gets ignored. They were set from the first CI results with ample headroom (about three times the
+median). To update them, download `bench-results` from a few recent runs on `main`, take the
+largest value of each, and set its ceiling well above that, never just above it. Raise a ceiling
+when a change makes something slower on purpose, and say why in the pull request; lower one when a
+change makes it clearly faster, so that the gain is kept. A new benchmark gets its ceiling once its
+first CI numbers are in (until then it is listed as having none, and passes).
 
 ### Releases
 
