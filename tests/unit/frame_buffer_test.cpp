@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <chrono>
 
 #include "integration/wire_text.hpp"
@@ -118,4 +119,60 @@ TEST_CASE("what arrives after messages were taken continues where they ended") {
   buffer.append(second.data() + kLengthBytes + 1, second.size() - kLengthBytes - 1);
   CHECK(buffer.next() == std::string("second"));
   CHECK(buffer.buffered() == 0);
+}
+
+namespace {
+
+constexpr std::size_t kSmallMessageBytes = kRetainedFrameBytes / 2;  // never worth shrinking for
+constexpr std::size_t kPieces = 4;                                   // a large message arrives in these
+
+// Appends a frame in kPieces appends, as the network may deliver a large one.
+void append_in_pieces(FrameBuffer& buffer, const std::vector<std::uint8_t>& bytes) {
+  const std::size_t piece = bytes.size() / kPieces + 1;
+  for (std::size_t start = 0; start < bytes.size(); start += piece) {
+    buffer.append(bytes.data() + start, std::min(piece, bytes.size() - start));
+  }
+}
+
+}  // namespace
+
+TEST_CASE("a buffer gives memory back once a large message has been taken") {
+  FrameBuffer buffer;
+  const std::string longest(kMaxFrameBytes, 'x');
+  const std::vector<std::uint8_t> large = raw_frame(longest);
+  buffer.append(large.data(), large.size());
+  CHECK(buffer.next() == longest);
+  CHECK(buffer.capacity() >= kMaxFrameBytes);
+  const std::vector<std::uint8_t> small = raw_frame("small");
+  buffer.append(small.data(), small.size());
+  CHECK(buffer.capacity() < kMaxFrameBytes / kShrinkRatio);
+  CHECK(buffer.next() == std::string("small"));
+}
+
+TEST_CASE("a buffer keeps its memory while a large message is still arriving, and when it is small") {
+  FrameBuffer buffer;
+  const std::string longest(kMaxFrameBytes, 'y');
+  append_in_pieces(buffer, raw_frame(longest));  // each append compacts: none may lose a piece
+  CHECK(buffer.next() == longest);
+  const std::string modest(kSmallMessageBytes, 'z');
+  const std::vector<std::uint8_t> bytes = raw_frame(modest);
+  buffer.append(bytes.data(), bytes.size());
+  CHECK(buffer.next() == modest);
+  const std::size_t settled = buffer.capacity();
+  CHECK(settled <= kRetainedFrameBytes);
+  buffer.append(bytes.data(), bytes.size());
+  CHECK(buffer.capacity() == settled);  // below kRetainedFrameBytes nothing is given back
+  CHECK(buffer.next() == modest);
+}
+
+TEST_CASE("a broken buffer gives all its memory back") {
+  FrameBuffer buffer;
+  const std::string longest(kMaxFrameBytes, 'w');
+  const std::vector<std::uint8_t> large = raw_frame(longest);
+  buffer.append(large.data(), large.size());
+  CHECK(buffer.next() == longest);
+  buffer.append(kHugeLength, sizeof(kHugeLength));
+  CHECK_FALSE(buffer.next().has_value());
+  CHECK(buffer.broken());
+  CHECK(buffer.capacity() == 0);
 }

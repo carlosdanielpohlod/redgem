@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/window.hpp"
 #include "scene/particles.hpp"
@@ -69,6 +70,9 @@ class Presenter {
   virtual bool open() const = 0;
   // How long the frame before this one took: what Engine::run advances the game by.
   virtual float frame_seconds() const = 0;
+  // How long the graphics card took over the passes of a frame lately, measured while the
+  // statistics overlay is shown; nothing measured by a presenter that does not draw, or cannot time.
+  virtual GpuTimings gpu_timings() const { return {}; }
   // The player's display settings (Settings in Ruby): the presenter takes what it can of them. One
   // that shows the game in no window of its own (nobody, the editor's view) takes none.
   virtual void apply_display(const DisplaySettings& /*display*/) {}

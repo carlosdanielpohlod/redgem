@@ -10,6 +10,24 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
+  Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
+  public address and port its router gives it from the relay it already uses, with no third
+  party (`compose.yaml` publishes UDP 7778 too). Inside the engine, `net/stun/` reads and writes
+  those messages (with a fuzz target, `stun`), probes a STUN server without ever waiting, and
+  chooses a route to a host: its direct addresses first, each for three seconds, then the relay.
+  No game uses these yet: KNOWN_LIMITATIONS.md says what is left and where the ceiling is.
+
+- **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
+  overlay also shows how long the graphics card spent on the frame's prepare, scene and post
+  passes (timer queries read back a frame late, so the game never waits for the card; hidden
+  where the card cannot time, such as OpenGL ES), and the five script methods a sampling profiler
+  caught most often. The profiler reads the Ruby call stack about every millisecond while
+  profiling is on; `Debug.script_profile` returns its methods and `Debug.export_script_profile`
+  writes the whole profile to `script_profile.tsv` in the game's data folder.
+- **`Debug.label(text, at:)`**: text pinned to a world position for one frame, centered where the
+  main camera shows it, with `color:`, `alpha:` and `size:` like `UI.text`.
+
 - **Benchmarks and a server load test with thresholds**: `redgem_bench` times the hot paths that
   need no window (script updates, the physics step, loading a `.glb`, the network frame, JSON
   saves, HTTP parsing) and reports each one's median and 95th percentile; `redgem_server_load` fills
@@ -36,6 +54,12 @@ until 1.0, a release may change what games rely on (see
   weights (lit, shadow, motion and see-through passes alike, desktop and OpenGL ES). Scripts set
   them by name: `face.morph(:Smile, 0.7)`, `face.morph(:Smile)`, `face.morph_names`. Imported
   models keep their shape keys in the editor.
+
+- **Smaller scene files**: saving writes repeated data once (a model imported or pasted twice
+  stores its vertices, pictures and textures once, found by content) and leaves out what no object
+  uses, including a deleted import's meshes and materials. Only the written file changes: undo
+  after a save still brings back everything. Each save that leaves something out logs how many
+  bytes, and `redgem scene compact <game>` rewrites a scene that way from the command line.
 
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
@@ -226,6 +250,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
+  side by side instead of waiting for each other's blocks, and writes of the same key still wait,
+  so no change is lost. A block that writes a second key another room is updating waits at most
+  250 ms, then raises an error instead of writing, so two rooms can never wait for each other
+  forever.
+- **A connection's receive buffer gives memory back** after a large message, down to 64 KiB, once
+  what it holds uses less than a quarter of it.
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
   this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
@@ -272,6 +303,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
+  removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
+  the file or console line runs, or at the end of the frame for a change made inside a method).
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

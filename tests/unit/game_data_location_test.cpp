@@ -56,6 +56,7 @@ TEST_CASE("a game keeps its save, settings, bindings and crash reports together 
   CHECK(files.settings == folder / "settings.json");
   CHECK(files.bindings == folder / "bindings.json");
   CHECK(files.crashes == folder / "crashes");
+  CHECK(files.script_profile == folder / "script_profile.tsv");
 }
 
 TEST_CASE("a game's folder is named after its studio, then its title") {

@@ -52,7 +52,14 @@ void Datagrams::close() {
 }
 
 Datagrams Datagrams::open_on(std::uint16_t port, std::string& error) {
-  Datagrams datagrams(open_datagrams(error));
+  return bound(Datagrams(open_datagrams(error)), port, error);
+}
+
+Datagrams Datagrams::open_alone(std::uint16_t port, std::string& error) {
+  return bound(Datagrams(open_non_blocking(SOCK_DGRAM, IPPROTO_UDP, error)), port, error);
+}
+
+Datagrams Datagrams::bound(Datagrams datagrams, std::uint16_t port, std::string& error) {
   if (!datagrams.valid()) return datagrams;
   if (bind_to_port(native(datagrams.handle_), port)) return datagrams;
   error = last_error();

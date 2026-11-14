@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <exception>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -59,6 +60,11 @@ nlohmann::json* holder_of(nlohmann::json& doc, Kind kind);
 // Refuses (NotFollowed) extensions other than the explicitly known ones: others may point at
 // the file's lists in ways of their own.
 void refuse_other_extensions(const nlohmann::json& object, const char* known, const char* also_known = nullptr);
+
+// Where a buffer view's bytes are in a binary chunk of `bin_size` bytes: first and one past last.
+// Refused (NotFollowed) for a view kept another way than plainly in the file's only buffer, and
+// for one that reaches past the chunk's end.
+std::pair<std::size_t, std::size_t> bytes_of(const nlohmann::json& view, std::size_t bin_size);
 
 // The entry a reference points at; refused when it points at none.
 std::size_t entry_of(const nlohmann::json& reference, std::size_t entries);

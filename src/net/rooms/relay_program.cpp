@@ -9,6 +9,7 @@
 #include "core/log.hpp"
 #include "core/ports.hpp"
 #include "core/translations.hpp"
+#include "net/stun/stun_responder.hpp"
 
 namespace redgem::net {
 
@@ -84,16 +85,29 @@ void report_rooms(const RelayServer& relay, std::size_t& rooms) {
   log::info(std::to_string(rooms) + " room(s) open, " + std::to_string(relay.connection_count()) + " machine(s)");
 }
 
-[[noreturn]] void serve_until_stopped(RelayServer& relay) {
+[[noreturn]] void serve_until_stopped(RelayServer& relay, stun::UdpStunServer& stun) {
   const Clock& clock = steady_clock();
   std::size_t rooms = 0;
   double before = clock.now();
   for (;;) {
     const double now = clock.now();
     serve_relay_once(relay, static_cast<float>(now - before));
+    stun.poll();
     before = now;
     report_rooms(relay, rooms);
   }
+}
+
+// Answers STUN Binding requests on the relay's port number, over UDP, so the games that meet in
+// its rooms can learn the address the internet sees them at. The relay works without it: a port
+// that cannot be had is only warned about.
+void start_stun(stun::UdpStunServer& stun, std::uint16_t port) {
+  std::string error;
+  if (stun.open(port, error)) {
+    log::info("answering STUN on UDP port " + std::to_string(stun.port()));
+    return;
+  }
+  log::warning("cannot answer STUN on UDP port " + std::to_string(port) + ": " + error);
 }
 
 // Starts the relay, proving itself with the identity kept in its data folder; false, with the
@@ -117,7 +131,9 @@ bool start_relay(RelayServer& relay, const RelayCommand& command) {
 int run_relay(const RelayCommand& command) {
   RelayServer relay(command.limits);
   if (!start_relay(relay, command)) return kExitFailure;
-  serve_until_stopped(relay);
+  stun::UdpStunServer stun;
+  start_stun(stun, relay.port());
+  serve_until_stopped(relay, stun);
 }
 
 int show_fingerprint(const RelayCommand& command) {

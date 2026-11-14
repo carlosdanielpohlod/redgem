@@ -104,4 +104,50 @@ void filter_cube_maps_across_seams() {
 #endif
 }
 
+#if defined(GRAPHICS_API_OPENGL_ES3)
+
+bool has_timer_queries() { return false; }
+unsigned int make_timer_query() { return 0; }
+void release_timer_query(unsigned int) {}
+void begin_timer(unsigned int) {}
+void end_timer() {}
+bool timer_ready(unsigned int) { return false; }
+std::uint64_t timer_nanoseconds(unsigned int) { return 0; }
+
+#else
+
+// (Loaded by raylib with the rest of OpenGL: a driver without them leaves them null.)
+bool has_timer_queries() {
+  const bool queries = glad_glGenQueries != nullptr && glad_glBeginQuery != nullptr && glad_glEndQuery != nullptr;
+  return queries && glad_glGetQueryObjectiv != nullptr && glad_glGetQueryObjectui64v != nullptr;
+}
+
+unsigned int make_timer_query() {
+  unsigned int query = 0;
+  glGenQueries(1, &query);
+  return query;
+}
+
+void release_timer_query(unsigned int query) {
+  if (query != 0) glDeleteQueries(1, &query);
+}
+
+void begin_timer(unsigned int query) { glBeginQuery(GL_TIME_ELAPSED, query); }
+
+void end_timer() { glEndQuery(GL_TIME_ELAPSED); }
+
+bool timer_ready(unsigned int query) {
+  GLint available = GL_FALSE;
+  glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
+  return available != GL_FALSE;
+}
+
+std::uint64_t timer_nanoseconds(unsigned int query) {
+  GLuint64 elapsed = 0;
+  glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed);
+  return elapsed;
+}
+
+#endif
+
 }  // namespace redgem::render_detail

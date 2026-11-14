@@ -21,6 +21,16 @@ using namespace binding;
 
 SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save is only available while a game runs"); }
 
+// What `write` returns; a key the store refused as busy (see SaveKeyBusy) is the script's error.
+template <typename Write>
+bool written(mrb_state* mrb, const Write& write) {
+  try {
+    return write();
+  } catch (const SaveKeyBusy& busy) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, busy.what());
+  }
+}
+
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
@@ -34,13 +44,14 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_value value;
   mrb_get_args(mrb, "oo", &key, &value);
   const nlohmann::json stored = json_from(mrb, value, kSaveHolder);
-  if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).where());
+  const std::string name = to_name(mrb, key);
+  if (!written(mrb, [&] { return save(mrb).set(name, stored); })) log::warning("could not write " + save(mrb).where());
   return value;
 }
 
 // Save.update(key, default = nil) { |value| new_value }: the block makes the key's new value of its
-// value (default when it has none), with no other room of a dedicated server reading or writing
-// the save meanwhile. Returns the new value.
+// value (default when it has none), with no other room of a dedicated server writing that key
+// meanwhile (rooms writing other keys go on). Returns the new value.
 mrb_value save_update(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
@@ -53,12 +64,14 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
     return json_from(mrb, made, kSaveHolder);
   };
   auto& store = save(mrb);
-  if (!store.update(to_name(mrb, key), change)) log::warning("could not write " + store.where());
+  const std::string name = to_name(mrb, key);
+  if (!written(mrb, [&] { return store.update(name, change); })) log::warning("could not write " + store.where());
   return made;
 }
 
 mrb_value save_delete(mrb_state* mrb, mrb_value) {
-  save(mrb).remove(name_arg(mrb));
+  const std::string name = name_arg(mrb);
+  written(mrb, [&] { return save(mrb).remove(name); });
   return mrb_nil_value();
 }
 

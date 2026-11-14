@@ -241,6 +241,10 @@ redgem_add_library(redgem_net
   net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
   net/rooms/relay_texts.cpp
+  net/stun/stun_message.cpp
+  net/stun/stun_probe.cpp
+  net/stun/stun_responder.cpp
+  net/stun/route_choice.cpp
   net/http/http_url.cpp
   net/http/http_message.cpp
   net/http/http_chunks.cpp
@@ -367,8 +371,11 @@ redgem_add_library(redgem_runtime
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp
+  script/engine_constants.cpp
   script/reload_ownership.cpp
   script/script_budget.cpp
+  script/script_profile.cpp
+  script/script_sampler.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp
   script/script_host_reload.cpp
@@ -435,6 +442,7 @@ redgem_add_library(redgem_runtime
   render/shadow_cascades.cpp
   render/temporal.cpp
   render/gl_extras.cpp
+  render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
@@ -508,6 +516,7 @@ redgem_add_library(redgem_runtime
   app/engine_saves.cpp
   app/engine_object_state.cpp
   app/profile_overlay.cpp
+  app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/engine_loading.cpp
@@ -550,6 +559,7 @@ if(NOT ANDROID)
     server/server_command.cpp
     server/stop_signals.cpp
     server/server_program.cpp
+    server/key_locks.cpp
     server/save_database.cpp
     server/save_database_slots.cpp
     server/room_slot.cpp
@@ -564,6 +574,7 @@ if(NOT ANDROID)
     editor/document/material_textures.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
+    editor/document/glb_dedup.cpp
     editor/document/gltf_json.cpp
     editor/document/gltf_json_entries.cpp
     editor/document/glb_geometry.cpp

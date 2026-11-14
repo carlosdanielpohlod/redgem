@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -10,9 +12,11 @@
 
 #include <sqlite3.h>
 
+#include "server/key_locks.hpp"
 #include "server/save_database.hpp"
 
 using namespace redgem;
+using redgem::server::KeyLocks;
 using redgem::server::SaveDatabase;
 
 namespace {
@@ -191,4 +195,108 @@ TEST_CASE("a database whose saves table is not the server's does not open as if 
   std::string error;
   CHECK(SaveDatabase::open(temp.database, error) == nullptr);
   CHECK(error.find("no such column") != std::string::npos);
+}
+
+namespace {
+
+// Far longer than two threads take to meet when nothing keeps them apart.
+constexpr std::chrono::seconds kMeetingPatience{5};
+constexpr std::chrono::milliseconds kPoll{1};
+constexpr int kInnerValue = 7;
+constexpr int kOuterValue = 1;
+constexpr int kHolderValue = 2;
+
+// Whether `flag` is set within kMeetingPatience.
+bool comes_up(const std::atomic<bool>& flag) {
+  const auto until = std::chrono::steady_clock::now() + kMeetingPatience;
+  while (!flag.load() && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(kPoll);
+  return flag.load();
+}
+
+// An update of `key` whose block says it began, then waits for `other` to begin too: whether it did.
+bool met_inside_update(SaveDatabase& database, const std::string& key, std::atomic<bool>& began,
+                       const std::atomic<bool>& other) {
+  bool met = false;
+  database.update(key, [&](const std::optional<nlohmann::json>&) {
+    began = true;
+    met = comes_up(other);
+    return nlohmann::json(met);
+  });
+  return met;
+}
+
+}  // namespace
+
+TEST_CASE("updates of different keys run side by side: one's block does not wait for the other's") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  std::atomic<bool> first_began{false};
+  std::atomic<bool> second_began{false};
+  bool first_met = false;
+  std::thread first([&] { first_met = met_inside_update(*database, "room-1", first_began, second_began); });
+  const bool second_met = met_inside_update(*database, "room-2", second_began, first_began);
+  first.join();
+  CHECK(first_met);
+  CHECK(second_met);
+  CHECK(*database->get("room-1") == true);
+}
+
+TEST_CASE("rooms updating their own keys and a shared one at once lose no change, in the save and its slots") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  auto slot = database->open_slot("arena");
+  std::vector<std::thread> rooms;
+  const auto add_one = [](const std::optional<nlohmann::json>& count) { return count.value_or(0).get<int>() + 1; };
+  for (int room = 0; room < kRooms; ++room) {
+    rooms.emplace_back([&, room] {
+      for (int write = 0; write < kWritesPerRoom; ++write) {
+        database->update("room-" + std::to_string(room), add_one);
+        database->update("visits", add_one);
+        slot->update("visits", add_one);
+      }
+    });
+  }
+  for (std::thread& room : rooms) room.join();
+  for (int room = 0; room < kRooms; ++room) CHECK(*database->get("room-" + std::to_string(room)) == kWritesPerRoom);
+  CHECK(*database->get("visits") == kRooms * kWritesPerRoom);
+  CHECK(*slot->get("visits") == kRooms * kWritesPerRoom);
+}
+
+TEST_CASE("a block that writes a key another room is updating is refused after a bounded wait, never deadlocks") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  std::atomic<bool> holding{false};
+  std::atomic<bool> released{false};
+  std::thread holder([&] {
+    database->update("b", [&](const std::optional<nlohmann::json>&) {
+      holding = true;
+      comes_up(released);
+      return nlohmann::json(kHolderValue);
+    });
+  });
+  REQUIRE(comes_up(holding));
+  bool refused = false;
+  const auto started = std::chrono::steady_clock::now();
+  CHECK(database->update("a", [&](const std::optional<nlohmann::json>&) {
+    CHECK_THROWS_AS(database->set("b", kInnerValue), redgem::SaveKeyBusy);
+    refused = true;
+    return nlohmann::json(kOuterValue);
+  }));
+  CHECK(std::chrono::steady_clock::now() - started >= redgem::server::kNestedKeyWait);
+  released = true;
+  holder.join();
+  CHECK(refused);
+  CHECK(*database->get("a") == kOuterValue);
+  CHECK(*database->get("b") == kHolderValue);
+}
+
+TEST_CASE("a key's lock is taken again by the thread holding it, and is gone once nobody holds it") {
+  KeyLocks locks;
+  {
+    const KeyLocks::Hold outer = locks.hold("", "coins");
+    const KeyLocks::Hold again = locks.hold("", "coins");  // (an update's block saving its own key)
+    const KeyLocks::Hold slot = locks.hold("arena", "coins");
+    CHECK(locks.size() == 2);
+  }
+  CHECK(locks.size() == 0);
 }

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "script/script_budget.hpp"
+#include "script/script_sampler.hpp"
 #include "script/ruby_reload.hpp"
 
 namespace redgem {
@@ -55,6 +56,10 @@ class RubyVm {
   std::chrono::milliseconds budget() const { return budget_.limit(); }
   // For the engine's work known to be long, which pauses it (BudgetPause).
   ScriptBudget& budget_keeper() { return budget_; }
+  // The scripts' sampling profiler: on while frame statistics are collected (Debug.profiling).
+  // Turning it on starts a fresh profile; turned off it keeps what it found.
+  void set_sampling(bool on);
+  ScriptSampler& sampler() { return sampler_; }
 
  private:
   RubyResult run_protected(mrb_protect_error_func* body, void* request);
@@ -62,7 +67,8 @@ class RubyVm {
   void finish_reload_failure();
   RubyResult failed_result(mrb_value exception, bool evaluated_source);
 
-  // (Before the interpreter, which keeps a pointer to it from its first instruction on.)
+  // (Before the interpreter, which keeps a pointer to them from its first instruction on.)
+  ScriptSampler sampler_;
   ScriptBudget budget_;
   mrb_state* mrb_;
   ReloadHooks reload_hooks_{};

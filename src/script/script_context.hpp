@@ -2,6 +2,7 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
@@ -65,6 +66,8 @@ struct ScriptContext {
   DebugDrawBuffer* debug_draw = nullptr;  // absent without a presenter; local frame commands only
   FrameProfiler* profiler = nullptr;      // borrowed from the engine; absent in standalone interpreters
   bool stats_visible = false;
+  // Where Debug.export_script_profile writes; empty when there is nowhere to.
+  std::filesystem::path script_profile_file;
   std::function<nlohmann::json(ObjectHandle)> capture_object_state;
   std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;

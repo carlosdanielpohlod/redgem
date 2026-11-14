@@ -132,7 +132,7 @@ void EditorApp::draw_side_panels(ui::PanelContext& context) {
   panel_state_.inspector.edits.end_frame(ImGui::IsAnyItemActive());
   if (!panels_.bottom) return;
   ui::draw_project(context);
-  ui::draw_console(*console_, panel_state_.console);
+  ui::draw_console(*console_, panel_state_.console, context.scripts);
 }
 
 void EditorApp::draw_hierarchy_panel(ui::PanelContext& context) {

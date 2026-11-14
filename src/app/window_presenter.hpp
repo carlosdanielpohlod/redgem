@@ -75,6 +75,7 @@ class WindowPresenter final : public Presenter {
   void present(const FrameView& view) override;
   bool open() const override;
   float frame_seconds() const override;
+  GpuTimings gpu_timings() const override { return renderer_.gpu_timings(); }
   void apply_display(const DisplaySettings& display) override;
   std::vector<SurfaceSize> display_modes() const override;
 

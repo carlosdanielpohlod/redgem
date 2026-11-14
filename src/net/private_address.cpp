@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <iterator>
 #include <sstream>
-#include <vector>
 
 #include "net/decimal_text.hpp"
 
@@ -17,6 +16,11 @@ namespace {
 constexpr std::size_t kOctets = 4;
 constexpr std::size_t kMostOctetDigits = 3;
 constexpr int kLargestOctet = 255;
+constexpr char kOctetSeparator = '.';
+constexpr unsigned kBitsPerOctet = 8;
+constexpr unsigned kFirstOctetShift = 3 * kBitsPerOctet;
+constexpr unsigned kSecondOctetShift = 2 * kBitsPerOctet;
+constexpr std::uint32_t kOctetMask = 0xFF;
 // The private ranges, by their first numbers.
 constexpr int kLoopback = 127;  // 127.x: this machine
 constexpr int kPrivateA = 10;   // 10.x
@@ -31,21 +35,6 @@ constexpr int kLinkLocalSecond = 254;
 // Azure and others (169.254.169.254, and Amazon's over IPv6), Alibaba (100.100.100.200).
 constexpr const char* kCloudMetadataAddresses[] = {"169.254.169.254", "fd00:ec2::254", "100.100.100.200"};
 
-bool is_octet(const std::string& part) {
-  return is_decimal(part, kMostOctetDigits) && std::stoi(part) <= kLargestOctet;
-}
-
-// The numbers of an IPv4 address; empty when it is not one.
-std::vector<int> octets(const std::string& numbers) {
-  std::vector<int> read;
-  std::istringstream parts(numbers);
-  for (std::string part; std::getline(parts, part, '.');) {
-    if (!is_octet(part)) return {};
-    read.push_back(std::stoi(part));
-  }
-  return read;
-}
-
 bool between(int number, int first, int last) { return number >= first && number <= last; }
 
 bool in_private_b(int first, int second) {
@@ -56,18 +45,38 @@ bool in_link_local(int first, int second) { return first == kLinkLocal && second
 // The ranges known by their first number alone.
 bool in_whole_range(int first) { return first == kLoopback || first == kPrivateA; }
 
-bool in_private_range(const std::vector<int>& address) {
-  const int first = address[0];
-  const int second = address[1];
+bool in_private_range(std::uint32_t address) {
+  const int first = first_octet(address);
+  const int second = static_cast<int>((address >> kSecondOctetShift) & kOctetMask);
   if (in_whole_range(first) || in_private_b(first, second)) return true;
   return in_private_c(first, second) || in_link_local(first, second);
 }
 
+bool is_octet(const std::string& part) {
+  return is_decimal(part, kMostOctetDigits) && std::stoi(part) <= kLargestOctet;
+}
+
+bool ends_in_separator(const std::string& numbers) { return !numbers.empty() && numbers.back() == kOctetSeparator; }
+
 }  // namespace
 
+std::optional<std::uint32_t> ipv4_number(const std::string& numbers) {
+  std::uint32_t value = 0;
+  std::size_t parts = 0;
+  std::istringstream text(numbers);
+  for (std::string part; std::getline(text, part, kOctetSeparator); ++parts) {
+    if (parts == kOctets || !is_octet(part)) return std::nullopt;
+    value = (value << kBitsPerOctet) | static_cast<std::uint32_t>(std::stoul(part));
+  }
+  if (parts != kOctets || ends_in_separator(numbers)) return std::nullopt;
+  return value;
+}
+
+int first_octet(std::uint32_t address) { return static_cast<int>(address >> kFirstOctetShift); }
+
 bool is_private_address(const std::string& numbers) {
-  const std::vector<int> address = octets(numbers);
-  return address.size() == kOctets && in_private_range(address);
+  const auto address = ipv4_number(numbers);
+  return address.has_value() && in_private_range(*address);
 }
 
 bool is_cloud_metadata_address(const std::string& numbers) {

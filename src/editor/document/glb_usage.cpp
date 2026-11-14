@@ -21,6 +21,15 @@ bool ends_with(std::string_view text, std::string_view suffix) {
 // A value of a material that may hold texture references, not too deep to be looked into.
 bool walkable(const Json& value, int depth) { return value.is_object() && depth <= kMaxMaterialDepth; }
 
+// A buffer view kept the plain way: no extension, in the file's only buffer.
+bool plain_view(const Json& view) {
+  return !view.contains(kExtensions) && view.value(kBuffer, kOnlyBuffer) == kOnlyBuffer;
+}
+
+bool inside(std::size_t offset, std::size_t length, std::size_t whole) {
+  return offset <= whole && length <= whole - offset;
+}
+
 // The entries of one of the file's lists that are used.
 template <typename Visit>
 void each_used(Json& doc, Kind kind, const Usage& usage, Visit visit) {
@@ -141,6 +150,14 @@ Json* lights_extension(Json& object) {
   if (extensions == object.end()) return nullptr;
   const auto lights = extensions->find(kLightsExtension);
   return lights != extensions->end() ? &*lights : nullptr;
+}
+
+std::pair<std::size_t, std::size_t> bytes_of(const Json& view, std::size_t bin_size) {
+  if (!plain_view(view)) throw NotFollowed();
+  const auto offset = view.value(kByteOffset, std::size_t{0});
+  const auto length = view.at(kByteLength).get<std::size_t>();
+  if (!inside(offset, length, bin_size)) throw NotFollowed();
+  return {offset, offset + length};
 }
 
 Json* holder_of(Json& doc, Kind kind) { return kind == kLightKind ? lights_extension(doc) : &doc; }

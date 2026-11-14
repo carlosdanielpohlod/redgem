@@ -148,7 +148,7 @@ the same pull request.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
-  `Debug` shapes a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
+  `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
 ## Editor
@@ -158,11 +158,15 @@ the same pull request.
   animations, and a few hundred bytes of description per object still stay until the editor is
   closed.
 - In Docker the editor has no sound.
-- A pasted object carries its own copy of its meshes and pictures, even in the scene it was copied
-  from (Duplicate shares them). A copy bigger than 64 MB pastes only in the editor window it was
-  copied in.
-- Importing the same model twice appends its meshes and textures again, and deleting an import
-  leaves its data in the scene's file (only pictures no material shows are dropped on save).
+- A pasted object carries its own copy of its meshes and pictures in memory, even in the scene it
+  was copied from (Duplicate shares them); the saved file stores the repeated data once. A copy
+  bigger than 64 MB pastes only in the editor window it was copied in.
+- Repeated data is merged when the scene is saved, not when it is imported: a model imported
+  twice holds two copies in the editor's memory (and on the graphics card) until the scene is
+  opened again. Only identical bytes, accessors, pictures, samplers and textures are merged;
+  materials and meshes stay one per import, so the Inspector edits each import apart. A scene whose
+  glTF uses extensions that point at its data in ways of their own (compressed meshes, GPU
+  instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
 - Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
@@ -211,8 +215,7 @@ not a promise of how it will be closed.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
-  existing blocks keep their old code. The script editor has no autocomplete, and console
-  backtraces do not jump to their lines.
+  existing blocks keep their old code. The script editor has no autocomplete.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
 - Scene recovery writes a separate copy at safe editing boundaries about once a minute. It is
@@ -289,9 +292,17 @@ not a promise of how it will be closed.
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
   Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
-- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay and immediate
-  world-space lines/wire boxes. World-space labels, GPU timing and per-function sampling remain
-  future work.
+- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
+  world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
+  GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
+  (Android) and the editor's Play show none. GPU time is
+  split into three coarse passes (prepare, scene, post), not per shadow cascade or effect. The
+  script sampler only samples while Ruby runs instructions: time inside the engine's own
+  functions counts for the Ruby method that called them, and Ruby blocks count for the method
+  that made them. It samples the running fiber's stack only (its innermost 64 frames) and keeps
+  at most 1024 distinct methods. A class collected while profiling whose memory is reused by a
+  new class can lend it its name until profiling starts again. Labels are not drawn without a main camera, and are not
+  hidden behind objects.
 
 ### Safety
 
@@ -308,8 +319,9 @@ not a promise of how it will be closed.
   the app's files and to `adb logcat`, and the next run only says so in its log. The report's
   backtrace on Android is what the unwinder could walk from the signal handler, after the address
   the crash happened at.
-- The scripts' time budget stops Ruby code only: one call of the engine's own that takes long
-  (a huge `Array#sort`, a request to the engine for millions of things) is not cut off, and the
+- The scripts' time budget counts the time spent in the engine's functions, but it stops Ruby
+  code only: one call of the engine's own that takes long (a huge `Array#sort`, a request to the
+  engine for millions of things) runs to its end, and the script is stopped right after it. The
   budget is wall time: a call paused in a debugger for longer than it is stopped when it resumes.
 
 ### Security
@@ -320,8 +332,11 @@ not a promise of how it will be closed.
   networks (only the clouds' known metadata addresses are refused).
 - On Windows a server's save database takes its folder's permissions: it is kept to its owner
   only on Linux and macOS.
-- A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
-  engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
+- A script that sets one of the engine's top-level constants to something else (`Vector3 = 5`)
+  or removes it gets an error and the constant is put back, but only once its code has run: the
+  file's top-level code, the console line, or (for a method that does it) the frame's updates.
+  Until then, the engine's calls that use the name fail with Ruby errors. Constants inside the
+  engine's classes and modules (`Input::PLAYERS`) are not watched.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
   the relay and server integration tests), the socket layer or the web requests' TLS stream on
   its own (only through requests; game connections' TLS is tested over loopback sockets only);
@@ -375,10 +390,13 @@ not a promise of how it will be closed.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
-- A connection's buffers never give memory back once grown, and copy what is left on every
-  partial send (`frame_buffer.cpp`, `socket_io.cpp`).
-- `Save.update`'s block runs under one lock for the whole database, which every room of a
-  dedicated server shares: a slow block holds up the saves of all rooms.
+- A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
+  receive buffer gives memory back after a large message, down to 64 KiB.
+- On a dedicated server, `Save.update`'s block holds its key's lock: a slow block holds up the
+  other rooms' writes of that key (not of others). A block that writes a second key another room
+  is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
+  then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
+  runs while another room clears the save writes its key back afterwards.
 - The threads of web requests are detached: one still running at exit may outlive the program's
   static objects.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
@@ -413,7 +431,23 @@ not a promise of how it will be closed.
 - Clients own the positions of their objects and decide their own collisions: a server cannot
   check movement, so a modified client can move anywhere.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
-  connection through home routers (no STUN or hole punching).
+  connection through home routers yet. The engine has the pieces, not the path through them: the
+  relay answers STUN on its UDP port (a game can learn the public address its router gives it),
+  and a joining machine can try direct routes before the relay (`RouteChooser`), but no game asks
+  either yet: the relay does not pass a host's public address to who joins its room, and
+  `Network` does not use them. The ceiling, even once wired: game connections are TCP, and STUN
+  maps a UDP port (routers map TCP apart), so what STUN finds is the host's public address, not
+  a TCP port anyone can reach. A direct route only connects where the host's router lets
+  connections in (a forwarded port, UPnP done by hand). TCP hole punching (simultaneous open) is
+  not done: routers handle it unevenly, and both ends would have to agree on which is the TLS
+  client. Everyone else plays through the relay, as now.
+- The relay's STUN answers are IPv4 only, unauthenticated (no MESSAGE-INTEGRITY or FINGERPRINT)
+  and only as fast as the relay wakes: about once a second while no TCP traffic arrives, 64
+  requests a wake at most (a game asks again every half second for five seconds). Its UDP port is
+  not limited per address; an answer is 32 bytes for a request of at least 20, and none goes to
+  a broadcast or multicast address, little to bounce traffic with. Behind something that proxies
+  UDP (Docker's userland proxy, rootless Docker), the relay sees the proxy's address and names
+  that instead of the player's.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,

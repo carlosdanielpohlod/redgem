@@ -20,6 +20,10 @@ class ScriptEditor {
   const std::filesystem::path& scripts_dir() const { return scripts_dir_; }
 
   std::string& text() { return text_; }
+  void show_line(std::size_t line);
+  void age_line_request();
+  std::size_t line_request() const { return line_request_; }
+  void finish_line_request() { line_request_ = 0; }
   bool modified() const { return text_ != saved_text_; }
   // The text's Ruby tokens, for coloring it (worked out again only after the text changed).
   const RubyHighlight& highlight() { return highlight_.of(text_); }
@@ -49,6 +53,8 @@ class ScriptEditor {
   std::string syntax_error_;
   std::filesystem::file_time_type disk_time_{};  // of the file when it was last read or written here
   bool changed_on_disk_ = false;
+  std::size_t line_request_ = 0;
+  int line_frames_left_ = 0;
   RubyHighlightCache highlight_;
   RubyVm vm_;
 };

@@ -178,6 +178,11 @@ RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)) {
 
 void RubyVm::set_budget(std::chrono::milliseconds budget) { budget_.set_limit(budget); }
 
+void RubyVm::set_sampling(bool on) {
+  sampler_.set_enabled(on);
+  budget_.set_sampler(on ? &sampler_ : nullptr);
+}
+
 // What went wrong, as Ruby tells it: the exception inspected, then where it came from.
 std::string RubyVm::describe_exception(mrb_value exception) {
   mrb_bool failed = false;
@@ -224,6 +229,7 @@ void RubyVm::finish_reload_failure() {
 }
 
 RubyVm::~RubyVm() {
+  budget_.set_sampler(nullptr);
   budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
   reload_ownership_.reset();
   mrb_close(mrb_);

@@ -7,6 +7,10 @@ add_executable(redgem_tests
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
+  unit/script_profile_test.cpp
+  unit/profile_overlay_test.cpp
+  unit/gpu_timers_test.cpp
+  unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/clock_test.cpp
@@ -75,6 +79,7 @@ add_executable(redgem_tests
   unit/gltf_json_test.cpp
   unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
+  unit/glb_dedup_test.cpp
   unit/glb_usage_test.cpp
   unit/undo_history_test.cpp
   unit/model_import_test.cpp
@@ -153,6 +158,9 @@ add_executable(redgem_tests
   unit/network_event_test.cpp
   unit/byte_allowance_test.cpp
   unit/relay_program_test.cpp
+  unit/stun_message_test.cpp
+  unit/stun_probe_test.cpp
+  unit/route_choice_test.cpp
   unit/room_choice_test.cpp
   unit/tick_pacer_test.cpp
   unit/server_command_test.cpp
@@ -196,6 +204,7 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
+  integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
@@ -224,6 +233,7 @@ add_executable(redgem_tests
   integration/encrypted_connection_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
+  integration/route_choice_socket_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp

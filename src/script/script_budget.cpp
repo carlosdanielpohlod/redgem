@@ -12,6 +12,7 @@
 #include "core/coarse_clock.hpp"
 #include "core/engine_thread.hpp"
 #include "script/script_config.hpp"
+#include "script/script_sampler.hpp"
 
 namespace redgem {
 namespace {
@@ -142,13 +143,23 @@ void ScriptBudget::attach(mrb_state* mrb, RClass* timeout_class) {
 void ScriptBudget::set_limit(Milliseconds limit) {
   limit_ms_.store(limit.count(), std::memory_order_relaxed);
   const bool limited = limit.count() > 0;
-  // (Set here, on the interpreter's own thread, and never from another.)
-  mrb_->code_fetch_hook = limited ? budget_hook : nullptr;
+  refresh_hook();
   if (limited) {
     Watchdog::instance().add(this);
   } else {
     Watchdog::instance().remove(this);
   }
+}
+
+void ScriptBudget::set_sampler(ScriptSampler* sampler) {
+  sampler_ = sampler;
+  refresh_hook();
+}
+
+// (Set here, on the interpreter's own thread, and never from another.)
+void ScriptBudget::refresh_hook() {
+  const bool watched = limit().count() > 0 || sampler_ != nullptr;
+  mrb_->code_fetch_hook = watched ? budget_hook : nullptr;
 }
 
 void ScriptBudget::push(bool limited) {
@@ -251,6 +262,7 @@ void ScriptBudget::raise(mrb_state* mrb, const mrb_code* pc, const Frame& frame,
 
 void budget_hook(mrb_state* mrb, const mrb_irep*, const mrb_code* pc, mrb_value*) {
   auto* budget = static_cast<ScriptBudget*>(mrb->allocf_ud);
+  if (ScriptSampler* sampler = budget->sampler()) sampler->on_instruction(mrb);
   if (budget->stop_requested()) budget->on_stop_request(mrb, pc);
 }
 

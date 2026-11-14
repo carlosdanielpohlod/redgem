@@ -34,6 +34,7 @@ constexpr const char* kKeys = "SELECT key FROM saves WHERE json_valid(value) ORD
 constexpr int kKeyPlace = 1;
 constexpr int kValuePlace = 2;
 constexpr int kFirstColumn = 0;
+constexpr const char* kSaveItself = "";  // the slot the save's own keys are locked under
 
 bool executed(sqlite3* database, const char* sql) {
   return sqlite3_exec(database, sql, nullptr, nullptr, nullptr) == SQLITE_OK;
@@ -131,11 +132,13 @@ std::optional<nlohmann::json> SaveDatabase::get(const std::string& key) {
 bool SaveDatabase::set(const std::string& key, const nlohmann::json& value) {
   if (value.is_null()) return remove(key);
   const std::string text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+  const KeyLocks::Hold writing = key_locks_.hold(kSaveItself, key);
   const std::lock_guard<std::recursive_mutex> hold(lock_);
   return write_.use().bind(kKeyPlace, key).bind(kValuePlace, text).run();
 }
 
 bool SaveDatabase::remove(const std::string& key) {
+  const KeyLocks::Hold writing = key_locks_.hold(kSaveItself, key);
   const std::lock_guard<std::recursive_mutex> hold(lock_);
   return remove_.use().bind(kKeyPlace, key).run();
 }
@@ -154,8 +157,9 @@ std::vector<std::string> SaveDatabase::keys() {
 }
 
 bool SaveDatabase::update(const std::string& key, const Change& change) {
-  // (The change runs under the lock: no other room reads or writes meanwhile.)
-  const std::lock_guard<std::recursive_mutex> hold(lock_);
+  // (The change runs under the key's lock only: no other room writes this key meanwhile, and the
+  // set inside takes it again on the same thread.)
+  const KeyLocks::Hold updating = key_locks_.hold(kSaveItself, key);
   return set(key, change(get(key)));
 }
 

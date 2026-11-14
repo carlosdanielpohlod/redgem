@@ -137,6 +137,19 @@ ImVec4 code_color(RubyTokenKind kind) {
   return palette::kText;
 }
 
+bool has_target_line(std::size_t line, std::size_t count) { return line != 0 && count != 0; }
+
+bool scroll_code_to_line(ImGuiID input_id, std::size_t line, std::size_t line_count) {
+  if (!has_target_line(line, line_count)) return false;
+  ImGuiWindow* box = text_box(input_id);
+  if (!shows_text(box)) return false;
+  if (box->InnerRect.GetHeight() <= 0.0f) return false;
+  const float line_y = static_cast<float>(std::min(line, line_count) - 1) * ImGui::GetFontSize();
+  constexpr float kCenter = 0.5f;
+  ImGui::SetScrollY(box, std::max(0.0f, line_y - box->InnerRect.GetHeight() * kCenter));
+  return true;
+}
+
 void draw_code_colors(ImGuiID input_id, const std::string& code, const RubyHighlight& highlight) {
   ImGuiWindow* box = text_box(input_id);
   if (!shows_text(box)) return;
