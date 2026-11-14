@@ -37,6 +37,12 @@ until 1.0, a release may change what games rely on (see
   them by name: `face.morph(:Smile, 0.7)`, `face.morph(:Smile)`, `face.morph_names`. Imported
   models keep their shape keys in the editor.
 
+- **Smaller scene files**: saving writes repeated data once (a model imported or pasted twice
+  stores its vertices, pictures and textures once, found by content) and leaves out what no object
+  uses, including a deleted import's meshes and materials. Only the written file changes: undo
+  after a save still brings back everything. Each save that leaves something out logs how many
+  bytes, and `redgem scene compact <game>` rewrites a scene that way from the command line.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
