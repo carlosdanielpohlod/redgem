@@ -43,6 +43,11 @@ inline constexpr const char* kFrameTexels = "frameTexels";
 // The vertex attribute a copy of a mesh finds its record by (see instance_records.hpp).
 inline constexpr const char* kInstanceSlot = "instanceSlot";
 inline constexpr const char* kSkinned = "skinned";
+// A mesh part's shape keys (see morph_shapes.hpp): the texture of every part's deltas, where the
+// part's start in it, and how many vertices the part has.
+inline constexpr const char* kMorphTexels = "morphTexels";
+inline constexpr const char* kMorphFirst = "morphFirst";
+inline constexpr const char* kMorphVertices = "morphVertices";
 inline constexpr const char* kReflectionMap = "reflectionMap";
 inline constexpr const char* kReflectionStrength = "reflectionStrength";
 inline constexpr const char* kFaceForward = "faceForward";

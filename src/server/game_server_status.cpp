@@ -5,7 +5,6 @@
 #include "core/log.hpp"
 #include "net/traffic.hpp"
 #include "server/game_server.hpp"
-#include "server/tick_pacer.hpp"
 
 namespace redgem::server {
 
@@ -23,7 +22,7 @@ bool GameServer::open_status(std::string& error) {
 ServerStatus GameServer::status() const {
   ServerStatus status;
   status.engine_version = crash::engine_version();
-  status.uptime_seconds = steady_seconds() - started_at_;
+  status.uptime_seconds = clock().now() - started_at_;
   status.max_rooms = settings_.limits.max_rooms;
   status.max_players = settings_.limits.max_players;
   status.tick_seconds = config::kFixedDeltaSeconds;
@@ -37,7 +36,7 @@ ServerStatus GameServer::status() const {
 void GameServer::log_status() const { log::info(status_line(status())); }
 
 void GameServer::report(float seconds) {
-  traffic_.note(steady_seconds(), net::traffic_totals());
+  traffic_.note(clock().now(), net::traffic_totals());
   status_port_.serve(seconds, [this] { return status_json(status()).dump(); });
   log_when_due(seconds);
 }

@@ -79,6 +79,9 @@ class RelayServer {
   // does by the clock, letting silent machines go and asking the quiet ones if they are there,
   // still needs calling now and then). True when it was not the time that ended the wait.
   bool wait(float seconds) const;
+  // The longest wait(`seconds`) sleeps: `seconds`, or less while the relay rests from a newcomer it
+  // could not take (see kAcceptRestSeconds), whose call does not end a wait meanwhile.
+  float sleep_seconds(float seconds) const;
 
   std::size_t room_count() const { return rooms_.size(); }
   std::size_t connection_count() const { return members_.size(); }
@@ -117,6 +120,8 @@ class RelayServer {
     bool left_untold() const { return connection.closed() && !farewelled; }
   };
   void accept_newcomers();
+  // Whether it rests from newcomers now (see kAcceptRestSeconds).
+  bool resting() const { return accept_rest_ > 0.0f; }
   // Whether one more machine from `address` may connect.
   bool room_for(const std::string& address) const;
   int connections_from(const std::string& address) const;

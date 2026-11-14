@@ -58,6 +58,7 @@ struct SeeThroughDraw {
   int mesh = 0;
   std::size_t first = 0;
   std::size_t count = 0;
+  bool mirrored = false;  // drawn with clockwise front faces (see InstanceBatch)
 };
 // The farthest first, so that each is mixed over what lies behind it; at the same distance, in
 // the order they came.
