@@ -60,6 +60,8 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_collision_enter(other)`: this object's body touched another
 - `on_collision_exit(other)`: this object's body stopped touching another
 - `on_destroy`: the object is being destroyed
+- `Behaviour.persist(*fields)`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
+- `Behaviour.persisted_fields`: what persist named, in this class and those above it
 - `game_object`: the object this behaviour is attached to
 - `name`: the object's name
 - `transform`: the object's Transform
@@ -679,8 +681,13 @@ What the game keeps between runs. See [online-services.md#saving-on-a-server](on
 - `Save.slot`: the selected save slot name; default keeps the existing save file
 - `Save.slot = name`: selects a named slot for this engine; default restores the original store
 - `Save.slots`: sorted names of persisted slots and slots opened in this run, including default
+- `Save.version`: the version of the saved data this game writes, or nil
+- `Save.version = number`: declares that version (1 or more): older slots are migrated, newer ones refused
+- `Save.migrate(from:, &block)`: the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one
+- `Save.checkpoint(key = :checkpoint)`: keeps this scene's spawned objects whose behaviours persist fields; returns how many
+- `Save.restore_checkpoint(key = :checkpoint)`: spawns them again in place of the current ones; returns the new copies
 
-Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata.
+Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Each slot records the Save.version that wrote it: the first use of a slot (or Save.slot =) runs the migration hooks it needs, in order, and writes the result back at once; a slot from a newer game, or one a hook raised on, is left untouched and every use of it raises a RuntimeError saying why (Save.slot = then keeps the previous slot). A slot written before the game declared a version counts as version 1.
 
 ## HTTP
 
