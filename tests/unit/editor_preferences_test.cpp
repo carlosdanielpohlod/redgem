@@ -80,6 +80,36 @@ TEST_CASE("invalid editor preferences are refused before writing") {
   }
 }
 
+TEST_CASE("editor interface scale can be persisted and cleared independently of camera settings") {
+  constexpr float kManualScale = 1.5f;
+  const Scratch scratch;
+  const EditorPreferences defaults;
+  auto manual = defaults;
+  manual.interface_scale = kManualScale;
+  std::string error;
+  REQUIRE(write_editor_preferences(scratch.file, defaults, manual, error));
+  auto camera = defaults;
+  camera.fly_speed = kFly;
+  REQUIRE(write_editor_preferences(scratch.file, defaults, camera, error));
+  CHECK(read_editor_preferences(scratch.file).interface_scale == kManualScale);
+  REQUIRE(write_editor_preferences(scratch.file, manual, defaults, error));
+  CHECK_FALSE(read_editor_preferences(scratch.file).interface_scale.has_value());
+  CHECK(read_editor_preferences(scratch.file).fly_speed == kFly);
+  CHECK_FALSE(read_json_file(scratch.file).contains("interface_scale"));
+}
+
+TEST_CASE("an out of range interface scale falls back to automatic and cannot be saved") {
+  const Scratch scratch;
+  std::filesystem::create_directories(scratch.folder);
+  const EditorPreferences defaults;
+  auto invalid = defaults;
+  invalid.interface_scale = 0.0f;
+  std::string error;
+  REQUIRE(write_text_file(scratch.file, R"({"interface_scale":0})", error));
+  CHECK_FALSE(read_editor_preferences(scratch.file).interface_scale.has_value());
+  CHECK_FALSE(write_editor_preferences(scratch.file, defaults, invalid, error));
+}
+
 TEST_CASE("an editor preferences save preserves a damaged file and refuses a directory") {
   const Scratch scratch;
   const EditorPreferences defaults;

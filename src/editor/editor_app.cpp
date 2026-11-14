@@ -44,8 +44,8 @@ std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const st
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   app->session_ = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   app->scripts_ = std::make_unique<ScriptWorkspace>(game_dir / config::kScriptsDirName);
-  app->apply_preferences(read_editor_preferences(editor_preferences_file()));
   app->open_window(options.gpu, std::move(options.clock));
+  app->apply_preferences(read_editor_preferences(editor_preferences_file()));
   app->make_agent_panel(options.agent);
   log::info("editing " + app->session_->document().path().string());
   return app;
