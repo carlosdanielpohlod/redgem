@@ -87,7 +87,12 @@ Test fixtures are regenerated with
 
 ## Continuous integration
 
-Every pull request runs these workflows (`.github/workflows/`), side by side:
+Every push to main runs these workflows (`.github/workflows/`), side by side. A pull request runs
+Linux, Windows, Android and AddressSanitizer only: the runners a repository gets at once are few,
+and every push to every pull request asks for them. Add the `full-ci` label to a pull request to
+run the rest on it too (macOS, ThreadSanitizer, coverage, benchmarks and fuzzing), for a change
+that touches what only they see (threads, Mac code, a parser, a hot loop). Whatever a pull request
+skipped still runs on main after the merge.
 
 * **Linux** (`linux.yml`): the build, every test (the system tests in windows drawn by Mesa's
   software renderer on a virtual display) and every linter.
@@ -107,7 +112,7 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
 * **Benchmarks** (`bench.yml`): the benchmarks and the server load test below, on Linux, in a job
   of its own that builds only what it runs. It fails when a result clearly passes its ceiling.
 
-* **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on a pull request, ten minutes
+* **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on main and on a `full-ci` pull request, ten minutes
   each every night.
 
 * **Release** (`release.yml`): only on a `release-*` pull request, a pushed `v*` tag or a run
@@ -138,8 +143,9 @@ The parsers of what comes from outside have fuzz targets in `tests/fuzz/` (`fuzz
 `gltf` (the glTF loader), `image_header` (PNG, JPEG, WebP and Radiance headers, Radiance and small
 WebP pictures decoded), `wire` (MessagePack messages and the frames they travel in),
 `http_response` (answers of web servers, in pieces), `json_scanner` (the custom properties of
-a scene's objects) and `game_archive` (a built game's `game.rgpak`: its header, its table and every
-file it lists, inflated and checked). With clang, libFuzzer makes up inputs for them:
+a scene's objects), `game_archive` (a built game's `game.rgpak`: its header, its table and every
+file it lists, inflated and checked) and `stun` (STUN Binding requests and answers, read as a
+relay and a game read them). With clang, libFuzzer makes up inputs for them:
 
 ```bash
 cmake -S . -B build-fuzz -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
