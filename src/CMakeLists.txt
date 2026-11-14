@@ -49,6 +49,10 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_interactions.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interactable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interaction.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interactor.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -192,6 +196,7 @@ redgem_add_library(redgem_core
   core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
+  core/frame_budget.cpp
   core/frame_profiler.cpp
   core/stopwatch.cpp
   core/clock.cpp)
@@ -548,6 +553,7 @@ redgem_add_library(redgem_runtime
   app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
+  app/scene_activation.cpp
   app/scene_bodies.cpp
   app/scene_joints.cpp
   app/scene_water.cpp

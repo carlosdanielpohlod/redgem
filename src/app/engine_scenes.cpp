@@ -3,7 +3,9 @@
 
 #include "app/engine.hpp"
 
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "app/scene_bodies.hpp"
 #include "app/scene_joints.hpp"
@@ -16,14 +18,23 @@ namespace redgem {
 
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
+std::unique_ptr<PhysicsWorld> Engine::new_physics_world() const {
+  return create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
+}
+
 void Engine::make_bodies() {
   physics_.reset();  // (the old world's memory goes first: a large world is never held twice)
-  physics_ = create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
+  physics_ = new_physics_world();
   bodies::create_all({scene_, scene_desc_}, *physics_);
+  settle_world();
+}
+
+void Engine::settle_world() {
   joints::create_all({scene_, scene_desc_}, *physics_, context_.scene_joints);
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
+  find_water();
   navigation_.forget();  // the grid was the old scene's
   if (navigation_.settings().bake_on_load) bake_navigation();
+  context_.physics = physics_.get();
 }
 
 void Engine::bake_navigation() {
@@ -50,29 +61,35 @@ void Engine::switch_scene_if_asked() {
 }
 
 void Engine::switch_to(const std::string& name, SceneDesc desc) {
+  SceneActivation incoming(name, std::move(desc), new_physics_world(), reserve_generation());
+  incoming.make_all_bodies();
+  switch_to(incoming);
+}
+
+void Engine::switch_to(SceneActivation& incoming) {
   // The Ruby VM survives (globals, loaded classes); the objects, bodies and behaviours do not.
   scripts_->reset_scene();
   scripts_->scene_was_reset();
-  replace_world(std::move(desc));
-  context_.scene_name = name;
-  ++scene_generation_;
+  install_world(incoming);
+  context_.scene_name = incoming.name();
+  scene_generation_ = incoming.generation();
   animations_.reset(scene_desc_.animations, scene_);
   particles_.clear();
   particle_emitters_.clear();
+  // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
-  scripts_->run_scene_script(name);
+  scripts_->run_scene_script(incoming.name());
   network_watch_.restart();  // the time the scene took to load is not the network's
 }
 
-void Engine::replace_world(SceneDesc desc) {
+void Engine::install_world(SceneActivation& incoming) {
   runtime_prefabs_.clear();
   runtime_prefab_bytes_ = 0;
-  scene_desc_ = std::move(desc);
-  scene_ = Scene::from_desc(scene_desc_);
+  scene_desc_ = std::move(incoming.desc());
+  scene_ = std::move(incoming.scene());
+  physics_ = incoming.take_physics();
   water_.reset(scene_desc_);
-  make_bodies();
-  find_water();
-  context_.physics = physics_.get();
+  settle_world();
 }
 
 void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {

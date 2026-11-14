@@ -94,6 +94,21 @@
           "about": "the object is being destroyed"
         },
         {
+          "name": "on_interact",
+          "args": "actor",
+          "about": "an actor used this object (it has an Interactable; on the host in a game over the network)"
+        },
+        {
+          "name": "on_focus",
+          "args": "actor",
+          "about": "this object became what an actor's interaction prompt is for"
+        },
+        {
+          "name": "on_blur",
+          "args": "actor",
+          "about": "it stopped being what that prompt is for"
+        },
+        {
           "name": "persist",
           "static": true,
           "params": [
@@ -3524,7 +3539,7 @@
           "about": "the version in game.json (\"1.2.0\"), or nil"
         }
       ],
-      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nOnly file reading and glTF parsing happen on the worker. Physics creation, script setup, texture\ndecoding and GPU upload still happen on the owning thread and may hitch during activation. The\nold and incoming scene coexist in memory during reading. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then show exactly one\nloading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the\nbackground reader even in fixed-step mode; activation still runs on the server loop and can stall\nother rooms sharing that loop. Closing the process waits for an active parser to return.",
+      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nFile reading, glTF parsing and, for a game shown in a window, picture decoding happen on the\nworker. The scene read is then made ready over the next loading frames while the old one is still\nshown: its physics bodies are made in batches of about 4 ms a frame, its textures and meshes go to\nthe graphics card about 8 MiB a frame, and the swap happens once all of it is ready. Every script\nof the new scene starts in that one frame, so a behaviour's first update sees the complete level.\nCreating the scene's objects, its water and its navigation bake still take one frame each. The old\nand incoming scene coexist in memory until the swap. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then make the scene ready\nall at once after exactly one loading frame, so completion depends neither on thread scheduling\nnor on the real clock. Networked runs and dedicated-server rooms keep the background reader and\nthe spread activation even in fixed-step mode; a dedicated server's rooms share their loop. Closing the process waits for an active parser to return.",
       "guide": "gameplay.md#a-loading-screen"
     },
     {
@@ -4879,6 +4894,144 @@
         "watch_afresh"
       ],
       "guide": "multiplayer.md#objects-in-the-same-place-everywhere"
+    },
+    {
+      "name": "Interactable",
+      "about": "A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).",
+      "methods": [
+        {
+          "name": "all",
+          "static": true,
+          "about": "every Interactable of the scene"
+        },
+        {
+          "name": "prompt",
+          "about": "the I18n key of its prompt, or nil for the engine's \"Interact\""
+        },
+        {
+          "name": "prompt=",
+          "args": "key",
+          "about": "changes the prompt"
+        },
+        {
+          "name": "prompt_text",
+          "about": "the prompt in the language in use"
+        },
+        {
+          "name": "range",
+          "about": "meters from the actor it can be used from (2 unless said)"
+        },
+        {
+          "name": "range=",
+          "args": "meters",
+          "about": "changes the range"
+        },
+        {
+          "name": "priority",
+          "about": "of those in reach, the highest wins (0 unless said)"
+        },
+        {
+          "name": "priority=",
+          "args": "value",
+          "about": "changes the priority"
+        },
+        {
+          "name": "enabled?",
+          "about": "whether it can be picked"
+        },
+        {
+          "name": "enabled=",
+          "args": "flag",
+          "about": "false: never picked"
+        },
+        {
+          "name": "angle",
+          "about": "degrees off the actor's forward it may be at; nil for any direction"
+        },
+        {
+          "name": "angle=",
+          "args": "degrees",
+          "about": "changes the angle (nil: any direction)"
+        }
+      ],
+      "internal": [
+        "number",
+        "on_destroy",
+        "registered",
+        "start"
+      ],
+      "guide": "interaction.md"
+    },
+    {
+      "name": "Interactor",
+      "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
+      "methods": [
+        {
+          "name": "target",
+          "about": "the Interactable in focus, or nil"
+        },
+        {
+          "name": "use",
+          "about": "uses what is in focus now; false when nothing is"
+        },
+        {
+          "name": "pad",
+          "about": "the player whose :interact it reads (0 unless said)"
+        },
+        {
+          "name": "prompt_label",
+          "args": "target",
+          "about": "what the prompt says for a target: \"[E] Open\""
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "update"
+      ],
+      "guide": "interaction.md"
+    },
+    {
+      "name": "Interaction",
+      "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",
+      "methods": [
+        {
+          "name": "on",
+          "static": true,
+          "args": "event, &block",
+          "about": "|actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)"
+        },
+        {
+          "name": "interact",
+          "static": true,
+          "args": "actor, target",
+          "about": "the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client"
+        },
+        {
+          "name": "best_for",
+          "static": true,
+          "args": "actor, candidates = Interactable.all, lenient: false",
+          "about": "the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)"
+        },
+        {
+          "name": "reachable?",
+          "static": true,
+          "args": "actor, target, lenient: false",
+          "about": "whether an actor can use a target now: enabled, in range, in front, in sight"
+        },
+        {
+          "name": "distance",
+          "static": true,
+          "args": "actor, target",
+          "about": "meters from an actor to a target"
+        },
+        {
+          "name": "angle_to",
+          "static": true,
+          "args": "actor, target",
+          "about": "degrees between where the actor faces and where the target is, across the ground"
+        }
+      ],
+      "guide": "interaction.md"
     }
   ]
 }
