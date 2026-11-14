@@ -32,12 +32,14 @@ void warn_of_unusable(const GameManifest& manifest) {
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
   for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
   for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
+  for (const std::string& warning : manifest.ui_warnings) log::warning(warning);
 }
 
 // What the game's scripts are told of what game.json says.
 void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
+  context.ui_reference = settings.ui;
 }
 
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long

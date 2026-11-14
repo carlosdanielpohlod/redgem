@@ -32,7 +32,7 @@ class GameMenu < Behaviour
   RUNNING = 1.0
   FROZEN = 0.0
   LAST = -1                   # where an option is added unless said: after the others
-  REFERENCE_HEIGHT = 720      # the screen height the sizes above are for: a shorter one shrinks them
+  REFERENCE_HEIGHT = 720      # the interface's height (UI.height) the sizes above are for
 
   # The name of the open screen; nil while the game goes on.
   attr_reader :screen
@@ -114,9 +114,14 @@ class GameMenu < Behaviour
     [(UI.width - width) / 2, y, width, height]
   end
 
-  # How much smaller than their sizes the menu's things are drawn: on a screen shorter than
-  # REFERENCE_HEIGHT, as much shorter (never larger; as they are where there is no screen).
-  def scale = UI.height.positive? ? [UI.height.to_f / REFERENCE_HEIGHT, 1.0].min : 1.0
+  # How much larger than their sizes the menu's things are, in the interface's units (which grow
+  # with the screen, see UI.scale): as the game's reference is taller than REFERENCE_HEIGHT, or as
+  # the screen is, in units, when it is shorter (a player's large Settings.ui_scale, a reference
+  # that is matched by its width), so that the menu always fits. As they are where there is no screen.
+  def scale
+    room = [UI.reference[1], UI.height].select(&:positive?).min
+    room ? room.to_f / REFERENCE_HEIGHT : 1.0
+  end
 
   # A size of the menu's, as it is drawn on this screen.
   def scaled(size) = (size * scale).to_i

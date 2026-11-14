@@ -3,6 +3,7 @@
 
 #include "render/renderer_impl.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -35,6 +36,11 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
+// A side of an image drawn at its own size, in pixels at the interface's scale: never less than one.
+int scaled_side(int side, float scale) {
+  return std::max(1, static_cast<int>(std::lround(static_cast<float>(side) * scale)));
+}
+
 bool is_clip(HudItem::Kind kind) { return kind == HudItem::Kind::Clip || kind == HudItem::Kind::Unclip; }
 
 // Cuts what follows to the item's box (Clip), or stops cutting it (Unclip); returns whether it is cut.
@@ -54,9 +60,10 @@ unsigned char control_alpha(ControlCircle::Look look) {
 
 }  // namespace
 
+// Drawn from the face's atlas made nearest above its size: its letters are never stretched.
 void Renderer::Impl::draw_hud_text(const HudItem& item) {
   const float size = static_cast<float>(item.size);
-  DrawTextEx(ui_fonts.get(item.font, item.text), item.text.c_str(),
+  DrawTextEx(ui_fonts.get(item.font, item.text, item.size), item.text.c_str(),
              {static_cast<float>(item.x), static_cast<float>(item.y)}, size, size * kUiLetterSpacing,
              to_raylib(item.color));
 }
@@ -64,7 +71,8 @@ void Renderer::Impl::draw_hud_text(const HudItem& item) {
 void Renderer::Impl::draw_hud_image(const HudItem& item) {
   const Texture2D* picture = ui_image(item.text);
   if (picture == nullptr) return;
-  const render_math::Size size = render_math::image_size(item.width, item.height, picture->width, picture->height);
+  const render_math::Size size = render_math::image_size(
+      item.width, item.height, scaled_side(picture->width, item.scale), scaled_side(picture->height, item.scale));
   DrawTexturePro(*picture, {0.0f, 0.0f, static_cast<float>(picture->width), static_cast<float>(picture->height)},
                  {static_cast<float>(item.x), static_cast<float>(item.y), size.width, size.height}, {0.0f, 0.0f}, 0.0f,
                  to_raylib(item.color));
@@ -99,16 +107,16 @@ void Renderer::draw_hud(const std::vector<HudItem>& hud) {
 
 int Renderer::text_width(const std::string& text, int size) const {
   const float text_size = static_cast<float>(size);
-  return static_cast<int>(
-      std::ceil(MeasureTextEx(impl_->ui_fonts.get("", text), text.c_str(), text_size, text_size * kUiLetterSpacing).x));
+  return static_cast<int>(std::ceil(
+      MeasureTextEx(impl_->ui_fonts.get("", text, size), text.c_str(), text_size, text_size * kUiLetterSpacing).x));
 }
 
 int Renderer::font_text_width(const std::string& text, int size, const std::string& font,
                               const std::filesystem::path& folder) const {
   impl_->ui_fonts.set_directory(folder);
   const float pixels = static_cast<float>(size);
-  return static_cast<int>(
-      std::ceil(MeasureTextEx(impl_->ui_fonts.get(font, text), text.c_str(), pixels, pixels * kUiLetterSpacing).x));
+  return static_cast<int>(std::ceil(
+      MeasureTextEx(impl_->ui_fonts.get(font, text, size), text.c_str(), pixels, pixels * kUiLetterSpacing).x));
 }
 
 void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {

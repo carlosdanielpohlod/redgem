@@ -103,7 +103,8 @@ mrb_value pair(mrb_state* mrb, mrb_value first, mrb_value second) {
 mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   mrb_float x = 0.0, y = 0.0;
   mrb_get_args(mrb, "ff", &x, &y);
-  const ScreenPoint point{static_cast<float>(finite(mrb, x)), static_cast<float>(finite(mrb, y))};
+  const float scale = ui_scale_of(context(mrb));  // (x and y are in the interface's units)
+  const ScreenPoint point{static_cast<float>(finite(mrb, x)) * scale, static_cast<float>(finite(mrb, y)) * scale};
   const CameraDesc* camera = main_camera(mrb);
   const ScreenFrame frame = screen_frame(context(mrb));
   const bool can_look = camera != nullptr && has_area(frame);
@@ -118,15 +119,16 @@ Vec3 point_of(mrb_state* mrb, mrb_value target) {
   return scene(mrb).world_transform(alive_id(mrb, target)).position;
 }
 
-// Where the main camera shows a point of the world on the screen, [x, y] in the pixels the
-// interface is drawn in; nil behind the camera (or nearer than its near plane).
+// Where the main camera shows a point of the world on the screen, [x, y] in the units the
+// interface is drawn in (UI.scale pixels each); nil behind the camera (or nearer than its near plane).
 mrb_value camera_world_to_screen(mrb_state* mrb, mrb_value) {
   const Vec3 point = point_of(mrb, single_arg(mrb));
   const CameraDesc* camera = main_camera(mrb);
   if (camera == nullptr) return mrb_nil_value();
   const auto shown = world_to_screen(main_camera_view(mrb), lens_of(*camera), screen_frame(context(mrb)), point);
   if (!shown) return mrb_nil_value();
-  return pair(mrb, mrb_float_value(mrb, shown->x), mrb_float_value(mrb, shown->y));
+  const float scale = ui_scale_of(context(mrb));
+  return pair(mrb, mrb_float_value(mrb, shown->x / scale), mrb_float_value(mrb, shown->y / scale));
 }
 
 // The main camera's field of view, top to bottom, in degrees.

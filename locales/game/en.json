@@ -108,6 +108,7 @@
   "game.settings.quality_medium": "Medium",
   "game.settings.quality_ultra": "Ultra",
   "game.settings.render_scale": "Render scale",
+  "game.settings.ui_scale": "Interface size",
   "game.settings.resolution": "Resolution",
   "game.settings.video": "Video",
   "game.settings.voice_volume": "Voice volume",

@@ -10,6 +10,7 @@
 #include "navigation/nav_settings.hpp"
 #include "physics/collision_layers.hpp"
 #include "render/display_settings.hpp"
+#include "render/ui_scale.hpp"
 #include "script/script_config.hpp"
 
 // game.json: what a game says about itself. This is the one place that reads the file.
@@ -34,6 +35,10 @@ struct GameSettings {
   //   "fullscreen": true, "vsync": false, "fps_cap": 144 (0: none), "render_scale": 0.75,
   //   "quality": "medium"
   DisplaySettings display;
+  // The screen the game's interface (UI) is laid out for, and which of its sides follows the
+  // screen's: the "ui" section. Without one, the game's own window, its height matched:
+  //   "ui": {"reference": [1920, 1080], "match": "height"}     ("width", "height" or "fit")
+  UiReference ui;
   // How long one call into the game's scripts may run before it is stopped (see
   // script/script_budget.hpp), in milliseconds, 1 to config::kMaxScriptBudgetMs:
   //   "script_budget_ms": 2000
@@ -71,6 +76,8 @@ struct GameManifest {
   std::vector<std::string> servers_warnings;
   // What is wrong with the "navigation" section; each such setting keeps its default.
   std::vector<std::string> navigation_warnings;
+  // What is wrong with the "ui" section; each such setting keeps its default.
+  std::vector<std::string> ui_warnings;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 

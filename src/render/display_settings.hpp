@@ -38,6 +38,11 @@ inline constexpr float kFullRenderScale = 1.0f;  // drawn at the window's size: 
 inline constexpr int kNoFrameCap = 0;            // frames come as fast as they are drawn
 inline constexpr int kMostFramesPerSecond = 1000;
 inline constexpr float kPlayersFullVolume = 1.0f;
+// The player's interface scale (Settings.ui_scale): what the interface's own scale to the screen
+// is multiplied by, for players who want it bigger (or smaller) than the game made it.
+inline constexpr float kSmallestUiScale = 0.5f;
+inline constexpr float kLargestUiScale = 2.0f;
+inline constexpr float kGamesUiScale = 1.0f;  // as the game made it
 
 struct DisplaySettings {
   WindowMode mode = WindowMode::Windowed;
@@ -55,6 +60,7 @@ struct DisplaySettings {
   float music_volume = kPlayersFullVolume;
   float effects_volume = kPlayersFullVolume;
   float voice_volume = kPlayersFullVolume;
+  float ui_scale = kGamesUiScale;
 };
 
 const char* window_mode_name(WindowMode mode);  // "windowed", "fullscreen", "borderless"
@@ -65,6 +71,9 @@ QualityCaps quality_caps(const DisplaySettings& display);
 // A render scale held within kSmallestRenderScale..kLargestRenderScale (kFullRenderScale when it
 // is not a number).
 float held_render_scale(float scale);
+// A player's interface scale held within kSmallestUiScale..kLargestUiScale (kGamesUiScale when it
+// is not a number).
+float held_ui_scale(float scale);
 // Whether the world is drawn at another size than the window's.
 bool scales_picture(float render_scale);
 // The size the world is drawn at in a window of `window`'s size: never less than a pixel a side.
@@ -80,7 +89,7 @@ int held_fps_cap(int cap);
 // The settings as the user's settings file keeps them, and as scripts see them (Settings):
 //   {"window_mode": "windowed", "width": 1280, "height": 720, "render_scale": 1.0, "vsync": true,
 //    "fps_cap": 60, "quality": "ultra", "volume": 1.0, "music_volume": 1.0, "effects_volume": 1.0,
-//    "voice_volume": 1.0,
+//    "voice_volume": 1.0, "ui_scale": 1.0,
 //    "custom_quality": {"msaa": 8, "antialias": true, "shadow_cascades": 4, "shadow_distance": 1.0,
 //                       "local_shadows": 4, "scatter_density": 1.0, "scatter_distance": 1.0, "sky_detail": 1.0,
 //                       "ambient_occlusion": 1.0, "bloom": 1.0}}

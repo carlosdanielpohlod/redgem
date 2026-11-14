@@ -32,7 +32,9 @@ class SystemTest
 
   def press_button(button, pad: Input::FIRST_PAD) = hold_button(button, frames: 1, pad: pad)
 
-  def move_mouse(x, y) = TestInput.move_mouse(x.to_f, y.to_f)
+  # Puts the pointer at a point given in the interface's units (where UI drew what is clicked, and
+  # what Camera.world_to_screen says): UI.scale pixels each.
+  def move_mouse(x, y) = TestInput.move_mouse(x.to_f * UI.scale, y.to_f * UI.scale)
 
   # Moves the mouse there and clicks: down for a frame, up for the next (what UI.button waits for).
   def click(x, y, button: :left)

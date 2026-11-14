@@ -25,6 +25,7 @@ constexpr const char* kVolumeKey = "volume";
 constexpr const char* kMusicVolumeKey = "music_volume";
 constexpr const char* kEffectsVolumeKey = "effects_volume";
 constexpr const char* kVoiceVolumeKey = "voice_volume";
+constexpr const char* kUiScaleKey = "ui_scale";
 constexpr const char* kMsaaKey = "msaa";
 constexpr const char* kAntialiasKey = "antialias";
 constexpr const char* kCascadesKey = "shadow_cascades";
@@ -125,6 +126,7 @@ void read_window(const nlohmann::json& json, DisplaySettings& display) {
     display.render_scale = held_render_scale(json[kRenderScaleKey].get<float>());
   read_bool(json, kVsyncKey, display.vsync);
   read_whole(json, kFpsCapKey, kNoFrameCap, kMostFramesPerSecond, display.fps_cap);
+  if (holds(json, kUiScaleKey, is_number)) display.ui_scale = held_ui_scale(json[kUiScaleKey].get<float>());
 }
 
 // The master volume and each group's, all shares from 0 to 1.
@@ -159,6 +161,10 @@ QualityCaps quality_caps(const DisplaySettings& display) {
 
 float held_render_scale(float scale) {
   return std::isfinite(scale) ? std::clamp(scale, kSmallestRenderScale, kLargestRenderScale) : kFullRenderScale;
+}
+
+float held_ui_scale(float scale) {
+  return std::isfinite(scale) ? std::clamp(scale, kSmallestUiScale, kLargestUiScale) : kGamesUiScale;
 }
 
 // (A scale held to its range is exactly 1 when it was asked to be: it is never off by a rounding.)
@@ -197,7 +203,8 @@ nlohmann::json display_json(const DisplaySettings& display) {
           {kVolumeKey, display.volume},
           {kMusicVolumeKey, display.music_volume},
           {kEffectsVolumeKey, display.effects_volume},
-          {kVoiceVolumeKey, display.voice_volume}};
+          {kVoiceVolumeKey, display.voice_volume},
+          {kUiScaleKey, display.ui_scale}};
 }
 
 DisplaySettings display_from_json(const nlohmann::json& json, DisplaySettings base) {

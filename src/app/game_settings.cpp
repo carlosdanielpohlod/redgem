@@ -1,7 +1,10 @@
 #include "app/game_settings.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -29,6 +32,10 @@ constexpr const char* kRenderScaleKey = "render_scale";
 constexpr const char* kQualityKey = "quality";
 constexpr const char* kScriptBudgetKey = config::kScriptBudgetKey;
 constexpr const char* kPhysicsKey = "physics";
+constexpr const char* kUiKey = "ui";
+constexpr const char* kUiReferenceKey = "reference";
+constexpr const char* kUiMatchKey = "match";
+constexpr std::size_t kReferenceSides = 2;  // [width, height]
 constexpr int kJsonIndent = 2;
 constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
 constexpr std::string_view kTwoSeparators = "..";
@@ -128,6 +135,65 @@ void read_navigation(const nlohmann::json& json, GameManifest& manifest) {
   manifest.navigation_warnings = std::move(reading.warnings);
 }
 
+// A side of the interface's reference screen, as a window's side may be; 0 when it is not one.
+int reference_side(const nlohmann::json& side) {
+  if (!side.is_number_integer()) return 0;
+  const auto asked = side.get<std::int64_t>();
+  return asked >= config::kMinWindowSide && asked <= config::kMaxWindowSide ? static_cast<int>(asked) : 0;
+}
+
+// Whether the reference is [width, height], each a size a window can be.
+bool usable_reference(const nlohmann::json& reference) {
+  return reference.is_array() && reference.size() == kReferenceSides && reference_side(reference[0]) > 0 &&
+         reference_side(reference[1]) > 0;
+}
+
+std::string ui_warning(const char* key, const std::string& what) {
+  return std::string(kGameSettingsFile) + ": ui." + key + " must be " + what + "; it keeps its default";
+}
+
+void read_ui_reference(const nlohmann::json& section, GameManifest& manifest) {
+  if (!section.contains(kUiReferenceKey)) return;
+  const nlohmann::json& reference = section[kUiReferenceKey];
+  if (!usable_reference(reference)) {
+    manifest.ui_warnings.push_back(ui_warning(kUiReferenceKey, "[width, height], each a window's side"));
+    return;
+  }
+  manifest.settings.ui.size = {reference_side(reference[0]), reference_side(reference[1])};
+}
+
+void read_ui_match(const nlohmann::json& section, GameManifest& manifest) {
+  if (!section.contains(kUiMatchKey)) return;
+  const nlohmann::json& match = section[kUiMatchKey];
+  const auto known = match.is_string() ? ui_match_from_name(match.get<std::string>()) : std::nullopt;
+  if (!known) {
+    manifest.ui_warnings.push_back(ui_warning(kUiMatchKey, "\"width\", \"height\" or \"fit\""));
+    return;
+  }
+  manifest.settings.ui.match = *known;
+}
+
+// The interface's reference: the game's window unless the "ui" section says otherwise.
+void read_ui(const nlohmann::json& json, GameManifest& manifest) {
+  manifest.settings.ui.size = {manifest.settings.window_width, manifest.settings.window_height};
+  if (!json.contains(kUiKey)) return;
+  const nlohmann::json& section = json[kUiKey];
+  if (!section.is_object()) {
+    manifest.ui_warnings.push_back(std::string(kGameSettingsFile) + ": ui must be an object; it keeps its default");
+    return;
+  }
+  read_ui_reference(section, manifest);
+  read_ui_match(section, manifest);
+}
+
+// The sections of game.json that each say about one part of the game.
+void read_sections(const nlohmann::json& json, GameManifest& manifest) {
+  read_physics(json, manifest);
+  read_servers(json, manifest);
+  read_navigation(json, manifest);
+  read_ui(json, manifest);
+}
+
 // What a game that says nothing is: named after its folder, with the engine's window.
 GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
@@ -135,6 +201,7 @@ GameManifest default_manifest(const std::filesystem::path& game_dir) {
   manifest.settings.window_width = config::kWindowWidth;
   manifest.settings.window_height = config::kWindowHeight;
   manifest.settings.display.resolution = {config::kWindowWidth, config::kWindowHeight};
+  manifest.settings.ui.size = {config::kWindowWidth, config::kWindowHeight};
   return manifest;
 }
 
@@ -151,9 +218,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
-  read_physics(json, manifest);
-  read_servers(json, manifest);
-  read_navigation(json, manifest);
+  read_sections(json, manifest);
   return manifest;
 }
 

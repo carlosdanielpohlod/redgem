@@ -1,5 +1,5 @@
 # The menu's settings screen (see GameMenu): how the game is shown (window mode, resolution,
-# render scale, vsync, frame cap, quality) and heard (the master volume and each group's: music,
+# render scale, vsync, frame cap, quality, the interface's size) and heard (the master volume and each group's: music,
 # effects, voice), as the Settings module has them. Each change takes effect at once; leaving the
 # screen (its Back button or Esc) keeps them for the game's next runs and goes back to the screen
 # it was opened from. Its Controls button keeps them too, and opens the controls page (see
@@ -8,15 +8,15 @@
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560
-    ROW_HEIGHT = 32            # (ten rows and the heading fit above the buttons on a 720 pixel screen)
-    ROW_GAP = 5
+    ROW_HEIGHT = 30            # (eleven rows and the heading fit above the buttons on a 720 unit screen)
+    ROW_GAP = 4
     CAPTION_SIZE = 20
     CAPTION_HEIGHT = 28        # pixels a section's caption takes above its rows
     CAPTION_COLOR = :gold
     BUTTONS_SHARE = 0.8        # where its Back button sits, as a share of the screen's height
     PERCENT = 100
     VOLUME_STEP = 0.05
-    VIDEO_ROWS = %i[window_mode resolution render_scale vsync fps_cap quality].freeze
+    VIDEO_ROWS = %i[window_mode resolution render_scale vsync fps_cap quality ui_scale].freeze
     AUDIO_ROWS = %i[volume music_volume effects_volume voice_volume].freeze
     SECTIONS = [[-> { I18n.t("game.settings.video") }, VIDEO_ROWS],
                 [-> { I18n.t("game.settings.audio") }, AUDIO_ROWS]].freeze
@@ -124,6 +124,13 @@ class GameMenu < Behaviour
       percent = ->(share) { "#{(share * PERCENT).round}%" }
       scale = pick(I18n.t("game.settings.render_scale"), values, Settings.render_scale, box, percent)
       Settings.render_scale = scale if scale
+    end
+
+    def ui_scale(box)
+      values = (Settings::UI_SCALES + [Settings.ui_scale]).uniq.sort
+      percent = ->(share) { "#{(share * PERCENT).round}%" }
+      scale = pick(I18n.t("game.settings.ui_scale"), values, Settings.ui_scale, box, percent)
+      Settings.ui_scale = scale if scale
     end
 
     def vsync(box)

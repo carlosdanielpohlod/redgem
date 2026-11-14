@@ -14,6 +14,7 @@ namespace {
 
 constexpr int kWideWidth = 1280;
 constexpr int kWideHeight = 720;
+constexpr float kLargerInterface = 1.25f;
 constexpr const char* kGpuVariable = "REDGEM_GPU";
 
 // No REDGEM_GPU for the life of the object (an empty one says nothing), what it held put back.
@@ -80,6 +81,7 @@ TEST_CASE("a game's display settings are kept in its own settings file, beside i
   DisplaySettings chosen = defaults;
   chosen.mode = WindowMode::Borderless;
   chosen.quality = QualityPreset::Low;
+  chosen.ui_scale = kLargerInterface;
   std::string error;
   REQUIRE_MESSAGE(write_game_display(file, chosen, error), error);
   UserSettings user;
@@ -88,6 +90,7 @@ TEST_CASE("a game's display settings are kept in its own settings file, beside i
   const DisplaySettings kept = read_game_display(file, defaults);
   CHECK(kept.mode == WindowMode::Borderless);
   CHECK(kept.quality == QualityPreset::Low);
+  CHECK(kept.ui_scale == doctest::Approx(kLargerInterface));  // the player's interface size is kept too
   CHECK(read_user_settings(file).gpu == GpuChoice::Integrated);
   std::ofstream(file) << R"({"display": "broken"})";
   CHECK(read_game_display(file, defaults).mode == WindowMode::Windowed);

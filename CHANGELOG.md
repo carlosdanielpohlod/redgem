@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **An interface that scales with the screen**: every size, position, margin and font size `UI`
+  takes is in units of a reference screen the game names in `game.json`
+  (`"ui": {"reference": [1920, 1080], "match": "height"}`, or `"width"` or `"fit"`; the game's own
+  window, its height matched, when it names none). `UI.scale` says how many pixels a unit takes,
+  so a HUD keeps its share of the screen at 720p, at 4K and in a small window, and texts are
+  drawn sharp from letters made near the pixels they take (a few raster sizes per face) instead of
+  being stretched. `UI.width` and `UI.height` are in units; `UI.pixel_width`, `UI.pixel_height`,
+  `UI.reference`, `UI.mouse_x` and `UI.mouse_y` are new, clicks and taps land on what is drawn at
+  any size, and `Camera.world_to_screen` and `Camera.screen_ray` are in units too. Players make
+  the interface bigger or smaller with `Settings.ui_scale` (0.5 to 2, the settings screen's
+  "Interface size"), kept with the other settings. `GameMenu` uses the same scale instead of its
+  own, so it now grows on large screens (and with the player's choice) as far as there is room.
+
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden
