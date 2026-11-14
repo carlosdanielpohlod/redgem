@@ -44,7 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_levels.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
@@ -808,7 +808,10 @@ if(NOT ANDROID)
     project/game_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
+    project/api_types.cpp
     project/api_reference.cpp
+    project/api_reference_read.cpp
+    project/api_rbs.cpp
     project/api_command.cpp
     project/crash_symbols.cpp
     project/symbolize_command.cpp

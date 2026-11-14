@@ -154,6 +154,9 @@ class Engine {
   Presenter& presenter() { return *presenter_; }
   AnimationPlayer& animations() { return animations_; }
   net::NetworkSession& network() { return network_; }
+  // Starts the behaviours that did not start yet, unless the world is frozen (a level loading, or
+  // the machines of a network game waiting for each other to have the next one).
+  void start_scripts();
 
  private:
   explicit Engine(const EngineOptions& options);
@@ -257,6 +260,8 @@ class Engine {
   void hand_on_animation_events();
   void switch_scene_if_asked();
   bool is_loading_scene() const;
+  // Whether the world is frozen: a level loading, or held until every machine has it (Network).
+  bool frozen() const { return is_loading_scene() || context_.level_held; }
   bool deterministic_scene_load() const;
   void advance_or_loading(float frame_seconds);
   void request_scene(const std::string& name);

@@ -116,6 +116,8 @@ inline constexpr const char* kRefused = "x";      // to a newcomer: you are not 
 inline constexpr const char* kGuarded = "g";  // opener to relay: whether its game decides who comes in (kData)
 inline constexpr const char* kAsking = "q";   // relay to opener: newcomer kFrom asks to come in, with kAuth
 inline constexpr const char* kVerdict = "v";  // opener to relay: newcomer kTo is let in (kData), or not and why
+// The opener's game lets machine kTo go (one late to load a level, see NetworkSession::dismiss).
+inline constexpr const char* kDismiss = "u";
 // Reconnecting. In a welcome: the token that gets this machine's place back should its connection
 // drop, and for how many seconds the game holds it (kWindow). In a hello: the token of the place
 // to get back, instead of a new one.

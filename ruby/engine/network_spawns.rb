@@ -26,6 +26,16 @@ module Network
       templates.each { |template| @spawnable << template.to_s unless @spawnable.include?(template.to_s) }
     end
 
+    # This machine's spawned objects go with its level: the others are told (those changing level
+    # with it have none of them any more).
+    def __despawn_mine
+      mine = keys_spawned_by(id)
+      __deliver(DESPAWN, mine, :all) if despawns?(mine)
+    end
+
+    # Whether there are others to tell that these keys are gone.
+    def despawns?(keys) = online? && keys.any?
+
     private
 
     def refuse_spawn(template, owner)
@@ -108,6 +118,18 @@ module Network
       end
     end
 
+    # A newcomer is told the level the game plays, then (once it has it) what is spawned there.
+    def greet(peer) = Level.welcome(peer)
+
+    def send_spawned_to(peer)
+      __deliver(SPAWNED, spawned_records, peer) if host?
+    end
+
+    # What a newcomer needs to see the objects spawned before it arrived, where they are now.
+    def spawned_records
+      @spawned.to_a.select { |_key, entry| entry[:object].alive? }.map { |key, entry| record_of(key, entry) }
+    end
+
     # Someone got its place back after its connection dropped. The host shows it the objects as
     # they are now; the machine that was away catches up.
     def welcome_back(peer)
@@ -141,12 +163,6 @@ module Network
     # A level loaded while reconnecting takes every object of this machine's with it.
     def note_scene_reset_away
       @despawned_away.concat(keys_spawned_by(@my_id)) if reconnecting?
-    end
-
-    def announce_scene_reset
-      mine = keys_spawned_by(id)
-      __deliver(DESPAWN, mine, :all) unless mine.empty?
-      __deliver(RESEND, nil, :host) unless host?
     end
   end
 end

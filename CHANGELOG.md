@@ -23,6 +23,15 @@ until 1.0, a release may change what games rely on (see
   and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
   and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
   how much.
+- **Changing level together in a network game**: on the host (a player's or a dedicated server's
+  room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
+  connection that stays up. Each machine loads it in the background and waits, frozen, until all
+  have it; a machine still loading after `Network.level_timeout` seconds (30) is let go. The
+  objects of the old level, spawned ones included, are gone everywhere, and nothing said about
+  them on the way reaches the new level. `Network.on_level_loading` and `Network.on_level_ready`
+  tell every machine, and `Network.changing_level?` says a change is going on. A machine that joins
+  loads the level the game plays. Only the host changes the level: elsewhere `Game.load_scene`
+  returns `false`. A room's opener on a relay can now have the relay let a machine go.
 
 - **Interaction**: an `Interactable` behaviour makes an object something the player can use or talk
   to (an I18n prompt, a range, a priority, an enabled flag and an optional facing angle), and an
@@ -230,6 +239,21 @@ until 1.0, a release may change what games rely on (see
   sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
   `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
   (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+- **A typed scripting API, and type signatures for editors**: every method of
+  `docs/scripting/api.json` gives each parameter a type (with whether it is a keyword, optional,
+  its default, a rest or a block) and the type it returns, in a small closed language (`Integer`,
+  `Float`, `Numeric`, `String`, `Symbol`, `bool`, `nil`, `Color`, the API's classes, `Array[T]`,
+  `Hash[K, V]`, `Range[T]`, tuples, unions and blocks); the file is refused when it holds a type
+  not in it or a parameter out of place. `redgem api <Class>`, its search, the MCP `api` tool and
+  the [API reference](docs/scripting/api.md) show the types (`Input.axis(Symbol name, pad: Integer
+  = 0) -> Float`). `redgem api --rbs` writes them as Ruby type signatures (RBS), which new games
+  get as `sig/redgem.rbs` (kept out of builds), so editors with a Ruby language server (Steep,
+  Solargraph and the like) complete and type-check game scripts. The tests now also check that
+  each class is the class or module the engine has, and that the methods written in Ruby take the
+  parameters the reference says. `Behaviour::Timer`, what `after`, `every` and `tween` return, is
+  in the reference (`cancel`, `cancelled?`), and so are the keywords some methods took without
+  saying: `pad:` of `Input.axis`, `action?`, `action_pressed?` and the gamepad's, `alpha:` of
+  `UI.image`, the colors, `size:`, `focused:` and `confirm:` of `UI.button`, and more.
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
@@ -372,6 +396,9 @@ until 1.0, a release may change what games rely on (see
 
 - **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
   when not given. A scene that wants its leaves as they were sets it to 0.
+- In a network game, a machine that is not the host can no longer load a level on its own
+  (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
+  objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
 - **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
   links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
