@@ -194,6 +194,8 @@ add_executable(redgem_tests
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp
+  integration/script_budget_clock_test.cpp
+  integration/save_budget_test.cpp
   integration/crash_handling_test.cpp
   integration/engine_headless_test.cpp
   integration/scene_parts_test.cpp

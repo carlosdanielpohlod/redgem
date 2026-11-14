@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/clock.hpp"
+
 namespace redgem {
 
 class ScriptSampler;
@@ -30,9 +32,15 @@ class ScriptSampler;
 //
 // What a call's time is: from when it begins, less the time spent in calls the engine makes from
 // inside it (each has a budget of its own: a stopped call does not stop them) and in the engine's
-// own work that is known to be long (Pause: spawning objects, placing scatter), up to
+// own work that is known to be long (Pause: spawning objects, placing scatter, reading and writing
+// the save and the settings), up to
 // kScriptForgivenBudgets of its budgets in all: a loop that only ever spawns is stopped too. A
 // function of the engine is never stopped halfway: the call ends at its next instruction of Ruby.
+//
+// What a call's time is read on: the computer's coarse clock (core/coarse_clock.hpp), or a clock
+// given to the budget (a test's, which only moves when the test moves it). On a given clock the
+// watchdog looks at a running call every kScriptWatchRetryMs of real time, and the call is past
+// its deadline only once that clock says so: a call on a clock that does not move never is.
 class ScriptBudget {
  public:
   using Milliseconds = std::chrono::milliseconds;
@@ -53,6 +61,11 @@ class ScriptBudget {
   // calls). The hook is set while there is a limit or a sampler.
   void set_sampler(ScriptSampler* sampler);
   ScriptSampler* sampler() const { return sampler_; }
+  // The clock calls are timed on; none (the default) for the computer's coarse clock. On the
+  // interpreter's thread, between calls; the clock outlives the budget's use of it.
+  void set_clock(const Clock* clock) { clock_.store(clock, std::memory_order_seq_cst); }
+  // Milliseconds on that clock.
+  std::int64_t now() const;
 
   // A call from the engine begins and ends (on the interpreter's thread).
   void begin_call() { push(true); }
@@ -70,6 +83,11 @@ class ScriptBudget {
   // runs the engine's work), and the request to look.
   static constexpr std::int64_t kNever = INT64_MAX;
   std::int64_t deadline() const { return deadline_.load(std::memory_order_seq_cst); }
+  // Whether the call running is past its deadline on the budget's clock.
+  bool past_deadline() const { return deadline() <= now(); }
+  // When, on the coarse clock (where `real_now` is), the watchdog is to look next: the deadline
+  // itself, or on a clock of its own a short while from now while a call runs (kNever when none).
+  std::int64_t next_look(std::int64_t real_now) const;
   void request_stop() { stop_.store(true, std::memory_order_relaxed); }
 
  private:
@@ -108,10 +126,24 @@ class ScriptBudget {
   std::vector<Frame> frames_;  // the calls in calls, innermost last (the interpreter's thread)
   std::atomic<std::int64_t> deadline_{kNever};
   std::atomic<bool> stop_{false};
+  std::atomic<const Clock*> clock_{nullptr};  // (read by the watchdog too)
 };
 
 // How many times the watchdog has woken since the program started (for the tests of its sleep).
 std::uint64_t script_watchdog_wakes();
+
+// Counts a call into the scripts against the budget for as long as it lasts, with a budget of its
+// own (see ScriptBudget): a call from C++, or a block the engine yields to from inside its work.
+class BudgetCall {
+ public:
+  explicit BudgetCall(ScriptBudget& budget) : budget_(budget) { budget_.begin_call(); }
+  ~BudgetCall() { budget_.end_call(); }
+  BudgetCall(const BudgetCall&) = delete;
+  BudgetCall& operator=(const BudgetCall&) = delete;
+
+ private:
+  ScriptBudget& budget_;
+};
 
 // Counts what runs inside it as engine work, not the call's (see ScriptBudget).
 class BudgetPause {

@@ -383,7 +383,12 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About forty unit and integration tests wait on the real clock, a source of rare timing failures.
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's buffers never give memory back once grown, and copy what is left on every

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "core/log.hpp"
+#include "fake_clock.hpp"
 #include "editor/build_job.hpp"
 
 using namespace redgem;
@@ -30,6 +31,7 @@ constexpr double kNearlyEight = 7.9;
 constexpr double kTwelveAndAHalfMinutes = 750.0;
 constexpr double kHourTwoMinutesThree = 3723.0;
 constexpr double kBeforeTheStart = -2.0;
+constexpr double kBuildSeconds = 42.0;
 
 const std::filesystem::path kGame = "games/mine";
 const std::filesystem::path kOut = "games/mine-build-android";
@@ -165,15 +167,17 @@ TEST_CASE("a job that goes while its build runs waits for the build: its thread 
   CHECK(finished);
 }
 
-TEST_CASE("a build's time counts up from its start") {
+TEST_CASE("a build's time counts up from its start, on the job's clock") {
+  test::FakeClock clock;
   HeldBuild held;
-  BuildJob job;
+  BuildJob job(clock);
+  clock.advance(kBuildSeconds);  // (before the start: not the build's time)
   REQUIRE(job.start(held.request()));
-  const double early = job.seconds();
-  std::this_thread::sleep_for(kShortWait);
-  CHECK(job.seconds() > early);
+  CHECK(job.seconds() == doctest::Approx(0.0));
+  clock.advance(kBuildSeconds);
+  CHECK(job.seconds() == doctest::Approx(kBuildSeconds));
   held.release.set_value();
-  CHECK(ended(job).seconds > 0.0);
+  CHECK(ended(job).seconds == doctest::Approx(kBuildSeconds));
 }
 
 TEST_CASE("a build's time reads in minutes and seconds, and hours once it takes that long") {

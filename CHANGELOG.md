@@ -273,6 +273,12 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A slow disk no longer stops the script that saves**: reading and writing the save with `Save`
+  and its slots, and `Settings.save`, are the engine's time, not the call's, like spawning
+  (forgiven up to four budgets in one call); the block of `Save.update` is a call with a budget of
+  its own. A save that took more than a second (another program scanning the file, a slow CI
+  machine) ended the call with a `ScriptTimeout`. The scripts' budget can be timed on a test's
+  clock (`ScriptBudget::set_clock`), and its tests no longer depend on how fast the machine is.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

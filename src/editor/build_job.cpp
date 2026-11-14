@@ -21,7 +21,7 @@ BuildJob::~BuildJob() { wait(); }
 bool BuildJob::start(BuildRequest request) {
   if (busy_) return false;
   target_ = request.choice.name;
-  started_ = Clock::now();
+  started_ = clock_.now();
   step_.clear();
   try {
     launch(std::move(request));
@@ -41,7 +41,7 @@ std::string BuildJob::step() const {
   return step_;
 }
 
-double BuildJob::seconds() const { return std::chrono::duration<double>(Clock::now() - started_).count(); }
+double BuildJob::seconds() const { return clock_.now() - started_; }
 
 std::optional<BuildOutcome> BuildJob::take_outcome() {
   if (!ended()) return std::nullopt;
