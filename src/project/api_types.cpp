@@ -73,8 +73,10 @@ class TypeReader {
   std::string problem(TypePlace place) {
     if (place == TypePlace::Block) {
       read_block();
+    } else if (is_whole_void(place)) {
+      at_ = tokens_.size();
     } else {
-      read_union(place == TypePlace::Returned);
+      read_union();
     }
     if (at_ < tokens_.size()) fail("unexpected " + tokens_[at_]);
     return problem_;
@@ -103,8 +105,13 @@ class TypeReader {
     at_ = tokens_.size();  // (nothing after the first problem says more)
   }
 
-  void read_union(bool returned) {
-    read_single(returned);
+  // Whether a method returns nothing: void, alone (RBS has no void in a union or a list).
+  bool is_whole_void(TypePlace place) const {
+    return place == TypePlace::Returned && tokens_.size() == 1 && tokens_.front() == kVoid;
+  }
+
+  void read_union() {
+    read_single(false);
     while (take(kUnion)) read_single(false);
   }
 
@@ -130,7 +137,7 @@ class TypeReader {
   std::size_t read_list(const char* close) {
     std::size_t count = 0;
     do {
-      read_union(false);
+      read_union();
       ++count;
     } while (take(kComma));
     expect(close);
@@ -141,7 +148,7 @@ class TypeReader {
     const std::string name = next();
     ++at_;
     if (name == kVoid) {
-      if (!returned) fail("void is only returned");
+      if (!returned) fail("void is only returned, alone");
       return;
     }
     if (const Generic* generic = generic_named(name)) return read_arguments(*generic);

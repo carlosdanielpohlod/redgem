@@ -63,9 +63,17 @@ ToolResult usage_failure(const std::string& problem) {
   return failed(problem + "\n\n" + tr("project.api.usage"), kExitUsage);
 }
 
+// Whether more than one of --json, --markdown and --rbs is asked: each writes the answer its own way.
+bool asks_two_formats(const ToolLine& line) {
+  const int formats = static_cast<int>(line.has(kJsonOption)) + static_cast<int>(line.has(kMarkdownOption)) +
+                      static_cast<int>(line.has(kRbsOption));
+  return formats > 1;
+}
+
 // What is wrong with how the command was asked; nothing when it can answer.
 std::string misuse(const ToolLine& line) {
   if (line.words.size() > 1) return tr("project.api.one_class");
+  if (asks_two_formats(line)) return tr("project.api.one_format");
   if (asks_part_as_rbs(line)) return tr("project.api.rbs_whole");
   return {};
 }

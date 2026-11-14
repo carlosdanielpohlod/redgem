@@ -138,6 +138,11 @@ std::string source_text(const char* file) {
   return without_returns(*text);
 }
 
+// Whether two texts part at a line: different lines, or one ends there and the other does not.
+bool parts_at(const std::string& a, const std::string& b, bool more_a, bool more_b) {
+  return a != b || more_a != more_b;
+}
+
 // Where two texts first part: "line 12: <one> | <other>"; nothing when they are the same. (A
 // failure says that instead of both whole pages.)
 std::string first_difference(const std::string& one, const std::string& other) {
@@ -149,7 +154,7 @@ std::string first_difference(const std::string& one, const std::string& other) {
     const bool more_a = static_cast<bool>(std::getline(ones, a));
     const bool more_b = static_cast<bool>(std::getline(others, b));
     if (!more_a && !more_b) return one == other ? "" : "the end of the text";
-    if (a != b || more_a != more_b) return "line " + std::to_string(line) + ": " + a + " | " + b;
+    if (parts_at(a, b, more_a, more_b)) return "line " + std::to_string(line) + ": " + a + " | " + b;
   }
 }
 
@@ -290,6 +295,14 @@ bool keywords_agree(const Shape& ruby, const Shape& documented) {
   return ruby.keyword_rest ? ruby.keywords <= documented.keywords : ruby.keywords == documented.keywords;
 }
 
+// Whether the reference says a method takes **rest that it does not.
+bool claims_keyword_rest(const Shape& ruby, const Shape& documented) {
+  return documented.keyword_rest && !ruby.keyword_rest;
+}
+
+// Whether a method takes a block (&block) the reference does not say.
+bool misses_block(const Shape& ruby, const Shape& documented) { return ruby.block && !documented.block; }
+
 // What the reference says wrong about a method Ruby knows the parameters of; nothing when right.
 // (It may say a block that the method yields to without naming it.)
 std::string shape_mismatch(const Shape& ruby, const Shape& documented) {
@@ -297,8 +310,8 @@ std::string shape_mismatch(const Shape& ruby, const Shape& documented) {
   if (ruby.optional != documented.optional) return "the positional parameters it may go without";
   if (ruby.rest != documented.rest) return "*rest";
   if (!keywords_agree(ruby, documented)) return "keywords";
-  if (documented.keyword_rest && !ruby.keyword_rest) return "**rest";
-  if (ruby.block && !documented.block) return "block";
+  if (claims_keyword_rest(ruby, documented)) return "**rest";
+  if (misses_block(ruby, documented)) return "block";
   return {};
 }
 
@@ -422,6 +435,11 @@ TEST_CASE("a new game comes with its guide and the API's type signatures, which 
   CHECK(read_text_file(game / kSignaturesFile, read_error) == api_rbs(api_reference()));
   const std::vector<fs::path> shipped = shipped_files(game);
   CHECK(std::find(shipped.begin(), shipped.end(), fs::path(kSignaturesFile)) == shipped.end());
+  // (a game's own file in sig ships; only signatures stay behind)
+  REQUIRE(write_text_file(game / kSignaturesFolder / "levels.json", "{}", error));
+  const std::vector<fs::path> with_own = shipped_files(game);
+  const fs::path own = fs::path(kSignaturesFolder) / "levels.json";
+  CHECK(std::find(with_own.begin(), with_own.end(), own) != with_own.end());
   fs::remove_all(game);
 }
 
@@ -448,4 +466,6 @@ TEST_CASE("redgem api: an index, a class with its types, a search, the type sign
   CHECK(api({"--search", "ray", "--rbs"}).exit_code == kExitUsage);
   CHECK(api({"--search", "ray"}).out.find("GameObject#children") == std::string::npos);  // (not Array's "ray")
   CHECK(api({"a", "b"}).exit_code == kExitUsage);
+  CHECK(api({"--json", "--rbs"}).exit_code == kExitUsage);  // (one way to write the answer)
+  CHECK(api({"--markdown", "--rbs"}).exit_code == kExitUsage);
 }

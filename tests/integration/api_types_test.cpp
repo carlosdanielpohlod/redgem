@@ -95,7 +95,9 @@ TEST_CASE("the type language: the closed vocabulary, generics, tuples, unions an
 
   CHECK(api_type_problem("Strin", kClasses, TypePlace::Parameter) == "unknown type Strin");
   CHECK(api_type_problem("Camera", kClasses, TypePlace::Parameter) == "unknown type Camera");
-  CHECK(api_type_problem("void", kClasses, TypePlace::Parameter) == "void is only returned");
+  CHECK(api_type_problem("void", kClasses, TypePlace::Parameter) == "void is only returned, alone");
+  CHECK(api_type_problem("void | nil", kClasses, TypePlace::Returned) == "void is only returned, alone");
+  CHECK(api_type_problem("[void]", kClasses, TypePlace::Returned) == "void is only returned, alone");
   CHECK(api_type_problem("Array", kClasses, TypePlace::Parameter) == "expected [");
   CHECK(api_type_problem("Hash[Symbol]", kClasses, TypePlace::Parameter) == "Hash takes 2");
   CHECK(api_type_problem("Array[String", kClasses, TypePlace::Parameter) == "expected ]");
@@ -174,6 +176,12 @@ TEST_CASE("the reference refuses what it may not hold, saying where") {
   data = reference_data();
   data["classes"][0]["methods"][1]["about"] = "moves it\nreturns itself";
   CHECK(has(refusal(data), "Mover#move: its about is one line"));
+  data = reference_data();
+  data["classes"][3]["methods"][0]["name"] = "new";
+  CHECK(has(refusal(data), "Tools.new: a module has no new"));
+  data = reference_data();
+  data["classes"][0]["methods"][2]["name"] = "[]=";
+  CHECK(has(refusal(data), "Mover#[]=: []= takes its keys, then the value"));
   data = reference_data();
   data["classes"][0]["methods"][2].erase("returns");
   CHECK_THROWS(read_api_reference(data.dump()));  // (every method says what it returns)

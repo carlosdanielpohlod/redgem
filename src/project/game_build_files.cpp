@@ -45,12 +45,18 @@ bool is_leftover(const std::string& name) {
   return !name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix);
 }
 
+// Whether a file inside the game's folder is a type signature (RBS) of the sig folder at its top,
+// for the maker's editor: the API's and the game's own. The folder's other files are the game's.
+bool is_type_signature(const std::filesystem::path& inside) {
+  return inside.parent_path() == tools::kSignaturesFolder && inside.extension() == tools::kSignaturesExtension;
+}
+
 // Whether a file is the guide of the game for whoever makes it: one of its files at the top of
-// the game's folder, or the folder of type signatures for their editor, the API's and the game's
-// own (one of those names deeper in is the game's own, and ships).
+// the game's folder, or a type signature (one of those names deeper in is the game's own, and
+// ships).
 bool is_makers_guide(const std::filesystem::path& file, const Shipping& shipping) {
   const std::filesystem::path inside = file.lexically_relative(shipping.game_dir);
-  return inside == tools::kGuideFileName || inside == tools::kPointerFileName || inside == tools::kSignaturesFolder;
+  return inside == tools::kGuideFileName || inside == tools::kPointerFileName || is_type_signature(inside);
 }
 
 // Whether the editor is still writing a file, under a name it takes off when it is done (a build

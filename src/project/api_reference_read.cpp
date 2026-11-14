@@ -26,6 +26,9 @@ constexpr const char* kParamFields[] = {kName, kType, kKeyword, kRest, kBlock, k
 constexpr const char* kTopPlace = "the reference";
 constexpr const char* kClassCall = ".";
 constexpr const char* kInstanceCall = "#";
+constexpr const char* kNewMethod = "new";
+constexpr const char* kElementWriter = "[]=";
+constexpr std::size_t kElementWriterParams = 2;  // at least a key and the value
 
 [[noreturn]] void refuse(const std::string& where, const std::string& why) {
   throw std::invalid_argument(std::string(kReferenceFile) + ": " + where + ": " + why);
@@ -168,9 +171,22 @@ void check_param(const ApiParam& param, const std::vector<std::string>& classes,
   check_type(param.type, classes, param.block ? TypePlace::Block : TypePlace::Parameter, place);
 }
 
+// Whether a module says it has new (only a class makes objects; RBS writes a class's new as its
+// initialize).
+bool is_module_new(const ApiClass& owner, const ApiMethod& method) {
+  return owner.is_module && method.on_class && method.name == kNewMethod;
+}
+
+// Whether an element's writer ([]=) misses its keys or its value.
+bool is_short_element_writer(const ApiMethod& method) {
+  return method.name == kElementWriter && method.params.size() < kElementWriterParams;
+}
+
 void check_method(const ApiClass& owner, const ApiMethod& method, const std::vector<std::string>& classes) {
   const std::string where = owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name;
   if (has_line_break(method.about)) refuse(where, "its about is one line");
+  if (is_module_new(owner, method)) refuse(where, "a module has no new: call its maker otherwise");
+  if (is_short_element_writer(method)) refuse(where, "[]= takes its keys, then the value");
   for (const ApiParam& param : method.params) check_param(param, classes, where);
   check_order(method.params, where);
   check_type(method.returns, classes, TypePlace::Returned, where);
