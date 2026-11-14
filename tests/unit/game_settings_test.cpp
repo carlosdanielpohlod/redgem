@@ -167,3 +167,24 @@ TEST_CASE("game.json says how the game is shown until its player chooses otherwi
   CHECK(odd.display.mode == WindowMode::Windowed);
   CHECK(odd.display.render_scale == kLargestRenderScale);
 }
+
+TEST_CASE("the interface is laid out for the game's own window, its height matched, unless game.json says") {
+  const GameSettings nothing = read_game_settings(game_saying(""));
+  CHECK(nothing.ui.size == SurfaceSize{config::kWindowWidth, config::kWindowHeight});
+  CHECK(nothing.ui.match == UiMatch::Height);
+  const GameSettings windowed = read_game_settings(game_saying(R"({"window_width": 800, "window_height": 450})"));
+  CHECK(windowed.ui.size == SurfaceSize{kWidth, kHeight});
+  const GameManifest said = read_game_manifest(game_saying(R"({"ui": {"reference": [1920, 1080], "match": "fit"}})"));
+  CHECK(said.settings.ui.size == SurfaceSize{1920, 1080});
+  CHECK(said.settings.ui.match == UiMatch::Fit);
+  CHECK(said.ui_warnings.empty());
+}
+
+TEST_CASE("an interface reference or match that cannot be used is said, and keeps its default") {
+  const GameManifest odd = read_game_manifest(game_saying(R"({"ui": {"reference": [1920], "match": "stretch"}})"));
+  CHECK(odd.settings.ui.size == SurfaceSize{config::kWindowWidth, config::kWindowHeight});
+  CHECK(odd.settings.ui.match == UiMatch::Height);
+  CHECK(odd.ui_warnings.size() == 2);
+  CHECK(read_game_manifest(game_saying(R"({"ui": {"reference": [10, 1080]}})")).ui_warnings.size() == 1);
+  CHECK(read_game_manifest(game_saying(R"({"ui": "big"})")).ui_warnings.size() == 1);
+}
