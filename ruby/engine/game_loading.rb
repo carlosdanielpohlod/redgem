@@ -24,20 +24,20 @@ module Game
   class << self
     # Switches to scenes/<name>.glb ("main" is scene.glb).
     def load_scene(name)
-      return __load_scene(name) unless Network.online?
+      return __load_scene(name) unless __online?
 
       Network::Level.ask(name.to_s)
     end
 
     def load_scene_async(name)
-      return __load_scene_async(name) unless Network.online?
+      return __load_scene_async(name) unless __online?
 
       Network::Level.ask(name.to_s)
     end
 
     # A change of level with the others is not cancelled: false, as nothing was.
     def cancel_scene_load
-      return false if Network.changing_level?
+      return false if __held?
 
       __cancel_scene_load
     end

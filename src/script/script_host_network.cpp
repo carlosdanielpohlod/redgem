@@ -59,8 +59,8 @@ void ScriptHost::scene_was_reset() {
 
 void ScriptHost::wait_for_level(float unscaled_delta) {
   const int arena = mrb_gc_arena_save(vm_.state());
-  const RubyResult result = vm_.call(module_named(kNetworkModule), kLevelTickEntry,
-                                     {mrb_float_value(vm_.state(), unscaled_delta)});
+  const RubyResult result =
+      vm_.call(module_named(kNetworkModule), kLevelTickEntry, {mrb_float_value(vm_.state(), unscaled_delta)});
   mrb_gc_arena_restore(vm_.state(), arena);
   if (!result.ok) report_error("the network's level change", result.error);
 }

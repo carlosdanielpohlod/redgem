@@ -68,7 +68,9 @@ TEST_CASE("async scene reads freeze simulation but keep loading UI and other eng
   }
   CHECK(first->script_context().time.elapsed == elapsed);
   CHECK(second->script_context().time.elapsed > other_elapsed);
-  CHECK(ruby(*first, "$loading_draws") == std::to_string(kLoadingFrames));
+  // (A room's game is a network game: its world froze for the change of level from the frame it
+  // asked for one, which drew a loading screen too.)
+  CHECK(ruby(*first, "$loading_draws") == std::to_string(kLoadingFrames + 1));
   CHECK(std::stof(ruby(*first, "$loading_delta")) > 0.0f);
   CHECK_FALSE(first->script_context().hud.empty());
   CHECK(first->scene_name() == "main");
