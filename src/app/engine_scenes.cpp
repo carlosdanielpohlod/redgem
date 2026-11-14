@@ -80,6 +80,8 @@ void Engine::switch_to(SceneActivation& incoming) {
 }
 
 void Engine::install_world(SceneActivation& incoming) {
+  runtime_prefabs_.clear();
+  runtime_prefab_bytes_ = 0;
   scene_desc_ = std::move(incoming.desc());
   scene_ = std::move(incoming.scene());
   physics_ = incoming.take_physics();
@@ -103,7 +105,10 @@ void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
 
 ObjectId Engine::spawn(const SpawnRequest& request) {
   if (!scene_.is_alive(request.source)) return kNoObject;
-  const std::vector<ObjectId> created = scene_.clone(request.source);
+  return finish_spawn(scene_.clone(request.source), request);
+}
+
+ObjectId Engine::finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request) {
   shape_spawned(created.front(), request);
   if (request.physics) {
     for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);

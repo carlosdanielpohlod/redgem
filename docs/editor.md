@@ -63,6 +63,11 @@ icons):
   Ctrl+V** cut, copy and paste, **Ctrl+S** save. Help > Keyboard Shortcuts lists them all. File >
   New / Open Game goes back to the hub.
 
+**Edit > Preferences** sets the scene camera's fly speed and the move, rotate and scale snap
+steps. The fly camera accepts six distinct letter or arrow keys. Choosing an assigned key swaps
+its direction with the key you replaced. Save applies the values and keeps them for the next session. Restore defaults fills the
+original values; Cancel discards changes.
+
 ## Material pictures
 
 Under a material's color, metallic, roughness and emission, the Inspector lists its five texture
@@ -176,7 +181,9 @@ use a denser framebuffer. Moving between monitors rebuilds spacing from the orig
 The font atlas rasterizes interface text, code and icons at the current density without replacing
 their font handles. Pointer coordinates, scene picking and the game's preview keep their existing
 coordinate system. The scene preview still renders at its logical viewport resolution, so its
-image does not yet gain the extra pixel density of Retina text. There is no manual scale override.
+image does not yet gain the extra pixel density of Retina text. In **Edit > Preferences**, turn
+off **Follow monitor scale** to set an editor scale from 75% to 200%. Save applies the scale to
+the editor immediately and remembers it for the next session. The project hub follows the monitor.
 
 ## Spot lights
 

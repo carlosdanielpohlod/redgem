@@ -54,6 +54,14 @@ void check_hierarchy(const SceneDesc& scene) {
     require(depths[i] <= gltf_checks::kMaxNodeDepth, "expanded prefab hierarchy is too deep");
   }
 }
+// Archive entries have no filesystem inode. Use their paths for cycle detection.
+bool same_prefab_file(const fs::path& first, const fs::path& second) {
+  if (first == second) return true;
+  if (game_files::in_archive(first) || game_files::in_archive(second)) return false;
+  std::error_code problem;
+  return fs::equivalent(first, second, problem);
+}
+
 class Resolver {
  public:
   Resolver(SceneDesc source, fs::path folder, const Limits& limits, Origins* origins)
@@ -111,7 +119,7 @@ class Resolver {
   }
   void enter(const fs::path& path) {
     require(stack_.size() < limits_.depth, "prefab nesting is too deep");
-    for (const auto& active : stack_) require(!fs::equivalent(active, path), "prefab reference cycle");
+    for (const auto& active : stack_) require(!same_prefab_file(active, path), "prefab reference cycle");
     require(instances_ < limits_.instances, "too many prefab instances");
     ++instances_;
     stack_.push_back(path);
