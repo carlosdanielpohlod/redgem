@@ -55,10 +55,7 @@ void EditorApp::render_viewport_texture() {
 void EditorApp::draw_edited_scene() {
   SceneViewport& view = *viewport_;
   aim_viewport_camera();
-  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
-  renderer_->set_motion_blur(kNoMotionBlur);
-  renderer_->set_underwater({});               // the editor's camera flies through water without the look
-  renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
+  set_editor_look();
   sync_renderer_assets();
   renderer_->draw_world(session_->scene(), view.camera, &view.target);
   std::optional<BrushMark> brush;
@@ -68,6 +65,13 @@ void EditorApp::draw_edited_scene() {
   draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
   EndMode3D();
   EndTextureMode();
+}
+
+void EditorApp::set_editor_look() {
+  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
+  renderer_->set_motion_blur(kNoMotionBlur);
+  renderer_->set_underwater({});               // the editor's camera flies through water without the look
+  renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
 }
 
 void EditorApp::aim_viewport_camera() {

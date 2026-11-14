@@ -6,9 +6,8 @@ namespace redgem {
 namespace {
 
 // Whether a surface at `height` over the column is above the water found there so far.
-bool higher(const std::optional<float>& height, const std::optional<WaterColumn>& found) {
-  if (!height) return false;
-  return !found || *height > found->height;
+bool higher(float height, const std::optional<WaterColumn>& found) {
+  return !found || height > found->height;
 }
 
 // Whether a surface at `height` is nearer a point at `y` than the one found so far.
@@ -37,7 +36,8 @@ std::optional<WaterColumn> water_column_at(const std::vector<WaterSurface>& surf
   std::optional<WaterColumn> found;
   for (const WaterSurface& surface : surfaces) {
     const auto height = water_surface_height(surface, x, z);
-    if (higher(height, found)) found = WaterColumn{*height, &surface};
+    if (!height) continue;
+    if (higher(*height, found)) found = WaterColumn{*height, &surface};
   }
   return found;
 }

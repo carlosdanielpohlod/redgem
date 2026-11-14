@@ -222,6 +222,8 @@ class EditorApp {
   // The Scene view's picture.
   void render_viewport_texture();
   void draw_edited_scene();
+  // How the renderer draws the edited scene: templates shown, and none of the game's camera effects.
+  void set_editor_look();
   void aim_viewport_camera();
   void sync_renderer_assets();
   void upload_preview_assets();

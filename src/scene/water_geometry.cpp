@@ -283,7 +283,9 @@ std::optional<WaterSweep> sweep_in_node(const WaterSurface& surface, std::size_t
 
 float triangle_height(const WaterTriangle& triangle) {
   constexpr float kCornerShare = 1.0f / static_cast<float>(kWaterTriangleCorners);
-  return (triangle.points[0].y + triangle.points[1].y + triangle.points[2].y) * kCornerShare;
+  float sum = 0.0f;
+  for (const Vec3& point : triangle.points) sum += point.y;
+  return sum * kCornerShare;
 }
 
 std::optional<float> height_in_leaf(const WaterSurface& surface, const WaterBvhNode& node, Vec3 point) {
