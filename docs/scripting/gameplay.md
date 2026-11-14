@@ -71,8 +71,15 @@ Input.gamepad_down?(:start, pad: 1)
 The keyboard and the mouse belong to the first player (pad 0). The other players start with the
 gamepad's bindings only, unless a player binds keys of their own (two players sharing one keyboard).
 
-Gamepads cannot rumble: the window library the engine uses on desktops has no vibration, and
-neither does Android's.
+Gamepads cannot rumble: the window library the engine uses (raylib 5.5) has no vibration on
+desktops nor on Android. `Input.rumble?` says so (false), and `Input.rumble(pad, strength,
+seconds)` is a hook that does nothing yet and returns false; it still checks its player, a
+strength from 0 to 1 and a time that is not negative, so a game can call it now and offer a
+vibration option only where `Input.rumble?` is true.
+
+```ruby
+Input.rumble(0, 0.8, 0.2) if Input.rumble?   # the first player's gamepad, hard, a fifth of a second
+```
 
 ## Controls
 
@@ -186,14 +193,19 @@ which stick moves an axis (`:left_x`, or `nil`): it is the game's, the same for 
 `GameMenu`'s settings screen has a Controls button that opens a ready-made controls page (the
 `:controls` screen). At its top, a choice of the player whose bindings it shows (1 to 4: the first
 also has the keyboard). Under it, a row for each action and one for each side of each axis, every
-one the game declared, in two cells: the player's keys and mouse buttons, and their gamepad buttons (an axis' stick
-shows among them, though no player rebinds it). Up and down move between the rows, left and
-right between a row's two cells.
+one the game declared, in four cells: two for the player's keys and mouse buttons, and two for
+their gamepad buttons. The first cell of each shows the first binding and the second the next (W
+and Up both move up), the second also listing any more a game bound; an axis' stick shows in its
+first buttons' cell, though no player rebinds it. Up and down move between the rows, left and
+right between a row's cells.
 
 Enter, a gamepad's A or a click on a cell (which also moves the focus there) waits for the next
-key, mouse button or wheel turn (the keys' cell) or gamepad button (the buttons' cell): that one
-takes the place of everything the cell
-had, and the row's other cell keeps its own. A button pressed for the keys' cell (or a key for the
+key, mouse button or wheel turn (a keys' cell) or gamepad button (a buttons' cell): that one takes
+the place of what the cell had, and the row's other cells keep theirs, in their places; caught for
+an empty second cell, it is added beside the first. One the row already has changes nothing.
+Delete, Backspace or a gamepad's Y clears the focused cell (the note under the rows says so). Keys
+are listed before mouse buttons, so a mouse button caught for the first cell of a row that has a
+key shows after it. A button pressed for a keys' cell (or a key for a
 buttons'), or a button of another player's gamepad, is not for it, and it waits on; any keyboard
 key or mouse button is taken for any player. The click on a cell that starts a wait is not taken for
 its binding; the next click is, and it clicks nothing else on the page. While a buttons' cell waits,
