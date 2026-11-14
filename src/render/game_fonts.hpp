@@ -35,7 +35,7 @@ class GameFonts {
     bool failed = false;
   };
   struct Face {
-    File* file = nullptr;  // (a decoding that fails marks the file failed, for every raster size)
+    const File* file = nullptr;
     int pixels = kDefaultPixels;
     std::set<int> letters;
     Font font{};
@@ -47,6 +47,8 @@ class GameFonts {
   Face& face(const std::string& name, int pixels);
   Face& add_face(const std::string& name, int pixels);
   File& file(const std::string& name);
+  bool no_room_for_file(const std::string& name) const;
+  Face* nearest_atlas(const std::string& name, int pixels);
   void read_file(File& file, const std::string& name) const;
   const Font& fallback(const std::string& name, const std::string& text, int pixels);
   bool add_letters(Face& face, const std::string& text);

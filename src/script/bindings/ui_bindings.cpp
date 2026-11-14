@@ -22,6 +22,7 @@ using namespace binding;
 constexpr mrb_int kOpaque = config::kMaxColorByte;  // a color channel at its fullest
 
 constexpr int kSmallestTextPixels = 1;
+constexpr float kUnitSlack = 1e-3f;  // a width a hair over a whole unit, from dividing by the scale, is that unit
 
 // Where something is drawn, in units of the interface (see ui_scale_of), as mruby hands it over.
 struct Box {
@@ -154,7 +155,9 @@ mrb_value ui_text_width(mrb_state* mrb, mrb_value) {
   // around it): a usual width per letter.
   const int pixels = text_pixels(size, ui_scale_of(ctx));
   const int width = ctx.measure_text ? ctx.measure_text(text, pixels) : estimated_text_width(text, pixels);
-  return in_units(mrb, width);
+  // (Rounded up: a text is never taken to be narrower than it is drawn.)
+  const float units = static_cast<float>(width) / ui_scale_of(ctx) - kUnitSlack;
+  return mrb_int_value(mrb, static_cast<mrb_int>(std::ceil(units)));
 }
 
 // A text field drawn this frame, tapped (or clicked) or not: a touch screen shows its keyboard

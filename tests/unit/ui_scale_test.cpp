@@ -64,3 +64,8 @@ TEST_CASE("the player's interface scale is kept with the other settings, and hel
   CHECK(display_from_json({{"ui_scale", 5.0}}, read).ui_scale == kLargestUiScale);
   CHECK(display_from_json({{"ui_scale", "big"}}, read).ui_scale == doctest::Approx(kLarger));
 }
+
+TEST_CASE("a player's interface scale far past a float's range is held to the largest") {
+  CHECK(display_from_json({{"ui_scale", 1e300}}, DisplaySettings{}).ui_scale == kLargestUiScale);
+  CHECK(display_from_json({{"ui_scale", -1e300}}, DisplaySettings{}).ui_scale == kSmallestUiScale);
+}

@@ -61,6 +61,13 @@ SurfaceSize scaled_size_by(SurfaceSize size, float scale) {
   return {side(size.width), side(size.height)};
 }
 
+// A number held to the player's interface scales before it becomes a float (a number past a
+// float's range does not fit one).
+float held_share_of(const nlohmann::json& value) {
+  return static_cast<float>(
+      std::clamp(value.get<double>(), static_cast<double>(kSmallestUiScale), static_cast<double>(kLargestUiScale)));
+}
+
 bool holds(const nlohmann::json& json, const char* key, const std::function<bool(const nlohmann::json&)>& kind) {
   return json.contains(key) && kind(json[key]);
 }
@@ -126,7 +133,7 @@ void read_window(const nlohmann::json& json, DisplaySettings& display) {
     display.render_scale = held_render_scale(json[kRenderScaleKey].get<float>());
   read_bool(json, kVsyncKey, display.vsync);
   read_whole(json, kFpsCapKey, kNoFrameCap, kMostFramesPerSecond, display.fps_cap);
-  if (holds(json, kUiScaleKey, is_number)) display.ui_scale = held_ui_scale(json[kUiScaleKey].get<float>());
+  if (holds(json, kUiScaleKey, is_number)) display.ui_scale = held_ui_scale(held_share_of(json[kUiScaleKey]));
 }
 
 // The master volume and each group's, all shares from 0 to 1.
