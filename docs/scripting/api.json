@@ -15,7 +15,7 @@
     "GameMenu::ControlsPage::Row",
     "GameMenu::ControlsScreen",
     "GameMenu::SettingsScreen",
-    "Network::Resends",
+    "Network::Level",
     "Network::Said",
     "NetworkSync::Snapshots",
     "NetworkSync::Snapshots::Pose",
@@ -3456,8 +3456,8 @@
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
-          "returns": {"type": "void"},
-          "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive"
+          "returns": {"type": "bool | nil"},
+          "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive. In a network game only the host may, and every machine changes level with it (false elsewhere)"
         },
         {
           "name": "load_scene_async",
@@ -3465,8 +3465,8 @@
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
-          "returns": {"type": "void"},
-          "about": "queues a background scene read; the old world survives failed reads and cancellation"
+          "returns": {"type": "bool | nil"},
+          "about": "queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)"
         },
         {
           "name": "loading?",
@@ -3494,7 +3494,7 @@
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
-          "about": "cancels a pending asynchronous request; returns whether one was pending"
+          "about": "cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)"
         },
         {
           "name": "on_loading",
@@ -4795,6 +4795,47 @@
           ],
           "returns": {"type": "String | nil"},
           "about": "a peer's name"
+        },
+        {
+          "name": "on_level_loading",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(String) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call"
+        },
+        {
+          "name": "on_level_ready",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(String) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call"
+        },
+        {
+          "name": "changing_level?",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "the machines are between two levels: loading, or waiting for each other"
+        },
+        {
+          "name": "level_timeout",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds the host, once it has a new level, waits for the others to have it (30); later ones are let go"
+        },
+        {
+          "name": "level_timeout=",
+          "static": true,
+          "params": [
+            {"name": "seconds", "type": "Numeric"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "sets it"
         },
         {
           "name": "spawn",

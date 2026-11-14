@@ -21,6 +21,16 @@ until 1.0, a release may change what games rely on (see
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. Quest stages are variables until a game sets
   `Dialogue.quests`. See the manual's Dialogue page.
+- **Changing level together in a network game**: on the host (a player's or a dedicated server's
+  room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
+  connection that stays up. Each machine loads it in the background and waits, frozen, until all
+  have it; a machine still loading after `Network.level_timeout` seconds (30) is let go. The
+  objects of the old level, spawned ones included, are gone everywhere, and nothing said about
+  them on the way reaches the new level. `Network.on_level_loading` and `Network.on_level_ready`
+  tell every machine, and `Network.changing_level?` says a change is going on. A machine that joins
+  loads the level the game plays. Only the host changes the level: elsewhere `Game.load_scene`
+  returns `false`. A room's opener on a relay can now have the relay let a machine go.
+
 - **Interaction**: an `Interactable` behaviour makes an object something the player can use or talk
   to (an I18n prompt, a range, a priority, an enabled flag and an optional facing angle), and an
   `Interactor` on the hero picks the best one in reach every frame (in range, in front, in line of
@@ -382,6 +392,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- In a network game, a machine that is not the host can no longer load a level on its own
+  (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
+  objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
 - **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
   links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run

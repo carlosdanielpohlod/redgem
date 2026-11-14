@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <initializer_list>
 #include <thread>
 
 #include <mruby.h>
@@ -558,6 +559,71 @@ TEST_CASE("a character's animation passes through a dedicated server's room to t
   online_game.round();
   ruby(first, "$hero.animation.play(:Attack)");
   CHECK(online_game.until([&] { return ruby(second, "$hero.animation.clip.inspect") == "\"Attack\""; }));
+}
+
+namespace {
+
+// Every machine of a room plays `name`, its change of level over: the server's game and its players.
+bool room_plays(Online& online_game, std::initializer_list<Engine*> players, const std::string& name) {
+  const std::string state = "[Game.scene_name, Network.changing_level?].inspect";
+  const std::string playing = "[\"" + name + "\", false]";
+  for (Engine* player : players) {
+    if (ruby(*player, state) != playing) return false;
+  }
+  return online_game.served(**players.begin(), state) == playing;
+}
+
+}  // namespace
+
+TEST_CASE("a dedicated server changes the level of a room, its players with it, and only it can") {
+  Online online_game(kRoomy);
+  Engine& first = online_game.join();
+  Engine& second = online_game.join();
+  const std::string watch = "$changes = []; Network.on_level_ready { |name| $changes << name }";
+  for (Engine* player : {&first, &second}) ruby(*player, watch);
+  online_game.served(first, watch + "; $kept = 3");
+  CHECK(online_game.served(first, "Game.load_scene('level2')") == "true");
+  REQUIRE(online_game.until([&] { return room_plays(online_game, {&first, &second}, "level2"); }));
+  for (Engine* player : {&first, &second}) {
+    CHECK(ruby(*player, "[$changes, Network.online?].inspect") == "[[\"level2\"], true]");
+  }
+  CHECK(online_game.served(first, "[$changes, $kept, Network.players.sort].inspect") == "[[\"level2\"], 3, [2, 3]]");
+
+  // A player can neither ask for a level nor order one as the server would.
+  CHECK(ruby(first, "Game.load_scene('main')") == "false");
+  ruby(first, "Network.__deliver(Network::LEVEL, [9, 'main'], :all)");
+  for (int turn = 0; turn < kServedTurns; ++turn) online_game.round();
+  CHECK(room_plays(online_game, {&first, &second}, "level2"));
+}
+
+TEST_CASE("a player back in its room after a drop loads the level the room changed to meanwhile") {
+  Online online_game(kRoomy);
+  Engine& first = online_game.join();
+  const std::string room = first.network().room();
+  online_game.served(first, "Network.reconnect_window = 20; Network.level_timeout = 1");
+  test::Middleman network(online_game.server.port());
+  REQUIRE(network.valid());
+  Engine& dropping = online_game.add_player();
+  const auto until = [&](const std::function<bool()>& done) {
+    return online_game.until([&] {
+      network.pump();
+      return done();
+    });
+  };
+  REQUIRE(ruby(dropping, "Network.join('127.0.0.1', port: " + std::to_string(network.port()) + ", room: '" + room +
+                             "')") == "true");
+  REQUIRE(until([&] { return online(dropping); }));
+  network.block(true);
+  network.cut();
+  REQUIRE(until([&] { return ruby(dropping, "Network.reconnecting?") == "true"; }));
+  // The room changes level without it (it is late past the timeout), and takes it back afterwards.
+  CHECK(online_game.served(first, "Game.load_scene('level2')") == "true");
+  REQUIRE(until([&] { return room_plays(online_game, {&first}, "level2"); }));
+  network.block(false);
+  REQUIRE(until([&] {
+    return ruby(dropping, "[Game.scene_name, Network.changing_level?, Network.online?].inspect") ==
+           "[\"level2\", false, true]";
+  }));
 }
 
 TEST_CASE("a dedicated server's status port answers an HTTP GET with how busy the server is") {
