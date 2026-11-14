@@ -1,0 +1,143 @@
+---
+description: "NPCs: a Brain (a state machine with transitions, guards, timers and events), and Perception (a sight cone with a line of sight, and hearing)."
+---
+
+# NPCs
+
+A character the player meets is made of a few behaviours on one object:
+
+- a `Brain`, which says what it is doing (patrolling, chasing, talking) and what makes it do
+  something else;
+- a `Perception`, which tells the brain what it sees and hears;
+- an [`Interactable`](interaction.md), when the player can talk to it or use it.
+
+```ruby
+class MainScene < SceneScript
+  def setup
+    find!("Player").add_component(Interactor)
+    guard = find!("Guard")
+    guard.add_component(Perception, sight: 15.0, fov: 90.0, hearing: 12.0)
+    guard.add_component(Interactable, prompt: "guard.talk")
+    guard.add_component(Guard)
+  end
+end
+```
+
+## Brain
+
+A brain is a state machine. A game's NPC is a subclass of `Brain` that declares its states and
+the transitions between them:
+
+```ruby
+class Guard < Brain
+  SEARCH_SECONDS = 8.0
+
+  initial :patrol
+  state :patrol                          # enter_patrol, update_patrol(dt), exit_patrol
+  state :chase, update: :run_at_target   # or a hook by name (or a block)
+  state :search
+  state :talk
+
+  transition from: :patrol, to: :chase, on: :see, if: ->(seen) { seen.tag?("Player") }
+  transition from: :chase, to: :search, on: :lose_sight
+  transition from: :search, to: :patrol, after: SEARCH_SECONDS
+  transition from: %i[patrol search], to: :search, on: :hear
+  transition from: :patrol, to: :talk, on: :interact
+  transition from: :talk, to: :patrol, after: 3.0
+  transition from: :any, to: :patrol, on: :reset
+
+  def update_patrol(dt); end            # walk the route (see Navigation)
+  def run_at_target(dt); end
+  def enter_talk = Debug.log("Halt!")
+end
+```
+
+A **state** has three hooks, each run on the brain: `enter` as it comes into the state, `update`
+every frame it is in it (with dt), and `exit` as it leaves. Unless given (`enter: :name`, or a
+block), they are the brain's methods `enter_<state>`, `update_<state>(dt)` and `exit_<state>`,
+when it has them. The brain starts in its `initial` state, or the first one declared, on its
+first frame.
+
+A **transition** goes `from:` a state, a list of states, or `:any`, `to:` another, when:
+
+- `on:` an **event** is fired (without `on:`, it is checked every frame);
+- `after:` that many seconds have gone by in the state (a **timer**);
+- its **guards** agree: `if:` is true and `unless:` is false.
+
+Every frame, the transitions without `on:` are checked in the order they were declared, and the
+first that may be taken is (at most one a frame); then the state's update runs. A transition
+from `:any` never leads to the state the brain is in already.
+
+A guard is a method's name, called with nothing, or a block run on the brain. A block that takes
+an argument gets the event's **payload**: what was seen, the noise heard, who used it.
+
+The events the engine fires on its own:
+
+| Event | When | Payload |
+|---|---|---|
+| `:see` | the object's Perception sees something come into sight | the object |
+| `:lose_sight` | ... and go out of it | the object |
+| `:hear` | the Perception hears a noise | a `Perception::Noise` |
+| `:interact` | the player uses the object's Interactable | the actor (the hero) |
+
+The game fires its own with `brain.fire(:hit, damage)`; `fire` is true when the brain changed
+state. `brain.go(:stunned)` changes state at once, whatever the transitions say. `state`,
+`previous_state` and `time_in_state` say where it is; `in?(:chase, :search)` asks.
+
+Time in a state is game time: it stands still while the game is paused (`Time.scale = 0`). A
+`Brain` subclass with its own `update` calls `super`.
+
+Declaring a state, or a transition, with an option it does not take raises at once. A transition
+to a state that was never declared raises as the brain starts.
+
+A subclass of a brain keeps its parent's states and transitions and may add to them.
+
+## Perception
+
+A `Perception` gives an NPC its senses.
+
+**Sight** is a cone in front of its eyes. It sees an object that is:
+
+1. no further than `sight` meters;
+2. inside the cone: no more than half of `fov` degrees off the way the NPC faces;
+3. in the line of sight: a ray from its eyes to the object hits nothing else first. What the NPC
+   carries is seen through, and the object's own collider, or one under it, counts as reaching
+   it. Triggers never block it.
+
+It looks from `eyes` meters above its origin, at `aim` meters above the watched object's origin.
+It looks for the players' heroes (the objects with an [Interactor](interaction.md)), or for the
+objects of one tag with `watch: "Enemy"`. As things come into sight and go out of it, the
+object's behaviours hear `on_see(object)` and `on_lose_sight(object)`. `in_sight` lists what it
+sees, `sees?(object)` asks about one, and `last_seen(object)` is where it last saw it: where to
+search.
+
+**Hearing** is a radius. A game makes a noise with `Perception.noise`:
+
+```ruby
+Perception.noise(at: transform.position)                               # a footstep
+Perception.noise(at: muzzle.transform.position, loudness: 3.0, source: game_object)  # a shot
+```
+
+Every Perception no further than its `hearing` times the noise's `loudness` hears it, walls or
+not; the noise's `source` does not hear itself. Its object's behaviours hear
+`on_hear(noise)`, with the noise's `position`, `loudness`, `source` and `distance` from them.
+`Perception.noise` returns the objects that heard it.
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `sight` | meters it sees | 15 |
+| `fov` | degrees of the whole cone, up to 360 | 120 |
+| `eyes` | meters above its origin it looks from | 1.6 |
+| `aim` | meters above a watched object's origin it looks at | 1 |
+| `hearing` | meters a noise of loudness 1 is heard from | 10 |
+| `watch` | the tag of what it looks for | the heroes |
+
+Each setting is also a Blender property of the object. One that is not a number from 0 up
+raises as the behaviour starts. While the game is paused it notices nothing new.
+
+## Over the network
+
+Only the host thinks and perceives: on a client, a `Brain` and a `Perception` do nothing, and a
+noise made there is heard by nobody. The host moves the NPC, and the players see it move through
+its [NetworkSync](multiplayer.md). An NPC's `on_interact` runs on the host already (see
+[Interaction over the network](interaction.md)).

@@ -5,6 +5,7 @@
   "internal_classes": [
     "Behaviour::Timer",
     "Behaviour::Tween",
+    "Brain::Transition",
     "Camera::Cut",
     "Camera::Follow",
     "Camera::Rig",
@@ -84,6 +85,21 @@
           "name": "on_blur",
           "args": "actor",
           "about": "it stopped being what that prompt is for"
+        },
+        {
+          "name": "on_see",
+          "args": "object",
+          "about": "a Perception on the object saw something come into sight"
+        },
+        {
+          "name": "on_lose_sight",
+          "args": "object",
+          "about": "... and saw it go out of sight"
+        },
+        {
+          "name": "on_hear",
+          "args": "noise",
+          "about": "a Perception on the object heard a noise (a Perception::Noise)"
         },
         {
           "name": "game_object",
@@ -2993,6 +3009,11 @@
       "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
       "methods": [
         {
+          "name": "all",
+          "static": true,
+          "about": "every Interactor of the scene: the players' heroes"
+        },
+        {
           "name": "target",
           "about": "the Interactable in focus, or nil"
         },
@@ -3012,6 +3033,8 @@
       ],
       "internal": [
         "on_destroy",
+        "registered",
+        "start",
         "update"
       ],
       "guide": "interaction.md"
@@ -3058,6 +3081,207 @@
         }
       ],
       "guide": "interaction.md"
+    },
+    {
+      "name": "LineOfSight",
+      "about": "Whether one thing can see another: a ray to it hits nothing else first.",
+      "methods": [
+        {
+          "name": "clear?",
+          "static": true,
+          "args": "from, to, target, ignore: []",
+          "about": "whether a ray from a point to a point on the target hits nothing but the target (or what is under it) first"
+        },
+        {
+          "name": "carried",
+          "static": true,
+          "args": "object",
+          "about": "an object and everything under it"
+        },
+        {
+          "name": "part_of?",
+          "static": true,
+          "args": "object, whole",
+          "about": "whether an object is the whole, or is under it"
+        }
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Perception",
+      "about": "A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear.",
+      "internal": [
+        "number",
+        "on_destroy",
+        "perceives_here?",
+        "registered",
+        "start",
+        "update"
+      ],
+      "methods": [
+        {
+          "name": "noise",
+          "static": true,
+          "args": "at:, loudness: 1.0, source: nil",
+          "about": "a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it"
+        },
+        {
+          "name": "all",
+          "static": true,
+          "about": "every Perception of the scene"
+        },
+        {
+          "name": "sees?",
+          "args": "object",
+          "about": "whether an object is in sight now: in range, in the cone, not hidden"
+        },
+        {
+          "name": "in_sight",
+          "about": "what it sees, as of its last update"
+        },
+        {
+          "name": "sees_any?",
+          "about": "whether it sees anything it watches"
+        },
+        {
+          "name": "last_seen",
+          "args": "object",
+          "about": "where it last saw an object (a Vector3), or nil"
+        },
+        {
+          "name": "watched",
+          "about": "what it looks for: the objects of its watch tag, or the players' heroes"
+        },
+        {
+          "name": "angle_to",
+          "args": "object",
+          "about": "degrees between where it looks and where an object is"
+        },
+        {
+          "name": "eye_point",
+          "about": "where it looks from"
+        },
+        {
+          "name": "sight",
+          "about": "meters it sees (15 unless said)"
+        },
+        {
+          "name": "fov",
+          "about": "degrees of the whole cone (120 unless said)"
+        },
+        {
+          "name": "eyes",
+          "about": "meters above its origin it looks from (1.6 unless said)"
+        },
+        {
+          "name": "aim",
+          "about": "meters above a watched object's origin it looks at (1 unless said)"
+        },
+        {
+          "name": "hearing",
+          "about": "meters a noise of loudness 1 is heard from (10 unless said)"
+        }
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Perception::Noise",
+      "about": "A noise someone heard.",
+      "internal": [
+        "distance=",
+        "loudness=",
+        "position=",
+        "source="
+      ],
+      "methods": [
+        {
+          "name": "position",
+          "about": "where it was made"
+        },
+        {
+          "name": "loudness",
+          "about": "how loud: 1 is heard as far as a listener's hearing"
+        },
+        {
+          "name": "source",
+          "about": "the object that made it, or nil"
+        },
+        {
+          "name": "distance",
+          "about": "meters from the listener"
+        }
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Brain",
+      "about": "A behaviour: an NPC's state machine, with states, transitions, guards, timers and events.",
+      "internal": [
+        "inherited",
+        "on_hear",
+        "on_interact",
+        "on_lose_sight",
+        "on_see",
+        "update"
+      ],
+      "methods": [
+        {
+          "name": "state",
+          "static": true,
+          "args": "name, **hooks",
+          "about": "a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)"
+        },
+        {
+          "name": "initial",
+          "static": true,
+          "args": "name = nil",
+          "about": "the state it starts in (the first declared unless said)"
+        },
+        {
+          "name": "transition",
+          "static": true,
+          "args": "from:, to:, **options",
+          "about": "a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards"
+        },
+        {
+          "name": "states",
+          "static": true,
+          "about": "its states, by name"
+        },
+        {
+          "name": "transitions",
+          "static": true,
+          "about": "its transitions, in the order they were declared"
+        },
+        {
+          "name": "state",
+          "about": "the state it is in (nil before its first frame)"
+        },
+        {
+          "name": "previous_state",
+          "about": "the state it was in before"
+        },
+        {
+          "name": "time_in_state",
+          "about": "seconds of game time in this state"
+        },
+        {
+          "name": "in?",
+          "args": "*names",
+          "about": "whether it is in one of these states"
+        },
+        {
+          "name": "fire",
+          "args": "event, payload = nil",
+          "about": "an event: the first transition waiting for it that may be taken is; true when the state changed"
+        },
+        {
+          "name": "go",
+          "args": "name",
+          "about": "goes to a state now, whatever the transitions say"
+        }
+      ],
+      "guide": "npcs.md#brain"
     }
   ]
 }

@@ -20,6 +20,9 @@ class Door < Behaviour
   def on_interact(actor); end         # the player used it (it has an Interactable: see Interaction)
   def on_focus(actor); end            # its prompt shows
   def on_blur(actor); end             # ... and no longer does
+  def on_see(object); end             # it has a Perception, which saw something (see NPCs)
+  def on_lose_sight(object); end      # ... and no longer sees it
+  def on_hear(noise); end             # ... or heard a noise (Perception.noise)
 end
 ```
 

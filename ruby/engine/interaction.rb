@@ -5,7 +5,8 @@
 #
 # A target is in reach of an actor when it is enabled, no further than its range, in front of the
 # actor within its angle (when it has one), and in sight: a ray from the actor to it hits nothing
-# but the target (or what is under it) first. Of those, the highest priority wins, then the nearest.
+# but the target (or what is under it) first (see LineOfSight). Of those, the highest priority
+# wins, then the nearest.
 #
 # In a game over the network, a client's use is asked of the host, which looks again (range, angle
 # and sight, where it sees the client's hero) and runs on_interact there: the host decides what
@@ -19,8 +20,6 @@ module Interaction
   # target's range, and degrees past its angle.
   NETWORK_SLACK = 1.0
   NETWORK_ANGLE_SLACK = 30.0
-  # Meters short of a target a ray may stop (on the target's own surface) and still see it.
-  SIGHT_TOLERANCE = 0.05
   NEAR = 1e-4                 # meters: closer than this, a target is where the actor is
   DEGREES_PER_RADIAN = 180.0 / Math::PI
   @handlers = {}
@@ -85,6 +84,7 @@ module Interaction
     def __scene_reset
       @handlers = {}
       Interactable.__forget_all
+      Interactor.__forget_all
     end
 
     private
@@ -115,26 +115,9 @@ module Interaction
     # Whether a ray from the actor reaches the target before anything else. What the actor
     # carries (the objects under it) does not hide anything.
     def in_sight?(actor, target)
-      length = distance(actor, target)
-      return true if length < NEAR
-
-      direction = (target.transform.position - actor.transform.position) / length
-      hit = Physics.raycast(actor.transform.position, direction, length, ignore: carried(actor))
-      clear_hit?(hit, target, length)
+      LineOfSight.clear?(actor.transform.position, target.transform.position, target.game_object,
+                         ignore: LineOfSight.carried(actor))
     end
-
-    def clear_hit?(hit, target, length)
-      hit.nil? || hit[:distance] >= length - SIGHT_TOLERANCE || part_of?(hit[:object], target.game_object)
-    end
-
-    # Whether an object is the target, or is under it (a character's collider on a child).
-    def part_of?(object, whole)
-      object = object.parent until object.nil? || object == whole
-      !object.nil?
-    end
-
-    # An object and everything under it.
-    def carried(object) = [object] + object.children.flat_map { |child| carried(child) }
 
     def interactable_of(target)
       target.is_a?(Interactable) ? target : target&.get_component(Interactable)
