@@ -420,6 +420,9 @@ TEST_CASE("requests answered just as their game ends, collected or not, end with
   }
 }
 
+// (Windows lets a wait on a socket hung up from another thread sleep on: there, a request given
+// up is seen at its wait's next look instead.)
+#ifndef _WIN32
 namespace {
 
 // A connection to `listener`, made.
@@ -457,3 +460,4 @@ TEST_CASE("giving a request up hangs up the connection it waits on, so the wait 
   const net::HeldConnection held(cancel, later);
   CHECK(net::Socket::wait({{&later, false}}, kLongWaitSeconds));
 }
+#endif

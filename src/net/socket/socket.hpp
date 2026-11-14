@@ -78,8 +78,9 @@ class Socket {
   void close_reading_at_most(std::size_t most_unread);
   // Closes it at once with a reset: nothing more is read, nor sent.
   void reset();
-  // Ends its connection both ways without closing it, from any thread: a wait on it ends at once,
-  // and what is read or sent from then on finds it ended. Its owner still closes it.
+  // Ends its connection both ways without closing it, from any thread: what is read or sent from
+  // then on finds it ended, and on POSIX systems a wait on it ends at once (Windows lets a wait
+  // sleep on). Its owner still closes it.
   void hang_up() const;
 
   // Sleeps until something happens on one of `sockets` (bytes arrive, someone connects, the other

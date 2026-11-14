@@ -51,7 +51,8 @@ std::unique_ptr<HttpStream> secure_stream(Socket socket, const std::string& host
                                           std::shared_ptr<const TrustStore> trust, std::string& error);
 
 // How a request is given up from another thread (its game ended): it is told so, and the
-// connection it is waiting on, if it is, is hung up, so that the wait ends at once.
+// connection it is waiting on, if it is, is hung up, so that the wait ends at once (on Windows,
+// whose waits a hang-up does not end, at the wait's next look, 50 ms later at most).
 class HttpCancel {
  public:
   void cancel();
