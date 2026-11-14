@@ -272,8 +272,8 @@ not a promise of how it will be closed.
   there is no HRTF, occlusion or Doppler.
 - One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
   effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
-  ducking, filters). Fades are linear in volume, and only the music fades by itself; a sound's
-  levels change at once.
+  filters). Only the music group ducks, and only under the voice group. Fades and ducking are
+  linear in volume, and only the music fades by itself; a sound's levels change at once.
 
 ### Text
 

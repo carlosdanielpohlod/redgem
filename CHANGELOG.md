@@ -22,6 +22,10 @@ until 1.0, a release may change what games rely on (see
   seconds) and takes at most 16 KiB of code. Release builds leave it
   out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
   `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
   block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
   passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
