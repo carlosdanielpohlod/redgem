@@ -52,7 +52,7 @@ struct AxisBinding {
 class InputMap {
  public:
   // What every game has without declaring anything: the axes "horizontal" and "vertical" and the
-  // actions "jump", "fire" and "run".
+  // actions "jump", "fire", "run" and "interact" (what Interactor uses things with).
   static InputMap defaults();
 
   void bind_axis(const std::string& name, AxisBinding binding) { axes_[name] = std::move(binding); }

@@ -17,7 +17,8 @@ Input.down?(:e)                # any key: held
 Input.pressed?(:e)             # any key: went down this frame
 ```
 
-Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift). A game
+Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift), `:interact` (E,
+what an [Interactor](interaction.md) uses things with). A game
 declares its own and lets players change them: see [Controls](#controls).
 
 Keys go by these names:
@@ -40,8 +41,8 @@ and a game never sees it go down there.
 ## Read a gamepad
 
 A game written with axes and actions already works with a gamepad: the left stick moves
-`:horizontal` and `:vertical` (by as much as it is pushed), and A, X and B are `:jump`, `:fire`
-and `:run`. For the rest, ask the gamepad itself:
+`:horizontal` and `:vertical` (by as much as it is pushed), and A, X, B and Y are `:jump`, `:fire`,
+`:run` and `:interact`. For the rest, ask the gamepad itself:
 
 ```ruby
 Input.gamepad?                        # is one plugged in?
@@ -78,7 +79,7 @@ neither does Android's.
 
 A game names what its players do (actions, which are on or off, and axes, from -1 to 1) and says
 what triggers them. Scripts then read the names, never the keys, so players can change the keys.
-The built-in `:jump`, `:fire`, `:run`, `:horizontal` and `:vertical` are always there; a game adds
+The built-in `:jump`, `:fire`, `:run`, `:interact`, `:horizontal` and `:vertical` are always there; a game adds
 its own, or binds one of those anew, in the `input` section of its `game.json`:
 
 ```json
@@ -113,7 +114,7 @@ Input.define_action(:shoot, :f, mouse: [:left], buttons: [:right_bumper])
 Input.define_action(:next_weapon, "mouse:wheel_up", "pad:y")
 Input.define_axis(:steer, negative: [:a, "pad:dpad_left"], positive: {keys: [:d], buttons: [:dpad_right]},
                   pad_axis: :left_x)
-Input.actions                   # [:dash, :fire, :jump, :run]
+Input.actions                   # [:dash, :fire, :interact, :jump, :run]
 Input.action_released?(:dash)   # true on the frame the last of its keys and buttons lets go
 ```
 

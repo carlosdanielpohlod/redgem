@@ -9,6 +9,9 @@
 #     def on_collision_enter(other); end
 #     def on_collision_exit(other); end
 #     def on_destroy; end
+#     def on_interact(actor); end    # with an Interactable (see interaction.rb)
+#     def on_focus(actor); end
+#     def on_blur(actor); end
 #   end
 class Behaviour
   attr_reader :game_object
@@ -21,6 +24,9 @@ class Behaviour
   def on_collision_enter(_other); end
   def on_collision_exit(_other); end
   def on_destroy; end
+  def on_interact(_actor); end
+  def on_focus(_actor); end
+  def on_blur(_actor); end
 
   def transform = game_object.transform
   def character = game_object.character

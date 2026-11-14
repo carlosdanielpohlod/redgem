@@ -158,6 +158,15 @@ mrb_value game_object_add_component(mrb_state* mrb, mrb_value self) {
   return script_host(mrb).add_behaviour(alive_id(mrb, self), klass);
 }
 
+// GameObject#__notify(:on_interact, actor): see ScriptHost::notify.
+mrb_value game_object_notify(mrb_state* mrb, mrb_value self) {
+  mrb_sym method = 0;
+  mrb_value argument = mrb_nil_value();
+  mrb_get_args(mrb, "no", &method, &argument);
+  script_host(mrb).notify(alive_id(mrb, self), mrb_sym_name(mrb, method), argument);
+  return mrb_nil_value();
+}
+
 // Loads the game script a missing constant should come from (see ruby/engine/kernel.rb).
 mrb_value kernel_require_class(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(script_host(mrb).require_class(name_arg(mrb)));
@@ -184,6 +193,7 @@ void install_look_bindings(RClass* game_object, mrb_state* mrb) {
 
 void install_component_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "__add_component", game_object_add_component, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "__notify", game_object_notify, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, mrb->kernel_module, "__require_class", kernel_require_class, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "__has_character?", game_object_has_character, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "__has_rigidbody?", game_object_has_rigidbody, MRB_ARGS_NONE());

@@ -312,6 +312,11 @@ Network.on(:coin) { |coin_name, _from| Scene.find(coin_name)&.get_component(Coin
 The platformer demo plays together this way: Esc > Multiplayer hosts or joins a game, and
 `games/platformer/scripts/co_op.rb` is the whole of its networking.
 
+What a player uses (a door, a lever, someone to talk to, through an `Interactor`) is the one
+exception: the host decides it. A client's use is asked of the host, which checks the hero's
+range and line of sight again before `on_interact` runs there (see
+[Interaction](interaction.md#over-the-network)).
+
 ## Testing it
 
 The engine's own multiplayer test runs two copies of the game at once, each with its own test

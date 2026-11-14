@@ -71,6 +71,21 @@
           "about": "the object is being destroyed"
         },
         {
+          "name": "on_interact",
+          "args": "actor",
+          "about": "an actor used this object (it has an Interactable; on the host in a game over the network)"
+        },
+        {
+          "name": "on_focus",
+          "args": "actor",
+          "about": "this object became what an actor's interaction prompt is for"
+        },
+        {
+          "name": "on_blur",
+          "args": "actor",
+          "about": "it stopped being what that prompt is for"
+        },
+        {
           "name": "game_object",
           "about": "the object this behaviour is attached to"
         },
@@ -2882,6 +2897,144 @@
         "watch_afresh"
       ],
       "guide": "multiplayer.md#objects-in-the-same-place-everywhere"
+    },
+    {
+      "name": "Interactable",
+      "about": "A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).",
+      "methods": [
+        {
+          "name": "all",
+          "static": true,
+          "about": "every Interactable of the scene"
+        },
+        {
+          "name": "prompt",
+          "about": "the I18n key of its prompt, or nil for the engine's \"Interact\""
+        },
+        {
+          "name": "prompt=",
+          "args": "key",
+          "about": "changes the prompt"
+        },
+        {
+          "name": "prompt_text",
+          "about": "the prompt in the language in use"
+        },
+        {
+          "name": "range",
+          "about": "meters from the actor it can be used from (2 unless said)"
+        },
+        {
+          "name": "range=",
+          "args": "meters",
+          "about": "changes the range"
+        },
+        {
+          "name": "priority",
+          "about": "of those in reach, the highest wins (0 unless said)"
+        },
+        {
+          "name": "priority=",
+          "args": "value",
+          "about": "changes the priority"
+        },
+        {
+          "name": "enabled?",
+          "about": "whether it can be picked"
+        },
+        {
+          "name": "enabled=",
+          "args": "flag",
+          "about": "false: never picked"
+        },
+        {
+          "name": "angle",
+          "about": "degrees off the actor's forward it may be at; nil for any direction"
+        },
+        {
+          "name": "angle=",
+          "args": "degrees",
+          "about": "changes the angle (nil: any direction)"
+        }
+      ],
+      "internal": [
+        "number",
+        "on_destroy",
+        "registered",
+        "start"
+      ],
+      "guide": "interaction.md"
+    },
+    {
+      "name": "Interactor",
+      "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
+      "methods": [
+        {
+          "name": "target",
+          "about": "the Interactable in focus, or nil"
+        },
+        {
+          "name": "use",
+          "about": "uses what is in focus now; false when nothing is"
+        },
+        {
+          "name": "pad",
+          "about": "the player whose :interact it reads (0 unless said)"
+        },
+        {
+          "name": "prompt_label",
+          "args": "target",
+          "about": "what the prompt says for a target: \"[E] Open\""
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "update"
+      ],
+      "guide": "interaction.md"
+    },
+    {
+      "name": "Interaction",
+      "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",
+      "methods": [
+        {
+          "name": "on",
+          "static": true,
+          "args": "event, &block",
+          "about": "|actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)"
+        },
+        {
+          "name": "interact",
+          "static": true,
+          "args": "actor, target",
+          "about": "the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client"
+        },
+        {
+          "name": "best_for",
+          "static": true,
+          "args": "actor, candidates = Interactable.all, lenient: false",
+          "about": "the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)"
+        },
+        {
+          "name": "reachable?",
+          "static": true,
+          "args": "actor, target, lenient: false",
+          "about": "whether an actor can use a target now: enabled, in range, in front, in sight"
+        },
+        {
+          "name": "distance",
+          "static": true,
+          "args": "actor, target",
+          "about": "meters from an actor to a target"
+        },
+        {
+          "name": "angle_to",
+          "static": true,
+          "args": "actor, target",
+          "about": "degrees between where the actor faces and where the target is, across the ground"
+        }
+      ],
+      "guide": "interaction.md"
     }
   ]
 }

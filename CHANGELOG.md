@@ -10,6 +10,15 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Interaction**: an `Interactable` behaviour makes an object something the player can use or talk
+  to (an I18n prompt, a range, a priority, an enabled flag and an optional facing angle), and an
+  `Interactor` on the hero picks the best one in reach every frame (in range, in front, in line of
+  sight; the highest priority, then the nearest), shows its prompt with the key or button bound to
+  the new built-in `:interact` action (E, a gamepad's Y; rebindable), and uses it on that action or
+  a tap on the prompt. The target's behaviours hear `on_interact(actor)`, `on_focus(actor)` and
+  `on_blur(actor)`, and the game `Interaction.on(:interact) { |actor, target| }`. Over the network
+  a client's use is asked of the host, which checks range and line of sight again and runs it there.
+  See the manual's Interaction page.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

@@ -17,10 +17,17 @@ module Network
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
     MAX_DISTANCE = 1_000_000.0   # meters from the middle of a level (or degrees of a turn) an object can be at
+    INTERACTION_SIZE = 2      # parts of what asks the host for a use: the actor's key, the target's
 
     class << self
       # A spawn record with every part of its kind.
       def record?(record) = list?(record, RECORD_SIZE) && right_parts?(*record)
+
+      # What asks the host for a use (see Interaction): two names objects go by.
+      def interaction?(data) = list?(data, INTERACTION_SIZE) && data.all? { |key| object_key?(key) }
+
+      # A name an object goes by on the network: a key, or (an object with no NetworkSync) its name.
+      def object_key?(key) = key.is_a?(String) && !key.empty? && key.bytesize <= MAX_KEY_SIZE
 
       # An array of exactly so many things.
       def list?(value, size) = value.is_a?(Array) && value.size == size
