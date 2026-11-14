@@ -32,7 +32,8 @@ class GameMenu < Behaviour
   RUNNING = 1.0
   FROZEN = 0.0
   LAST = -1                   # where an option is added unless said: after the others
-  REFERENCE_HEIGHT = 720      # the screen height the sizes above are for: a shorter one shrinks them
+  REFERENCE_HEIGHT = 720      # the interface's height (UI.height) the sizes above are for
+  REFERENCE_WIDTH = 800       # the width its widest rows need, with room beside them
 
   # The name of the open screen; nil while the game goes on.
   attr_reader :screen
@@ -114,14 +115,26 @@ class GameMenu < Behaviour
     [(UI.width - width) / 2, y, width, height]
   end
 
-  # How much smaller than their sizes the menu's things are drawn: on a screen shorter than
-  # REFERENCE_HEIGHT, as much shorter (never larger; as they are where there is no screen).
-  def scale = UI.height.positive? ? [UI.height.to_f / REFERENCE_HEIGHT, 1.0].min : 1.0
+  # How much larger than their sizes the menu's things are, in the interface's units (which grow
+  # with the screen, see UI.scale): as the game's reference is taller than REFERENCE_HEIGHT, or as
+  # the screen is, in units, when it is shorter or narrower than the menu needs (a player's large
+  # Settings.ui_scale, a narrow window), so that the menu always fits: it already takes the
+  # screen's height, so a larger interface size grows the game's HUD, not the menu. As they are
+  # where there is no screen.
+  def scale = [height_share, width_share].compact.min || 1.0
 
   # A size of the menu's, as it is drawn on this screen.
   def scaled(size) = (size * scale).to_i
 
   private
+
+  # The menu's scale as the room in height allows (nil with no screen), and as the width does.
+  def height_share
+    room = [UI.reference[1], UI.height].select(&:positive?).min
+    room && room.to_f / REFERENCE_HEIGHT
+  end
+
+  def width_share = UI.width.positive? ? UI.width.to_f / REFERENCE_WIDTH : nil
 
   def first_button_share = open_screen&.first_button_share || FIRST_BUTTON_SHARE
 

@@ -52,6 +52,8 @@ mrb_value settings_save(mrb_state* mrb, mrb_value) {
   const ScriptContext& game = context(mrb);
   if (!game.save_display) return mrb_false_value();
   std::string error;
+  // (Writing the file is the engine's time, not the script's: see save_bindings.)
+  const BudgetPause pause(script_budget(mrb));
   const bool saved = game.save_display(game.display, error);
   if (!saved) log::warning("could not keep the settings: " + error);
   return mrb_bool_value(saved);

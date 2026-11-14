@@ -126,9 +126,13 @@ TEST_CASE("the presenter is handed each frame of the game: what scripts drew, pa
 TEST_CASE("the game is as big as the presenter's surface, and texts as wide as it measures them") {
   RecordingPresenter presenter;
   auto engine = sandbox(presenter);
-  CHECK(ruby(*engine, "UI.width") == std::to_string(kScreenWidth));  // from the start, before any frame
-  CHECK(ruby(*engine, "UI.height") == std::to_string(kScreenHeight));
-  CHECK(ruby(*engine, "UI.text_width('abcd', size: 30)") == std::to_string(4 * kLetterWidth));
+  // From the start, before any frame. (Its interface is laid out for a 1280x720 window: on this
+  // one, half as big, a unit takes half a pixel.)
+  CHECK(ruby(*engine, "[UI.pixel_width, UI.pixel_height]") ==
+        "[" + std::to_string(kScreenWidth) + ", " + std::to_string(kScreenHeight) + "]");
+  CHECK(ruby(*engine, "[UI.width, UI.height]") == "[1280, 720]");
+  // Measured at the pixels it is drawn at (15 for 30 units), and told in units: twice the pixels.
+  CHECK(ruby(*engine, "UI.text_width('abcd', size: 30)") == std::to_string(2 * 4 * kLetterWidth));
 }
 
 TEST_CASE("the game asks for the pointer every frame; the presenter decides") {

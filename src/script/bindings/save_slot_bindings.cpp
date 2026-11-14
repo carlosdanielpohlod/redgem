@@ -17,6 +17,7 @@ ScriptContext& slots(mrb_state* mrb) {
   if (!available) mrb_raise(mrb, E_RUNTIME_ERROR, "Save slots are only available while a game runs");
   return ctx;
 }
+// (Opening and listing slots reads the disk: the engine's time, not the script's.)
 mrb_value current(mrb_state* mrb, mrb_value) {
   const auto& name = slots(mrb).save_slot;
   return mrb_str_new(mrb, name.data(), static_cast<mrb_int>(name.size()));
@@ -29,6 +30,7 @@ mrb_value try_select(mrb_state* mrb, ScriptContext& ctx, const std::string& name
   }
   std::string failure;
   try {
+    const BudgetPause pause(script_budget(mrb));
     ctx.select_save_slot(name);
     return mrb_nil_value();
   } catch (const std::exception& error) {
@@ -49,6 +51,7 @@ mrb_value select(mrb_state* mrb, mrb_value) {
 mrb_value try_list(mrb_state* mrb, ScriptContext& ctx, std::vector<std::string>& values) {
   std::string failure;
   try {
+    const BudgetPause pause(script_budget(mrb));
     values = ctx.list_save_slots();
     return mrb_nil_value();
   } catch (const std::exception& error) {

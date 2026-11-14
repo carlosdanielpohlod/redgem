@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "app/scene_bodies.hpp"
+#include "app/scene_joints.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
@@ -29,6 +30,7 @@ void Engine::make_bodies() {
 }
 
 void Engine::settle_world() {
+  joints::create_all({scene_, scene_desc_}, *physics_, context_.scene_joints);
   find_water();
   navigation_.forget();  // the grid was the old scene's
   if (navigation_.settings().bake_on_load) bake_navigation();
@@ -106,17 +108,19 @@ void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
 
 ObjectId Engine::spawn(const SpawnRequest& request) {
   if (!scene_.is_alive(request.source)) return kNoObject;
-  return finish_spawn(scene_.clone(request.source), request);
+  return finish_spawn(scene_.clone_pairs(request.source), request);
 }
 
-ObjectId Engine::finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request) {
-  shape_spawned(created.front(), request);
+ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request) {
+  shape_spawned(copies.front().second, request);
   if (request.physics) {
-    for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
+    for (const auto& [original, id] : copies) bodies::create({scene_, scene_desc_}, *physics_, id);
+    // (Once every body of the copy is there: a joint may hold two of its parts.)
+    joints::create_copies({scene_, scene_desc_}, *physics_, copies, context_.scene_joints);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
-  for (const ObjectId id : created) scripts_->attach_object(id);
-  return created.front();
+  for (const auto& [original, id] : copies) scripts_->attach_object(id);
+  return copies.front().second;
 }
 
 void Engine::process_destroyed() {
@@ -129,6 +133,7 @@ void Engine::process_destroyed() {
     for (const ObjectId id : pending) scripts_->detach(id);
     // Children first, so each parent is torn down with nothing left under it.
     for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
+      joints::forget(context_.scene_joints, scene_.handle(*id));
       physics_->remove_object(*id);
       scene_.finalize_destroy(*id);
     }

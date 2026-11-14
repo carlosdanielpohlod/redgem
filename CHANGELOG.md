@@ -18,6 +18,26 @@ until 1.0, a release may change what games rely on (see
   level on its first update. Offline fixed-step runs (`--record`, `redgem run`) still make the
   level ready all at once, in the same frame as before.
 
+- **Joints set up in the editor**: Add Component > Joint gives an object a fixed, hinge, slider,
+  point or distance joint to another object (picked by name) or to the world, with its anchor,
+  axis, limits, motor, lengths, spring and break force, saved in the scene as the object's `joint`
+  properties (Blender can set them too). The joint is made as the scene loads, like one from
+  `Physics.joint`, and `GameObject#joint` returns it. The Scene view draws its anchor, its axis and
+  its limits as an arc. Undo, copy and paste, duplication, prefabs and `Scene.spawn` keep it, a
+  copy made with its other end holding to that end's copy.
+- **An interface that scales with the screen**: every size, position, margin and font size `UI`
+  takes is in units of a reference screen the game names in `game.json`
+  (`"ui": {"reference": [1920, 1080], "match": "height"}`, or `"width"` or `"fit"`; the game's own
+  window, its height matched, when it names none). `UI.scale` says how many pixels a unit takes,
+  so a HUD keeps its share of the screen at 720p, at 4K and in a small window, and texts are
+  drawn sharp from letters made near the pixels they take (a few raster sizes per face) instead of
+  being stretched. `UI.width` and `UI.height` are in units; `UI.pixel_width`, `UI.pixel_height`,
+  `UI.reference`, `UI.mouse_x` and `UI.mouse_y` are new, clicks and taps land on what is drawn at
+  any size, and `Camera.world_to_screen` and `Camera.screen_ray` are in units too. Players make
+  the interface bigger or smaller with `Settings.ui_scale` (0.5 to 2, the settings screen's
+  "Interface size"), kept with the other settings. `GameMenu` uses the same scale instead of its
+  own, so it now grows on large screens; it already takes the screen's height, so a larger
+  interface size grows a game's HUD, and the menu shrinks to fit a short or narrow screen.
 - **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
   model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
   or folder has every word, best match first (a name that is the word, then one that starts with
@@ -396,6 +416,12 @@ until 1.0, a release may change what games rely on (see
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).
+- **A slow disk no longer stops the script that saves**: reading and writing the save with `Save`
+  and its slots, and `Settings.save`, are the engine's time, not the call's, like spawning
+  (forgiven up to four budgets in one call); the block of `Save.update` still counts as the call's.
+  A save that took more than a second (another program scanning the file, a slow CI
+  machine) ended the call with a `ScriptTimeout`. The scripts' budget can be timed on a test's
+  clock (`ScriptBudget::set_clock`), and its tests no longer depend on how fast the machine is.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
