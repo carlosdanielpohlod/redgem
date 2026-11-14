@@ -20,10 +20,10 @@ ship a standalone game.
 > open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).
 
 <p align="center">
-  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo"><img src="https://carlosdanielpohlod.github.io/redgem-site/assets/poster-0.5.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
-  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo">Watch the demo</a> ·
-  <a href="https://carlosdanielpohlod.github.io/redgem-site/">Site</a> ·
-  <a href="https://carlosdanielpohlod.github.io/redgem-site/manual/">Manual</a>
+  <a href="https://www.redgem-engine.org/#showcase"><img src="https://www.redgem-engine.org/assets/poster-0.5.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
+  <a href="https://www.redgem-engine.org/#showcase">Watch the demo</a> ·
+  <a href="https://www.redgem-engine.org/">Site</a> ·
+  <a href="https://www.redgem-engine.org/manual/">Manual</a>
 </p>
 
 <details>
