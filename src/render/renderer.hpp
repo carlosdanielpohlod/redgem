@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
 #include "render/underwater.hpp"
@@ -62,6 +63,10 @@ class Renderer {
   void draw_debug(const DebugDrawBuffer& commands, const Camera3D& camera, const RenderTexture2D& output);
   // Draws what scripts put on screen this frame: texts, rectangles and images.
   void draw_hud(const std::vector<HudItem>& hud);
+  // Whether the card's time over each pass of a frame is measured (while the statistics overlay
+  // shows it), and the last it measured: nothing where the card cannot time (see gpu_timers.hpp).
+  void set_gpu_timing(bool on);
+  GpuTimings gpu_timings() const;
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
   // Where the camera of the next frames is against the water: under it, they look underwater.

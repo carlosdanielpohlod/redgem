@@ -154,7 +154,7 @@ the same pull request.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
-  `Debug` shapes a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
+  `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
 ## Editor
@@ -164,11 +164,15 @@ the same pull request.
   animations, and a few hundred bytes of description per object still stay until the editor is
   closed.
 - In Docker the editor has no sound.
-- A pasted object carries its own copy of its meshes and pictures, even in the scene it was copied
-  from (Duplicate shares them). A copy bigger than 64 MB pastes only in the editor window it was
-  copied in.
-- Importing the same model twice appends its meshes and textures again, and deleting an import
-  leaves its data in the scene's file (only pictures no material shows are dropped on save).
+- A pasted object carries its own copy of its meshes and pictures in memory, even in the scene it
+  was copied from (Duplicate shares them); the saved file stores the repeated data once. A copy
+  bigger than 64 MB pastes only in the editor window it was copied in.
+- Repeated data is merged when the scene is saved, not when it is imported: a model imported
+  twice holds two copies in the editor's memory (and on the graphics card) until the scene is
+  opened again. Only identical bytes, accessors, pictures, samplers and textures are merged;
+  materials and meshes stay one per import, so the Inspector edits each import apart. A scene whose
+  glTF uses extensions that point at its data in ways of their own (compressed meshes, GPU
+  instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
 - Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
@@ -217,8 +221,7 @@ not a promise of how it will be closed.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
-  existing blocks keep their old code. The script editor has no autocomplete, and console
-  backtraces do not jump to their lines.
+  existing blocks keep their old code. The script editor has no autocomplete.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
 - Scene recovery writes a separate copy at safe editing boundaries about once a minute. It is
@@ -295,9 +298,17 @@ not a promise of how it will be closed.
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
   Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
-- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay and immediate
-  world-space lines/wire boxes. World-space labels, GPU timing and per-function sampling remain
-  future work.
+- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
+  world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
+  GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
+  (Android) and the editor's Play show none. GPU time is
+  split into three coarse passes (prepare, scene, post), not per shadow cascade or effect. The
+  script sampler only samples while Ruby runs instructions: time inside the engine's own
+  functions counts for the Ruby method that called them, and Ruby blocks count for the method
+  that made them. It samples the running fiber's stack only (its innermost 64 frames) and keeps
+  at most 1024 distinct methods. A class collected while profiling whose memory is reused by a
+  new class can lend it its name until profiling starts again. Labels are not drawn without a main camera, and are not
+  hidden behind objects.
 
 ### Safety
 

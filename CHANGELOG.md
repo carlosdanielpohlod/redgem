@@ -20,6 +20,16 @@ until 1.0, a release may change what games rely on (see
   never flickers.
 - **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
   `Water.under?(point)` say where the scene's water is.
+- **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
+  overlay also shows how long the graphics card spent on the frame's prepare, scene and post
+  passes (timer queries read back a frame late, so the game never waits for the card; hidden
+  where the card cannot time, such as OpenGL ES), and the five script methods a sampling profiler
+  caught most often. The profiler reads the Ruby call stack about every millisecond while
+  profiling is on; `Debug.script_profile` returns its methods and `Debug.export_script_profile`
+  writes the whole profile to `script_profile.tsv` in the game's data folder.
+- **`Debug.label(text, at:)`**: text pinned to a world position for one frame, centered where the
+  main camera shows it, with `color:`, `alpha:` and `size:` like `UI.text`.
+
 - **Benchmarks and a server load test with thresholds**: `redgem_bench` times the hot paths that
   need no window (script updates, the physics step, loading a `.glb`, the network frame, JSON
   saves, HTTP parsing) and reports each one's median and 95th percentile; `redgem_server_load` fills
@@ -46,6 +56,12 @@ until 1.0, a release may change what games rely on (see
   weights (lit, shadow, motion and see-through passes alike, desktop and OpenGL ES). Scripts set
   them by name: `face.morph(:Smile, 0.7)`, `face.morph(:Smile)`, `face.morph_names`. Imported
   models keep their shape keys in the editor.
+
+- **Smaller scene files**: saving writes repeated data once (a model imported or pasted twice
+  stores its vertices, pictures and textures once, found by content) and leaves out what no object
+  uses, including a deleted import's meshes and materials. Only the written file changes: undo
+  after a save still brings back everything. Each save that leaves something out logs how many
+  bytes, and `redgem scene compact <game>` rewrites a scene that way from the command line.
 
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
