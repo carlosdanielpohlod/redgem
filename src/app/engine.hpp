@@ -251,6 +251,13 @@ class Engine {
   void finish_scene_load(LoadResult loaded);
 
   void fixed_step(float dt);
+  // Before a physics step: the water notes bodies that appeared or jumped, the bodies take the poses
+  // scripts gave them, and the water holds up what floats (its forces turn the bodies about where
+  // they are now, not where they were before a script moved them).
+  void push_poses_and_float();
+  // The water of a world just made, and the bodies in it: found at once, so its scripts' first calls
+  // and a game that starts paused (no fixed step yet) see it.
+  void find_water();
   // Whether a contact is between two objects that are both still there to hear of it.
   bool both_alive(const ContactEvent& event) const;
   void process_destroyed();

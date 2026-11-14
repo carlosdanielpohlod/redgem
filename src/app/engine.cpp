@@ -127,6 +127,7 @@ void Engine::build_world(const GameSettings& settings) {
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
+  find_water();
 }
 
 void Engine::open_presenter(const GameSettings& settings) {
@@ -249,6 +250,7 @@ void Engine::connect_world() {
   context_.scene = &scene_;
   context_.physics = physics_.get();
   context_.navigation = &navigation_;
+  context_.water = &water_.surfaces();
   context_.bake_navigation = [this] { bake_navigation(); };
 }
 
