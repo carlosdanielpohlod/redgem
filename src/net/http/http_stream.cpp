@@ -37,17 +37,14 @@ class PlainStream : public HttpStream {
 
 std::unique_ptr<HttpStream> plain_stream(Socket socket) { return std::make_unique<PlainStream>(std::move(socket)); }
 
-Patience::Patience(float seconds, const std::atomic<bool>& cancelled)
-    : deadline_(std::chrono::steady_clock::now() +
-                std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(seconds))),
-      seconds_(seconds),
-      cancelled_(cancelled) {}
+Patience::Patience(float seconds, const std::atomic<bool>& cancelled, const Clock& clock)
+    : clock_(clock), deadline_(clock.now() + seconds), seconds_(seconds), cancelled_(cancelled) {}
 
-bool Patience::over() const { return cancelled_.load() || std::chrono::steady_clock::now() >= deadline_; }
+bool Patience::over() const { return cancelled_.load() || clock_.now() >= deadline_; }
 
 bool Patience::wait(const Socket& socket, bool sending) const {
   if (over()) return false;
-  const float left = std::chrono::duration<float>(deadline_ - std::chrono::steady_clock::now()).count();
+  const auto left = static_cast<float>(deadline_ - clock_.now());
   Socket::wait({{&socket, sending}}, std::min(left, kLookSeconds));
   return !over();
 }
