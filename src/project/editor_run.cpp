@@ -33,18 +33,18 @@ bool pick_game(std::filesystem::path& game, std::string& hub_message, GpuChoice 
   return chosen.has_value();
 }
 
-EditorOptions options_with_agents(GpuChoice gpu, std::unique_ptr<tools::EditorBridge>& bridge) {
+EditorOptions options_with_agents(GpuChoice gpu, std::unique_ptr<tools::EditorBridge>& bridge, bool ruby_eval) {
   EditorOptions options = editor_options(gpu);
-  options.agent = agent_hooks(bridge);
+  options.agent = agent_hooks(bridge, ruby_eval);
   return options;
 }
 
 // One game in the editor, until the editor is left. The exit code, or nullopt to go (back) to the
 // hub: a broken game from the command line exits; from the hub it returns there.
 std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message,
-                             GpuChoice gpu, bool bridge_enabled) {
+                             GpuChoice gpu, EditorTooling tooling) {
   std::unique_ptr<tools::EditorBridge> bridge;  // (outlives the editor, whose agents' tools reach it)
-  auto created = EditorApp::create(game, options_with_agents(gpu, bridge));
+  auto created = EditorApp::create(game, options_with_agents(gpu, bridge, tooling.ruby_eval));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     if (from_command_line) return kExitFailure;
@@ -53,7 +53,7 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
   }
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
   // (One bridge for the editor: an agent's session may have enabled it already.)
-  if (bridge_enabled && !bridge) bridge = enable_editor_bridge(app);
+  if (tooling.bridge && !bridge) bridge = enable_editor_bridge(app, {}, tooling.ruby_eval);
   const int code = app.run();
   if (app.exit_action() != EditorExit::OpenHub) return code;
   return std::nullopt;
@@ -61,12 +61,12 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
 
 }  // namespace
 
-int run_editor(const std::filesystem::path& given, GpuChoice gpu, bool bridge) {
+int run_editor(const std::filesystem::path& given, GpuChoice gpu, EditorTooling tooling) {
   std::filesystem::path game = given;
   bool from_command_line = !game.empty();
   std::string hub_message;  // why the last game did not open, shown in the hub
   while (pick_game(game, hub_message, gpu)) {
-    if (const auto code = edit_game(game, from_command_line, hub_message, gpu, bridge)) return *code;
+    if (const auto code = edit_game(game, from_command_line, hub_message, gpu, tooling)) return *code;
     from_command_line = false;
     game.clear();  // back to the hub
   }

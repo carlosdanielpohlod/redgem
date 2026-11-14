@@ -106,6 +106,7 @@ class SceneDocument {
   // One brush stroke on a terrain, in the terrain's own space. Like a gizmo drag, it is not
   // recorded by itself: call checkpoint() once when a stroke begins. False when nothing changed.
   bool sculpt_terrain(int node, const TerrainBrush& brush);
+  bool paint_terrain(int node, const TerrainBrush& brush, Color tint);
   // Meshes reshaped since the last call (the renderer has to upload their vertices again).
   std::vector<int> take_changed_meshes();
   // Moves a node (and its children) under `new_parent` (kNoIndex = scene root), keeping its world
@@ -174,7 +175,10 @@ class SceneDocument {
   struct MeshShape {
     std::vector<float> positions;
     std::vector<float> normals;
-    bool operator==(const MeshShape& other) const { return positions == other.positions && normals == other.normals; }
+    std::vector<std::uint8_t> colors;
+    bool operator==(const MeshShape& other) const {
+      return positions == other.positions && normals == other.normals && colors == other.colors;
+    }
   };
   struct Snapshot {
     std::vector<NodeDesc> nodes;
