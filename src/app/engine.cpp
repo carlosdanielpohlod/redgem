@@ -26,13 +26,16 @@ namespace redgem {
 namespace {
 
 // What game.json says that cannot be used, and what the game does instead.
+void warn_of_all(const std::vector<std::string>& warnings) {
+  for (const std::string& warning : warnings) log::warning(warning);
+}
+
 void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
-  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
-  for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
-  for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
-  for (const std::string& warning : manifest.ui_warnings) log::warning(warning);
+  for (const auto* warnings :
+       {&manifest.physics_warnings, &manifest.servers_warnings, &manifest.navigation_warnings, &manifest.ui_warnings})
+    warn_of_all(*warnings);
 }
 
 // What the game's scripts are told of what game.json says.

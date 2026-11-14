@@ -117,9 +117,11 @@ class MarkedGame {
   }
 
   // Checks the marker is drawn where world_to_screen put it, over the coin where the picture shows it.
+  // (Both are in the interface's units: UI.scale pixels each in the picture taken.)
   void check_marker_over_coin() {
-    const Spot marker = spot_of(*engine_, "Camera.main.get_component(CoinMarker).spot");
-    const Spot coin = spot_of(*engine_, "Camera.world_to_screen(Camera.main.get_component(CoinMarker).coin)");
+    const Spot marker = spot_of(*engine_, "Camera.main.get_component(CoinMarker).spot.map { |side| side * UI.scale }");
+    const Spot coin = spot_of(
+        *engine_, "Camera.world_to_screen(Camera.main.get_component(CoinMarker).coin).map { |side| side * UI.scale }");
     const Found drawn = find_near(shot_, marker, kMarkerReach, is_marker);
     CHECK(drawn.count >= kLeastMarkerPixels);
     CHECK(std::abs(drawn.middle.x - marker.x) < kMarkerTolerance);

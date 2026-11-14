@@ -172,6 +172,16 @@ mrb_value ui_text_field_drawn(mrb_state* mrb, mrb_value) {
 
 mrb_value ui_keyboard_visible(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).keyboard_visible); }
 
+// The screen's size, in units and in pixels, and the interface's scale and reference.
+void install_ui_size_bindings(mrb_state* mrb, RClass* ui_module) {
+  mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "pixel_width", ui_pixel_width, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "pixel_height", ui_pixel_height, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "scale", ui_scale_value, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "reference", ui_reference, MRB_ARGS_NONE());
+}
+
 }  // namespace
 
 void install_ui_bindings(mrb_state* mrb) {
@@ -186,12 +196,7 @@ void install_ui_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, ui_module, "__text_field_drawn", ui_text_field_drawn, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, ui_module, "keyboard_visible?", ui_keyboard_visible, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "pixel_width", ui_pixel_width, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "pixel_height", ui_pixel_height, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "scale", ui_scale_value, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, ui_module, "reference", ui_reference, MRB_ARGS_NONE());
+  install_ui_size_bindings(mrb, ui_module);
 }
 
 }  // namespace redgem
