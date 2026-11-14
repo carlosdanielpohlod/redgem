@@ -117,6 +117,7 @@ std::string chain_of(mrb_state* mrb, mrb_value list) {
   const mrb_int count = RARRAY_LEN(list);
   if (static_cast<std::size_t>(count) > kMaxChainFaces) refuse_font(mrb);
   std::vector<std::string> names;
+  names.reserve(static_cast<std::size_t>(count));
   for (mrb_int i = 0; i < count; ++i) names.push_back(font_name(mrb, mrb_ary_ref(mrb, list, i)));
   return font_chain(names);
 }

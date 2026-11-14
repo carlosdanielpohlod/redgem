@@ -215,6 +215,7 @@ std::vector<FontPiece> GameFonts::layout(const std::string& chain, const std::st
   if (faces_.empty()) face("");
   const std::vector<std::string> names = chain_faces(chain);
   std::vector<const Face*> faces;
+  faces.reserve(names.size());
   for (const std::string& name : names) faces.push_back(&face(name));
   const auto has_glyph = [&faces](std::size_t index, int codepoint) { return can_draw(*faces[index], codepoint); };
   std::vector<FontPiece> laid = pieces(names, face_runs(visual_order(text), names.size(), has_glyph));
