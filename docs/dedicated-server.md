@@ -182,4 +182,7 @@ machines that stay silent and of players who say nothing to the game for five mi
 left paused counts), and keeps out addresses that guess at room codes. Its connections are
 encrypted, and a handshake not over in 3 seconds is let go.
 Players are let in without asking unless the game decides who plays: see
-[Online services](scripting/online-services.md#letting-players-in).
+[Online services](scripting/online-services.md#letting-players-in). The players' machines say where their
+objects are; game.json's `"movement_validation"` makes each room refuse moves faster or further
+than the game allows, and let go of players caught too often: see
+[Multiplayer](scripting/multiplayer.md#movement-validation).

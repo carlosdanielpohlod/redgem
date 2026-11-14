@@ -41,6 +41,9 @@ void install_network_approval_bindings(RClass* network_module, mrb_state* mrb);
 void install_network_search_bindings(RClass* network_module, mrb_state* mrb);
 // Where the objects this machine moves are: Network.__pose (network_pose_bindings.cpp).
 void install_network_pose_bindings(RClass* network_module, mrb_state* mrb);
+// Movement validation: Network.__validate_movement, movement_rules, movement_violations
+// (network_movement_bindings.cpp).
+void install_network_movement_bindings(RClass* network_module, mrb_state* mrb);
 // What the session is like right now: online?, host?, server?, id, peers... (network_state_bindings.cpp).
 void install_network_state_bindings(RClass* network_module, mrb_state* mrb);
 
