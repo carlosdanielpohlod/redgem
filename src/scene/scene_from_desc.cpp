@@ -78,11 +78,14 @@ Scene Scene::from_desc(const SceneDesc& desc) {
 
 namespace {
 
-GameObject rigid_object(const NodeDesc& node, ObjectId id, ObjectId parent, int mesh_offset) {
-  GameObject object = object_of(node, id);
+GameObject rigid_object(const NodeDesc& node, ObjectId id, ObjectId parent, int mesh_offset, const SceneDesc& assets) {
+  GameObject object = placed_object(node, id);
+  copy_parts(node, object);
+  apply_props(node.props, object);
   object.serial = new_object_serial();
   object.stable_id.clear();
   if (object.mesh != kNoIndex) object.mesh += mesh_offset;
+  give_shape_keys(assets, object);
   object.parent = parent;
   object.children.clear();
   object.prefab = false;
@@ -91,13 +94,14 @@ GameObject rigid_object(const NodeDesc& node, ObjectId id, ObjectId parent, int 
 
 }  // namespace
 
-std::vector<ObjectId> Scene::instantiate_rigid(const std::vector<NodeDesc>& nodes, int mesh_offset) {
+std::vector<ObjectId> Scene::instantiate_rigid(const std::vector<NodeDesc>& nodes, int mesh_offset,
+                                               const SceneDesc& assets) {
   std::vector<ObjectId> ids;
   ids.reserve(nodes.size());
   for (const auto& node : nodes) {
     const ObjectId id = free_slot();
     const ObjectId parent = node.parent == kNoIndex ? kNoObject : ids.at(static_cast<std::size_t>(node.parent));
-    objects_[id] = rigid_object(node, id, parent, mesh_offset);
+    objects_[id] = rigid_object(node, id, parent, mesh_offset, assets);
     if (parent != kNoObject) objects_[parent].children.push_back(id);
     ids.push_back(id);
   }

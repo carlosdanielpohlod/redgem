@@ -92,8 +92,7 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   return object_or_nil(mrb, spawned(mrb, request));
 }
 
-ObjectId spawned_prefab(mrb_state* mrb, const std::string& file, const SpawnRequest& request,
-                        std::string& failure) {
+ObjectId spawned_prefab(mrb_state* mrb, const std::string& file, const SpawnRequest& request, std::string& failure) {
   try {
     const BudgetPause pause(script_host(mrb).vm().budget_keeper());
     return context(mrb).spawn_prefab(file, request);

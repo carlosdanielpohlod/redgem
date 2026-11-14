@@ -19,21 +19,29 @@ std::string prefab_path(const std::string& name) {
   return (std::filesystem::path(config::kPrefabsDirName) / path).generic_u8string();
 }
 
-prefabs::Source read_prefab(const std::string& file, const std::filesystem::path& game_dir,
-                            std::uint64_t available) {
+SceneDesc prefab_reference(const std::string& file) {
   NodeDesc root;
   root.props[prefabs::kFileProperty] = file;
   SceneDesc reference;
   reference.nodes.push_back(std::move(root));
+  return reference;
+}
+
+void require_rigid_prefab(const SceneDesc& scene) {
+  const bool rigid = scene.skins.empty() && scene.animations.empty();
+  if (!rigid) {
+    throw std::invalid_argument("Scene.spawn_prefab requires a rigid prefab without skins or animation");
+  }
+}
+
+prefabs::Source read_prefab(const std::string& file, const std::filesystem::path& game_dir, std::uint64_t available) {
   prefabs::Limits limits;
   limits.nodes = kMaxRuntimePrefabNodes;
   limits.expanded_bytes = available;
   limits.input_bytes = available;
   prefabs::Source prefab;
-  prefab.scene = prefabs::resolve(std::move(reference), game_dir, limits);
-  if (!prefab.scene.skins.empty() || !prefab.scene.animations.empty()) {
-    throw std::invalid_argument("Scene.spawn_prefab requires a rigid prefab without skins or animation");
-  }
+  prefab.scene = prefabs::resolve(prefab_reference(file), game_dir, limits);
+  require_rigid_prefab(prefab.scene);
   for (auto& node : prefab.scene.nodes) node.props.erase(props::kPrefab);
   return prefab;
 }
@@ -56,7 +64,7 @@ const prefabs::Source& Engine::load_runtime_prefab(const std::string& file) {
 
 ObjectId Engine::spawn_prefab(const std::string& name, const SpawnRequest& request) {
   const auto& prefab = load_runtime_prefab(prefab_path(name));
-  return finish_spawn(scene_.instantiate_rigid(prefab.scene.nodes, prefab.assets.meshes), request);
+  return finish_spawn(scene_.instantiate_rigid(prefab.scene.nodes, prefab.assets.meshes, scene_desc_), request);
 }
 
 }  // namespace redgem

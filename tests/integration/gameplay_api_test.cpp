@@ -762,9 +762,8 @@ TEST_CASE("Ruby spawns a nested rigid prefab from an archive and shares its mesh
   REQUIRE_MESSAGE(outer.save(error), error);
   {
     const auto archive_file = temporary.dir / "built.rgpak";
-    const std::vector<ArchiveInput> inputs = {
-        archive_input_from_file("prefabs/outer.glb", outer_file),
-        archive_input_from_file("prefabs/crate.glb", folder / "crate.glb")};
+    const std::vector<ArchiveInput> inputs = {archive_input_from_file("prefabs/outer.glb", outer_file),
+                                              archive_input_from_file("prefabs/crate.glb", folder / "crate.glb")};
     REQUIRE_MESSAGE(write_game_archive(archive_file, inputs, ArchiveCompression::None, error), error);
     auto archive = GameArchive::open(archive_file, error);
     REQUIRE_MESSAGE(archive.has_value(), error);
