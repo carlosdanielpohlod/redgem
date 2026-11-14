@@ -354,13 +354,19 @@ same section (1 to 32; 1, the default, is how every game ran before):
 "physics": {"threads": 4}
 ```
 
-Each step is then shared by a pool of that many threads, with the same results as one thread, and
+Each step is then shared by a pool of that many threads, which solves it as one thread would, and
 the world takes each frame's last step on a thread of its own while that frame is drawn. Scripts
 never run while it does: `fixed_update`, `update` and every callback see the world between two
-steps. The frame drawn shows the objects where they were before that step, and the next frame
-starts by putting them where their bodies went and calling `on_collision_enter` and the others for
-it, so collisions reach scripts a frame later than with one thread, and `Time.elapsed` during
-`update` counts the steps finished, not that last one.
+steps. That last step is taken after `update`, so it is a little later than with one thread:
+
+- the frame drawn shows the objects where they were before it;
+- the next frame starts by putting them where their bodies went and calling `on_collision_enter`
+  and the others for it, so collisions reach scripts a frame later;
+- a force, an impulse or a velocity set in `update` acts in that step, one step sooner than with
+  one thread (set them in `fixed_update` for the same game on any number of threads);
+- `Time.elapsed` during `update` counts the steps finished, not that last one.
+
+A dedicated server's rooms solve their physics on one thread whatever the setting.
 
 ## Drive a car
 

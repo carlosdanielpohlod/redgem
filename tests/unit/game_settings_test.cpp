@@ -220,3 +220,17 @@ TEST_CASE("a game that never said how many threads solve its physics is saved wi
   CHECK(text.find("physics") == std::string::npos);
   std::filesystem::remove_all(game.parent_path());
 }
+
+TEST_CASE("a physics section that is no object is left as it is when the threads are saved") {
+  constexpr int kFourThreads = 4;
+  const std::filesystem::path game = game_saying(R"({"physics": ["default", "player"]})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kFourThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  std::ifstream file(game / kGameSettingsFile);
+  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  CHECK(text.find("player") != std::string::npos);
+  CHECK(text.find("threads") == std::string::npos);
+  std::filesystem::remove_all(game.parent_path());
+}

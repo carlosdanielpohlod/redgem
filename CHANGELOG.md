@@ -14,8 +14,9 @@ until 1.0, a release may change what games rely on (see
   physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
   of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
   scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
-  see the scene's transforms, a copy of the bodies taken at that sync point. 1 thread, the
-  default, keeps every step exactly as before.
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a

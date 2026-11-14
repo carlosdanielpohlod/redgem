@@ -3,7 +3,6 @@
 #include "app/engine.hpp"
 
 #include <algorithm>
-#include <utility>
 
 #include "app/scene_bodies.hpp"
 #include "app/profile_overlay.hpp"
@@ -117,21 +116,25 @@ void Engine::run_fixed_steps(int steps) {
   for (int i = 0; i < in_place; ++i) fixed_step(config::kFixedDeltaSeconds);
   if (in_place == steps) return;
   prepare_fixed_step(config::kFixedDeltaSeconds);
-  prepared_step_ = config::kFixedDeltaSeconds;
+  step_prepared_ = true;
 }
 
 void Engine::begin_prepared_step() {
-  if (!prepared_step_) return;
-  overlapped_->begin_step(*prepared_step_);
-  step_in_flight_ = std::exchange(prepared_step_, std::nullopt);
+  if (!step_prepared_) return;
+  overlapped_->begin_step(config::kFixedDeltaSeconds);
+  step_prepared_ = false;
+  step_in_flight_ = true;
 }
 
 void Engine::settle_physics() {
   if (!step_in_flight_) return;
   const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
-  const float dt = *std::exchange(step_in_flight_, std::nullopt);
+  step_in_flight_ = false;
   overlapped_->finish_step();
-  finish_fixed_step(dt);
+  // (Behaviours added since the step began start before they hear of its contacts, as they would
+  // with the step taken in place, after the next frame's start.)
+  if (!is_loading_scene()) scripts_->start_pending();
+  finish_fixed_step(config::kFixedDeltaSeconds);
 }
 
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
@@ -174,6 +177,7 @@ void Engine::prepare_fixed_step(float dt) {
 }
 
 void Engine::finish_fixed_step(float dt) {
+  context_.time.delta = dt;  // (the contacts' callbacks read the step's)
   bodies::pull_poses(scene_, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
   for (const ContactEvent& event : physics_->drain_events()) {

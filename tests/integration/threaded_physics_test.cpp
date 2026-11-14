@@ -205,7 +205,8 @@ TEST_CASE("a game drawn while its physics steps shows each frame the step before
     in_place->frame(kDt);
   }
   // At the next frame's start the step under way is finished: the two games are at one again.
-  CHECK(crate_of(*overlapped).position.y < kDropHeight);
+  overlapped->frame(kDt);
+  CHECK(same_pose(crate_of(*overlapped), crate_of(*in_place)));
 }
 
 TEST_CASE("a game drawn while its physics steps tells its scripts of contacts and time at the next frame's start") {
@@ -224,8 +225,10 @@ TEST_CASE("a game drawn while its physics steps tells its scripts of contacts an
   game::frames(*overlapped, game::kTwoSeconds);
   CHECK(game::ruby(*overlapped, "$touched") == "true");
   // Every frame's step but the last has been finished; that one is, at the start of the next.
-  CHECK(game::number(*overlapped, "Time.elapsed") ==
-        doctest::Approx(kDt * static_cast<float>(game::kTwoSeconds - 1)).epsilon(kDt));
+  const float elapsed = game::number(*overlapped, "Time.elapsed");
+  const float finished = kDt * static_cast<float>(game::kTwoSeconds - 1);
+  CHECK(elapsed > finished - kDt / 2);
+  CHECK(elapsed < finished + kDt / 2);
 }
 
 TEST_CASE("a game drawn while its physics steps can destroy and spawn objects with a step under way") {

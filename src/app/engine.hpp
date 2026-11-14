@@ -98,7 +98,8 @@ struct EngineOptions {
   SceneLoader* scene_loader = nullptr;
   // The threads that solve the game's physics, in place of what game.json's "physics" section says
   // (see physics/physics_threads.hpp). More than one also overlaps each frame's last physics step
-  // with the drawing of the frame (see Engine::frame).
+  // with the drawing of the frame (see Engine::frame). A dedicated server's room, which draws
+  // nothing, always solves its physics on one.
   std::optional<int> physics_threads;
 };
 
@@ -261,6 +262,8 @@ class Engine {
   void begin_prepared_step();
   // The sync point: waits for the step under way, then finishes it. Nothing when none is.
   void settle_physics();
+  // How many threads solve the physics: the options', or game.json's; one for a server's room.
+  int chosen_physics_threads(const GameSettings& settings) const;
   // The world for the scene in place, solved on the threads the game asked for.
   std::unique_ptr<PhysicsWorld> make_physics_world();
   // Whether a contact is between two objects that are both still there to hear of it.
@@ -280,8 +283,8 @@ class Engine {
   // How many threads solve the physics (game.json's, or the options'); and, with more than one:
   int physics_threads_ = config::kDefaultPhysicsThreads;
   OverlappedPhysicsWorld* overlapped_ = nullptr;  // physics_, whose steps overlap the drawing
-  std::optional<float> prepared_step_;            // this frame's last step, whose scripts ran
-  std::optional<float> step_in_flight_;           // begun on the physics thread, not finished
+  bool step_prepared_ = false;                    // this frame's last step, whose scripts ran
+  bool step_in_flight_ = false;                   // begun on the physics thread, not finished
   InputState input_;
   ScriptedInputSource scripted_input_;
   std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere
