@@ -641,6 +641,7 @@ TEST_CASE("Preferences can scroll on a compact window at 200 percent") {
   if (auto* failure = std::get_if<std::string>(&created)) FAIL(*failure);
   auto& app = std::get<std::unique_ptr<EditorApp>>(created);
   SetWindowSize(kCompactWidth, kCompactHeight);
+  run(*app, kWarmupFrames);
   check_compact_preferences(*app);
   app.reset();
   std::filesystem::remove_all(game);
