@@ -75,3 +75,16 @@ TEST_CASE("staging another scene starts over") {
   CHECK_FALSE(stage.stage(first, kOtherScene, kOneByte));  // (one asset again, of four)
   CHECK(calls_until_staged(stage, first, kOneByte) == static_cast<int>(first.images.size() + first.meshes.size()));
 }
+
+TEST_CASE("a staged KTX2 picture goes up as it would unstaged, compressed where the card can") {
+  RenderStage stage;
+  SceneDesc desc;
+  desc.images = {picture("etc1s_opaque.ktx2", ".ktx2")};
+  desc.decoded_images = {render_detail::decode_scene_picture(desc.images[0])};
+  CHECK(calls_until_staged(stage, desc, kEverything) == 1);
+  stage.upload(desc, kStagedScene);
+  const Texture2D unstaged = render_detail::load_scene_texture(desc.images[0]);
+  CHECK(stage.scene_texture(0).format == unstaged.format);
+  CHECK(stage.scene_texture(0).mipmaps == unstaged.mipmaps);
+  UnloadTexture(unstaged);
+}

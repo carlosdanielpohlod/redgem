@@ -18,17 +18,18 @@ namespace redgem {
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
 std::unique_ptr<PhysicsWorld> Engine::new_physics_world() const {
-  return create_jolt_physics_world(gravity(), collision_layers_);
+  return create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
 }
 
 void Engine::make_bodies() {
+  physics_.reset();  // (the old world's memory goes first: a large world is never held twice)
   physics_ = new_physics_world();
   bodies::create_all({scene_, scene_desc_}, *physics_);
   settle_world();
 }
 
 void Engine::settle_world() {
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
+  find_water();
   navigation_.forget();  // the grid was the old scene's
   if (navigation_.settings().bake_on_load) bake_navigation();
   context_.physics = physics_.get();

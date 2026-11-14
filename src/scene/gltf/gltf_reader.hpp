@@ -115,6 +115,8 @@ class GltfReader {
   // Animation clips.
   void load_animations();
   AnimationDesc load_animation(const cgltf_animation& animation, cgltf_size index, const std::vector<int>& nodes);
+  // The markers listed in a clip's extras (see kAnimationEventsProperty), warning of bad ones.
+  std::vector<AnimationMarker> load_markers(const cgltf_animation& animation, const std::string& clip_name);
   std::optional<AnimationChannel> load_channel(const cgltf_animation_channel& channel, const std::string& clip_name,
                                                const std::vector<int>& nodes);
   // What a channel animates; nullopt (warned about when it is worth it) for one that cannot be played.

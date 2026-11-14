@@ -15,6 +15,7 @@ QUALITY_ROW = 5             # on the settings screen: mode, resolution, scale, v
 CONTROLS_OPTION = 10        # after its ten rows (six of video, four volumes): the Controls button, then Back
 JUMP_ROW = 2                # on the controls page: the player's choice, then fire, jump, run...
 JUMP = GameMenu::ControlsPage::Row.new(:jump, nil)
+FIRST_SLOT = 0              # a column's first cell, on a row of the controls page
 
 SystemTest.define do |t|
   menu = GameMenu.instance
@@ -58,13 +59,13 @@ SystemTest.define do |t|
   down.call(JUMP_ROW)
   t.press_button(:a)
   t.wait
-  t.assert("A on jump's keys waits for a key") { controls.page.waiting == [JUMP, GameMenu::ControlsPage::KEYS] }
+  t.assert("A on jump's keys waits for a key") { controls.page.waiting == [JUMP, GameMenu::ControlsPage::KEYS, FIRST_SLOT] }
   t.screenshot("controls_waiting")
   t.press(:k)
   t.wait
   t.assert("K takes the place of Space") { Input.bindings(:jump) == ["key:k", "pad:a"] }
 
-  cell = controls.cells.fetch([:jump, nil, GameMenu::ControlsPage::BUTTONS])
+  cell = controls.cells.fetch([:jump, nil, GameMenu::ControlsPage::BUTTONS, FIRST_SLOT])
   t.click(cell[:x] + cell[:width] / 2, cell[:y] + cell[:height] / 2)
   t.wait
   t.press_button(:y)

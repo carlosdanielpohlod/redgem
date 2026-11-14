@@ -39,6 +39,7 @@ class FramePainter {
   void follow_game(const FrameView& view);
   // Uploads the scene of a generation it has not drawn yet, taking what was readied for it.
   void take_scene(const FrameView& view);
+  static UnderwaterView underwater_of(const FrameView& view, const Camera3D& camera);
 
   Renderer& renderer_;
   int uploaded_generation_ = kNothingUploaded;

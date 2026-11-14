@@ -9,6 +9,7 @@
 #include <memory>
 #include <variant>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
@@ -35,7 +36,7 @@ namespace fs = std::filesystem;
 // How many names a message that suggests some lists.
 constexpr std::size_t kMostSuggestions = 3;
 // What a sky picture may be named, after its name (as render/sky_picture.cpp looks for it).
-constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
+constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"};
 // What a syntax error starts with, and what goes between a file and its line instead.
 constexpr const char* kLineWord = "line ";
 constexpr const char* kLineJoiner = ":";
@@ -187,6 +188,12 @@ std::vector<std::string> script_files(const fs::path& scripts_dir) {
   }
   std::sort(files.begin(), files.end());
   return files;
+}
+
+void check_game_file(const fs::path& game_dir, CheckReport& report) {
+  const GameManifest manifest = read_game_manifest(game_dir);
+  if (!manifest.max_bodies_error.empty()) report.errors.push_back(manifest.max_bodies_error);
+  for (const std::string& warning : manifest.physics_warnings) report.warnings.push_back(warning);
 }
 
 void check_scripts(const fs::path& game_dir, CheckReport& report) {

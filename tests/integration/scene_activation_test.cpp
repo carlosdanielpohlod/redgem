@@ -179,3 +179,12 @@ TEST_CASE("a picture that cannot be decoded in the background is marked so, and 
   CHECK(broken.unreadable);
   CHECK(broken.empty());
 }
+
+TEST_CASE("a KTX2 picture with its own mipmaps is left for the thread that knows the graphics card") {
+  const auto bytes =
+      read_file_up_to(std::filesystem::path(test::fixture("images")) / "etc1s_opaque.ktx2", kMaxEncodedImageBytes);
+  REQUIRE(bytes.has_value());
+  const DecodedPicture left = render_detail::decode_scene_picture(ImageData{*bytes, ".ktx2"});
+  CHECK(left.empty());
+  CHECK_FALSE(left.unreadable);
+}
