@@ -17,10 +17,19 @@ module Network
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
     MAX_DISTANCE = 1_000_000.0   # meters from the middle of a level (or degrees of a turn) an object can be at
+    INTERACTION_SIZE = 2      # parts of what asks the host for a use: the actor's key, the target's
+    LEVEL_SIZE = 2            # parts of a change of level: its number, the level's name
+    MAX_LEVEL_NAME_SIZE = 256 # bytes in a level's name, as a change carries it
 
     class << self
       # A spawn record with every part of its kind.
       def record?(record) = list?(record, RECORD_SIZE) && right_parts?(*record)
+
+      # What asks the host for a use (see Interaction): two names objects go by.
+      def interaction?(data) = list?(data, INTERACTION_SIZE) && data.all? { |key| object_key?(key) }
+
+      # A name an object goes by on the network: a key, or (an object with no NetworkSync) its name.
+      def object_key?(key) = key.is_a?(String) && !key.empty? && key.bytesize <= MAX_KEY_SIZE
 
       # An array of exactly so many things.
       def list?(value, size) = value.is_a?(Array) && value.size == size
@@ -121,8 +130,16 @@ module Network
         numbers?([time, speed]) && time >= 0 && flags.all? { |flag| boolean?(flag) }
       end
 
-      def clip_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_CLIP_NAME_SIZE
+      def clip_name?(name) = bounded_text?(name, MAX_CLIP_NAME_SIZE)
       def numbers?(list) = list.all? { |number| reachable?(number) }
+
+      # A change of level, as the host orders it: [change, name].
+      def level?(data) = list?(data, LEVEL_SIZE) && data[0].is_a?(Integer) && level_name?(data[1])
+
+      def level_name?(name) = bounded_text?(name, MAX_LEVEL_NAME_SIZE)
+
+      # A text that is not empty, and at most `most` bytes long.
+      def bounded_text?(text, most) = text.is_a?(String) && !text.empty? && text.bytesize <= most
 
       # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
       # seventh thing machine 2 spawned. Nothing else is a spawned object's key, so no machine

@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -9,9 +10,11 @@
 #include <string>
 #include <vector>
 
+#include "core/frame_budget.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
+#include "render/underwater.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -33,11 +36,23 @@ class Renderer {
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  // Uploads meshes, materials and textures, replacing the previous scene's assets.
+  // Uploads meshes, materials and textures, replacing the previous scene's assets. What was staged
+  // is dropped.
   void upload(const SceneDesc& desc);
+  // The same for the scene staged under `scene` (see stage): its staged assets are taken instead of
+  // being sent again; what was staged under another is dropped.
+  void upload(const SceneDesc& desc, int scene);
   // Uploads assets added to `desc` since the last upload/sync and refreshes every material's values
   // (cheap enough to call every frame in the editor).
   void sync(const SceneDesc& desc);
+  // Readies the textures and meshes of the scene to be shown next on the graphics card, a share at
+  // a time, while the scene uploaded before is still drawn: about `bytes` a call, within
+  // `budget`, at least one asset. `scene` is what the caller calls that scene (a generation): what
+  // was staged under another is dropped first. True once all of them are.
+  bool stage(const SceneDesc& desc, int scene, std::size_t bytes, const FrameBudget& budget);
+  static constexpr int kNoStagedScene = -1;  // (what stage is never called with)
+  // Releases what stage readied (a scene that will not be shown after all).
+  void drop_staged();
   // Borrows an uploaded image for this frame, or returns an empty texture. Never unload it.
   Texture2D scene_texture(int image) const;
   std::uint64_t scene_upload_count() const;
@@ -68,6 +83,8 @@ class Renderer {
   GpuTimings gpu_timings() const;
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
+  // Where the camera of the next frames is against the water: under it, they look underwater.
+  void set_underwater(const UnderwaterView& view);
   // The most the scene's environment and its scattered copies get of what they ask for (the
   // player's quality); everything unless said.
   void set_quality(const QualityCaps& caps);

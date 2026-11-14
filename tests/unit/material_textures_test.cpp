@@ -11,6 +11,7 @@ using Json = nlohmann::json;
 namespace {
 
 constexpr float kBumpy = 0.5f;  // the normal map's scale in the document below
+constexpr int kKtx2Image = 2;   // the picture the KTX2 case adds after the document's two
 
 // Two pictures (the second a WebP one), a texture showing the first, and a material using it.
 Json document() {
@@ -94,10 +95,10 @@ TEST_CASE("a WebP texture is required to read the file, and forgotten once none 
   Json doc = document();
   texture_showing(doc, 1);
   CHECK(doc["extensionsRequired"] == Json::array({"EXT_texture_webp"}));
-  forget_unused_webp(doc);  // a texture still shows it
+  forget_unused_texture_extensions(doc);  // a texture still shows it
   CHECK(doc.contains("extensionsUsed"));
   doc["textures"].erase(1);
-  forget_unused_webp(doc);
+  forget_unused_texture_extensions(doc);
   CHECK_FALSE(doc.contains("extensionsUsed"));
   CHECK_FALSE(doc.contains("extensionsRequired"));
 }
@@ -113,4 +114,37 @@ TEST_CASE("slots are written into a material whose metallic-roughness part is no
   desc.base_color_image = kNoIndex;
   write_slots(doc, material, desc);  // nothing to take out, nothing thrown
   CHECK(slot_image(doc, material, Slot::BaseColor) == kNoIndex);
+}
+
+TEST_CASE("a KTX2 picture is shown through KHR_texture_basisu, and its texture is found by any of its pictures") {
+  Json doc = document();
+  doc["images"].push_back({{"bufferView", kKtx2Image}, {"mimeType", "image/ktx2"}});
+  CHECK(texture_showing(doc, kKtx2Image) == 1);
+  CHECK(doc["textures"][1] == Json::parse(R"({"extensions": {"KHR_texture_basisu": {"source": 2}}})"));
+  CHECK(doc["extensionsRequired"] == Json::array({"KHR_texture_basisu"}));
+  // A texture with a KTX2 picture and a PNG fallback is the texture of either.
+  doc["textures"][0]["extensions"]["KHR_texture_basisu"]["source"] = kKtx2Image;
+  CHECK(texture_showing(doc, 0) == 0);
+  CHECK(texture_showing(doc, kKtx2Image) == 0);
+  CHECK(doc["textures"].size() == 2);
+}
+
+TEST_CASE("a KTX2 texture's extension is forgotten once no texture shows a KTX2 picture") {
+  Json doc = document();
+  doc["images"].push_back({{"bufferView", kKtx2Image}, {"mimeType", "image/ktx2"}});
+  texture_showing(doc, kKtx2Image);
+  forget_unused_texture_extensions(doc);  // a texture still shows it
+  CHECK(doc["extensionsRequired"] == Json::array({"KHR_texture_basisu"}));
+  doc["textures"].erase(1);
+  forget_unused_texture_extensions(doc);
+  CHECK_FALSE(doc.contains("extensionsUsed"));
+  CHECK_FALSE(doc.contains("extensionsRequired"));
+}
+
+TEST_CASE("a WebP texture is not borrowed for its plain picture, which it never shows") {
+  Json doc = document();
+  doc["textures"][0]["extensions"]["EXT_texture_webp"]["source"] = 1;
+  CHECK(texture_showing(doc, 1) == 0);
+  CHECK(texture_showing(doc, 0) == 1);  // a texture of its own, which shows it
+  CHECK(image_of_texture(doc, 1) == 0);
 }

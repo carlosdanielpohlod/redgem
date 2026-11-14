@@ -34,6 +34,7 @@ struct WaterSurface {
   Bounds bounds;
   std::vector<WaterTriangle> triangles;
   std::vector<WaterBvhNode> nodes;
+  WaterDesc water;  // how its material draws it (waves, absorption)
 };
 
 struct WaterSweep {
@@ -46,11 +47,15 @@ Bounds water_world_bounds(const Bounds& local, const Transform& world);
 std::vector<WaterSurface> water_surfaces(const Scene& scene, const SceneDesc& desc);
 std::optional<Vec3> water_contact_point(const WaterSurface& surface, const Bounds& body);
 std::optional<WaterSweep> water_swept_contact(const WaterSurface& surface, const Bounds& before, const Bounds& after);
+// The undisplaced height of a surface over the world column at (x, z), when its footprint covers it.
+std::optional<float> water_surface_height(const WaterSurface& surface, float x, float z);
 
 // Runtime geometry changes are uncommon; moving bodies do not rebuild the water's spatial index.
 class WaterGeometryCache {
  public:
   const std::vector<WaterSurface>& refresh(const Scene& scene, const SceneDesc& desc);
+  // What the last refresh found.
+  const std::vector<WaterSurface>& surfaces() const { return surfaces_; }
   void clear() {
     keys_.clear();
     surfaces_.clear();

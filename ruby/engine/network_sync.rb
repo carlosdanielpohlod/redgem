@@ -72,6 +72,7 @@ module Network
     def forget_spawned(key, entry)
       @spawned.delete(key)
       __deliver(DESPAWN, [key], :all) if shared_by_me?(entry[:owner])
+      note_despawned_away(key, entry[:owner])
     end
   end
 end
@@ -103,8 +104,9 @@ class NetworkSync < Behaviour
   # Whether its own animation goes along: known from the first pose that arrives, started or not.
   def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
-  # Offline, everything is this machine's to move.
-  def mine? = !Network.online? || owner == Network.id
+  # Out of a game, everything is this machine's to move (not while it reconnects: the others'
+  # objects stay theirs).
+  def mine? = !Network.__in_game? || owner == Network.id
 
   def start
     Network.__track(self)
@@ -135,9 +137,12 @@ class NetworkSync < Behaviour
     from + ((to - from + HALF_TURN) % FULL_TURN - HALF_TURN) * share
   end
 
+  # Whether its owner tells the others where it is: in a game, and not between two levels.
+  def sends? = Network.online? && !Network.changing_level?
+
   def update(dt)
     return watch(dt) unless mine?
-    return unless Network.online?
+    return unless sends?
 
     @since_sent += dt
     return if @since_sent < 1.0 / SENDS_PER_SECOND
