@@ -22,6 +22,7 @@
 #include "core/math.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "script/script_budget.hpp"
 #include "script/script_context.hpp"
 
 namespace redgem::binding {
@@ -38,6 +39,16 @@ inline constexpr const char* kTagVariable = "@tag";
 
 ScriptContext& context(mrb_state* mrb);
 Scene& scene(mrb_state* mrb);
+// The interpreter's time budget (see script/script_budget.hpp).
+ScriptBudget& script_budget(mrb_state* mrb);
+
+// Runs engine work known to be long (spawning, the disk): its time is the engine's, not the
+// call's (BudgetPause). Returns what `work` does.
+template <typename Work>
+auto paused(mrb_state* mrb, const Work& work) {
+  const BudgetPause pause(script_budget(mrb));
+  return work();
+}
 
 // A part of the engine a native cannot do without. A context that has none (a script run outside
 // a game) gets a RuntimeError saying `unavailable`.

@@ -15,7 +15,6 @@
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/bindings/message_values.hpp"
-#include "script/script_host.hpp"
 
 namespace redgem {
 namespace {
@@ -26,13 +25,8 @@ using namespace binding;
 
 SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save is only available while a game runs"); }
 
-// Reading and writing the save is the engine's time, not the script's: a disk that is slow for a
-// moment (another program scanning the file, say) does not stop the call that saves.
-template <typename Work>
-auto paused(mrb_state* mrb, const Work& work) {
-  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
-  return work();
-}
+// (Reading and writing the save is the engine's time, not the script's, `paused`: a disk that is
+// slow for a moment, another program scanning the file say, does not stop the call that saves.)
 
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
@@ -54,11 +48,11 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   return value;
 }
 
-// What Save.update's block makes of a key's value (into `made`), as a call of its own from the
-// engine's work, on a budget of its own.
+// What Save.update's block makes of a key's value (into `made`): the call's own time, between the
+// engine's reading and writing.
 SaveStore::Change block_change(mrb_state* mrb, mrb_value block, mrb_value fallback, mrb_value& made) {
   return [mrb, block, fallback, &made](const std::optional<nlohmann::json>& current) {
-    const BudgetCall call(script_host(mrb).vm().budget_keeper());
+    const BudgetResume resume(script_budget(mrb));
     made = mrb_yield(mrb, block, current ? value_from(mrb, *current, HashKeys::Strings) : fallback);
     return json_from(mrb, made, kSaveHolder);
   };

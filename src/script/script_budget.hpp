@@ -40,7 +40,8 @@ class ScriptSampler;
 // What a call's time is read on: the computer's coarse clock (core/coarse_clock.hpp), or a clock
 // given to the budget (a test's, which only moves when the test moves it). On a given clock the
 // watchdog looks at a running call every kScriptWatchRetryMs of real time, and the call is past
-// its deadline only once that clock says so: a call on a clock that does not move never is.
+// its deadline (and its grace to unwind) only once that clock says so: on a clock that does not
+// move, a call never is.
 class ScriptBudget {
  public:
   using Milliseconds = std::chrono::milliseconds;
@@ -84,10 +85,10 @@ class ScriptBudget {
   static constexpr std::int64_t kNever = INT64_MAX;
   std::int64_t deadline() const { return deadline_.load(std::memory_order_seq_cst); }
   // Whether the call running is past its deadline on the budget's clock.
-  bool past_deadline() const { return deadline() <= now(); }
-  // When, on the coarse clock (where `real_now` is), the watchdog is to look next: the deadline
-  // itself, or on a clock of its own a short while from now while a call runs (kNever when none).
-  std::int64_t next_look(std::int64_t real_now) const;
+  bool past_deadline() const;
+  // When, on the coarse clock, the watchdog is to look next: the deadline itself, or on a clock of
+  // its own a short while from now while a call runs (kNever when none).
+  std::int64_t next_look() const;
   void request_stop() { stop_.store(true, std::memory_order_relaxed); }
 
  private:
@@ -132,8 +133,8 @@ class ScriptBudget {
 // How many times the watchdog has woken since the program started (for the tests of its sleep).
 std::uint64_t script_watchdog_wakes();
 
-// Counts a call into the scripts against the budget for as long as it lasts, with a budget of its
-// own (see ScriptBudget): a call from C++, or a block the engine yields to from inside its work.
+// Counts a call from C++ into the scripts against the budget for as long as it lasts, with a
+// budget of its own (see ScriptBudget).
 class BudgetCall {
  public:
   explicit BudgetCall(ScriptBudget& budget) : budget_(budget) { budget_.begin_call(); }
@@ -152,6 +153,19 @@ class BudgetPause {
   ~BudgetPause() { budget_.end_pause(); }
   BudgetPause(const BudgetPause&) = delete;
   BudgetPause& operator=(const BudgetPause&) = delete;
+
+ private:
+  ScriptBudget& budget_;
+};
+
+// Inside a BudgetPause, the call's own Ruby that the engine's work runs (a block it yields to):
+// its time is the call's again, and the pause goes on after it.
+class BudgetResume {
+ public:
+  explicit BudgetResume(ScriptBudget& budget) : budget_(budget) { budget_.end_pause(); }
+  ~BudgetResume() { budget_.begin_pause(); }
+  BudgetResume(const BudgetResume&) = delete;
+  BudgetResume& operator=(const BudgetResume&) = delete;
 
  private:
   ScriptBudget& budget_;

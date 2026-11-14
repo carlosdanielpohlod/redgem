@@ -15,6 +15,7 @@
 
 #include "app/engine.hpp"
 #include "fake_clock.hpp"
+#include "script_ticks.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_config.hpp"
 #include "storage/save_file.hpp"
@@ -35,21 +36,16 @@ static_assert(2 * kSlowWriteBudgets < config::kScriptForgivenBudgets);
 constexpr double kWatchedSeconds = 20 * config::kScriptWatchRetryMs / kMillisecondsPerSecond;
 constexpr int kTicksPerBudget = 4;
 
-test::FakeClock* moved_clock = nullptr;
-double budget_seconds = 0.0;
+double budget_seconds = 0.0;  // the game's
 
-// tick: a quarter of a budget passes.
-mrb_value tick(mrb_state*, mrb_value) {
-  moved_clock->advance(budget_seconds / kTicksPerBudget);
-  return mrb_nil_value();
-}
-
-// A game whose save is kept in a file on a slow disk, its scripts timed on a fake clock.
+// A game whose save is kept in a file on a slow disk, its scripts timed on a fake clock (which
+// `tick` moves by a quarter of a budget).
 struct SlowDiskGame {
   std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-save-budget-test";
   test::FakeClock clock;
   std::unique_ptr<SaveFile> save;
   std::unique_ptr<Engine> engine;
+  std::unique_ptr<test::ScriptTicks> ticks;
 
   SlowDiskGame() {
     std::filesystem::remove_all(folder);
@@ -67,7 +63,6 @@ struct SlowDiskGame {
   ~SlowDiskGame() {
     engine.reset();
     save.reset();
-    moved_clock = nullptr;
     std::filesystem::remove_all(folder);
   }
   SlowDiskGame(const SlowDiskGame&) = delete;
@@ -77,9 +72,7 @@ struct SlowDiskGame {
     RubyVm& vm = engine->scripts().vm();
     REQUIRE(vm.budget().count() > 0);
     budget_seconds = static_cast<double>(vm.budget().count()) / kMillisecondsPerSecond;
-    moved_clock = &clock;
-    vm.budget_keeper().set_clock(&clock);
-    mrb_define_method(vm.state(), vm.state()->kernel_module, "tick", tick, MRB_ARGS_NONE());
+    ticks = std::make_unique<test::ScriptTicks>(vm, clock, budget_seconds / kTicksPerBudget);
   }
 
   bool slow_write() {
@@ -108,7 +101,7 @@ TEST_CASE("a write of the save slower than the budget does not stop the call tha
   CHECK(game.text(game.run("Save.delete(:coins)" + then_watched("Save[:coins].inspect"))) == "nil");
 }
 
-TEST_CASE("Save.update's slow write is the engine's time, and its block a call of its own") {
+TEST_CASE("Save.update's slow write is the engine's time, and its block the call's") {
   SlowDiskGame game;
   CHECK(game.text(game.run("Save.update(:coins, 1) { |coins| coins + 1 }" + then_watched("Save[:coins]"))) == "2");
   const RubyResult stuck = game.run("Save.update(:coins, 0) { loop { tick } }");

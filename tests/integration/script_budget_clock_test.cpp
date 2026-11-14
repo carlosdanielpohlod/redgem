@@ -10,6 +10,7 @@
 #include <string>
 
 #include "fake_clock.hpp"
+#include "script_ticks.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_budget.hpp"
 #include "script/script_config.hpp"
@@ -32,12 +33,6 @@ constexpr double kRealSpinBudgets = 5.0;
 test::FakeClock* moved_clock = nullptr;
 RubyVm* budgeted_vm = nullptr;
 
-// tick: a quarter of a budget passes.
-mrb_value tick(mrb_state*, mrb_value) {
-  moved_clock->advance(kBudgetSeconds / kTicksPerBudget);
-  return mrb_nil_value();
-}
-
 // stall: three budgets pass in the engine's code that is not known to be long.
 mrb_value stall(mrb_state*, mrb_value) {
   moved_clock->advance(kLongWorkBudgets * kBudgetSeconds);
@@ -51,18 +46,18 @@ mrb_value long_work(mrb_state*, mrb_value) {
   return mrb_nil_value();
 }
 
-// An interpreter with a budget, timed on a fake clock, with the natives above.
+// An interpreter with a budget, timed on a fake clock, with `tick` (a quarter of a budget) and the
+// natives above.
 struct ClockedVm {
   test::FakeClock clock;
   RubyVm vm;
+  test::ScriptTicks ticks{vm, clock, kBudgetSeconds / kTicksPerBudget};
 
   ClockedVm() {
     moved_clock = &clock;
     budgeted_vm = &vm;
-    vm.budget_keeper().set_clock(&clock);
     vm.set_budget(kBudget);
     mrb_state* mrb = vm.state();
-    mrb_define_method(mrb, mrb->kernel_module, "tick", tick, MRB_ARGS_NONE());
     mrb_define_method(mrb, mrb->kernel_module, "stall", stall, MRB_ARGS_NONE());
     mrb_define_method(mrb, mrb->kernel_module, "long_work", long_work, MRB_ARGS_NONE());
   }

@@ -12,7 +12,6 @@
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/bindings/message_values.hpp"
-#include "script/script_host.hpp"
 
 namespace redgem {
 namespace {
@@ -54,7 +53,7 @@ mrb_value settings_save(mrb_state* mrb, mrb_value) {
   if (!game.save_display) return mrb_false_value();
   std::string error;
   // (Writing the file is the engine's time, not the script's: see save_bindings.)
-  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+  const BudgetPause pause(script_budget(mrb));
   const bool saved = game.save_display(game.display, error);
   if (!saved) log::warning("could not keep the settings: " + error);
   return mrb_bool_value(saved);

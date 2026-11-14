@@ -84,7 +84,7 @@ class Watchdog {
   }
 
   static std::int64_t look_at(ScriptBudget& budget, std::int64_t now) {
-    if (!budget.past_deadline()) return budget.next_look(now);  // (kNever with no call running)
+    if (!budget.past_deadline()) return budget.next_look();  // (kNever with no call running)
     budget.request_stop();
     return now + config::kScriptWatchRetryMs;  // (until the interpreter is back in Ruby to see it)
   }
@@ -105,9 +105,8 @@ class Watchdog {
   }
 
   std::int64_t earliest_look() const {
-    const std::int64_t now = coarse_milliseconds();
     std::int64_t earliest = ScriptBudget::kNever;
-    for (const ScriptBudget* budget : budgets_) earliest = std::min(earliest, budget->next_look(now));
+    for (const ScriptBudget* budget : budgets_) earliest = std::min(earliest, budget->next_look());
     return earliest;
   }
 
@@ -170,11 +169,17 @@ std::int64_t ScriptBudget::now() const {
   return static_cast<std::int64_t>(std::llround(clock->now() * kMillisecondsPerSecond));
 }
 
-std::int64_t ScriptBudget::next_look(std::int64_t real_now) const {
+// (A call with no deadline, or none running, is never past it: its clock is not read.)
+bool ScriptBudget::past_deadline() const {
+  const std::int64_t due = deadline();
+  return due != kNever && due <= now();
+}
+
+std::int64_t ScriptBudget::next_look() const {
   const std::int64_t due = deadline();
   const bool on_coarse_clock = clock_.load(std::memory_order_seq_cst) == nullptr;
   if (on_coarse_clock || due == kNever) return due;
-  return real_now + config::kScriptWatchRetryMs;
+  return coarse_milliseconds() + config::kScriptWatchRetryMs;
 }
 
 void ScriptBudget::push(bool limited) {
@@ -233,7 +238,7 @@ bool ScriptBudget::counts(const Frame& frame) const { return frame.limited && li
 // (A deadline to keep: the watchdog is woken if it would look later than that.)
 void ScriptBudget::publish(std::int64_t deadline) {
   deadline_.store(deadline, std::memory_order_seq_cst);
-  if (deadline != kNever) Watchdog::instance().deadline_set(next_look(coarse_milliseconds()));
+  if (deadline != kNever) Watchdog::instance().deadline_set(next_look());
 }
 
 bool ScriptBudget::overdue(const Frame& frame, std::int64_t now) const {

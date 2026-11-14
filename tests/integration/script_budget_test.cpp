@@ -27,6 +27,7 @@
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "fake_clock.hpp"
+#include "script_ticks.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_budget.hpp"
 #include "script/script_config.hpp"
@@ -158,22 +159,7 @@ std::string ruby(Engine& engine, const std::string& code) {
 
 constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr int kTicksPerBudget = 4;  // (a slow object's three ticks are most of a budget)
-
-// What `tick` moves, on an interpreter given to tick_on.
-test::FakeClock* ticked_clock = nullptr;
-
-// tick: a quarter of the test's budget passes on the test's clock.
-mrb_value tick(mrb_state*, mrb_value) {
-  ticked_clock->advance(kTestBudgetMs / kMillisecondsPerSecond / kTicksPerBudget);
-  return mrb_nil_value();
-}
-
-// The interpreter's calls are timed on `clock`, which its scripts move with `tick`.
-void tick_on(RubyVm& vm, test::FakeClock& clock) {
-  ticked_clock = &clock;
-  vm.budget_keeper().set_clock(&clock);
-  mrb_define_method(vm.state(), vm.state()->kernel_module, "tick", tick, MRB_ARGS_NONE());
-}
+constexpr double kTickSeconds = kTestBudgetMs / kMillisecondsPerSecond / kTicksPerBudget;
 
 // Runs frames; how long they took.
 SteadyClock::duration frames(Engine& engine, int count) {
@@ -303,14 +289,13 @@ TEST_CASE("the calls the engine makes from inside a call are not that call's tim
   test::LogCapture capture;
   test::FakeClock clock;  // (before the game, which reads it until it ends)
   std::unique_ptr<Engine> engine = started(game, scene_of({"patient.rb", "slow.rb"}));
-  tick_on(engine->scripts().vm(), clock);
+  const test::ScriptTicks ticks(engine->scripts().vm(), clock, kTickSeconds);
   ruby(*engine, "$ticking = true");
   frames(*engine, kFramesAfter);
   CHECK(clock.now() > test::kFakeClockStart + kTestBudgetMs / kMillisecondsPerSecond);
   CHECK(engine->scripts().error_count() == 0);
   CHECK(ruby(*engine, "$patient_done.inspect") == "true");
   engine.reset();
-  ticked_clock = nullptr;
   std::filesystem::remove_all(game);
 }
 
@@ -330,13 +315,11 @@ TEST_CASE("an interpreter has no budget until given one, and each call gets all 
     RubyVm vm;
     CHECK(vm.budget().count() == 0);
     vm.set_budget(kTestBudget);
-    tick_on(vm, clock);
+    const test::ScriptTicks ticks(vm, clock, kTickSeconds);
     // Calls that each take most of the budget on the test's clock, longer than it together, all
     // finish.
     for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval("3.times { tick }; :done", "most.rb").ok);
-    vm.budget_keeper().set_clock(nullptr);
   }
-  ticked_clock = nullptr;
   RubyVm vm;
   vm.set_budget(kTestBudget);
   const RubyResult stuck = vm.eval("loop {}", "stuck.rb");

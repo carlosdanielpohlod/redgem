@@ -58,7 +58,7 @@ std::optional<Transform> spawn_placement(mrb_state* mrb, ObjectId id, mrb_value 
 
 // Making the object, its bodies and its behaviours is the engine's time, not the script's.
 ObjectId spawned(mrb_state* mrb, const SpawnRequest& request) {
-  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+  const BudgetPause pause(script_budget(mrb));
   return context(mrb).spawn(request);
 }
 
