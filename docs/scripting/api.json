@@ -2708,18 +2708,15 @@
         {
           "name": "play",
           "static": true,
-<<<<<<< HEAD
-          "args": "name, volume: 1.0, pitch: 1.0, loop: false, group: :effects, priority: 128",
-=======
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
->>>>>>> origin/main
           "about": "plays a sound; returns its id (for stop, playing? and set), or nil",
           "top": 24,
           "example": "Audio.play(:jump)"
@@ -2786,9 +2783,6 @@
         {
           "name": "play_at",
           "static": true,
-<<<<<<< HEAD
-          "args": "name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0, group: :effects, priority: 128",
-=======
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "position", "type": "Vector3"},
@@ -2797,10 +2791,10 @@
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "reference_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "max_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "50.0"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
->>>>>>> origin/main
           "about": "plays a sound at a place in the world; returns its id, or nil"
         },
         {
