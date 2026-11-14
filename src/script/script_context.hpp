@@ -13,6 +13,7 @@
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/display_settings.hpp"
 #include "render/hud.hpp"
 #include "render/ui_scale.hpp"
@@ -99,7 +100,7 @@ struct ScriptContext {
   UiReference ui_reference;
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
-  std::string ui_font;  // selected game face; empty uses the built-in font
+  std::string ui_font;  // selected game face or chain (render/font_chain.hpp); empty uses the built-in font
   // Called when a player's bindings changed (Input.bind, unbind, reset_bindings), so that they are
   // kept for the next run; null when nobody keeps them.
   std::function<void()> on_bindings_changed;
@@ -114,6 +115,8 @@ struct ScriptContext {
   bool keyboard_visible = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // Camera.auto_exposure and the others: what the game changes of the scene's auto exposure.
+  AutoExposureOverrides auto_exposure;
   // How the player chose the game to be shown and heard (Settings): what is in use now.
   DisplaySettings display;
   // What puts a change of `display` into effect (the window, the renderer's quality, the volume),

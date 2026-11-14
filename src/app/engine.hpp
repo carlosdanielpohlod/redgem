@@ -22,6 +22,7 @@
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "navigation/navigation.hpp"
+#include "physics/overlapped_physics_world.hpp"
 #include "physics/physics_world.hpp"
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
@@ -99,6 +100,11 @@ struct EngineOptions {
   Stopwatch::Reading network_time;
   // A borrowed reader (must outlive the engine); otherwise one process-wide worker is shared.
   SceneLoader* scene_loader = nullptr;
+  // The threads that solve the game's physics, in place of what game.json's "physics" section says
+  // (see physics/physics_threads.hpp). More than one also overlaps each frame's last physics step
+  // with the drawing of the frame (see Engine::frame). A dedicated server's room, which draws
+  // nothing, always solves its physics on one.
+  std::optional<int> physics_threads;
   // Where the time a scene read in the background takes to be made ready is counted, each loading
   // frame taking about kActivationSecondsPerFrame of it: the steady clock when empty. Tests give a
   // counter, never the real time.
@@ -131,6 +137,17 @@ class Engine {
   ObjectId finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
+  //
+  // A game whose physics is solved on more than one thread draws frame N while the physics steps
+  // frame N+1: the frame's last fixed step runs its scripts (fixed_update) in place, as every step
+  // does, and once the frame's update has run too, the world takes that step on a thread of its
+  // own, with what the scripts left it, while the frame is handed to the presenter. The next
+  // frame's game update waits for it first (the sync point: after the frame's input, network and
+  // web callbacks, where the step would have run in place, and never while a scene loads), and
+  // only then puts the objects where their bodies went and tells the scripts of the contacts. The
+  // scene's transforms are the scripts' copy of the bodies, and the world the physics thread's: no
+  // script ever runs while the world steps, and the frame drawn shows the transforms as they were
+  // before the step. With one thread every step is done in place.
   void frame(float frame_seconds);
   // Hands the game as it is now to the presenter again, without advancing it (a paused game
   // whose view has to be drawn anew).
@@ -212,7 +229,7 @@ class Engine {
   void seed_scripts();
 
   static Vec3 gravity();
-  // An empty physics world with the game's layers.
+  // An empty physics world with the game's layers, solved on the threads the game asked for.
   std::unique_ptr<PhysicsWorld> new_physics_world() const;
   // A physics world of its own for the scene in place, with a body for every object that asks for one.
   void make_bodies();
@@ -278,6 +295,22 @@ class Engine {
   void forget_decoded_pictures();
 
   void fixed_step(float dt);
+  // A fixed step's parts: its scripts and its inputs, before the world steps; then where the
+  // bodies went and the contacts, once it has.
+  void prepare_fixed_step(float dt);
+  void finish_fixed_step(float dt);
+  // The fixed steps a frame owes: the last one only prepared when the steps overlap the drawing.
+  void run_fixed_steps(int steps);
+  // Whether the world's steps overlap the drawing (more than one thread solves them).
+  bool overlaps_physics() const { return overlapped_ != nullptr; }
+  // Starts the step prepared this frame on the physics thread.
+  void begin_prepared_step();
+  // The sync point: waits for the step under way, then finishes it. Nothing when none is.
+  void settle_physics();
+  // How many threads solve the physics: the options', or game.json's; one for a server's room.
+  int chosen_physics_threads(const GameSettings& settings) const;
+  // Puts `world` in place of the physics world, and forgets the step the old one had under way.
+  void adopt_physics(std::unique_ptr<PhysicsWorld> world);
   // Before a physics step: the water notes bodies that appeared or jumped, the bodies take the poses
   // scripts gave them, and the water holds up what floats (its forces turn the bodies about where
   // they are now, not where they were before a script moved them).
@@ -304,6 +337,11 @@ class Engine {
   std::uint32_t max_bodies_ = kDefaultMaxBodies;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
   Navigation navigation_;             // where characters walk in the running scene
+  // How many threads solve the physics (game.json's, or the options'); and, with more than one:
+  int physics_threads_ = config::kDefaultPhysicsThreads;
+  OverlappedPhysicsWorld* overlapped_ = nullptr;  // physics_, whose steps overlap the drawing
+  bool step_prepared_ = false;                    // this frame's last step, whose scripts ran
+  bool step_in_flight_ = false;                   // begun on the physics thread, not finished
   InputState input_;
   ScriptedInputSource scripted_input_;
   std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere

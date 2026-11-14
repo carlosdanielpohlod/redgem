@@ -109,6 +109,7 @@ add_executable(redgem_tests
   unit/project_files_test.cpp
   unit/game_scenes_test.cpp
   unit/environment_test.cpp
+  unit/auto_exposure_test.cpp
   unit/scene_lights_test.cpp
   unit/local_shadows_test.cpp
   unit/gpu_select_test.cpp
@@ -118,6 +119,8 @@ add_executable(redgem_tests
   unit/quality_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
+  unit/font_chain_test.cpp
+  unit/bidi_text_test.cpp
   unit/material_alpha_test.cpp
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
@@ -179,6 +182,7 @@ add_executable(redgem_tests
   unit/server_status_test.cpp
   unit/particle_emitters_test.cpp
   unit/particles_test.cpp
+  unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
   unit/animation_blend_grid_test.cpp
@@ -201,6 +205,7 @@ add_executable(redgem_tests
   unit/markdown_blocks_test.cpp
   unit/session_history_test.cpp
   integration/physics_world_test.cpp
+  integration/threaded_physics_test.cpp
   integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
@@ -646,13 +651,15 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/display_render_test.cpp
                render_system/camera_marker_render_test.cpp
                render_system/local_shadow_render_test.cpp
+               render_system/exposure_foliage_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_GAMES_DIR="${CMAKE_SOURCE_DIR}/games"
-  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+  REDGEM_EDITOR_FONTS_DIR="${CMAKE_SOURCE_DIR}/assets/editor/fonts")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 

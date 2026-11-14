@@ -3,6 +3,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 
@@ -16,6 +17,8 @@ constexpr int kFontAtlasPadding = 4;
 constexpr int kSkylinePacking = 1;  // packs actual glyph heights, including tall accents
 constexpr std::size_t kPaddingEdges = 2;
 constexpr int kLargestAtlasSide = 8192;
+constexpr int kCoveragePixels = 16;             // any size: only which letters a face has is read
+constexpr std::size_t kMaxCoverage = 0x110000;  // every Unicode codepoint
 constexpr FT_Int32 kGlyphFlags = FT_LOAD_RENDER | FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP;
 
 bool request_pixel_height(FT_Face face, int pixels) {
@@ -27,9 +30,9 @@ bool request_pixel_height(FT_Face face, int pixels) {
 
 class FontFace {
  public:
-  FontFace(const std::vector<std::uint8_t>& bytes, int pixels) {
+  FontFace(const std::uint8_t* data, std::size_t size, int pixels) {
     if (FT_Init_FreeType(&library_) != 0) return;
-    if (FT_New_Memory_Face(library_, bytes.data(), static_cast<FT_Long>(bytes.size()), 0, &face) != 0) return;
+    if (FT_New_Memory_Face(library_, data, static_cast<FT_Long>(size), 0, &face) != 0) return;
     if (!FT_IS_SFNT(face)) return;
     ready = request_pixel_height(face, pixels);
   }
@@ -126,6 +129,7 @@ Font glyph_font(std::size_t count, int pixels) {
   font.glyphs = static_cast<GlyphInfo*>(MemAlloc(static_cast<unsigned int>(count * sizeof(GlyphInfo))));
   return font;
 }
+bool more_coverage(FT_UInt glyph, const std::vector<int>& codes) { return glyph != 0 && codes.size() < kMaxCoverage; }
 void fill_glyphs(Font& font, FT_Face face, const std::set<int>& letters) {
   std::size_t remaining = kGlyphPixelBudget;
   int index = 0;
@@ -135,7 +139,7 @@ void fill_glyphs(Font& font, FT_Face face, const std::set<int>& letters) {
 }  // namespace
 
 Font rasterize_game_font(const std::vector<std::uint8_t>& bytes, const std::set<int>& letters, int pixels) {
-  FontFace decoder(bytes, pixels);
+  FontFace decoder(bytes.data(), bytes.size(), pixels);
   if (!decoder.ready) return {};
   Font font = glyph_font(letters.size(), pixels);
   if (font.glyphs == nullptr) return {};
@@ -146,6 +150,18 @@ Font rasterize_game_font(const std::vector<std::uint8_t>& bytes, const std::set<
     return {};
   }
   return font;
+}
+
+std::vector<int> font_coverage(const std::uint8_t* data, std::size_t size) {
+  std::vector<int> codes;
+  FontFace decoder(data, size, kCoveragePixels);
+  if (!decoder.ready) return codes;
+  FT_UInt glyph = 0;
+  for (FT_ULong code = FT_Get_First_Char(decoder.face, &glyph); more_coverage(glyph, codes);
+       code = FT_Get_Next_Char(decoder.face, code, &glyph))
+    codes.push_back(static_cast<int>(code));
+  std::sort(codes.begin(), codes.end());
+  return codes;
 }
 
 }  // namespace redgem

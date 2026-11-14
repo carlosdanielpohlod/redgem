@@ -347,6 +347,9 @@ redgem_add_library(redgem_runtime
   physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
+  physics/physics_threads.cpp
+  physics/step_worker.cpp
+  physics/overlapped_physics_world.cpp
   physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
   physics/jolt/jolt_vehicle.cpp
@@ -420,6 +423,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scene_bindings.cpp
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
+  script/bindings/exposure_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/physics_args.cpp
   script/bindings/physics_query_bindings.cpp
@@ -514,6 +518,7 @@ redgem_add_library(redgem_runtime
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
+  render/auto_exposure.cpp
   render/scene_lights.cpp
   render/local_shadows.cpp
   render/renderer_local_shadows.cpp
@@ -523,6 +528,8 @@ redgem_add_library(redgem_runtime
   render/ui_scale.cpp
   render/quality.cpp
   render/font_rasterizer.cpp
+  render/font_chain.cpp
+  render/bidi_text.cpp
   render/game_fonts.cpp
   render/ui_font.cpp
   render/culling.cpp
@@ -569,7 +576,7 @@ redgem_embed_texts(redgem_runtime game)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
   "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
-target_link_libraries(redgem_runtime PRIVATE freetype)
+target_link_libraries(redgem_runtime PRIVATE freetype redgem_sheenbidi)
 target_link_libraries(redgem_runtime PRIVATE ${CMAKE_DL_LIBS})  # render/window.cpp keeps the OpenGL libraries loaded
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
