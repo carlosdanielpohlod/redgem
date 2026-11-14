@@ -2,11 +2,13 @@
 
 #include <chrono>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <thread>
 #include <utility>
 
+#include "fake_clock.hpp"
 #include "http_compression.hpp"
 #include "http_test_server.hpp"
 #include "net/http/http_client.hpp"
@@ -25,7 +27,7 @@ constexpr int kFound = 302;
 constexpr std::chrono::milliseconds kPollPause{5};
 constexpr std::chrono::seconds kLongestWait{10};
 constexpr float kShortTimeout = 0.3f;
-constexpr std::chrono::seconds kHangUpNoticed{2};  // far less than a request's own timeout (15 s)
+constexpr int kTimeoutSteps = 10;  // the fake clock passes a short timeout in this many polls
 
 net::HttpRequest request(const std::string& method, const std::string& url) {
   net::HttpRequest made;
@@ -41,13 +43,14 @@ int start(net::HttpClient& client, net::HttpRequest made) {
   return id;
 }
 
-// The answer to request `id`, polled for as a game does every frame.
-net::HttpResponse answer(net::HttpClient& client, int id) {
+// The answer to request `id`, polled for as a game does every frame; `between` runs between polls.
+net::HttpResponse answer(net::HttpClient& client, int id, const std::function<void()>& between = [] {}) {
   const auto give_up = std::chrono::steady_clock::now() + kLongestWait;
   while (std::chrono::steady_clock::now() < give_up) {
     for (net::HttpResult& result : client.poll()) {
       if (result.id == id) return std::move(result.response);
     }
+    between();
     std::this_thread::sleep_for(kPollPause);
   }
   FAIL("no answer came");
@@ -127,24 +130,28 @@ TEST_CASE("an https answer that lasts until the connection ends is whole only wh
 TEST_CASE("an https server that hangs up before the request went fails it at once") {
   HttpTestServer server(HttpTestServer::Kind::Secure, http_answer("200 OK", "never"));
   server.hang_up_at_once();
-  net::HttpClient client(net::TrustStore::from_pem(server.certificate_pem()));
-  const auto before = std::chrono::steady_clock::now();
+  // On a clock that never moves, its timeout never comes: only the hang-up can end the request.
+  const auto clock = std::make_shared<test::FakeClock>();
+  net::HttpClient client(net::TrustStore::from_pem(server.certificate_pem()), clock);
   const net::HttpResponse refused = answer(client, start(client, request("GET", server.url("/"))));
   CHECK(refused.status == 0);
   CHECK_FALSE(refused.error.empty());
-  CHECK(std::chrono::steady_clock::now() - before < kHangUpNoticed);
+  CHECK_FALSE(contains(refused.error, "no answer within"));
 }
 
 TEST_CASE("a server that never answers is given up on at the request's timeout") {
   HttpTestServer server(HttpTestServer::Kind::Plain, "");
   server.keep_quiet();
-  net::HttpClient client;
+  const auto clock = std::make_shared<test::FakeClock>();
+  net::HttpClient client(nullptr, clock);
   net::HttpRequest slow = request("GET", server.url("/"));
   slow.timeout_seconds = kShortTimeout;
-  const auto started = std::chrono::steady_clock::now();
-  const net::HttpResponse response = answer(client, start(client, slow));
+  const double started = clock->now();
+  const net::HttpResponse response =
+      answer(client, start(client, slow), [&clock] { clock->advance(kShortTimeout / kTimeoutSteps); });
   CHECK(contains(response.error, "no answer within 0.3 seconds"));
-  CHECK(std::chrono::steady_clock::now() - started < std::chrono::seconds(3));
+  // Given up before the clock got anywhere near the default timeout: at the request's own.
+  CHECK(clock->now() - started < net::kDefaultHttpTimeoutSeconds);
 }
 
 TEST_CASE("an answer larger than a game may take is refused") {

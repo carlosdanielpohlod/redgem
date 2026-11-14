@@ -95,6 +95,25 @@ TEST_CASE("copies of a mesh that come one after the other are batched; another m
   CHECK(same(batches.slots(), {0.0f, 1.0f, 2.0f, 100.0f, 101.0f, 102.0f, 3.0f}));
 }
 
+TEST_CASE("mirrored copies of a mesh are batched apart from the others, and runs of them stay together") {
+  constexpr bool kMirrored = true;
+  InstanceBatches batches;
+  batches.start();
+  batches.add(kTree, 0);
+  batches.add(kTree, 1, kMirrored);
+  batches.add(kTree, 2, kMirrored);
+  batches.add(kTree, 3);
+  batches.add_run(kTree, kGrassRunStart, kGrassRunLength);  // scattered copies are never mirrored
+  REQUIRE(batches.batches().size() == 3);
+  CHECK_FALSE(batches.batches()[0].mirrored);
+  CHECK(batches.batches()[0].count == 1);
+  CHECK(batches.batches()[1].mirrored);
+  CHECK(batches.batches()[1].first == 1);
+  CHECK(batches.batches()[1].count == 2);
+  CHECK_FALSE(batches.batches()[2].mirrored);
+  CHECK(batches.batches()[2].count == 1 + kGrassRunLength);
+}
+
 TEST_CASE("a new pass starts with no copies, and an empty run does not split a batch") {
   InstanceBatches batches;
   batches.start();

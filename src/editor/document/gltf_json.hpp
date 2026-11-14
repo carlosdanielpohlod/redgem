@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -215,6 +216,9 @@ std::optional<nlohmann::json> skin_with_current_nodes(nlohmann::json skin, const
 // An animation pointing at its nodes' current numbers, without the channels of deleted nodes;
 // nullopt when no channel is left.
 std::optional<nlohmann::json> animation_with_current_nodes(nlohmann::json animation, const std::vector<int>& current);
+// Adds to an animation, for each channel that moves a node of `copies` (source node -> the source
+// node of its copy), the same channel moving the copy (sharing its sampler).
+void add_channels_for_copies(nlohmann::json& animation, const std::map<int, int>& copies);
 
 // True when the file holds more scenes than the one the engine loads.
 bool has_several_scenes(const nlohmann::json& json);
