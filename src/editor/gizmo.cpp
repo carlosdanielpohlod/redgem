@@ -41,9 +41,9 @@ ImGuizmo::OPERATION gizmo_operation(GizmoMode mode) {
 
 }  // namespace
 
-float snap_step(GizmoMode mode) {
-  if (mode == GizmoMode::Translate) return kTranslateSnap;
-  return mode == GizmoMode::Rotate ? kRotateSnapDegrees : kScaleSnap;
+float snap_step(GizmoMode mode, const EditorPreferences& preferences) {
+  if (mode == GizmoMode::Translate) return preferences.translate_snap;
+  return mode == GizmoMode::Rotate ? preferences.rotate_snap : preferences.scale_snap;
 }
 
 void Gizmo::use_keys() {
@@ -95,7 +95,7 @@ void Gizmo::drag(float* model, const SceneViewport& view) const {
   const float16 projection =
       MatrixToFloatV(MatrixPerspective(view.camera.fovy * DEG2RAD, view.width_pixels() / view.height_pixels(),
                                        rlGetCullDistanceNear(), rlGetCullDistanceFar()));
-  const float step = snap_step(mode_);
+  const float step = snap_step(mode_, preferences_);
   const float snap_values[] = {step, step, step};
   ImGuizmo::Manipulate(camera.v, projection.v, gizmo_operation(mode_), own_axes() ? ImGuizmo::LOCAL : ImGuizmo::WORLD,
                        model, nullptr, snaps() ? snap_values : nullptr);

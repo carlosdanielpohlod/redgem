@@ -2,6 +2,9 @@
 #include <mruby.h>
 #include <mruby/string.h>
 #include <filesystem>
+#include <stdexcept>
+#include <string>
+#include <vector>
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "server/save_database.hpp"
@@ -34,6 +37,14 @@ struct SlotData {
   std::filesystem::path file = folder / "save.json";
   SlotData() { std::filesystem::remove_all(folder); }
   ~SlotData() { std::filesystem::remove_all(folder); }
+};
+class SlotListFailure final : public std::runtime_error {
+ public:
+  explicit SlotListFailure(bool& destroyed) : std::runtime_error("listing failed"), destroyed_(destroyed) {}
+  ~SlotListFailure() override { destroyed_ = true; }
+
+ private:
+  bool& destroyed_;
 };
 }  // namespace
 TEST_CASE("Save selects isolated named slots and keeps the default across restarts") {
@@ -94,4 +105,15 @@ TEST_CASE("a supplied backend without slots retains its default data on a reject
   CHECK(game.ruby("begin; Save.slot = 'campaign'; rescue RuntimeError; 'unsupported'; end") == "unsupported");
   CHECK(game.ruby("Save.slot") == "default");
   CHECK(game.ruby("Save[:coins]") == "7");
+}
+
+TEST_CASE("Save.slots unwinds a native exception before Ruby rescues it") {
+  SlotData data;
+  bool destroyed = false;
+  SlotGame game(data.file);
+  game.engine->script_context().list_save_slots = [&destroyed]() -> std::vector<std::string> {
+    throw SlotListFailure(destroyed);
+  };
+  CHECK(game.ruby("begin; Save.slots; rescue RuntimeError => error; error.message; end") == "listing failed");
+  CHECK(destroyed);
 }

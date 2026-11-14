@@ -1,6 +1,7 @@
 #pragma once
 
 #include "scene/animation/animation_graph.hpp"
+#include "scene/animation/clip_clock.hpp"
 
 namespace redgem {
 
@@ -34,12 +35,24 @@ class AnimationGraphPlayer {
   bool playing() const;
   std::string state() const;
   AnimationGraphFrame frame() const;
+  // Where the destination state's normalized phase (and the source's, while fading) went in the
+  // last advance, in laps of 1. A state entered
+  // in that advance went from its start; nothing moved while paused.
+  ClockSpan current_span() const { return span_of(current_); }
+  std::optional<ClockSpan> source_span() const;
 
  private:
   struct StateClock {
     std::size_t state = 0;
     double phase = 0.0;
+    double from = 0.0;  // the phase before the last advance
+    double laps = 0.0;  // laps gone round in it
   };
+
+  static ClockSpan span_of(const StateClock& clock) { return {clock.from, clock.phase, clock.laps}; }
+  static void hold(StateClock& clock);
+  // Nothing moved yet in this advance.
+  void hold_clocks();
 
   const AnimationGraph& installed_graph() const;
   const CompiledAnimationState& state_of(const StateClock& clock) const;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 
 #include "render/window.hpp"
 
@@ -23,9 +24,12 @@ class Interface {
   // Everything of the interface drawn in a frame goes between these two, inside the window's frame.
   void begin_frame();
   void end_frame();
+  void set_scale_override(std::optional<float> scale) { scale_override_ = scale; }
 
  private:
+  float preferred_scale() const;
   ScaleReader read_scale_;
+  std::optional<float> scale_override_;
   float scale_ = 0;
 };
 
