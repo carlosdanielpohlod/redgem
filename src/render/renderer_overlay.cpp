@@ -3,6 +3,7 @@
 
 #include "render/renderer_impl.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -35,6 +36,11 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
+// A side of an image drawn at its own size, in pixels at the interface's scale: never less than one.
+int scaled_side(int side, float scale) {
+  return std::max(1, static_cast<int>(std::lround(static_cast<float>(side) * scale)));
+}
+
 bool is_clip(HudItem::Kind kind) { return kind == HudItem::Kind::Clip || kind == HudItem::Kind::Unclip; }
 
 // Cuts what follows to the item's box (Clip), or stops cutting it (Unclip); returns whether it is cut.
@@ -54,7 +60,8 @@ unsigned char control_alpha(ControlCircle::Look look) {
 
 }  // namespace
 
-// A text in its font chain: each piece with the face that has its letters, right-to-left runs reversed.
+// A text in its font chain: each piece with the face that has its letters, right-to-left runs reversed,
+// drawn from the face's atlas made nearest above its size (its letters are never stretched).
 void Renderer::Impl::draw_hud_text(const HudItem& item) {
   const float size = static_cast<float>(item.size);
   const float spacing = size * kUiLetterSpacing;
@@ -68,7 +75,8 @@ void Renderer::Impl::draw_hud_text(const HudItem& item) {
 void Renderer::Impl::draw_hud_image(const HudItem& item) {
   const Texture2D* picture = ui_image(item.text);
   if (picture == nullptr) return;
-  const render_math::Size size = render_math::image_size(item.width, item.height, picture->width, picture->height);
+  const render_math::Size size = render_math::image_size(
+      item.width, item.height, scaled_side(picture->width, item.scale), scaled_side(picture->height, item.scale));
   DrawTexturePro(*picture, {0.0f, 0.0f, static_cast<float>(picture->width), static_cast<float>(picture->height)},
                  {static_cast<float>(item.x), static_cast<float>(item.y), size.width, size.height}, {0.0f, 0.0f}, 0.0f,
                  to_raylib(item.color));

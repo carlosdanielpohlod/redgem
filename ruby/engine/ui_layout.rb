@@ -31,25 +31,25 @@ module UI
   KEEP_EMPTY_LINES = -1              # split's limit that keeps a text's empty last lines
   WRAPS_KEPT = 64                    # wrapped texts remembered between frames (the latest used)
 
-  # The lines a text is drawn in at `size` when no line may be wider than `width` pixels (in the
+  # The lines a text is drawn in at `size` when no line may be wider than `width` units (in the
   # face selected): broken at spaces, at the text's own line breaks, and between the letters of a
   # word too long for a line.
   def self.wrap(text, width:, size: DEFAULT_SIZE)
-    key = [text.to_s, width.to_i, size.to_i, font]
+    key = [text.to_s, width.to_i, size.to_i, font, scale]
     lines = wraps.delete(key) || wrapped(*key)
     wraps.shift if wraps.size >= WRAPS_KEPT
     wraps[key] = lines
   end
 
-  # How tall a text is drawn, in pixels, from its first line's top to its last line's bottom: with
+  # How tall a text is drawn, in units, from its first line's top to its last line's bottom: with
   # a width, wrapped as UI.wrap does it.
   def self.text_height(text, size: DEFAULT_SIZE, width: nil) = lines_height(text_lines(text, width, size).size, size)
 
-  # Pixels from one line's top to the next one's.
+  # Units from one line's top to the next one's.
   def self.line_height(size) = (size * LINE_SPACING).round
 
   # Where a box `width` by `height` starts (its top-left corner, [x, y]) when it sits at an anchor
-  # by its matching corner, `x` and `y` pixels from it. Without an anchor: at [x, y].
+  # by its matching corner, `x` and `y` units from it. Without an anchor: at [x, y].
   def self.anchored(anchor, x:, y:, width: 0, height: 0)
     across, down = anchor_shares(anchor)
     [(x + (UI.width - width) * across).to_i, (y + (UI.height - height) * down).to_i]
@@ -76,10 +76,11 @@ module UI
 
   def self.align_share(align) = ALIGNS.fetch(align) { raise ArgumentError, "unknown align #{align.inspect}" }
 
-  # The wrapped texts remembered, by [text, width, size, face]: the one used longest ago first.
+  # The wrapped texts remembered, by [text, width, size, face, scale] (a text is measured at the
+  # pixels it takes): the one used longest ago first.
   def self.wraps = @wraps ||= {}
 
-  def self.wrapped(text, width, size, _face)
+  def self.wrapped(text, width, size, _face, _scale)
     paragraphs(text).flat_map { |line| Wrapping.new(width, size).lines(line) }.freeze
   end
 
@@ -149,7 +150,7 @@ module UI
     [start, [finish, start].max]
   end
 
-  def self.pointer_in?(box) = inside?(box, Input.mouse_x, Input.mouse_y)
+  def self.pointer_in?(box) = inside?(box, mouse_x, mouse_y)
   def self.pointer_in_clip? = clips.empty? || pointer_in?(clips.last)
   def self.inside?(box, x, y) = within?(x, box[:x], box[:width]) && within?(y, box[:y], box[:height])
 

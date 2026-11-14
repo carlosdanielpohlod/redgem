@@ -179,7 +179,8 @@ constexpr const char* kFullBlock = "█";  // in JetBrains Mono, not in the buil
 constexpr int kFullBlockCode = 0x2588;
 constexpr const char* kTurnedE = "Ǝ";  // in the built-in face, not in JetBrains Mono
 constexpr int kTurnedECode = 0x018e;
-constexpr float kChainTextPixels = 28.0f;
+constexpr int kChainPixels = 28;  // a chain's texts are this tall: their faces' atlases are made for it
+constexpr float kChainTextPixels = static_cast<float>(kChainPixels);
 
 // The built-in face as "latin" and the editor's code face as "mono": two faces with different letters.
 class ChainFiles : public FontFiles {
@@ -191,7 +192,7 @@ class ChainFiles : public FontFiles {
   }
 };
 unsigned atlas_of(GameFonts& fonts, const std::string& name, const std::string& text) {
-  return fonts.get(name, text).texture.id;
+  return fonts.get(name, text, kChainPixels).texture.id;
 }
 }  // namespace
 
@@ -260,10 +261,24 @@ TEST_CASE("a letter no face of a chain has shows the built-in question mark with
   ChainFiles files;
   GameFonts fonts;
   fonts.set_directory(files.folder);
-  const int letters_before = fonts.get("", "A").glyphCount;
+  const int letters_before = fonts.get("", "A", kChainPixels).glyphCount;
   const auto pieces = fonts.layout("latin:mono", "\xf4\x8f\xbf\xbf", kChainTextPixels, 0.0f);
   REQUIRE(pieces.size() == 1);
   REQUIRE(pieces[0].font != nullptr);  // drawn, not taken for a line break
   CHECK(pieces[0].font->glyphCount == letters_before);
   CHECK(GetGlyphInfo(*pieces[0].font, kUnsupported).value == kQuestion);
+}
+
+TEST_CASE("a text is drawn from an atlas made at least as tall as it is, never stretched up to the largest") {
+  constexpr int kSmallText = 20;
+  constexpr int kLargeText = 100;
+  constexpr int kHugeText = 300;
+  RenderStage stage;
+  GameFonts fonts;
+  CHECK(GameFonts::raster_pixels(GameFonts::kDefaultPixels) == GameFonts::kDefaultPixels);
+  CHECK(fonts.get("", "Sharp", kSmallText).baseSize == GameFonts::raster_pixels(kSmallText));
+  CHECK(GameFonts::raster_pixels(kSmallText) >= kSmallText);
+  CHECK(fonts.get("", "Sharp", kLargeText).baseSize >= kLargeText);
+  CHECK(fonts.get("", "Sharp", kHugeText).baseSize == GameFonts::raster_pixels(kHugeText));  // the largest
+  CHECK(fonts.get("", "Sharp", kSmallText).texture.id != fonts.get("", "Sharp", kLargeText).texture.id);
 }

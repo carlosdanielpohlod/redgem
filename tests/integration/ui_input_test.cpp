@@ -52,7 +52,11 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, Presenter* presenter 
   options.presenter = presenter;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
-  return std::move(std::get<std::unique_ptr<Engine>>(created));
+  auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
+  // A unit of the interface is a pixel here, whatever the screen: these tests are about the input and what is queued
+  // (tests/integration/ui_scale_test.cpp is about the interface's units).
+  engine->script_context().ui_reference = UiReference{};
+  return engine;
 }
 
 void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
