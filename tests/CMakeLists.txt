@@ -40,6 +40,7 @@ add_executable(redgem_tests
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
+  unit/asset_search_test.cpp
   unit/mcp_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
@@ -50,6 +51,7 @@ add_executable(redgem_tests
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/webp_image_test.cpp
+  unit/ktx2_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
@@ -125,6 +127,8 @@ add_executable(redgem_tests
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
   unit/water_interactions_test.cpp
+  unit/water_volume_test.cpp
+  unit/buoyancy_test.cpp
   unit/sky_light_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
@@ -160,6 +164,7 @@ add_executable(redgem_tests
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
+  unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
   unit/movement_validator_test.cpp
   unit/movement_rules_test.cpp
@@ -211,10 +216,13 @@ add_executable(redgem_tests
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
+  integration/water_buoyancy_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
   integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
+  integration/save_migration_api_test.cpp
+  integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
@@ -237,6 +245,7 @@ add_executable(redgem_tests
   integration/http_client_test.cpp
   integration/http_game_test.cpp
   integration/network_session_test.cpp
+  integration/network_reconnect_test.cpp
   integration/movement_validation_test.cpp
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
@@ -253,6 +262,7 @@ add_executable(redgem_tests
   integration/game_project_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
+  integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
   integration/error_hints_test.cpp
@@ -617,6 +627,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/mirrored_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
+               render_system/ktx2_render_test.cpp
                render_system/material_pictures_render_test.cpp
                render_system/morph_render_test.cpp
                render_system/game_font_render_test.cpp

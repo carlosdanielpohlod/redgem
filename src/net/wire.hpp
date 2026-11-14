@@ -58,6 +58,18 @@ inline constexpr std::size_t kMaxReasonBytes = 256;
 // its join carried.
 inline constexpr const char* kTooLate = "the game did not decide in time";
 inline constexpr const char* kUnreadableAuth = "what the join carried for the game (auth:) is not a hash it can take";
+// Reconnecting (Network.reconnect_window): a machine whose connection dropped (not one that left,
+// nor one let go) keeps its place and id for as long as the game hosting it says, at most this
+// long, and gets them back by proving it is the one that held them, with the secret token its
+// last welcome gave it (this many random bytes, written in hexadecimal). Meanwhile it calls again
+// this often. A token that names no place held is turned away with this reason.
+inline constexpr float kMostReconnectWindowSeconds = 300.0f;
+inline constexpr std::size_t kResumeTokenBytes = 16;
+inline constexpr std::size_t kResumeTokenDigits = 2 * kResumeTokenBytes;
+inline constexpr float kRedialSeconds = 1.0f;
+inline constexpr const char* kResumeRefused = "the game holds no place for this machine any more";
+// Why a machine that was reconnecting is out of the game: nobody answered in time.
+inline constexpr const char* kReconnectTimedOut = "the game could not be reached again in time";
 
 namespace wire {
 
@@ -104,6 +116,14 @@ inline constexpr const char* kRefused = "x";      // to a newcomer: you are not 
 inline constexpr const char* kGuarded = "g";  // opener to relay: whether its game decides who comes in (kData)
 inline constexpr const char* kAsking = "q";   // relay to opener: newcomer kFrom asks to come in, with kAuth
 inline constexpr const char* kVerdict = "v";  // opener to relay: newcomer kTo is let in (kData), or not and why
+// Reconnecting. In a welcome: the token that gets this machine's place back should its connection
+// drop, and for how many seconds the game holds it (kWindow). In a hello: the token of the place
+// to get back, instead of a new one.
+inline constexpr const char* kResume = "u";
+inline constexpr const char* kWindow = "z";
+inline constexpr const char* kBye =
+    "e";  // a guest to its host: I leave (no place to hold); the host to all: the game is over
+inline constexpr const char* kBack = "b";  // to the others: kFrom reconnected (it missed what was said meanwhile)
 
 // The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
 // handed out again once free, so they never outgrow what a message may carry.
@@ -130,6 +150,11 @@ nlohmann::json refusal(const std::string& reason);
 nlohmann::json refusal_of_protocol(int theirs);
 // What tells a newcomer that the game is deciding on its hello.
 nlohmann::json considering();
+// A hello that asks for the place `token` holds back.
+nlohmann::json resume_hello(const std::string& token);
+// A word that has nothing else in it but its kind (kBye), or that and whom it is about (kBack).
+nlohmann::json word(const char* kind);
+nlohmann::json word_about(const char* kind, int peer);
 // Whether a message that is well formed is one a game sent (under a name to hear it by), or a pose.
 bool is_game_message(const nlohmann::json& message);
 // The version of the protocol a message says it speaks, whatever else it holds (0 when it says

@@ -64,6 +64,8 @@ void close_native(NativeSocket socket);
 // lose what it had not read yet of what this one said last. At most `most_bytes`: a machine still
 // sending at full speed is not waited out.
 void discard_unread(NativeSocket socket, std::size_t most_bytes);
+// Ends a connection both ways, the socket left open.
+void shut_both(NativeSocket socket);
 // Makes closing the socket reset the connection at once: nothing unread is read, nothing unsent sent.
 void reset_on_close(NativeSocket socket);
 bool make_non_blocking(NativeSocket socket);

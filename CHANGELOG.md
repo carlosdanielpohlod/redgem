@@ -18,6 +18,60 @@ until 1.0, a release may change what games rely on (see
   vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
   not joined yet (no shaping).
 
+- **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
+  model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
+  or folder has every word, best match first (a name that is the word, then one that starts with
+  it, holds it, a subfolder tag of that name, and the rest of the path); `redgem templates
+  [words]` does the same for the templates new games start from. MCP has both as the read-only
+  tools `asset_search` and `template_search`.
+- **Scene diff against Git**: `redgem scene diff <game> --against <revision>` (or `--revision`;
+  `HEAD`, `HEAD~1`, `main`, a commit hash) compares the scene with the one that commit saved,
+  read through `git show`; MCP's `scene_diff` takes the same as `revision`, and a connected editor compares
+  its open, unsaved document with it. A missing revision, or a game in no Git repository, is an
+  error that says so.
+- **Reconnecting after a drop**: `Network.reconnect_window = seconds` on the machine hosting
+  (directly, or a dedicated server's room) holds the place and id of a player whose connection
+  drops. That player stays in the game (`Network.reconnecting?`) and calls back every second with
+  a secret token from its welcome, single use, getting the same id back; a token that holds no
+  place, an old one, or one past the window is turned away. New events: `on_reconnecting`,
+  `on_reconnected` (on the host and on the machine that dropped) and `on_lost` (it could not get
+  back in time). The others hear the player left only once the window is over, and on its return
+  the host shows it the spawned objects as they are now. A player who leaves, and a host that
+  leaves, now say goodbye, so no place is held for them. Not in rooms on a relay, and there is
+  no host migration (see KNOWN_LIMITATIONS.md).
+- **A second key or button per action on the controls page**: each row of the menu's controls
+  page has two cells of keys and two of gamepad buttons, so a player binds W and Up both to
+  "Move up". A key caught for the second cell is added beside the first, one caught for the first
+  keeps the second in its place, Delete, Backspace or a gamepad's Y clears the focused cell, and a
+  key the row already has changes nothing. Both are kept for the next runs.
+- **`Input.rumble(pad, strength, seconds)` and `Input.rumble?`**: a hook for gamepad vibration
+  that does nothing yet (raylib 5.5 has none on desktops or Android) and says so: `rumble?` is
+  false and `rumble` returns false, checking its arguments all the same.
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
+- **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
+  (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
+  format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
+  ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
+  file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
+  encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
+
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
+  displace and drags as they move, so bodies bob, settle and flat ones right themselves. The new
+  `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep a body
+  floats; denser than water's 1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, fading in as the camera goes under the waves so crossing the surface
+  never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
 - **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
   editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
   Ruby snippet in the game the editor plays, given that token, and answers with the result's
@@ -328,6 +382,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
 - **A program on Linux opens as many windows, one after another, as it likes**: closing a window
   unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
   storage of a library loaded again, so after about a hundred windows in one process the driver
