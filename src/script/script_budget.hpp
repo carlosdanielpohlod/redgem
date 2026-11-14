@@ -110,6 +110,8 @@ class ScriptBudget {
     Phase phase = Phase::Running;
   };
 
+  // When the watchdog is to look at a call due at `due` (see next_look).
+  std::int64_t look_for(std::int64_t due) const;
   void push(bool limited);
   void pop();
   void resume(Frame& frame, std::int64_t now);

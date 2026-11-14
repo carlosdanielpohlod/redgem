@@ -31,7 +31,8 @@ class ScriptTicks {
     return ticking;
   }
 
-  static mrb_value tick(mrb_state*, mrb_value) {
+  static mrb_value tick(mrb_state* mrb, mrb_value) {
+    if (current().clock == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "tick: the test's clock is gone");
     current().clock->advance(current().step);
     return mrb_nil_value();
   }

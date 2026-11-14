@@ -348,23 +348,30 @@ mrb_value slow_engine_call(mrb_state*, mrb_value) {
   return mrb_nil_value();
 }
 
+void give_slow_engine_call(RubyVm& vm, test::FakeClock& clock) {
+  slow_vm = &vm;
+  slow_clock = &clock;
+  mrb_define_method(vm.state(), vm.state()->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
+}
+
 }  // namespace
 
 TEST_CASE("time spent inside engine functions counts against the budget") {
   const TestDeadline deadline("engine calls");
   test::FakeClock clock;
   RubyVm vm;
-  slow_vm = &vm;
-  slow_clock = &clock;
   const test::ScriptTicks ticks(vm, clock, kTickSeconds);  // (`tick`: a quick engine function)
-  mrb_define_method(vm.state(), vm.state()->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
+  give_slow_engine_call(vm, clock);
   vm.set_budget(kTestBudget);
   // One call past the budget: stopped at the first instruction of Ruby after it returns.
   const RubyResult slow = vm.eval("slow_engine_call; $after_slow = true", "slow.rb");
+  CHECK_FALSE(slow.ok);
   CHECK(slow.error.find("ScriptTimeout") != std::string::npos);
   CHECK(mrb_true_p(vm.eval("$after_slow.nil?", "check.rb").value));
   // Many short ones, with next to no Ruby between them: stopped all the same.
-  CHECK(vm.eval("loop { tick }", "many.rb").error.find("ScriptTimeout") != std::string::npos);
+  const RubyResult many = vm.eval("loop { tick }", "many.rb");
+  CHECK_FALSE(many.ok);
+  CHECK(many.error.find("ScriptTimeout") != std::string::npos);
 }
 
 #if !defined(_WIN32)

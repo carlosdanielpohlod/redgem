@@ -175,9 +175,10 @@ bool ScriptBudget::past_deadline() const {
   return due != kNever && due <= now();
 }
 
-std::int64_t ScriptBudget::next_look() const {
-  const std::int64_t due = deadline();
-  const bool on_coarse_clock = clock_.load(std::memory_order_seq_cst) == nullptr;
+std::int64_t ScriptBudget::next_look() const { return look_for(deadline()); }
+
+std::int64_t ScriptBudget::look_for(std::int64_t due) const {
+  const bool on_coarse_clock = clock_.load(std::memory_order_relaxed) == nullptr;
   if (on_coarse_clock || due == kNever) return due;
   return coarse_milliseconds() + config::kScriptWatchRetryMs;
 }
@@ -238,7 +239,7 @@ bool ScriptBudget::counts(const Frame& frame) const { return frame.limited && li
 // (A deadline to keep: the watchdog is woken if it would look later than that.)
 void ScriptBudget::publish(std::int64_t deadline) {
   deadline_.store(deadline, std::memory_order_seq_cst);
-  if (deadline != kNever) Watchdog::instance().deadline_set(next_look());
+  if (deadline != kNever) Watchdog::instance().deadline_set(look_for(deadline));
 }
 
 bool ScriptBudget::overdue(const Frame& frame, std::int64_t now) const {
