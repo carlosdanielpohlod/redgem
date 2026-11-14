@@ -26,6 +26,8 @@
 #include "app/engine.hpp"
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
+#include "fake_clock.hpp"
+#include "script_ticks.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_budget.hpp"
 #include "script/script_config.hpp"
@@ -104,10 +106,11 @@ const std::map<std::string, std::string> kScripts = {
      "end\nend\n"},
     {"innocent.rb", "class Innocent < Behaviour\n  def start = $innocents = ($innocents || 0) + 1\nend\n"},
     // Calls the engine makes from inside a call are not that call's time: two slow objects made
-    // from one update, each nearly a budget long, leave it well within its own.
+    // from one update, each most of a budget long on the test's clock (once it ticks), leave it
+    // within its own.
     {"slow.rb",
-     "class Slow < Behaviour\n  def initialize(*arguments)\n    super\n    started = Time.now\n"
-     "    nil while Time.now - started < 0.07\n  end\nend\n"},
+     "class Slow < Behaviour\n  def initialize(*arguments)\n    super\n"
+     "    3.times { tick } if $ticking\n  end\nend\n"},
     // A loop that only ever spawns: the engine's work it does is forgiven only up to a point.
     {"breeder.rb", "class Breeder < Behaviour\n  def update(_dt) = loop { Scene.spawn('innocent.rb') }\nend\n"},
     {"patient.rb",
@@ -153,6 +156,10 @@ std::string ruby(Engine& engine, const std::string& code) {
   REQUIRE_MESSAGE(result.ok, result.error);
   return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
 }
+
+constexpr double kMillisecondsPerSecond = 1000.0;
+constexpr int kTicksPerBudget = 4;  // (a slow object's three ticks are most of a budget)
+constexpr double kTickSeconds = kTestBudgetMs / kMillisecondsPerSecond / kTicksPerBudget;
 
 // Runs frames; how long they took.
 SteadyClock::duration frames(Engine& engine, int count) {
@@ -280,8 +287,12 @@ TEST_CASE("the calls the engine makes from inside a call are not that call's tim
   const TestDeadline deadline("patient");
   const std::filesystem::path game = budget_game("patient", budget_settings());
   test::LogCapture capture;
+  test::FakeClock clock;  // (before the game, which reads it until it ends)
   std::unique_ptr<Engine> engine = started(game, scene_of({"patient.rb", "slow.rb"}));
+  const test::ScriptTicks ticks(engine->scripts().vm(), clock, kTickSeconds);
+  ruby(*engine, "$ticking = true");
   frames(*engine, kFramesAfter);
+  CHECK(clock.now() > test::kFakeClockStart + kTestBudgetMs / kMillisecondsPerSecond);
   CHECK(engine->scripts().error_count() == 0);
   CHECK(ruby(*engine, "$patient_done.inspect") == "true");
   engine.reset();
@@ -298,14 +309,20 @@ TEST_CASE("a running game's scripts are on the budget game.json gives them") {
 }
 
 TEST_CASE("an interpreter has no budget until given one, and each call gets all of it") {
-  const TestDeadline deadline("interpreter");
+  test::FakeClock clock;
   RubyVm vm;
   CHECK(vm.budget().count() == 0);
   vm.set_budget(kTestBudget);
-  // Calls that each take most of the budget, longer than it together, all finish.
-  const std::string most_of_it =
-      "t = Time.now; while Time.now - t < " + std::to_string(kTestBudgetMs / 2 / 1000.0) + "; end; :done";
-  for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval(most_of_it, "most.rb").ok);
+  const test::ScriptTicks ticks(vm, clock, kTickSeconds);
+  // Calls that each take most of the budget on the test's clock, longer than it together, all
+  // finish.
+  for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval("3.times { tick }; :done", "most.rb").ok);
+}
+
+TEST_CASE("an interpreter's call that never returns is stopped, even one stuck saying what it raised") {
+  const TestDeadline deadline("interpreter");
+  RubyVm vm;
+  vm.set_budget(kTestBudget);
   const RubyResult stuck = vm.eval("loop {}", "stuck.rb");
   CHECK_FALSE(stuck.ok);
   CHECK(stuck.error.find("ScriptTimeout") != std::string::npos);
@@ -319,17 +336,15 @@ TEST_CASE("an interpreter has no budget until given one, and each call gets all 
 namespace {
 
 // An engine function that takes longer than the budget on its own, as a request for millions of
-// things would: the interpreter cannot stop it halfway, but its time is the call's.
-constexpr std::chrono::milliseconds kSlowEngineCall = 2 * kTestBudget;
-constexpr int kQuickEngineCallMs = 5;  // many of these together pass the budget
+// things would: the interpreter cannot stop it halfway, but its time is the call's. On the test's
+// clock it lasts two budgets, and goes on until the watchdog has seen that.
+constexpr double kSlowEngineCallSeconds = 2 * kTestBudgetMs / kMillisecondsPerSecond;
+RubyVm* slow_vm = nullptr;
+test::FakeClock* slow_clock = nullptr;
 
 mrb_value slow_engine_call(mrb_state*, mrb_value) {
-  std::this_thread::sleep_for(kSlowEngineCall);
-  return mrb_nil_value();
-}
-
-mrb_value quick_engine_call(mrb_state*, mrb_value) {
-  std::this_thread::sleep_for(std::chrono::milliseconds(kQuickEngineCallMs));
+  slow_clock->advance(kSlowEngineCallSeconds);
+  while (!slow_vm->budget_keeper().stop_requested()) std::this_thread::yield();
   return mrb_nil_value();
 }
 
@@ -337,20 +352,19 @@ mrb_value quick_engine_call(mrb_state*, mrb_value) {
 
 TEST_CASE("time spent inside engine functions counts against the budget") {
   const TestDeadline deadline("engine calls");
+  test::FakeClock clock;
   RubyVm vm;
-  mrb_state* mrb = vm.state();
-  mrb_define_method(mrb, mrb->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
-  mrb_define_method(mrb, mrb->kernel_module, "quick_engine_call", quick_engine_call, MRB_ARGS_NONE());
+  slow_vm = &vm;
+  slow_clock = &clock;
+  const test::ScriptTicks ticks(vm, clock, kTickSeconds);  // (`tick`: a quick engine function)
+  mrb_define_method(vm.state(), vm.state()->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
   vm.set_budget(kTestBudget);
   // One call past the budget: stopped at the first instruction of Ruby after it returns.
   const RubyResult slow = vm.eval("slow_engine_call; $after_slow = true", "slow.rb");
-  CHECK_FALSE(slow.ok);
   CHECK(slow.error.find("ScriptTimeout") != std::string::npos);
   CHECK(mrb_true_p(vm.eval("$after_slow.nil?", "check.rb").value));
   // Many short ones, with next to no Ruby between them: stopped all the same.
-  const RubyResult many = vm.eval("loop { quick_engine_call }", "many.rb");
-  CHECK_FALSE(many.ok);
-  CHECK(many.error.find("ScriptTimeout") != std::string::npos);
+  CHECK(vm.eval("loop { tick }", "many.rb").error.find("ScriptTimeout") != std::string::npos);
 }
 
 #if !defined(_WIN32)

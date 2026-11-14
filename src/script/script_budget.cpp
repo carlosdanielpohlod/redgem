@@ -3,6 +3,7 @@
 #include <mruby.h>
 
 #include <algorithm>
+#include <cmath>
 #include <condition_variable>
 #include <mutex>
 #include <string>
@@ -20,6 +21,7 @@ namespace {
 using std::chrono::milliseconds;
 
 constexpr std::size_t kUsualDepth = 16;  // calls in calls, room made for them at once
+constexpr double kMillisecondsPerSecond = 1000.0;
 
 std::atomic<std::uint64_t> watchdog_wakes{0};
 
@@ -82,8 +84,7 @@ class Watchdog {
   }
 
   static std::int64_t look_at(ScriptBudget& budget, std::int64_t now) {
-    const std::int64_t deadline = budget.deadline();
-    if (deadline > now) return deadline;  // (kNever for a budget with no call running)
+    if (!budget.past_deadline()) return budget.next_look();  // (kNever with no call running)
     budget.request_stop();
     return now + config::kScriptWatchRetryMs;  // (until the interpreter is back in Ruby to see it)
   }
@@ -103,9 +104,9 @@ class Watchdog {
     return shortest;
   }
 
-  std::int64_t earliest_deadline() const {
+  std::int64_t earliest_look() const {
     std::int64_t earliest = ScriptBudget::kNever;
-    for (const ScriptBudget* budget : budgets_) earliest = std::min(earliest, budget->deadline());
+    for (const ScriptBudget* budget : budgets_) earliest = std::min(earliest, budget->next_look());
     return earliest;
   }
 
@@ -113,7 +114,7 @@ class Watchdog {
   // is seen here, or sees the plan and wakes it.
   void sleep_until(std::unique_lock<std::mutex>& hold, std::int64_t next) {
     planned_.store(next, std::memory_order_seq_cst);
-    if (earliest_deadline() < next) return;
+    if (earliest_look() < next) return;
     const auto woken_early = [this, next] { return planned_.load(std::memory_order_seq_cst) < next; };
     if (next == ScriptBudget::kNever) {
       wake_.wait(hold, woken_early);
@@ -162,8 +163,27 @@ void ScriptBudget::refresh_hook() {
   mrb_->code_fetch_hook = watched ? budget_hook : nullptr;
 }
 
+std::int64_t ScriptBudget::now() const {
+  const Clock* clock = clock_.load(std::memory_order_seq_cst);
+  if (clock == nullptr) return coarse_milliseconds();
+  return static_cast<std::int64_t>(std::llround(clock->now() * kMillisecondsPerSecond));
+}
+
+// (A call with no deadline, or none running, is never past it: its clock is not read.)
+bool ScriptBudget::past_deadline() const {
+  const std::int64_t due = deadline();
+  return due != kNever && due <= now();
+}
+
+std::int64_t ScriptBudget::next_look() const {
+  const std::int64_t due = deadline();
+  const bool on_coarse_clock = clock_.load(std::memory_order_seq_cst) == nullptr;
+  if (on_coarse_clock || due == kNever) return due;
+  return coarse_milliseconds() + config::kScriptWatchRetryMs;
+}
+
 void ScriptBudget::push(bool limited) {
-  const std::int64_t now = coarse_milliseconds();
+  const std::int64_t now = this->now();
   if (!frames_.empty()) frames_.back().left_at = now;
   Frame frame;
   frame.limited = limited;
@@ -179,7 +199,7 @@ void ScriptBudget::pop() {
     silence();
     return;
   }
-  resume(frames_.back(), coarse_milliseconds());
+  resume(frames_.back(), now());
 }
 
 // Back in a call from what ran inside it, which does not count (up to a point): a call that is
@@ -218,7 +238,7 @@ bool ScriptBudget::counts(const Frame& frame) const { return frame.limited && li
 // (A deadline to keep: the watchdog is woken if it would look later than that.)
 void ScriptBudget::publish(std::int64_t deadline) {
   deadline_.store(deadline, std::memory_order_seq_cst);
-  if (deadline != kNever) Watchdog::instance().deadline_set(deadline);
+  if (deadline != kNever) Watchdog::instance().deadline_set(next_look());
 }
 
 bool ScriptBudget::overdue(const Frame& frame, std::int64_t now) const {
@@ -226,7 +246,7 @@ bool ScriptBudget::overdue(const Frame& frame, std::int64_t now) const {
 }
 
 void ScriptBudget::on_stop_request(mrb_state* mrb, const mrb_code* pc) {
-  const std::int64_t now = coarse_milliseconds();
+  const std::int64_t now = this->now();
   if (frames_.empty() || !overdue(frames_.back(), now)) {
     silence();  // (not this call's, or not yet)
     return;

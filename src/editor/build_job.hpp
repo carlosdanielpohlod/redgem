@@ -6,7 +6,6 @@
 // its own copy of what it was asked: never on the scene being edited, nor on the editor's console
 // (what the build logs is kept, and handed over with how it ended).
 
-#include <chrono>
 #include <filesystem>
 #include <mutex>
 #include <optional>
@@ -14,6 +13,7 @@
 #include <thread>
 #include <vector>
 
+#include "core/clock.hpp"
 #include "core/log.hpp"
 #include "editor/editor_options.hpp"
 
@@ -45,7 +45,8 @@ struct BuildOutcome {
 
 class BuildJob {
  public:
-  BuildJob() = default;
+  // A build's time is read on `clock` (a test's own, or the computer's steady clock).
+  explicit BuildJob(const Clock& clock = steady_clock()) : clock_(clock) {}
   // Waits for a build that still runs: its thread never outlives the job.
   ~BuildJob();
   BuildJob(const BuildJob&) = delete;
@@ -69,8 +70,6 @@ class BuildJob {
   void wait();
 
  private:
-  using Clock = std::chrono::steady_clock;
-
   // Starts the build's thread; throws std::system_error when the system gives none.
   void launch(BuildRequest request);
   // On the build's thread.
@@ -82,7 +81,8 @@ class BuildJob {
   // The editor's thread sets these before the build's thread starts, which only reads them.
   bool busy_ = false;
   std::string target_;
-  Clock::time_point started_;
+  const Clock& clock_;
+  double started_ = 0.0;                 // on clock_
   mutable std::mutex lock_;              // guards the two below, which both threads use
   std::string step_;                     // what the build said it began last
   std::optional<BuildOutcome> outcome_;  // set by the build's thread as it ends

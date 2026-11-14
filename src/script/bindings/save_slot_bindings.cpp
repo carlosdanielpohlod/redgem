@@ -14,6 +14,7 @@ ScriptContext& slots(mrb_state* mrb) {
   if (!available) mrb_raise(mrb, E_RUNTIME_ERROR, "Save slots are only available while a game runs");
   return ctx;
 }
+// (Opening and listing slots reads the disk: the engine's time, not the script's.)
 mrb_value current(mrb_state* mrb, mrb_value) {
   const auto& name = slots(mrb).save_slot;
   return mrb_str_new(mrb, name.data(), static_cast<mrb_int>(name.size()));
@@ -25,6 +26,7 @@ mrb_value select(mrb_state* mrb, mrb_value) {
               "slot name must be 1..48 lowercase letters/digits, '-' or '_', starting with a letter/digit");
   auto& ctx = slots(mrb);
   try {
+    const BudgetPause pause(script_budget(mrb));
     ctx.select_save_slot(name);
   } catch (const std::exception& error) {
     mrb_raise(mrb, E_RUNTIME_ERROR, error.what());
@@ -35,6 +37,7 @@ mrb_value names(mrb_state* mrb, mrb_value) {
   auto& ctx = slots(mrb);
   std::vector<std::string> values;
   try {
+    const BudgetPause pause(script_budget(mrb));
     values = ctx.list_save_slots();
   } catch (const std::exception& error) {
     mrb_raise(mrb, E_RUNTIME_ERROR, error.what());
