@@ -85,6 +85,21 @@ void place_pieces(std::vector<FontPiece>& pieces, float size, float spacing) {
     pen.x += piece.width + spacing;
   }
 }
+// Each face's letters in one string, so its atlas grows once for the whole text.
+std::vector<std::string> letters_by_face(std::size_t faces, const std::vector<FaceRun>& runs) {
+  std::vector<std::string> letters(faces);
+  for (const FaceRun& run : runs) {
+    if (!is_line_break(run.text)) letters[run.face] += run.text;
+  }
+  return letters;
+}
+std::vector<FontPiece> runs_as_pieces(const std::vector<FaceRun>& runs, const std::vector<const Font*>& fonts) {
+  std::vector<FontPiece> laid;
+  laid.reserve(runs.size());
+  for (const FaceRun& run : runs)
+    laid.push_back({is_line_break(run.text) ? nullptr : fonts[run.face], run.text, Vector2{}, 0.0f});
+  return laid;
+}
 
 }  // namespace
 
@@ -189,18 +204,12 @@ const Font& GameFonts::get(const std::string& name, const std::string& text) {
 }
 bool GameFonts::covers(const std::string& name, int codepoint) { return can_draw(face(name), codepoint); }
 std::vector<FontPiece> GameFonts::pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs) {
-  std::vector<std::string> letters(names.size());
-  for (const FaceRun& run : runs) {
-    if (!is_line_break(run.text)) letters[run.face] += run.text;
-  }
-  std::vector<const Font*> fonts(names.size());  // each atlas grows once for the whole text
+  const std::vector<std::string> letters = letters_by_face(names.size(), runs);
+  std::vector<const Font*> fonts(names.size());
   for (std::size_t i = 0; i < names.size(); ++i) {
     if (!letters[i].empty()) fonts[i] = &get(names[i], letters[i]);
   }
-  std::vector<FontPiece> laid;
-  for (const FaceRun& run : runs)
-    laid.push_back({is_line_break(run.text) ? nullptr : fonts[run.face], run.text, Vector2{}, 0.0f});
-  return laid;
+  return runs_as_pieces(runs, fonts);
 }
 std::vector<FontPiece> GameFonts::layout(const std::string& chain, const std::string& text, float size, float spacing) {
   if (faces_.empty()) face("");
