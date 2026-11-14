@@ -5,6 +5,7 @@
 #include <mruby/string.h>
 
 #include <chrono>
+#include <exception>
 #include <string>
 
 #include "app/engine.hpp"
@@ -71,20 +72,25 @@ bool gives_token(const std::string& token, const mcp::Json& args) {
   return args.is_object() && bridge::same_token(token, args.value(kTokenKey, mcp::Json()));
 }
 
-// Whether the call gives code to run.
-bool gives_code(const mcp::Json& args) {
-  const mcp::Json code = args.value(kCodeKey, mcp::Json());
-  return code.is_string() && !code.get_ref<const std::string&>().empty();
-}
+// Whether the call's code is code to run: a string with something in it.
+bool is_code(const mcp::Json& code) { return code.is_string() && !code.get_ref<const std::string&>().empty(); }
 
 // Why the call is refused before anything runs, or empty when it is not.
 std::string refusal(const std::string& token, const RubyVm* vm, const mcp::Json& args) {
   if (!gives_token(token, args)) return kBadToken;
-  if (!gives_code(args)) return kNeedsCode;
-  if (args[kCodeKey].get_ref<const std::string&>().size() > kMostEvalCodeBytes)
+  const mcp::Json code = args.value(kCodeKey, mcp::Json());
+  if (!is_code(code)) return kNeedsCode;
+  if (code.get_ref<const std::string&>().size() > kMostEvalCodeBytes)
     return "code is longer than " + std::to_string(kMostEvalCodeBytes) + " bytes";
   if (vm == nullptr) return kEditorNotPlaying;
   return {};
+}
+
+// The tool's schema, with the longest code it takes.
+mcp::Json built_schema() {
+  mcp::Json schema = mcp::Json::parse(kSchema);
+  schema["inputSchema"]["properties"][kCodeKey]["maxLength"] = kMostEvalCodeBytes;
+  return schema;
 }
 
 }  // namespace
@@ -98,8 +104,7 @@ EvalReply evaluate_ruby(RubyVm& vm, const std::string& code) {
 }
 
 mcp::Json ruby_eval_schema() {
-  mcp::Json schema = mcp::Json::parse(kSchema);
-  schema["inputSchema"]["properties"][kCodeKey]["maxLength"] = kMostEvalCodeBytes;
+  static const mcp::Json schema = built_schema();  // (the catalog is built on every tool call)
   return schema;
 }
 
@@ -118,8 +123,13 @@ std::shared_ptr<const RubyEvalGate> open_ruby_eval(std::ostream& out) {
 
 mcp::Json answer_ruby_eval(const RubyEvalGate* gate, EditorSession& session, const mcp::Json& args) {
   if (gate == nullptr) return mcp::tool_result(kNotEnabled, true);
-  Engine* runtime = playing_runtime(session);
-  return gate->answer(runtime == nullptr ? nullptr : &runtime->scripts().vm(), args);
+  try {
+    Engine* runtime = playing_runtime(session);
+    return gate->answer(runtime == nullptr ? nullptr : &runtime->scripts().vm(), args);
+  } catch (const std::exception& error) {
+    // An error answered, as every editor tool's is, rather than the bridge's caller cut off.
+    return mcp::tool_result(error.what(), true);
+  }
 }
 
 mcp::Json no_editor_for_ruby_eval() { return mcp::tool_result(kNoEvalEditor, true); }

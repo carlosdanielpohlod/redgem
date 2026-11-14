@@ -145,6 +145,9 @@ TEST_CASE("the gate refuses a wrong or missing token, too much code and a game t
   CHECK(failed(too_long));
   CHECK(says(text_of(too_long), "longer than"));
   CHECK(failed(gate.answer(&vm, call(kToken, ""))));
+  for (const Json& no_code : {Json{{"token", kToken}}, Json{{"token", kToken}, {"code", Json::array()}}}) {
+    CHECK(says(text_of(gate.answer(&vm, no_code)), "needs code"));
+  }
   CHECK(says(text_of(gate.answer(nullptr, call(kToken, "1"))), "not playing"));
   const Json answered = gate.answer(&vm, call(kToken, "6 * 7"));
   CHECK_FALSE(failed(answered));

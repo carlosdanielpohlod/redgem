@@ -182,7 +182,9 @@ jobs:
       # A release build leaves out the editor's Ruby evaluation (REDGEM_RUBY_EVAL follows the
       # tests, which are off here): none of its texts may be in what goes out.
       - name: Check that the programs have no Ruby evaluation
-        run: tests/ships_no_ruby_eval.sh build/src/redgem build/src/redgem-player build/src/redgem-server
+        run: >
+          tests/ships_no_ruby_eval.sh build/src/redgem build/src/redgem-player build/src/redgem-relay
+          build/src/redgem-server
 
       - name: Keep the libraries' sources
         if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
@@ -264,7 +266,8 @@ jobs:
       # (As the Linux programs are checked: a release build has no Ruby evaluation.)
       - name: Check that the Windows programs have no Ruby evaluation
         run: >
-          tests/ships_no_ruby_eval.sh build-windows/src/redgem.exe build-windows/src/redgem-server.exe
+          tests/ships_no_ruby_eval.sh build-windows/src/redgem.exe build-windows/src/redgem-relay.exe
+          build-windows/src/redgem-server.exe
           build/src/runtimes/windows/redgem-player.exe
 
       - name: Restore the NDK
@@ -463,6 +466,12 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON \
             -DREDGEM_BUILD_TESTS=OFF
           cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
+
+      # (As the Linux programs are checked: a release build has no Ruby evaluation.)
+      - name: Check that the Mac programs have no Ruby evaluation
+        run: >
+          tests/ships_no_ruby_eval.sh build/src/redgem build/src/redgem-player build/src/redgem-relay
+          build/src/redgem-server
 
       - name: Pack the download
         run: tools/release/package.sh

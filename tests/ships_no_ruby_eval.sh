@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails when a program carries the editor's Ruby evaluation (project/ruby_eval.hpp), which only
 # development builds have (the CMake option REDGEM_RUBY_EVAL): a release build of redgem, the
-# player and the game server must have none of its texts.
+# player, the relay and the game server must have none of its texts.
 #   ships_no_ruby_eval.sh <program>...
 set -uo pipefail
 
