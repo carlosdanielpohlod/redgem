@@ -109,8 +109,7 @@ std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& te
 GameSettings game_physics(const std::filesystem::path& game_dir) {
   if (game_dir.empty()) return {};
   GameManifest manifest = read_game_manifest(game_dir);
-  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
-  if (!manifest.max_bodies_error.empty()) log::warning(manifest.max_bodies_error);
+  for (const std::string& problem : physics_problems(manifest)) log::warning(problem);
   return std::move(manifest.settings);
 }
 

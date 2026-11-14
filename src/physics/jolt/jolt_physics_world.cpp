@@ -28,7 +28,7 @@ World::World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodi
     : gravity_(gravity),
       layers_(layers),
       capacity_(body_capacity(max_bodies)),
-      temp_allocator_(capacity_.scratch_bytes),
+      temp_allocator_(static_cast<JPH::uint>(capacity_.scratch_bytes)),  // (160 MB at most: kMostMaxBodies)
       job_system_(config::kMaxPhysicsJobs) {
   system_.Init(capacity_.bodies, config::kNumBodyMutexes, capacity_.body_pairs, capacity_.contact_constraints,
                broad_phase_layers_, object_vs_broad_phase_, object_pairs_);

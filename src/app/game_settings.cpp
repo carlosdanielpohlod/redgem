@@ -160,6 +160,12 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   return manifest;
 }
 
+std::vector<std::string> physics_problems(const GameManifest& manifest) {
+  std::vector<std::string> problems = manifest.physics_warnings;
+  if (!manifest.max_bodies_error.empty()) problems.push_back(manifest.max_bodies_error);
+  return problems;
+}
+
 bool valid_game_id(const std::string& id) {
   if (!sized_as_id(id)) return false;
   const auto first = static_cast<unsigned char>(id.front());

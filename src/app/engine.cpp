@@ -25,17 +25,11 @@
 namespace redgem {
 namespace {
 
-// What game.json's "physics" section says that cannot be used.
-void warn_of_unusable_physics(const GameManifest& manifest) {
-  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
-  if (!manifest.max_bodies_error.empty()) log::warning(manifest.max_bodies_error);
-}
-
 // What game.json says that cannot be used, and what the game does instead.
 void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
-  warn_of_unusable_physics(manifest);
+  for (const std::string& problem : physics_problems(manifest)) log::warning(problem);
   for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
   for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
 }

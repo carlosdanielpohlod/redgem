@@ -241,7 +241,7 @@ TEST_CASE("past the bodies the world can hold, an object gets none, and that is 
 
 TEST_CASE("a world holds as many bodies as the game asks for, and no more") {
   constexpr std::uint32_t kFewBodies = 100;
-  constexpr std::uint32_t kManyBodies = kDefaultMaxBodies * 2;
+  constexpr std::uint32_t kManyBodies = kDefaultMaxBodies + kFewestMaxBodies;  // (past the default: more memory)
   fill_past_the_limit(*world_of(kFewBodies), kFewBodies);
   fill_past_the_limit(*world_of(kManyBodies), kManyBodies);
 }

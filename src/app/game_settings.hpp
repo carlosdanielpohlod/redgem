@@ -81,6 +81,8 @@ struct GameManifest {
   std::vector<std::string> navigation_warnings;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
+// What is wrong with the "physics" section, a line each (its layers', then its body limit's).
+std::vector<std::string> physics_problems(const GameManifest& manifest);
 
 // Whether a text can be a game's id: small letters, digits, '.', '-' and '_', starting and ending
 // with a letter or a digit, with no two dots in a row, up to kMaxGameIdLength long.
