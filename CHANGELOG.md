@@ -288,6 +288,12 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries opening a window loads now stay
+  loaded until the program ends. A system test opens, draws in and closes 300 windows in one
+  process.
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).

@@ -2,9 +2,13 @@
 
 #include <raylib.h>
 
+#include <algorithm>
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "core/log.hpp"
 #include "render/gl_extras.hpp"
@@ -12,6 +16,9 @@
 
 // On desktop Linux raylib opens windows through the GLFW it is built with (see windowing_started).
 #if defined(__linux__) && !defined(__ANDROID__)
+#include <dlfcn.h>
+#include <link.h>
+
 extern "C" int glfwInit(void);
 #endif
 
@@ -33,6 +40,50 @@ bool windowing_started() {
 #endif
 }
 
+#if defined(__linux__) && !defined(__ANDROID__)
+constexpr int kKeepIterating = 0;  // what a dl_iterate_phdr callback returns to see the next library
+
+// Whether a loaded object is a library with a name (the program itself has none).
+bool named_library(const char* name) { return name != nullptr && name[0] != '\0'; }
+
+int add_library_name(dl_phdr_info* info, std::size_t /*size*/, void* names) {
+  if (named_library(info->dlpi_name)) static_cast<std::vector<std::string>*>(names)->emplace_back(info->dlpi_name);
+  return kKeepIterating;
+}
+
+using LibraryNames = std::vector<std::string>;
+
+// The libraries loaded in the process now, by file name.
+LibraryNames loaded_libraries() {
+  LibraryNames names;
+  dl_iterate_phdr(add_library_name, &names);
+  return names;
+}
+
+bool among(const LibraryNames& names, const std::string& name) {
+  return std::find(names.begin(), names.end(), name) != names.end();
+}
+
+// Keeps the libraries opening a window loaded (those not in `before`) until the process ends.
+// Closing a window, GLFW unloads the OpenGL library and Mesa its driver, and opening the next
+// loads them again; glibc does not take back the thread-local storage a library loaded at run time
+// is given, so after about a hundred windows in one process the driver no longer loads ("GLX: No
+// GLXFBConfigs returned"). Kept loaded, the next window finds them there. Libraries loaded before
+// the first window, such as a game's own, keep unloading as they did. (Names are gathered first:
+// dlopen is not called while dl_iterate_phdr walks the list.)
+void keep_window_libraries_loaded(const LibraryNames& before) {
+  for (const std::string& name : loaded_libraries()) {
+    if (among(before, name)) continue;
+    void* library = dlopen(name.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
+    if (library != nullptr) dlclose(library);  // the flag stays; only this reference is given back
+  }
+}
+#else
+using LibraryNames = std::vector<std::string>;
+LibraryNames loaded_libraries() { return {}; }
+void keep_window_libraries_loaded(const LibraryNames& /*before*/) {}  // the limit above is glibc's
+#endif
+
 constexpr int kTraceLineLength = 512;  // characters of a raylib log line that are kept
 
 // Passes on raylib's warnings and the one line that says which graphics card draws the window.
@@ -50,6 +101,7 @@ void report_graphics_card(int level, const char* format, va_list args) {
 // Opens the window. raylib names the graphics card only at its most verbose level: listen while
 // it opens.
 void open_window(const WindowSettings& settings) {
+  const LibraryNames before = loaded_libraries();  // before GLFW loads the OpenGL library
   if (!windowing_started()) throw std::runtime_error(kNoDisplay);
   SetTraceLogCallback(report_graphics_card);
   SetTraceLogLevel(LOG_INFO);
@@ -57,6 +109,7 @@ void open_window(const WindowSettings& settings) {
   InitWindow(settings.width, settings.height, settings.title.c_str());
   SetTraceLogCallback(nullptr);
   SetTraceLogLevel(LOG_WARNING);
+  keep_window_libraries_loaded(before);  // a window that failed to open loaded them too
   if (!IsWindowReady()) throw std::runtime_error("cannot open a window");
 }
 

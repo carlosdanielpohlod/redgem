@@ -607,6 +607,15 @@ target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 
+# Window after window in one process, as the render system tests open them (render/window.cpp):
+# Linux only, where glibc's limit on libraries loaded again is.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(redgem_window_reopen_tests render_system/render_test_main.cpp render_system/window_reopen_test.cpp)
+  target_link_libraries(redgem_window_reopen_tests PRIVATE redgem_runtime doctest::doctest)
+  add_test(NAME system.render.windows_reopen COMMAND redgem_window_reopen_tests)
+  set_tests_properties(system.render.windows_reopen PROPERTIES LABELS system RUN_SERIAL TRUE)
+endif()
+
 # Games whose scene is generated from downloaded assets (not committed) are tested when it is
 # there, and reported as skipped when it is not: a test that did not run never counts as passed.
 set(REDGEM_RUN_IF_BUILT ${CMAKE_CURRENT_SOURCE_DIR}/system_optional/run_if_built.sh)

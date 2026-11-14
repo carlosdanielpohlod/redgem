@@ -536,6 +536,7 @@ target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
   "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_runtime PRIVATE freetype)
+target_link_libraries(redgem_runtime PRIVATE ${CMAKE_DL_LIBS})  # render/window.cpp keeps the OpenGL libraries loaded
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
   target_link_libraries(redgem_runtime PUBLIC ws2_32)
