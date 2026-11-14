@@ -37,6 +37,12 @@ class ScriptSampler;
 // kScriptForgivenBudgets of its budgets in all: a loop that only ever spawns is stopped too. A
 // function of the engine is never stopped halfway: the call ends at its next instruction of Ruby.
 //
+// The budget is wall time, not a count of instructions: the time a call spends inside the engine's
+// functions (Physics queries, Scene lookups, a long Array#sort) is the call's like its Ruby's, and
+// one engine function that alone runs past the budget has the call stopped as soon as it returns.
+// Nothing is charged per engine call, so a function of the engine costs no more for it: the hook
+// reads one atomic flag per instruction, and the clock is read only when the watchdog asks.
+//
 // What a call's time is read on: the computer's coarse clock (core/coarse_clock.hpp), or a clock
 // given to the budget (a test's, which only moves when the test moves it). On a given clock the
 // watchdog looks at a running call every kScriptWatchRetryMs of real time, and the call is past

@@ -28,6 +28,17 @@ SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save 
 // (Reading and writing the save is the engine's time, not the script's, `paused`: a disk that is
 // slow for a moment, another program scanning the file say, does not stop the call that saves.)
 
+// What `write` returns, as engine work; a key the store refused as busy (see SaveKeyBusy) is the
+// script's error.
+template <typename Write>
+bool written(mrb_state* mrb, const Write& write) {
+  try {
+    return paused(mrb, write);
+  } catch (const SaveKeyBusy& busy) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, busy.what());
+  }
+}
+
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
@@ -43,8 +54,8 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_get_args(mrb, "oo", &key, &value);
   const nlohmann::json stored = json_from(mrb, value, kSaveHolder);
   const std::string name = to_name(mrb, key);
-  const bool written = paused(mrb, [&] { return save(mrb).set(name, stored); });
-  if (!written) log::warning("could not write " + save(mrb).where());
+  const bool stored_now = written(mrb, [&] { return save(mrb).set(name, stored); });
+  if (!stored_now) log::warning("could not write " + save(mrb).where());
   return value;
 }
 
@@ -59,8 +70,8 @@ SaveStore::Change block_change(mrb_state* mrb, mrb_value block, mrb_value fallba
 }
 
 // Save.update(key, default = nil) { |value| new_value }: the block makes the key's new value of its
-// value (default when it has none), with no other room of a dedicated server reading or writing
-// the save meanwhile. Returns the new value.
+// value (default when it has none), with no other room of a dedicated server writing that key
+// meanwhile (rooms writing other keys go on). Returns the new value.
 mrb_value save_update(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
@@ -70,14 +81,14 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
   mrb_value made = mrb_nil_value();
   const SaveStore::Change change = block_change(mrb, block, fallback, made);
   const std::string name = to_name(mrb, key);
-  const bool written = paused(mrb, [&] { return save(mrb).update(name, change); });
-  if (!written) log::warning("could not write " + save(mrb).where());
+  const bool stored_now = written(mrb, [&] { return save(mrb).update(name, change); });
+  if (!stored_now) log::warning("could not write " + save(mrb).where());
   return made;
 }
 
 mrb_value save_delete(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
-  paused(mrb, [&] { return save(mrb).remove(name); });
+  written(mrb, [&] { return save(mrb).remove(name); });
   return mrb_nil_value();
 }
 
