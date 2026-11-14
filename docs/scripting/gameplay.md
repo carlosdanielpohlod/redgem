@@ -250,7 +250,7 @@ To click on things in the world, cast a ray from the camera through the pointer:
 
 ```ruby
 if Input.mouse_pressed?(:left)
-  origin, direction = Camera.screen_ray(Input.mouse_x, Input.mouse_y)
+  origin, direction = Camera.screen_ray(UI.mouse_x, UI.mouse_y)
   hit = Physics.raycast(origin, direction, 100.0)
   hit[:object].destroy if hit
 end
@@ -332,6 +332,16 @@ end
 `:slider` lets one slide along an axis (`limits:` in meters), `:point` lets it turn every way (a
 ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons, or twisted
 harder than 500 newton meters (`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
+
+A joint can also come with the scene: set up in the editor's Joint card (or with `joint`
+properties in Blender, see [Levels](../levels.md)), it is made as the scene loads, and
+`game_object.joint` returns it:
+
+```ruby
+class Gate < Behaviour
+  def open = game_object.joint.motor(90, 200)                 # the hinge set up in the editor
+end
+```
 
 ## Collision layers
 
@@ -638,7 +648,7 @@ picture.
 
 ## Mark things on the screen
 
-`Camera.world_to_screen` says where a point of the world is on the screen, in the pixels `UI`
+`Camera.world_to_screen` says where a point of the world is on the screen, in the units `UI`
 draws in, at any window size and render scale: a health bar over an enemy, an arrow over a coin.
 It is nil when the point is behind the camera; a point beside the view comes back off the screen.
 
@@ -693,6 +703,34 @@ The anchors are `:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`,
 and the settings widgets all take one. `UI.anchored(:center, x: 0, y: 0, width: 300, height: 200)`
 gives the top-left `[x, y]` of a box placed that way, for laying out several things together. An
 image is placed by the width and height you give it.
+
+### At any screen size: the reference screen
+
+Anchors keep things at their corners; the reference screen keeps them the right size. Every
+size, position, margin and font size `UI` takes is in units of the screen the game lays its
+interface out for, which `game.json` names:
+
+```json
+"ui": {"reference": [1920, 1080], "match": "height"}
+```
+
+Without it, the reference is the game's own window (`window_width` by `window_height`), its
+height matched. On another screen a unit is `UI.scale` pixels: with `"match": "height"`, the
+screen's height over the reference's, so a HUD takes the same share of the screen at 1280x720,
+at 4K and in a small window; `"width"` follows the width instead, and `"fit"` takes the smaller
+of the two, so all of the reference always shows. Texts are drawn at the pixels they take, from
+letters made at about that size: they stay sharp at 4K rather than being stretched.
+
+`UI.width` and `UI.height` are the screen in units (with the height matched, `UI.height` is the
+reference's, and `UI.width` follows the screen's shape), so anchors and `UI.width / 2` work as
+before. `UI.pixel_width` and `UI.pixel_height` are its pixels, `UI.reference` the reference's
+size, and `UI.mouse_x` and `UI.mouse_y` the pointer in units: clicks and taps land on what is
+drawn at any size. `Camera.world_to_screen` and `Camera.screen_ray` are in units too.
+
+The player makes everything bigger or smaller with `Settings.ui_scale` (0.5 to 2; the settings
+screen's "Interface size"), which `UI.scale` is multiplied by and which is kept with the other
+settings. The game's menus already take the screen's height: they shrink with a smaller one, and
+stay as they are with a larger one, where only the HUD grows.
 
 ### Long texts: word wrap
 
@@ -839,7 +877,9 @@ Game.load_scene_async("level2")
 Normal simulation pauses while the file is read; the loading screen, audio and network continue.
 Failure or cancellation preserves the current scene. Check `Game.loading_error` after the load
 ends to report a failure or retry. Successful activation removes the old loading callback.
-Physics, texture decoding and GPU upload can still cause an activation hitch; see
+The new scene is made ready over several frames while the loading screen keeps drawing (its
+bodies a few milliseconds a frame, its textures and meshes a few megabytes a frame); its scripts
+all start in the frame it takes the old one's place, so they see the whole level. See
 [the API's loading limits](api.md#game). Use `Game.load_scene` for the existing synchronous switch.
 
 ## A settings screen

@@ -239,6 +239,11 @@
           "about": "its custom properties"
         },
         {
+          "name": "joint",
+          "about": "the Joint it came with in the scene (its Joint component, set up in the editor), or nil",
+          "example": "Scene.find(\"Door\").joint.angle"
+        },
+        {
           "name": "alive?",
           "about": "false once it was destroyed"
         },
@@ -1063,7 +1068,7 @@
     },
     {
       "name": "Joint",
-      "about": "What holds two bodies together, or one to the world (made by Physics.joint).",
+      "about": "What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint).",
       "methods": [
         {
           "name": "kind",
@@ -1384,13 +1389,13 @@
           "name": "screen_ray",
           "static": true,
           "args": "x, y",
-          "about": "[origin, direction] through a pixel of the screen"
+          "about": "[origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)"
         },
         {
           "name": "world_to_screen",
           "static": true,
           "args": "point",
-          "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera",
+          "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera",
           "example": "x, y = Camera.world_to_screen(enemy.transform.position + Vector3.up * 2)"
         },
         {
@@ -1857,18 +1862,48 @@
         {
           "name": "width",
           "static": true,
-          "about": "the width of the screen, in pixels"
+          "about": "the width of the screen, in the interface's units (UI.scale pixels each)"
         },
         {
           "name": "height",
           "static": true,
+          "about": "the height of the screen, in the interface's units: the reference's height when it is matched"
+        },
+        {
+          "name": "pixel_width",
+          "static": true,
+          "about": "the width of the screen, in pixels"
+        },
+        {
+          "name": "pixel_height",
+          "static": true,
           "about": "the height of the screen, in pixels"
+        },
+        {
+          "name": "scale",
+          "static": true,
+          "about": "the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json \"ui\") times Settings.ui_scale"
+        },
+        {
+          "name": "reference",
+          "static": true,
+          "about": "[width, height] of the screen the interface is laid out for (game.json \"ui\": its \"reference\", or the game's window)"
+        },
+        {
+          "name": "mouse_x",
+          "static": true,
+          "about": "where the pointer is across the screen, in the interface's units"
+        },
+        {
+          "name": "mouse_y",
+          "static": true,
+          "about": "where the pointer is down the screen, in the interface's units"
         },
         {
           "name": "text_width",
           "static": true,
           "args": "str, size:",
-          "about": "how wide a text is, in pixels (in the face selected)"
+          "about": "how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)"
         },
         {
           "name": "wrap",
@@ -2210,7 +2245,7 @@
           "about": "the version in game.json (\"1.2.0\"), or nil"
         }
       ],
-      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nOnly file reading and glTF parsing happen on the worker. Physics creation, script setup, texture\ndecoding and GPU upload still happen on the owning thread and may hitch during activation. The\nold and incoming scene coexist in memory during reading. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then show exactly one\nloading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the\nbackground reader even in fixed-step mode; activation still runs on the server loop and can stall\nother rooms sharing that loop. Closing the process waits for an active parser to return.",
+      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nFile reading, glTF parsing and, for a game shown in a window, picture decoding happen on the\nworker. The scene read is then made ready over the next loading frames while the old one is still\nshown: its physics bodies are made in batches of about 4 ms a frame, its textures and meshes go to\nthe graphics card about 8 MiB a frame, and the swap happens once all of it is ready. Every script\nof the new scene starts in that one frame, so a behaviour's first update sees the complete level.\nCreating the scene's objects, its water and its navigation bake still take one frame each. The old\nand incoming scene coexist in memory until the swap. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then make the scene ready\nall at once after exactly one loading frame, so completion depends neither on thread scheduling\nnor on the real clock. Networked runs and dedicated-server rooms keep the background reader and\nthe spread activation even in fixed-step mode; a dedicated server's rooms share their loop. Closing the process waits for an active parser to return.",
       "guide": "gameplay.md#a-loading-screen"
     },
     {
@@ -2265,6 +2300,18 @@
           "static": true,
           "args": "scale",
           "about": "changes it"
+        },
+        {
+          "name": "ui_scale",
+          "static": true,
+          "about": "how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it"
+        },
+        {
+          "name": "ui_scale=",
+          "static": true,
+          "args": "scale",
+          "about": "changes it",
+          "example": "Settings.ui_scale = 1.25"
         },
         {
           "name": "vsync",

@@ -285,10 +285,12 @@ not a promise of how it will be closed.
 - Text fields take single key presses: there is no input-method composition, so languages typed
   through a composition window cannot be entered even with a game font that draws them.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
-  hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
-  by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
-  no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
-  one height.
+  hyphenation, no line-breaking rules of scripts written without spaces). Sizes scale with the
+  screen from one reference screen (game.json's `"ui"`) and one player multiplier
+  (`Settings.ui_scale`): there are no per-screen layouts (a phone held upright gets the same
+  layout, only its height matched), and the touch screen's stick and buttons follow the screen's
+  height but not the player's multiplier. There is no layout engine (rows, columns, stacks) and no
+  scroll region for anything other than rows of one height.
 - On Android the on-screen keyboard types the letters that have a key of their own on it (with
   Shift, digits and signs). Letters a keyboard sends as a whole text (some accented letters, emoji,
   words written by swiping or picked from suggestions on some keyboards) do not arrive.
@@ -327,6 +329,10 @@ not a promise of how it will be closed.
   sight from the hero's late pose: a client hears of what it did only through the game's own
   messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
   them to an action of its own rebinds one.
+- A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
+  one whose other end is in another scene, or was deleted, is not made (the log says so). The
+  editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
+- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
@@ -359,10 +365,14 @@ not a promise of how it will be closed.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
-- `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
-  worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
-  upload still block the owning thread at activation. Old and new scenes coexist in memory.
-  Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
+- `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
+  a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
+  creating the scene's objects, its water and its navigation bake still take one frame each, and
+  the editor's Play view uploads the new scene's textures and meshes in the frame it first shows
+  it. Old and new scenes, their physics worlds included, coexist in memory until the swap, and
+  the new one's decoded pictures are all held at once until they are on the graphics card.
+  Offline fixed-step runs intentionally wait for the reader and activate all at once, for
+  reproducible activation frames.
 - `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
   world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
   GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
@@ -458,7 +468,12 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About forty unit and integration tests wait on the real clock, a source of rare timing failures.
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its

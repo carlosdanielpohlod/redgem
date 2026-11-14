@@ -64,7 +64,11 @@ const prefabs::Source& Engine::load_runtime_prefab(const std::string& file) {
 
 ObjectId Engine::spawn_prefab(const std::string& name, const SpawnRequest& request) {
   const auto& prefab = load_runtime_prefab(prefab_path(name));
-  return finish_spawn(scene_.instantiate_rigid(prefab.scene.nodes, prefab.assets.meshes, scene_desc_), request);
+  std::vector<std::pair<ObjectId, ObjectId>> made;
+  for (const ObjectId id : scene_.instantiate_rigid(prefab.scene.nodes, prefab.assets.meshes, scene_desc_)) {
+    made.emplace_back(kNoObject, id);  // (copies of nothing in the scene)
+  }
+  return finish_spawn(made, request);
 }
 
 }  // namespace redgem

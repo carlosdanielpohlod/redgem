@@ -17,7 +17,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Input`](#input) | Keyboard, mouse, gamepad and touch, read every frame. |
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
-| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
+| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
@@ -101,6 +101,7 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `tag`: its tag property
 - `tag?(value)`: whether its tag is value
 - `props`: its custom properties
+- `joint`: the Joint it came with in the scene (its Joint component, set up in the editor), or nil
 - `alive?`: false once it was destroyed
 - `destroy`: removes it at the end of the step
 - `visible`: whether it is drawn
@@ -289,7 +290,7 @@ Questions to the physics world: rays, moving shapes and shapes in place. See [ga
 
 ## Joint
 
-What holds two bodies together, or one to the world (made by Physics.joint). See [gameplay.md](gameplay.md).
+What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). See [gameplay.md](gameplay.md).
 
 - `kind`: :fixed, :hinge, :slider, :point or :distance
 - `object`: the object it holds
@@ -386,8 +387,8 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.main = camera`: sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
 - `Camera.cut_to(camera, fade: 0)`: cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
 - `Camera.cutting?`: whether a cut with a fade is still playing
-- `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
-- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
+- `Camera.screen_ray(x, y)`: [origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)
+- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
 - `Camera.fov = degrees`: sets the field of view
 - `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
@@ -505,9 +506,15 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.button(label, x:, y:, width:, height:, anchor: nil)`: draws a button; true the frame it is clicked
 - `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:, anchor: nil)`: a field to type in; returns the new value
 - `UI.keyboard_visible?`: whether a phone's on-screen keyboard covers the bottom of the screen
-- `UI.width`: the width of the screen, in pixels
-- `UI.height`: the height of the screen, in pixels
-- `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)
+- `UI.width`: the width of the screen, in the interface's units (UI.scale pixels each)
+- `UI.height`: the height of the screen, in the interface's units: the reference's height when it is matched
+- `UI.pixel_width`: the width of the screen, in pixels
+- `UI.pixel_height`: the height of the screen, in pixels
+- `UI.scale`: the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json "ui") times Settings.ui_scale
+- `UI.reference`: [width, height] of the screen the interface is laid out for (game.json "ui": its "reference", or the game's window)
+- `UI.mouse_x`: where the pointer is across the screen, in the interface's units
+- `UI.mouse_y`: where the pointer is down the screen, in the interface's units
+- `UI.text_width(str, size:)`: how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)
 - `UI.wrap(str, width:, size:)`: the lines a text wraps to at word boundaries, none wider than width
 - `UI.text_height(str, size:, width: nil)`: how tall a text is drawn, in pixels (wrapped to width, when given)
 - `UI.line_height(size)`: pixels from a line's top to the next one's at a text size
@@ -598,13 +605,17 @@ reported through `Game.loading_error` and the event log. At most eight backgroun
 outstanding across the process, using one shared reader; a full queue fails without changing the
 world. Cancelling an active read discards its result; it does not interrupt the file parser.
 
-Only file reading and glTF parsing happen on the worker. Physics creation, script setup, texture
-decoding and GPU upload still happen on the owning thread and may hitch during activation. The
-old and incoming scene coexist in memory during reading. Fixed-step offline runs (including
-recordings and scripted replays) wait for the reader before advancing, then show exactly one
-loading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the
-background reader even in fixed-step mode; activation still runs on the server loop and can stall
-other rooms sharing that loop. Closing the process waits for an active parser to return.
+File reading, glTF parsing and, for a game shown in a window, picture decoding happen on the
+worker. The scene read is then made ready over the next loading frames while the old one is still
+shown: its physics bodies are made in batches of about 4 ms a frame, its textures and meshes go to
+the graphics card about 8 MiB a frame, and the swap happens once all of it is ready. Every script
+of the new scene starts in that one frame, so a behaviour's first update sees the complete level.
+Creating the scene's objects, its water and its navigation bake still take one frame each. The old
+and incoming scene coexist in memory until the swap. Fixed-step offline runs (including
+recordings and scripted replays) wait for the reader before advancing, then make the scene ready
+all at once after exactly one loading frame, so completion depends neither on thread scheduling
+nor on the real clock. Networked runs and dedicated-server rooms keep the background reader and
+the spread activation even in fixed-step mode; a dedicated server's rooms share their loop. Closing the process waits for an active parser to return.
 
 ## Settings
 
@@ -619,6 +630,8 @@ How the player chose the game to be shown and heard; a change takes effect at on
 - `Settings.resolutions`: the sizes the monitor offers: [[w, h], ...]
 - `Settings.render_scale`: the share of the window's size the world is drawn at (0.5 to 2)
 - `Settings.render_scale = scale`: changes it
+- `Settings.ui_scale`: how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it
+- `Settings.ui_scale = scale`: changes it
 - `Settings.vsync`: whether frames wait for the screen
 - `Settings.vsync = on`: changes it
 - `Settings.fps_cap`: frames a second at most; nil for none
