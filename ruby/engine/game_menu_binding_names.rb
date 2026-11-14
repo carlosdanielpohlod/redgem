@@ -76,6 +76,7 @@ class GameMenu < Behaviour
     ROWS = { jump: -> { I18n.t("game.controls.action_jump") },
              fire: -> { I18n.t("game.controls.action_fire") },
              run: -> { I18n.t("game.controls.action_run") },
+             interact: -> { I18n.t("game.controls.action_interact") },
              horizontal_negative: -> { I18n.t("game.controls.action_horizontal_negative") },
              horizontal_positive: -> { I18n.t("game.controls.action_horizontal_positive") },
              vertical_negative: -> { I18n.t("game.controls.action_vertical_negative") },

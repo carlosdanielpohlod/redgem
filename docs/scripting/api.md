@@ -47,6 +47,9 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Network`](#network) | Games played together: on a local network, through a relay or on a dedicated server. |
 | [`Network::Decision`](#networkdecision) | What an authenticate block decides with. |
 | [`NetworkSync`](#networksync) | A behaviour: the same object in the same place on every machine. |
+| [`Interactable`](#interactable) | A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor). |
+| [`Interactor`](#interactor) | A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. |
+| [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 
 ## Behaviour
 
@@ -769,6 +772,43 @@ A behaviour: the same object in the same place on every machine. See [multiplaye
 - `owner = peer`: gives it to a peer
 - `key`: the name it is known by on every machine
 - `assign(owner:, key:)`: sets its owner and key
+
+## Interactable
+
+A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor). See [interaction.md](interaction.md).
+
+- `Interactable.all`: every Interactable of the scene
+- `prompt`: the I18n key of its prompt, or nil for the engine's "Interact"
+- `prompt = key`: changes the prompt
+- `prompt_text`: the prompt in the language in use
+- `range`: meters from the actor it can be used from (2 unless said)
+- `range = meters`: changes the range
+- `priority`: of those in reach, the highest wins (0 unless said)
+- `priority = value`: changes the priority
+- `enabled?`: whether it can be picked
+- `enabled = flag`: false: never picked
+- `angle`: degrees off the actor's forward it may be at; nil for any direction
+- `angle = degrees`: changes the angle (nil: any direction)
+
+## Interactor
+
+A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. See [interaction.md](interaction.md).
+
+- `target`: the Interactable in focus, or nil
+- `use`: uses what is in focus now; false when nothing is
+- `pad`: the player whose :interact it reads (0 unless said)
+- `prompt_label(target)`: what the prompt says for a target: "[E] Open"
+
+## Interaction
+
+Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. See [interaction.md](interaction.md).
+
+- `Interaction.on(event, &block)`: |actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)
+- `Interaction.interact(actor, target)`: the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client
+- `Interaction.best_for(actor, candidates = Interactable.all)`: the Interactable an actor would use now, or nil
+- `Interaction.reachable?(actor, target, slack = 0.0)`: whether an actor can use a target now: enabled, in range, in front, in sight
+- `Interaction.distance(actor, target)`: meters from an actor to a target
+- `Interaction.angle_to(actor, target)`: degrees between where the actor faces and where the target is, across the ground
 
 ## Notes
 

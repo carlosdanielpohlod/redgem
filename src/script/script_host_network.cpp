@@ -12,8 +12,9 @@ namespace redgem {
 namespace {
 
 constexpr const char* kNetworkModule = "Network";
-// What forgets the handlers of a scene when another takes its place.
-constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP", "Input", "Game"};  // (Input: a capture waiting)
+// What forgets the handlers of a scene when another takes its place (Input: a capture waiting;
+// Interaction: the scene's Interactables too).
+constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP", "Input", "Game", "Interaction"};
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
 

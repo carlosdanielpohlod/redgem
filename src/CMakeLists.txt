@@ -46,6 +46,10 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_interactions.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interactable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interaction.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/interactor.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)

@@ -76,6 +76,7 @@ InputMap InputMap::defaults() {
   map.bind_action("jump", {{Key::Space}, {GamepadButton::A}});
   map.bind_action("fire", {{Key::LeftControl, Key::Enter}, {GamepadButton::X}});
   map.bind_action("run", {{Key::LeftShift}, {GamepadButton::B}});
+  map.bind_action("interact", {{Key::E}, {GamepadButton::Y}});
   return map;
 }
 

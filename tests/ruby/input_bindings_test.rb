@@ -9,7 +9,7 @@ class InputBindingsTest < RedGemTest::Case
   end
 
   def test_the_built_in_names_are_there
-    %i[jump fire run].each { |name| assert Input.actions.include?(name), name.to_s }
+    %i[jump fire run interact].each { |name| assert Input.actions.include?(name), name.to_s }
     assert_equal %i[horizontal vertical], Input.axes.sort
     assert_equal ["key:space", "pad:a"], Input.bindings(:jump)
   end

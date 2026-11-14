@@ -13,7 +13,7 @@ HALF = 0.5
 SETTINGS_OPTION = 3         # on the pause menu: Resume, Restart, Multiplayer, Settings, Quit
 QUALITY_ROW = 5             # on the settings screen: mode, resolution, scale, vsync, cap, quality
 CONTROLS_OPTION = 10        # after its ten rows (six of video, four volumes): the Controls button, then Back
-JUMP_ROW = 2                # on the controls page: the player's choice, then fire, jump, run...
+JUMP_ROW = 3                # on the controls page: the player's choice, then fire, interact, jump...
 JUMP = GameMenu::ControlsPage::Row.new(:jump, nil)
 
 SystemTest.define do |t|

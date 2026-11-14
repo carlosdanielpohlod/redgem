@@ -270,6 +270,12 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
+- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
+  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
+  from the actor's middle to the target's (a target whose collider is on a child object is hidden
+  by it, and a thin gap can show something mostly hidden), there is no hold-to-use or use of an
+  object's part, and its prompt is one line at a fixed place on the screen. Over the network the
+  host runs every use: a client hears of what it did only through the game's own messages.
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
