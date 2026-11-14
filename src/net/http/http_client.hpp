@@ -20,8 +20,10 @@ struct HttpResult {
 };
 
 // How long a client that goes waits for the threads of its requests still on their way, once it
-// gave them up: they end at once, unless one is still looking its server's name up (which the
-// system cannot be made to stop), and such a thread is left behind.
+// gave them up: they end at once, unless one is busy with what cannot be cut short (looking its
+// server's name up, which the system cannot be made to stop, most likely), and such a thread is
+// left behind. The thread that ends the client (a game's, an editor's, a server room's) waits
+// that long only then.
 inline constexpr std::chrono::milliseconds kHttpShutdownWait{2000};
 
 // The web requests of one game (HTTP in Ruby). Each runs on a thread of its own, so the game never

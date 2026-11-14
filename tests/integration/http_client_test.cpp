@@ -434,7 +434,7 @@ net::Socket connected_to(const net::Socket& listener) {
 }  // namespace
 
 TEST_CASE("giving a request up hangs up the connection it waits on, so the wait ends at once") {
-  constexpr float kLongWaitSeconds = 30.0f;
+  constexpr float kLongWaitSeconds = 10.0f;  // (far past the bound checked below)
   constexpr std::chrono::milliseconds kWhileItWaits{100};
   std::string error;
   const net::Socket listener = net::Socket::listen_local(0, error);

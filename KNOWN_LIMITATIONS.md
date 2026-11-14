@@ -391,9 +391,12 @@ not a promise of how it will be closed.
   partial send (`frame_buffer.cpp`, `socket_io.cpp`).
 - `Save.update`'s block runs under one lock for the whole database, which every room of a
   dedicated server shares: a slow block holds up the saves of all rooms.
-- A web request still looking its server's name up 2 seconds after its game ended is left
-  behind (the system's lookup cannot be interrupted): if the program exits meanwhile, its thread
-  may outlive the program's static objects. Every other request's thread is joined at exit.
+- A web request still busy 2 seconds after its game ended is left behind: one looking its
+  server's name up (the system's lookup cannot be interrupted), or, on a slow device, loading the
+  system's certificates or decompressing a large answer. If the program exits meanwhile, its
+  thread may outlive the program's static objects. Ending the game waits those 2 seconds then,
+  which on a dedicated server holds up the other rooms of its thread. Every request that is
+  waiting on the network ends at once.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
   shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
   reflections march up to 32 steps, and the shore foam's distance is computed for every water
