@@ -326,19 +326,46 @@ TEST_CASE("what the engine keeps cannot be found through ObjectSpace and emptied
   CHECK(ruby(*engine, "$bullet_starts") == "1");
 }
 
-// The engine's own modules looked up by name: one a script replaced is the script's error.
+// The engine's own modules looked up by name: one a script replaced is the script's error. (Run
+// on the interpreter itself, past the host's check, which would put them back at once: the
+// lookups must hold up for as long as a method's change lasts, until the frame ends.)
 TEST_CASE("a script that replaces the Network or HTTP module gets errors, not the end of the game") {
   test::LogCapture capture;
   auto engine = sandbox();
   frames(*engine, 1);
   const int errors = engine->scripts().error_count();
-  ruby(*engine, "Network = 5; HTTP = 5");
+  REQUIRE(engine->scripts().vm().eval("Network = 5; HTTP = 5", "replace.rb").ok);
   engine->scripts().dispatch(net::NetworkEvent::of(net::NetworkEvent::Kind::PeerJoined, 2));
   engine->scripts().dispatch(net::HttpResult{});
-  ruby(*engine, "Game.load_scene('level2')");
+  REQUIRE(engine->scripts().vm().eval("Game.load_scene('level2')", "load.rb").ok);
   frames(*engine, 1);
   CHECK(engine->scene_name() == "level2");
   CHECK(engine->scripts().error_count() > errors);
+  CHECK(ruby(*engine, "Network.is_a?(Module) && HTTP.is_a?(Module)") == "true");  // put back by the frame
+}
+
+// A game's code that sets the engine's constants is told so, and the engine goes on with its own.
+TEST_CASE("a script that sets an engine constant gets a clear error, and the constant is put back") {
+  test::LogCapture capture;
+  auto engine = sandbox();
+  const RubyResult replaced = engine->scripts().eval("Vector3 = 5", "game.rb");
+  CHECK_FALSE(replaced.ok);
+  CHECK(replaced.error.find("EngineConstantError") != std::string::npos);
+  CHECK(replaced.error.find("Vector3") != std::string::npos);
+  CHECK(ruby(*engine, "Vector3.new(1, 2, 3).y == 2") == "true");
+  const RubyResult removed = engine->scripts().eval("Object.send(:remove_const, :Scene); GC.start", "game.rb");
+  CHECK_FALSE(removed.ok);
+  CHECK(ruby(*engine, "Scene.is_a?(Module)") == "true");
+  // Set from inside a method while the frame runs: reported, and put back by the frame's end.
+  frames(*engine, 1);  // (the sandbox's broken behaviour reports its own error on its first frame)
+  const int errors = engine->scripts().error_count();
+  REQUIRE(engine->scripts().vm().eval("Object.const_set(:HTTP, nil)", "behaviour.rb").ok);
+  frames(*engine, 1);
+  CHECK(engine->scripts().error_count() == errors + 1);
+  CHECK(capture.contains("put back: HTTP"));
+  CHECK(ruby(*engine, "HTTP.is_a?(Module)") == "true");
+  // A game's own constants are its own to change.
+  CHECK(ruby(*engine, "MY_SPEED = 1; Object.send(:remove_const, :MY_SPEED); MY_SPEED = 2") == "2");
 }
 
 // The serial says which object a wrapper stands for; a script writing something else there gets

@@ -102,6 +102,13 @@ One address may hold 24 machines and 8 open rooms on a relay. When many players 
 address (a campus, some mobile networks), raise them: `--per-address <number>` (up to 1024) and
 `--rooms-per-address <number>` (up to 256).
 
+The relay also answers STUN Binding requests on the same port number over UDP (open UDP 7778 as
+well as TCP to let them through): a machine that asks learns the public address and port its
+router gives it. Games do not use this yet (see KNOWN_LIMITATIONS.md); when the UDP port cannot be
+had, the relay says so and runs without it. Behind a proxy of UDP (Docker's userland proxy,
+rootless Docker) the relay sees the proxy's address and its answers name that one: publish the
+port without a proxy (rootful Docker with `"userland-proxy": false`, or host networking).
+
 While nobody talks to it the relay sleeps: it wakes when a machine connects or says something,
 and about once a second to let go of machines that went silent.
 
