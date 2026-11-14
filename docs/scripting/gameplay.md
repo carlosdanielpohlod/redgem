@@ -368,7 +368,8 @@ body that does not say gets) floats half under, one of 250 a quarter under, and 
 sinks. Its mass only says how hard it is to push.
 
 When the camera goes under the surface the picture fades into the water's color with distance and
-wobbles a little; it fades in and out over the waves' height as the camera crosses the surface.
+wobbles a little; it fades in as the camera goes under the waves, so crossing the surface never
+flickers.
 
 Scripts ask where the water is:
 

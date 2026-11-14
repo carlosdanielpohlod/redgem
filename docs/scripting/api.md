@@ -313,7 +313,7 @@ Where the scene's water is: the height of its surface, and how deep a point is u
 - `Water.depth_at(point)`: how far below the water surface a point is in meters (negative above it), or nil where there is no water
 - `Water.under?(point)`: whether a point is below the water surface
 
-Every surface whose material has `water = true` fills the column under it down to whatever ground the level has; where surfaces overlap, the highest counts. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
+Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
 
 ## CharacterController
 

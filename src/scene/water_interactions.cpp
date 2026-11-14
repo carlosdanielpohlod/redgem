@@ -262,7 +262,7 @@ void WaterInteractions::step(const Scene& scene, const SceneDesc& desc, const st
     simulate(scene, desc, bodies, delta);
     return;
   }
-  geometry_.refresh(scene, desc);
+  if (geometry_.surfaces().empty()) geometry_.refresh(scene, desc);  // a new world: find its water once
   prime(scene, bodies);
 }
 

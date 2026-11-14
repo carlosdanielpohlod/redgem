@@ -30,7 +30,8 @@ class WaterInteractions {
   // A zero delta primes new bodies without aging or emitting. Only positive finite steps simulate.
   void step(const Scene& scene, const SceneDesc& desc, const std::vector<WaterBodySample>& bodies, float delta);
   const WaterRippleSnapshot& snapshot() const { return snapshot_; }
-  // The scene's water surfaces as the last step found them (every step, a priming one too, looks).
+  // The scene's water surfaces as the last step found them (a priming step looks only while none
+  // were found, so a world just loaded has them before its first step).
   const std::vector<WaterSurface>& surfaces() const { return geometry_.surfaces(); }
 
  private:

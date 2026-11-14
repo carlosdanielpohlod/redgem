@@ -1,9 +1,10 @@
 #pragma once
 
 // How water holds a body up: the math alone, with no world or water lookup. A body is sampled as a
-// grid of vertical columns over its collider's world box; each column is pushed up by the water it
-// displaces (Archimedes) at the middle of its wet part, and slowed by the water it moves through.
-// Pushing each column where it is wet also turns a tipped body back upright.
+// grid of columns through its collider's own box, running along the box's axis that points most
+// nearly up. Each column is pushed up by the water it displaces (Archimedes) at the middle of its
+// wet part, and slowed by the water it moves through. A tipped body's lower columns are deeper, so
+// they push harder, off its middle: it turns back.
 
 #include <array>
 #include <cstddef>
@@ -12,6 +13,7 @@
 
 #include "core/math.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/transform.hpp"
 
 namespace redgem {
 
@@ -23,7 +25,8 @@ inline constexpr std::size_t kBuoyancyColumnsPerSide = 2;
 inline constexpr std::size_t kBuoyancyColumns = kBuoyancyColumnsPerSide * kBuoyancyColumnsPerSide;
 
 struct BuoyancyBody {
-  Bounds bounds;  // the collider's box in world space
+  Bounds box;       // the collider's box in its own space, scale included
+  Transform world;  // where that space is: position and rotation (its scale is ignored)
   Vec3 velocity;
   Vec3 angular_velocity;  // radians per second, around the box's center
   float mass = 0.0f;
@@ -31,7 +34,15 @@ struct BuoyancyBody {
   float gravity = 0.0f;                 // meters per second squared pulling it down (positive)
 };
 
-// The water over each column (columns_of's order); nothing where a column is out of any water.
+// A column through the body, in world space: its lower end and its upper end.
+struct BuoyancyColumn {
+  Vec3 low;
+  Vec3 high;
+};
+using BuoyancyColumns = std::array<BuoyancyColumn, kBuoyancyColumns>;
+
+// The water surface over each column (in buoyancy_columns' order); nothing where a column is out of
+// any water.
 using ColumnWater = std::array<std::optional<float>, kBuoyancyColumns>;
 
 // A force (newtons) and where it pushes (world space).
@@ -46,12 +57,13 @@ float submerged_fraction(float bottom, float top, float surface);
 Vec3 buoyant_force(float mass, float density, float gravity, float fraction);
 // Water slowing `mass` kilograms moving at `velocity`, with that fraction of it under.
 Vec3 water_drag(Vec3 velocity, float mass, float fraction);
-// The middle of each column's footprint, at the bottom of the box.
-std::array<Vec3, kBuoyancyColumns> buoyancy_columns(const Bounds& bounds);
-// Whether a body can be held up at all: a finite box, mass and density.
+// Whether a body can be held up at all: a box with height, a finite pose, mass and density.
 bool buoyant(const BuoyancyBody& body);
-// Every push on the body this step: none when no column is wet.
-std::vector<BuoyancyPush> buoyancy_pushes(const BuoyancyBody& body, const ColumnWater& water);
+// The columns a body is sampled as.
+BuoyancyColumns buoyancy_columns(const BuoyancyBody& body);
+// Every push on a body whose columns are `columns`, this step: none when no column is wet.
+std::vector<BuoyancyPush> buoyancy_pushes(const BuoyancyBody& body, const BuoyancyColumns& columns,
+                                          const ColumnWater& water);
 // The depth a body of that density rests at: the fraction of its height under the surface.
 float floating_fraction(float density);
 

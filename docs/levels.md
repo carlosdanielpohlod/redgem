@@ -401,20 +401,22 @@ There is no fluid simulation or wave collision. Use ordinary scene meshes for wa
 rather than Scatter copies.
 
 **Floating.** Each water surface fills the world column under its footprint, down to whatever
-ground is there. Dynamic bodies and vehicles in it are held up with no script: their collider's
-world box is sampled as a 2 × 2 grid of vertical columns, and each column is pushed up by the
-weight of the water it displaces (Archimedes) at the middle of its wet part, so a tipped body
-rights itself and one half over a shore tips toward the dry side. Water also drags on each column
-as it moves (more vertically than horizontally), which settles bobbing in a few seconds. The
-object's `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep it
-floats: the share of its height under water is its density over water's 1000; denser bodies sink.
-Buoyancy follows the calm surface, not the waves; uses the world-aligned box, so a body turned on
-its side floats as that box does; and leaves sleeping bodies alone. Kinematic bodies, triggers and
-characters are not pushed.
+ground is there (or to the next surface below: a pool on a roof does not flood the lake under it).
+Dynamic bodies and vehicles in it are held up with no script: their collider's box is sampled as a
+2 × 2 grid of columns running along its axis that points most nearly up, and each column is pushed
+up by the weight of the water it displaces (Archimedes) at the middle of its wet part. A tipped
+body's lower side is deeper and pushed harder, so a flat one rights itself, and one half over a
+shore tips toward the dry side. Water also drags on each column as it moves (more vertically than
+horizontally), which settles bobbing in a few seconds. The object's `density` custom property
+(kilograms per cubic meter, 500 unless said) sets how deep it floats: the share of its height under
+water is its density over water's 1000; denser bodies sink. Buoyancy follows the calm surface, not
+the waves, and leaves sleeping bodies alone. Kinematic bodies, triggers and characters are not
+pushed.
 
 **Under the surface.** When the camera is below the water its picture fades with distance into
 the water's own color (what its absorption leaves of the light) and wobbles slightly. The look
-fades in over a band as tall as the waves around the calm surface, so crossing it never flickers.
+fades in from 5 cm above the calm surface to as deep as the waves are tall, so crossing it never
+flickers and a camera above the calm surface stays clear.
 The editor's scene camera does not get it. Scripts ask where the water is with `Water.height_at`,
 `Water.depth_at` and `Water.under?`.
 

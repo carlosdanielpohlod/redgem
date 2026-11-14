@@ -80,6 +80,14 @@ TEST_CASE("a point is under water below its column's surface, and its depth says
   CHECK_FALSE(water_depth(ponds.surfaces, {NAN, 0.0f, 0.0f}));
 }
 
+TEST_CASE("under a raised pool a point is in the pond below it, and above both it is over the pool") {
+  Ponds ponds;
+  CHECK(*water_depth(ponds.surfaces, {2.0f, 0.0f, 0.0f}) == doctest::Approx(kPondHeight));
+  CHECK(*water_depth(ponds.surfaces, {2.0f, 5.0f, 0.0f}) == doctest::Approx(kPoolHeight - 5.0f));
+  CHECK(water_column_over(ponds.surfaces, {2.0f, 2.0f, 0.0f})->height == doctest::Approx(kPoolHeight));
+  CHECK(water_column_at(ponds.surfaces, 2.0f, 0.0f)->height == doctest::Approx(kPoolHeight));  // the top one
+}
+
 TEST_CASE("the camera's view of the water carries how deep it is and the surface's look") {
   Ponds ponds;
   const UnderwaterView under = underwater_view(ponds.surfaces, {-2.0f, 0.0f, 0.0f});
@@ -106,8 +114,13 @@ TEST_CASE("crossing the surface fades the underwater look in steadily, with no j
     before = amount;
   }
   CHECK(before == 1.0f);
+  view.depth = -kUnderwaterMinBand;  // just above the calm surface: still clear
+  CHECK(underwater_amount(view) == 0.0f);
   view.depth = 0.0f;
-  CHECK(underwater_amount(view) == doctest::Approx(kHalf));
+  CHECK(underwater_amount(view) > 0.0f);
+  CHECK(underwater_amount(view) < kHalf);
+  view.depth = view.band;  // under the lowest trough
+  CHECK(underwater_amount(view) == 1.0f);
   CHECK(underwater_band(0.0f) == kUnderwaterMinBand);
   CHECK(underwater_band(NAN) == kUnderwaterMinBand);
 }

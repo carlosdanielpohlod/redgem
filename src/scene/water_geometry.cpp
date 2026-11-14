@@ -281,12 +281,6 @@ std::optional<WaterSweep> sweep_in_node(const WaterSurface& surface, std::size_t
   return sweep_leaf(surface, node, before, after);
 }
 
-bool column_in(const Bounds& bounds, Vec3 point) {
-  const bool across = point.x >= bounds.min.x && point.x <= bounds.max.x;
-  const bool along = point.z >= bounds.min.z && point.z <= bounds.max.z;
-  return across && along;
-}
-
 float triangle_height(const WaterTriangle& triangle) {
   constexpr float kCornerShare = 1.0f / static_cast<float>(kWaterTriangleCorners);
   return (triangle.points[0].y + triangle.points[1].y + triangle.points[2].y) * kCornerShare;
@@ -302,7 +296,7 @@ std::optional<float> height_in_leaf(const WaterSurface& surface, const WaterBvhN
 
 std::optional<float> height_in_node(const WaterSurface& surface, std::size_t index, Vec3 point) {
   const auto& node = surface.nodes[index];
-  if (!column_in(node.bounds, point)) return std::nullopt;
+  if (!overlapping_bounds(node.bounds, Bounds{point, point, true})) return std::nullopt;
   if (node.count != 0) return height_in_leaf(surface, node, point);
   const auto left = height_in_node(surface, node.left, point);
   return left ? left : height_in_node(surface, node.right, point);

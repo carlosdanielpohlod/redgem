@@ -15,7 +15,7 @@ bool usable(const UnderwaterView& view) { return view.water && std::isfinite(vie
 
 float underwater_amount(const UnderwaterView& view) {
   if (!usable(view)) return 0.0f;
-  const float t = std::clamp((view.depth + view.band) / (kTwo * view.band), 0.0f, 1.0f);
+  const float t = std::clamp((view.depth + kUnderwaterMinBand) / (view.band + kUnderwaterMinBand), 0.0f, 1.0f);
   return t * t * (kSmoothStepSquare - kSmoothStepCube * t);
 }
 
