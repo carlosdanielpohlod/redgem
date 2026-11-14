@@ -19,6 +19,7 @@
 #include "net/http/http_client.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
+#include "navigation/navigation.hpp"
 #include "physics/physics_world.hpp"
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
@@ -113,9 +114,9 @@ class Engine {
   // Runs until the presenter has nowhere left to show the game or a script quits, each frame as
   // long as the presenter says the last one took. Returns the exit code.
   int run();
-  // Copies a prefab (or any object) into the running game with physics and scripts. `world`
-  // overrides the copy's position/rotation. Returns the new root object.
-  ObjectId spawn(ObjectId source, const std::optional<Transform>& world, bool physics = true);
+  // Copies a prefab (or any object) into the running game with physics and scripts, as the request
+  // says (see SpawnRequest). Returns the new root object.
+  ObjectId spawn(const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   void frame(float frame_seconds);
@@ -147,8 +148,11 @@ class Engine {
 
   // Starting up, in this order (the first scene is in place by then).
   void initialize();
-  // The scene, its animations and its bodies, which collide as game.json's layers say.
-  void build_world(const CollisionLayers& layers);
+  // The scene, its animations and its bodies, which collide as game.json's layers say; and how
+  // its navigation grid is baked.
+  void build_world(const GameSettings& settings);
+  // Bakes the running scene's navigation grid now, and logs what it cost.
+  void bake_navigation();
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
@@ -171,6 +175,8 @@ class Engine {
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void connect_effects();
+  // The scene, its bodies and its navigation, for the scripts.
+  void connect_world();
   void connect_saves();
   void select_save_slot(const std::string& name);
   void fill_context(const GameSettings& settings);
@@ -196,6 +202,8 @@ class Engine {
   // Puts a newly loaded scene, with its bodies, in place of the running one.
   void replace_world(SceneDesc desc);
   void place_spawned(ObjectId id, const std::optional<Transform>& world);
+  // Names, places and parents a new copy as its request says, before its bodies and scripts.
+  void shape_spawned(ObjectId id, const SpawnRequest& request);
 
   // The parts of a frame, in the order frame() runs them.
   void prepare_frame();
@@ -241,6 +249,7 @@ class Engine {
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
+  Navigation navigation_;             // where characters walk in the running scene
   InputState input_;
   ScriptedInputSource scripted_input_;
   std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere

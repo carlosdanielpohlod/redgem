@@ -20,12 +20,13 @@ declare -A ALLOWED=(
   [physics]="core scene"
   [storage]="core scene"
   [render]="core scene"
-  [script]="core scene net input audio physics storage render"
-  [app]="core scene net input audio physics storage render script"
-  [server]="core scene net input audio physics storage render script app"
-  [editor]="core scene net input audio physics storage render script app"
-  [project]="core scene net input audio physics storage render script app editor"
-  [testing]="core scene net input audio physics storage render script app editor project"
+  [navigation]="core scene physics"
+  [script]="core scene net input audio physics navigation storage render"
+  [app]="core scene net input audio physics navigation storage render script"
+  [server]="core scene net input audio physics navigation storage render script app"
+  [editor]="core scene net input audio physics navigation storage render script app"
+  [project]="core scene net input audio physics navigation storage render script app editor"
+  [testing]="core scene net input audio physics navigation storage render script app editor project"
 )
 
 # Includes that break the table and are known, as "<file under src>:<included file>", each with a

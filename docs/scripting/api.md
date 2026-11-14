@@ -18,6 +18,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
+| [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
@@ -96,6 +97,8 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `visible = value`: shows or hides it
 - `behaviours`: its behaviours
 - `parent`: the object it is under, or nil
+- `parent = object`: puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries
+- `set_parent(object, keep_world: true)`: like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent
 - `children`: the objects under it
 - `transform`: its Transform
 - `character`: its CharacterController, or nil
@@ -182,7 +185,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find!(name)`: find that stops with a clear error when the object is missing
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
-- `Scene.spawn(template, position: nil, rotation: nil, physics: true)`: copies a prefab = true template, with its physics and scripts; returns the copy
+- `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
 
 ## SceneScript
 
@@ -288,6 +291,19 @@ What holds two bodies together, or one to the world (made by Physics.joint). See
 
 Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes.
 
+## Navigation
+
+Where the characters a game moves can walk, and the way from one place to another. See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
+
+- `Navigation.path(from, to)`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+- `Navigation.nearest(point)`: the walkable point nearest a point (within 8 m of it), or nil
+- `Navigation.walkable?(point)`: whether a point is on walkable ground, up to a character's height above it
+- `Navigation.draw(around, radius = 10, color: :blue, alpha: 255)`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
+- `Navigation.bake`: bakes the scene's grid again now (a level a script changed); returns what stats does
+- `Navigation.stats`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
+
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
 ## CharacterController
 
 The body of an object with body = "character": walks, jumps, climbs steps. See [gameplay.md](gameplay.md).
@@ -341,7 +357,10 @@ Wheel meshes must have their rotation applied (the axle along X). `drive`'s inpu
 
 The camera the game is seen through, and what it does on its own: follow, orbit, shake. See [gameplay.md#follow-orbit-and-shake-the-camera](gameplay.md#follow-orbit-and-shake-the-camera).
 
-- `Camera.main`: the object holding the camera
+- `Camera.main`: the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first
+- `Camera.main = camera`: sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
+- `Camera.cut_to(camera, fade: 0)`: cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
+- `Camera.cutting?`: whether a cut with a fade is still playing
 - `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
 - `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
