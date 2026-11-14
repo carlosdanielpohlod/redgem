@@ -374,6 +374,7 @@ redgem_add_library(redgem_runtime
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp
+  script/engine_constants.cpp
   script/reload_ownership.cpp
   script/script_budget.cpp
   script/script_profile.cpp
@@ -561,6 +562,7 @@ if(NOT ANDROID)
     server/server_command.cpp
     server/stop_signals.cpp
     server/server_program.cpp
+    server/key_locks.cpp
     server/save_database.cpp
     server/save_database_slots.cpp
     server/room_slot.cpp
