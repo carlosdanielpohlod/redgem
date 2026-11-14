@@ -15,6 +15,7 @@ https://carlosdanielpohlod.github.io/redgem-site/manual/ (`llms.txt` there index
 | `sounds/`, `images/`, `fonts/`, `models/` | sounds, pictures for the HUD and the sky, faces for UI.font, models to place |
 | `locales/<language>.json` | the texts players read (`I18n.t`) |
 | `game.json` | the game's id, title and window size |
+| `sig/redgem.rbs` | the scripting API's types (RBS), for editors and type checkers (`redgem api --rbs > sig/redgem.rbs` updates it) |
 
 ## Commands
 

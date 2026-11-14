@@ -215,16 +215,38 @@ check: 0 errors, 0 warnings (12 scripts, 2 scenes)
 ```console
 $ redgem api Transform
 Transform: Where an object is, how it is turned and how big it is.
-  position                        its position in the world (Vector3)
-  position = vector               moves it; a physics object is teleported
-  rotate(degrees)                 turns it by those Euler degrees
+  position -> Vector3             its position in the world (Vector3)
+  position = Vector3 vector       moves it; a physics object is teleported
+  rotate(Vector3 degrees) -> void turns it by those Euler degrees
+  look_at(Vector3 | GameObject target, Vector3 up = Vector3.up) -> void turns it to face a point
   ...
 ```
 
-`redgem api` alone lists the classes, a line each; `redgem api <Class>` the methods of one;
-`redgem api --search <word>` the methods that have to do with a word (at most 20). `--json` says
-the same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown`
-writes, and which is made from `docs/scripting/api.json`.
+`redgem api` alone lists the classes, a line each; `redgem api <Class>` the methods of one, each
+with the types of its parameters and of what it returns; `redgem api --search <word>` the methods
+that have to do with a word (at most 20). `--json` says the
+same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown` writes,
+and which is made from `docs/scripting/api.json`.
+
+`--rbs` writes the API as Ruby type signatures (RBS), the file
+[`docs/scripting/redgem.rbs`](https://github.com/carlosdanielpohlod/redgem/blob/main/docs/scripting/redgem.rbs)
+holds. Every new game has them as `sig/redgem.rbs` (left out of its builds), where an editor's
+Ruby language server finds them: completion, the line about each method on hover, and type checks
+of the game's scripts. With [Steep](https://github.com/soutaro/steep), a `Steepfile` at the top of
+the game is enough:
+
+```ruby
+target :game do
+  signature "sig"
+  check "scripts"
+end
+```
+
+After updating the engine, `redgem api --rbs > sig/redgem.rbs` brings a game's signatures up to
+date. Types are written in a small language: `Integer`, `Float`, `Numeric`, `String`, `Symbol`,
+`bool`, `nil`, `untyped`, `Color` (a name such as `:orange`, or `[r, g, b]`), the API's classes,
+`Array[T]`, `Hash[K, V]`, `Range[T]`, tuples such as `[Integer, Integer]`, unions such as
+`GameObject | nil`, and blocks such as `{ (Float) -> void }`; `void` returns nothing to use.
 
 ## `redgem symbolize`: a crash report's functions
 

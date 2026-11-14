@@ -9,6 +9,7 @@
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "generated/templates.hpp"
+#include "project/api_rbs.hpp"
 #include "project/assistant_guide.hpp"
 
 namespace redgem {
@@ -133,7 +134,8 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
   }
   create_game_folders(game_dir);
   return write_template_files(game_dir, shared_files(), error) && write_template_files(game_dir, *files, error) &&
-         name_game(game_dir, error) && tools::write_assistant_guide(game_dir, error);
+         name_game(game_dir, error) && tools::write_assistant_guide(game_dir, error) &&
+         tools::write_type_signatures(game_dir, error);
 }
 
 }  // namespace redgem

@@ -8,28 +8,16 @@
 #include <nlohmann/json.hpp>
 
 #include "core/translations.hpp"
+#include "project/api_json_keys.hpp"
+#include "project/api_types.hpp"
 #include "project/closest_words.hpp"
 #include "generated/assistant_files.hpp"
 
 namespace redgem::tools {
 namespace {
 
-// Where the reference is in the repository, as it was built in.
-constexpr const char* kReferenceFile = "docs/scripting/api.json";
-// The keys of that file.
-constexpr const char* kAbout = "about";
-constexpr const char* kDescription = "description";  // of the manual's page, for its index
-constexpr const char* kNotes = "notes";
-constexpr const char* kClasses = "classes";
-constexpr const char* kName = "name";
-constexpr const char* kGuide = "guide";
-constexpr const char* kMethods = "methods";
-constexpr const char* kInternal = "internal";
-constexpr const char* kInternalClasses = "internal_classes";
-constexpr const char* kArgs = "args";
-constexpr const char* kStatic = "static";
-constexpr const char* kTop = "top";
-constexpr const char* kExample = "example";
+using namespace api_keys;
+
 constexpr const char* kClassKey = "class";  // what a found method says it is of
 // How texts lay a method out.
 constexpr std::size_t kSignatureColumn = 34;  // where a method's line starts after its signature
@@ -38,35 +26,20 @@ constexpr const char* kClassCall = ".";
 constexpr const char* kInstanceCall = "#";
 constexpr const char* kGuidesFolder = "docs/scripting/";
 constexpr const char* kElement = "[]";  // reads an element; "[]=" writes one
-
-std::string text_of(const nlohmann::json& json, const char* key) { return json.value(key, std::string()); }
-
-ApiMethod method_from(const nlohmann::json& json) {
-  ApiMethod method;
-  method.name = text_of(json, kName);
-  method.args = text_of(json, kArgs);
-  method.about = text_of(json, kAbout);
-  method.on_class = json.value(kStatic, false);
-  method.top = json.value(kTop, 0);
-  method.example = text_of(json, kExample);
-  return method;
-}
-
-ApiClass class_from(const nlohmann::json& json) {
-  ApiClass owner;
-  owner.name = text_of(json, kName);
-  owner.about = text_of(json, kAbout);
-  owner.guide = text_of(json, kGuide);
-  owner.notes = text_of(json, kNotes);
-  for (const nlohmann::json& method : json.at(kMethods)) owner.methods.push_back(method_from(method));
-  owner.internal = json.value(kInternal, std::vector<std::string>());
-  return owner;
-}
+constexpr const char* kSeparator = ", ";
+constexpr const char* kReturnsMark = " -> ";
+constexpr const char* kRestMark = "*";
+constexpr const char* kKeywordRestMark = "**";
+constexpr const char* kBlockArgumentMark = "&";
+constexpr const char* kOptionalBlockMark = "?";
+constexpr const char* kBlockOpen = "{ ";
+constexpr const char* kBlockClose = " }";
+constexpr std::size_t kElementWriteArguments = 2;  // "[]=": the key and the value
 
 bool holds(const std::string& text, const std::string& word) { return lowered(text).find(word) != std::string::npos; }
 
 bool matches(const ApiClass& owner, const ApiMethod& method, const std::string& word) {
-  return holds(signature(owner, method), word) || holds(method.about, word);
+  return holds(signature(owner, method), word) || holds(method.about, word);  // (not the types: Array has "ray")
 }
 
 // "  name(args)                      about".
@@ -84,31 +57,106 @@ bool is_operator(const std::string& name) {
   return std::isalpha(static_cast<unsigned char>(name.front())) == 0 && name.front() != '_';
 }
 
-// "[]=" with "key, value" -> "[key] = value".
-std::string element_call(const ApiMethod& method) {
-  const std::size_t comma = method.args.find(", ");
-  if (method.name == kElement || comma == std::string::npos) return "[" + method.args + "]";
-  return "[" + method.args.substr(0, comma) + "] = " + method.args.substr(comma + std::strlen(", "));
+std::string rest_mark(const ApiParam& param) { return param.keyword ? kKeywordRestMark : kRestMark; }
+
+std::string with_default(const std::string& text, const char* mark, const ApiParam& param) {
+  return param.default_value.empty() ? text : text + mark + param.default_value;
+}
+
+// An argument as a call writes it: "name", "loop: true", "*bindings", "&block".
+std::string plain_argument(const ApiParam& param) {
+  if (param.block) return kBlockArgumentMark + param.name;
+  if (param.rest) return rest_mark(param) + param.name;
+  if (param.keyword) return with_default(param.name + ":", " ", param);
+  return with_default(param.name, " = ", param);
+}
+
+// ... with its type: "Symbol name", "loop: bool = true", "*String bindings".
+std::string typed_argument(const ApiParam& param) {
+  if (param.rest) return rest_mark(param) + param.type + " " + param.name;
+  if (param.keyword) return with_default(param.name + ": " + param.type, " = ", param);
+  return with_default(param.type + " " + param.name, " = ", param);
+}
+
+// How calls are written: with types (and what they return), or not.
+struct CallStyle {
+  std::string (*argument)(const ApiParam&);
+  bool typed;
+};
+constexpr CallStyle kPlainCall{plain_argument, false};
+constexpr CallStyle kTypedCall{typed_argument, true};
+
+// Whether a parameter goes between the call's parentheses in a style (a typed call writes its
+// block after them).
+bool is_listed(const ApiParam& param, const CallStyle& style) { return !(style.typed && param.block); }
+
+std::string arguments_in(const ApiMethod& method, const CallStyle& style) {
+  std::string text;
+  for (const ApiParam& param : method.params) {
+    if (is_listed(param, style)) text += (text.empty() ? "" : kSeparator) + style.argument(param);
+  }
+  return text;
+}
+
+std::string returned(const ApiMethod& method, const CallStyle& style) {
+  return style.typed ? kReturnsMark + method.returns : std::string();
+}
+
+bool takes_block(const ApiMethod& method) { return !method.params.empty() && method.params.back().block; }
+
+bool writes_block_after(const ApiMethod& method, const CallStyle& style) { return style.typed && takes_block(method); }
+
+// " { (Float) -> void }" after a typed call that takes a block ("?{" when it may go without).
+std::string block_after(const ApiMethod& method, const CallStyle& style) {
+  if (!writes_block_after(method, style)) return {};
+  const ApiParam& block = method.params.back();
+  return std::string(" ") + (block.optional ? kOptionalBlockMark : "") + kBlockOpen + block_signature(block.type) +
+         kBlockClose;
+}
+
+// Whether an element's method reads one ([] and the like) rather than writes one ([]=).
+bool reads_element(const ApiMethod& method) {
+  return method.name == kElement || method.params.size() < kElementWriteArguments;
+}
+
+// The keys an element's writer takes: every parameter but the last, the value.
+std::string keys_in(const ApiMethod& method, const CallStyle& style) {
+  std::string text;
+  for (std::size_t at = 0; at + 1 < method.params.size(); ++at) {
+    text += (text.empty() ? "" : kSeparator) + style.argument(method.params[at]);
+  }
+  return text;
+}
+
+// "[key]" or "[key] = value", typed: "[String key] -> untyped", "[String key] = untyped value".
+std::string element_call(const ApiMethod& method, const CallStyle& style) {
+  if (reads_element(method)) return "[" + arguments_in(method, style) + "]" + returned(method, style);
+  return "[" + keys_in(method, style) + "] = " + style.argument(method.params.back());
 }
 
 // How a call is written after what it is called on: "rotate(degrees)", "position = vector",
-// "+ other", "[x, y, z]".
-std::string call_of(const ApiMethod& method) {
-  if (method.name.front() == '[') return element_call(method);
-  if (is_setter(method.name)) return method.name.substr(0, method.name.size() - 1) + " = " + method.args;
-  if (is_operator(method.name)) return method.args.empty() ? method.name : method.name + " " + method.args;
-  return method.args.empty() ? method.name : method.name + "(" + method.args + ")";
+// "+ other", "[x, y, z]"; typed, "rotate(Vector3 degrees) -> void".
+std::string call_of(const ApiMethod& method, const CallStyle& style) {
+  const std::string arguments = arguments_in(method, style);
+  if (method.name.front() == '[') return element_call(method, style);
+  if (is_setter(method.name)) return method.name.substr(0, method.name.size() - 1) + " = " + arguments;
+  if (is_operator(method.name))
+    return (arguments.empty() ? method.name : method.name + " " + arguments) + returned(method, style);
+  const std::string call = arguments.empty() ? method.name : method.name + "(" + arguments + ")";
+  return call + block_after(method, style) + returned(method, style);
 }
 
 // `receiver` and the call, joined by `separator` unless the call is an element's ([...]).
-std::string called_on(const std::string& receiver, const char* separator, const ApiMethod& method) {
-  const std::string call = call_of(method);
+std::string called_on(const std::string& receiver, const char* separator, const ApiMethod& method,
+                      const CallStyle& style) {
+  const std::string call = call_of(method, style);
   return call.front() == '[' ? receiver + call : receiver + separator + call;
 }
 
-// How a method is written inside its class's own text: "rotate(degrees)", or "Input.axis(name)".
+// How a method is written inside its class's own text: "rotate(Vector3 degrees) -> void", or
+// "Input.axis(Symbol name, pad: Integer = 0) -> Float".
 std::string call_in_class(const ApiClass& owner, const ApiMethod& method) {
-  return method.on_class ? called_on(owner.name, kClassCall, method) : call_of(method);
+  return method.on_class ? called_on(owner.name, kClassCall, method, kTypedCall) : call_of(method, kTypedCall);
 }
 
 std::string guide_line(const ApiClass& owner) {
@@ -138,9 +186,20 @@ std::string anchor(const std::string& name) {
   return kept;
 }
 
+nlohmann::json param_data(const ApiParam& param) {
+  nlohmann::json data = {{kName, param.name}, {kType, param.type}};
+  for (const auto& [key, on] : {std::pair{kKeyword, param.keyword}, std::pair{kRest, param.rest},
+                                std::pair{kBlock, param.block}, std::pair{kOptional, param.optional}}) {
+    if (on) data[key] = true;
+  }
+  if (!param.default_value.empty()) data[kDefault] = param.default_value;
+  return data;
+}
+
 nlohmann::json method_data(const ApiMethod& method) {
-  nlohmann::json data = {{kName, method.name}, {kAbout, method.about}};
-  if (!method.args.empty()) data[kArgs] = method.args;
+  nlohmann::json data = {{kName, method.name}, {kAbout, method.about}, {kParams, nlohmann::json::array()}};
+  for (const ApiParam& param : method.params) data[kParams].push_back(param_data(param));
+  data[kReturns] = {{kType, method.returns}};
   if (method.on_class) data[kStatic] = true;
   if (method.top > 0) data[kTop] = method.top;
   if (!method.example.empty()) data[kExample] = method.example;
@@ -148,7 +207,11 @@ nlohmann::json method_data(const ApiMethod& method) {
 }
 
 nlohmann::json class_data(const ApiClass& owner) {
-  nlohmann::json data = {{kName, owner.name}, {kAbout, owner.about}, {kMethods, nlohmann::json::array()}};
+  nlohmann::json data = {{kName, owner.name},
+                         {kKind, owner.is_module ? kModuleKind : kClassKind},
+                         {kAbout, owner.about},
+                         {kMethods, nlohmann::json::array()}};
+  if (!owner.superclass.empty()) data[kSuperclass] = owner.superclass;
   if (!owner.guide.empty()) data[kGuide] = owner.guide;
   if (!owner.notes.empty()) data[kNotes] = owner.notes;
   for (const ApiMethod& method : owner.methods) data[kMethods].push_back(method_data(method));
@@ -167,17 +230,6 @@ std::string quoted(const std::string& text) {
 
 }  // namespace
 
-ApiReference read_api_reference(const std::string& json_text) {
-  const nlohmann::json json = nlohmann::json::parse(json_text);
-  ApiReference reference;
-  reference.about = text_of(json, kAbout);
-  reference.description = text_of(json, kDescription);
-  reference.internal_classes = json.value(kInternalClasses, std::vector<std::string>());
-  reference.notes = text_of(json, kNotes);
-  for (const nlohmann::json& owner : json.at(kClasses)) reference.classes.push_back(class_from(owner));
-  return reference;
-}
-
 const std::string& api_reference_json() {
   static const std::string text = [] {
     const auto* file =
@@ -194,7 +246,11 @@ const ApiReference& api_reference() {
 }
 
 std::string signature(const ApiClass& owner, const ApiMethod& method) {
-  return called_on(owner.name, method.on_class ? kClassCall : kInstanceCall, method);
+  return called_on(owner.name, method.on_class ? kClassCall : kInstanceCall, method, kPlainCall);
+}
+
+std::string typed_signature(const ApiClass& owner, const ApiMethod& method) {
+  return called_on(owner.name, method.on_class ? kClassCall : kInstanceCall, method, kTypedCall);
 }
 
 const ApiClass* find_api_class(const ApiReference& reference, const std::string& name) {
@@ -221,7 +277,7 @@ std::string api_search(const ApiReference& reference, const std::string& word, s
   if (found.empty()) return tr("project.api.nothing_found", {{"word", word}}) + "\n";
   std::string text;
   for (std::size_t call = 0; call < found.size() && call < most; ++call) {
-    text += method_line(signature(*found[call].owner, *found[call].method), found[call].method->about);
+    text += method_line(typed_signature(*found[call].owner, *found[call].method), found[call].method->about);
   }
   if (found.size() > most)
     text += tr("project.api.more_found", {{"count", std::to_string(found.size() - most)}}) + "\n";

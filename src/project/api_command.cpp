@@ -2,6 +2,7 @@
 
 #include "core/command_line.hpp"
 #include "core/translations.hpp"
+#include "project/api_rbs.hpp"
 #include "project/api_reference.hpp"
 #include "project/closest_words.hpp"
 
@@ -11,10 +12,13 @@ namespace {
 constexpr const char* kSearchOption = "--search";
 constexpr const char* kJsonOption = "--json";
 constexpr const char* kMarkdownOption = "--markdown";
+constexpr const char* kRbsOption = "--rbs";
 constexpr std::size_t kMostFound = 20;
 constexpr std::size_t kMostSuggestions = 3;
 
-ToolGrammar grammar() { return {{kSearchOption}, {kJsonOption, kMarkdownOption, command_line::kHelpOption}}; }
+ToolGrammar grammar() {
+  return {{kSearchOption}, {kJsonOption, kMarkdownOption, kRbsOption, command_line::kHelpOption}};
+}
 
 ToolResult answer(std::string text) { return ToolResult{kExitSuccess, std::move(text), {}}; }
 
@@ -44,12 +48,26 @@ ToolResult search(const std::string& word, bool as_json) {
 
 ToolResult whole(const ToolLine& line) {
   if (line.has(kMarkdownOption)) return answer(api_markdown(api_reference()));
+  if (line.has(kRbsOption)) return answer(api_rbs(api_reference()));
   if (line.has(kJsonOption)) return answer(api_json(api_reference()) + "\n");
   return answer(api_index(api_reference()));
 }
 
+// Whether --rbs is asked of one class or a search: the signatures are of the whole API (RBS
+// files are read whole).
+bool asks_part_as_rbs(const ToolLine& line) {
+  return line.has(kRbsOption) && (!line.words.empty() || line.value(kSearchOption).has_value());
+}
+
 ToolResult usage_failure(const std::string& problem) {
   return failed(problem + "\n\n" + tr("project.api.usage"), kExitUsage);
+}
+
+// What is wrong with how the command was asked; nothing when it can answer.
+std::string misuse(const ToolLine& line) {
+  if (line.words.size() > 1) return tr("project.api.one_class");
+  if (asks_part_as_rbs(line)) return tr("project.api.rbs_whole");
+  return {};
 }
 
 }  // namespace
@@ -59,7 +77,8 @@ ToolResult run_api_command(const std::vector<std::string>& args) {
   const auto line = read_tool_line(args, 0, grammar(), error);
   if (!line) return usage_failure(error);
   if (line->has(command_line::kHelpOption)) return answer(tr("project.api.usage"));
-  if (line->words.size() > 1) return usage_failure(tr("project.api.one_class"));
+  const std::string problem = misuse(*line);
+  if (!problem.empty()) return usage_failure(problem);
   if (const auto word = line->value(kSearchOption)) return search(*word, line->has(kJsonOption));
   if (!line->words.empty()) return one_class(line->words.front(), line->has(kJsonOption));
   return whole(*line);
