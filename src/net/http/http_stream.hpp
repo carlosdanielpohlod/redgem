@@ -1,12 +1,12 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "core/clock.hpp"
 #include "net/http/http_trust.hpp"
 #include "net/socket/socket.hpp"
 
@@ -49,11 +49,11 @@ std::unique_ptr<HttpStream> plain_stream(Socket socket);
 std::unique_ptr<HttpStream> secure_stream(Socket socket, const std::string& host,
                                           std::shared_ptr<const TrustStore> trust, std::string& error);
 
-// How long a request may still wait, on the thread it runs on: until its timeout, or until it is
-// given up (its game ended).
+// How long a request may still wait, on the thread it runs on: until its timeout, on `clock`, or
+// until it is given up (its game ended).
 class Patience {
  public:
-  Patience(float seconds, const std::atomic<bool>& cancelled);
+  Patience(float seconds, const std::atomic<bool>& cancelled, const Clock& clock);
   // Sleeps until `socket` can go on (has something to read, or room to send when `sending`) or a
   // moment passed. False once there is no waiting left: why() says why.
   bool wait(const Socket& socket, bool sending) const;
@@ -61,7 +61,8 @@ class Patience {
   std::string why() const;
 
  private:
-  std::chrono::steady_clock::time_point deadline_;
+  const Clock& clock_;
+  double deadline_;
   float seconds_;
   const std::atomic<bool>& cancelled_;
 };

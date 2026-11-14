@@ -101,6 +101,11 @@ editor's own clipboard and pastes only in the window it was copied in.
 A pasted object has its own copy of its meshes and pictures, even in the scene it was copied from
 (Duplicate shares them instead); the saved file keeps repeated data once (see below).
 
+A duplicated object moves with the clips that move the original: a duplicated character plays
+the same clips (each copy of a bone gets the keys of its original), so it does not stand still in
+the pose it was copied in. The copied object itself stays where it is put: keys that move the
+original's top node are not copied onto it.
+
 Undo goes back up to 200 steps, and keeps at most 256 MB for them (its copies of the objects and
 terrains, and what deleted objects and undone imports were made of: vertices, pictures and their
 bytes in the scene's file; an estimate, counted as each step begins): past either, the oldest steps

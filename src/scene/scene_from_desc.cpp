@@ -42,9 +42,19 @@ void apply_props(const PropertyMap& props, GameObject& object) {
   if (const auto to = get_number(props, props::kVisibleTo)) object.visible_to = static_cast<float>(*to);
 }
 
-GameObject object_of(const NodeDesc& node, ObjectId id) {
+// The shape keys of its mesh, at the weights the mesh starts with.
+void give_shape_keys(const SceneDesc& desc, GameObject& object) {
+  if (!is_index_of(object.mesh, desc.meshes.size())) return;
+  const MeshDesc& mesh = desc.meshes[static_cast<std::size_t>(object.mesh)];
+  object.morph_names = mesh.target_names;
+  object.morph_weights = mesh.target_weights;
+  object.morph_rest = mesh.target_weights;
+}
+
+GameObject object_of(const NodeDesc& node, ObjectId id, const SceneDesc& desc) {
   GameObject object = placed_object(node, id);
   copy_parts(node, object);
+  give_shape_keys(desc, object);
   apply_props(node.props, object);
   return object;
 }
@@ -55,7 +65,7 @@ Scene Scene::from_desc(const SceneDesc& desc) {
   Scene scene;
   scene.objects_.reserve(desc.nodes.size());
   for (std::size_t i = 0; i < desc.nodes.size(); ++i) {
-    GameObject object = object_of(desc.nodes[i], static_cast<ObjectId>(i));
+    GameObject object = object_of(desc.nodes[i], static_cast<ObjectId>(i), desc);
     object.serial = new_object_serial();
     // Parents come first, so a prefab's descendants inherit the flag.
     if (scene.is_prefab(object.parent)) object.prefab = true;
@@ -75,7 +85,7 @@ std::vector<ObjectHandle> Scene::joints_of(const NodeDesc& node, const SceneDesc
 
 void Scene::refresh_from_desc(const SceneDesc& desc, ObjectId id) {
   const NodeDesc& node = desc.nodes.at(static_cast<std::size_t>(id));
-  GameObject object = object_of(node, id);
+  GameObject object = object_of(node, id, desc);
   object.serial = at(id).serial;
   object.joints = joints_of(node, desc);
   if (is_prefab(object.parent)) object.prefab = true;
