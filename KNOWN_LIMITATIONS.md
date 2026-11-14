@@ -148,7 +148,7 @@ the same pull request.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
-  `Debug` shapes a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
+  `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
 ## Editor
@@ -292,9 +292,17 @@ not a promise of how it will be closed.
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
   Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
-- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay and immediate
-  world-space lines/wire boxes. World-space labels, GPU timing and per-function sampling remain
-  future work.
+- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
+  world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
+  GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
+  (Android) and the editor's Play show none. GPU time is
+  split into three coarse passes (prepare, scene, post), not per shadow cascade or effect. The
+  script sampler only samples while Ruby runs instructions: time inside the engine's own
+  functions counts for the Ruby method that called them, and Ruby blocks count for the method
+  that made them. It samples the running fiber's stack only (its innermost 64 frames) and keeps
+  at most 1024 distinct methods. A class collected while profiling whose memory is reused by a
+  new class can lend it its name until profiling starts again. Labels are not drawn without a main camera, and are not
+  hidden behind objects.
 
 ### Safety
 
