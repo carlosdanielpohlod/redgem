@@ -25,4 +25,7 @@ inline bool discovers_editor(const Options& options) { return options.editor_con
 Json catalog(const Options& options);
 Json invoke(const Options& options, const std::string& name, const Json& args);
 void validate_arguments(const Json& schema, const Json& args);
+// scene_diff takes one of against (an earlier .glb) and revision (a Git revision): throws
+// std::invalid_argument when it has both, neither, or a revision Git could not take as one.
+void check_diff_baseline(const Json& args);
 }  // namespace redgem::tools::mcp

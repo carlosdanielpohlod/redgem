@@ -465,7 +465,8 @@ not a promise of how it will be closed.
 
 ### Working with AI assistants
 
-What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`), the MCP
+What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`,
+`assets`, `templates`), the MCP
 tools (`redgem mcp`), the editor's Agent panel, the `AGENTS.md` guide of new games and `llms.txt`;
 see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not there yet:
 
@@ -473,10 +474,18 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   gestures and the on-screen touch controls of a phone are not replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or
   its connected editor, using a process-local `since` cursor.
-- `redgem scene diff` compares loaded object content against an earlier scene file, but does
-  not read a revision directly from Git or compare unused assets and unsupported glTF data.
-- A search of the game's assets and of the templates. `api` covers the engine's classes only, not
-  the game's own behaviours: read the game's scripts for those.
+- `redgem scene diff` compares loaded object content against an earlier scene file or the scene
+  a Git revision saved (`--against HEAD~1`), but does not compare unused assets or unsupported
+  glTF data. A revision is read with `git show`, so it needs `git` on the `PATH`; a scene kept in
+  Git LFS reads as its pointer file there, not as a scene. A revision is a branch, tag or commit
+  with `~N`, `^N` or `@{N}`; ranges and `rev:path` forms are refused. A connected editor runs
+  `git` while it answers MCP's `scene_diff` with a `revision`, so a slow repository holds its
+  frame for that long.
+- The asset search (`redgem assets`, MCP `asset_search`) knows an asset's kind by its folder and
+  its tags by the subfolders it sits in: a game has no tag files or other metadata, so nothing
+  inside a file (a model's mesh names, a script's classes) is searched. It reads at most 10,000
+  files of each kind, and says nothing when a folder had more. `api` covers the engine's classes only, not the game's own behaviours: read the game's
+  scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
   viewport images, runtime queries and event history. Live add creates empty objects only;

@@ -8,6 +8,7 @@
 #include "project/mcp_tools.hpp"
 #include "project/scene_assignments.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_revision.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/runtime_query.hpp"
 #include "project/scene_text.hpp"
@@ -182,11 +183,24 @@ Json query(EditorSession& session, const Json& args) {
   return tool_result(answer_query(*runtime, runtime_scene(session, *runtime), args));
 }
 
-Json compare(EditorSession& session, const Json& args) {
+// The open document compared with an earlier save of it inside the game.
+ToolResult compared_with_file(EditorSession& session, const Json& args, std::size_t limit) {
   const auto before = file_inside(session.game_dir(), args.at("against").get<std::string>());
   if (!before) throw std::invalid_argument("against must name a regular file inside the game");
-  const auto result =
-      compare_scene_file(session.scene_desc(), session.scene_name(), *before, args.value("limit", kDefaultDiffLines));
+  return compare_scene_file(session.scene_desc(), session.scene_name(), *before, limit);
+}
+
+// The open document compared with its file as a Git revision holds it.
+ToolResult compared_with_revision(EditorSession& session, const Json& args, std::size_t limit) {
+  return compare_scene_revision(session.scene_desc(), session.scene_name(), session.document().path(),
+                                args.at("revision").get<std::string>(), limit);
+}
+
+Json compare(EditorSession& session, const Json& args) {
+  check_diff_baseline(args);
+  const std::size_t limit = args.value("limit", kDefaultDiffLines);
+  const auto result = args.contains("revision") ? compared_with_revision(session, args, limit)
+                                                : compared_with_file(session, args, limit);
   return tool_result(result.out + result.err, result.exit_code != kExitSuccess);
 }
 

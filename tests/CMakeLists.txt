@@ -39,6 +39,7 @@ add_executable(redgem_tests
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
+  unit/asset_search_test.cpp
   unit/mcp_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
@@ -242,6 +243,7 @@ add_executable(redgem_tests
   integration/game_project_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
+  integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
   integration/error_hints_test.cpp

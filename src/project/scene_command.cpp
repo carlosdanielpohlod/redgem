@@ -1,7 +1,6 @@
 #include "project/scene_command.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -19,6 +18,7 @@
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_revision.hpp"
 #include "scene/props.hpp"
 
 namespace redgem::tools {
@@ -30,11 +30,12 @@ constexpr const char* kParentOption = "--parent";
 constexpr const char* kDepthOption = "--depth";
 constexpr const char* kLimitOption = "--limit";
 constexpr const char* kAgainstOption = "--against";
+constexpr const char* kRevisionOption = "--revision";
 constexpr const char* kDiffWord = "diff";
 constexpr const char* kCompactWord = "compact";
 // What the command takes after its name.
 ToolGrammar grammar() {
-  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption},
+  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption, kRevisionOption},
           {command_line::kHelpOption}};
 }
 // A list stops after this many lines unless --limit says otherwise (0: never).
@@ -84,21 +85,6 @@ std::variant<int, ToolResult> named_object(const OpenScene& scene) {
   const FoundObject found = find_object(scene.document.desc(), object_word(scene));
   if (found.index == kNoIndex) return failed(found.error);
   return found.index;
-}
-
-// What a count must be: a whole number, not below zero.
-bool is_count(double number) {
-  const double end = std::ldexp(1.0, std::numeric_limits<std::size_t>::digits);
-  return number >= 0 && number < end && std::floor(number) == number;
-}
-
-// The count an option is given: `otherwise` without the option, nothing when it is no count.
-std::optional<std::size_t> count_option(const ToolLine& line, const char* option, std::size_t otherwise) {
-  const auto value = line.value(option);
-  if (!value) return otherwise;
-  const auto number = number_from(*value);
-  if (!number || !is_count(*number)) return std::nullopt;
-  return static_cast<std::size_t>(*number);
 }
 
 ToolResult list(OpenScene& scene) {
@@ -186,12 +172,35 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+// The earlier save a diff compares with: what --against names, when it is one (no --revision does).
+std::optional<std::string> earlier_save(const ToolLine& line) {
+  std::optional<std::string> against = line.value(kAgainstOption);
+  if (!against) return std::nullopt;
+  if (!names_earlier_save(*against)) return std::nullopt;
+  return against;
+}
+
+// Whether the line names what scene diff compares with: --against or --revision.
+bool names_baseline(const ToolLine& line) {
+  return line.value(kAgainstOption).has_value() || line.value(kRevisionOption).has_value();
+}
+
+ToolResult diff_with(OpenScene& scene, std::size_t limit) {
+  const SceneDesc& desc = scene.document.desc();
+  const ToolLine& line = scene.line;
+  const std::optional<std::string> save = earlier_save(line);
+  if (save) return compare_scene_file(desc, scene.name, *save, limit);
+  const std::string revision = line.value(kRevisionOption).value_or(line.value(kAgainstOption).value_or(std::string()));
+  return compare_scene_revision(desc, scene.name, scene.document.path(), revision, limit);
+}
+
 ToolResult diff(OpenScene& scene) {
-  const auto baseline = scene.line.value(kAgainstOption);
-  if (!baseline) return failed(tr("project.scene.diff_needs_against"), kExitUsage);
+  const bool against = scene.line.value(kAgainstOption).has_value();
+  if (against == scene.line.value(kRevisionOption).has_value())
+    return failed(tr("project.scene.diff_needs_against"), kExitUsage);
   const auto limit = count_option(scene.line, kLimitOption, kDefaultDiffLines);
   if (!limit) return failed(tr("project.scene.needs_count"), kExitUsage);
-  return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
+  return diff_with(scene, *limit);
 }
 
 // Whether the scene's file, as saved, is one compact can work on (see compactable).
@@ -232,7 +241,8 @@ constexpr Known kSubcommands[] = {
 
 // The options diff and compact have no use for.
 constexpr const char* kDiffRefuses[] = {kFromOption, kParentOption, kDepthOption};
-constexpr const char* kCompactRefuses[] = {kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption};
+constexpr const char* kCompactRefuses[] = {kFromOption,  kParentOption,  kDepthOption,
+                                           kLimitOption, kAgainstOption, kRevisionOption};
 
 // The refusal (`message`) of the first of `options` the line gives; "" when it gives none.
 template <std::size_t N>
@@ -247,7 +257,7 @@ std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
   const std::string word = subcommand.word;
   if (word == kCompactWord) return first_refused(line, kCompactRefuses, "project.scene.compact_bad_option");
   const bool diff_command = word == kDiffWord;
-  if (!diff_command && line.value(kAgainstOption)) return tr("project.scene.diff_against_only");
+  if (!diff_command && names_baseline(line)) return tr("project.scene.diff_against_only");
   if (!diff_command) return {};
   return first_refused(line, kDiffRefuses, "project.scene.diff_bad_option");
 }
