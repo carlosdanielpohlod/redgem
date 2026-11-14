@@ -84,7 +84,7 @@ struct ScriptContext {
   int picture_height = 0;
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
-  std::string ui_font;  // selected game face; empty uses the built-in font
+  std::string ui_font;  // selected game face or chain (render/font_chain.hpp); empty uses the built-in font
   // Called when a player's bindings changed (Input.bind, unbind, reset_bindings), so that they are
   // kept for the next run; null when nobody keeps them.
   std::function<void()> on_bindings_changed;

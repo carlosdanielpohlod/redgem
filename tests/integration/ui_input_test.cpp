@@ -206,6 +206,23 @@ TEST_CASE("UI font selection is captured per text and can return to the built-in
   CHECK(engine->script_context().ui_font.empty());
 }
 
+TEST_CASE("UI.font takes a fallback chain of faces, tried in order for each letter") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  CHECK(ruby(*engine, "UI.font = [:latin, 'cjk', :emoji]; UI.font.inspect") == "[\"latin\", \"cjk\", \"emoji\"]");
+  ruby(*engine, "UI.text('Hi 日本', x: 10, y: 10)");
+  REQUIRE(engine->script_context().hud.size() == 1);
+  CHECK(engine->script_context().hud[0].font == "latin:cjk:emoji");
+  CHECK(ruby(*engine, "UI.font = [:solo]; UI.font") == "solo");
+  CHECK(ruby(*engine, "UI.font = []; UI.font.nil?") == "true");
+  CHECK(ruby(*engine, "UI.font = ''; UI.font.nil?") == "true");
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:a, :b, :c, :d, :e]", "long_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:latin, '../outside']", "unsafe_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:latin, '']", "empty_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = 'a:b'", "joined_chain.rb").ok);
+  CHECK(engine->script_context().ui_font.empty());
+}
+
 namespace {
 class FontMeasurePresenter final : public Presenter {
  public:

@@ -54,11 +54,15 @@ unsigned char control_alpha(ControlCircle::Look look) {
 
 }  // namespace
 
+// A text in its font chain: each piece with the face that has its letters, right-to-left runs reversed.
 void Renderer::Impl::draw_hud_text(const HudItem& item) {
   const float size = static_cast<float>(item.size);
-  DrawTextEx(ui_fonts.get(item.font, item.text), item.text.c_str(),
-             {static_cast<float>(item.x), static_cast<float>(item.y)}, size, size * kUiLetterSpacing,
-             to_raylib(item.color));
+  const float spacing = size * kUiLetterSpacing;
+  for (const FontPiece& piece : ui_fonts.layout(item.font, item.text, size, spacing)) {
+    if (piece.font == nullptr) continue;  // a line break
+    const Vector2 at{static_cast<float>(item.x) + piece.at.x, static_cast<float>(item.y) + piece.at.y};
+    DrawTextEx(*piece.font, piece.text.c_str(), at, size, spacing, to_raylib(item.color));
+  }
 }
 
 void Renderer::Impl::draw_hud_image(const HudItem& item) {
@@ -97,18 +101,17 @@ void Renderer::draw_hud(const std::vector<HudItem>& hud) {
   if (clipped) EndScissorMode();
 }
 
-int Renderer::text_width(const std::string& text, int size) const {
-  const float text_size = static_cast<float>(size);
-  return static_cast<int>(
-      std::ceil(MeasureTextEx(impl_->ui_fonts.get("", text), text.c_str(), text_size, text_size * kUiLetterSpacing).x));
-}
+int Renderer::text_width(const std::string& text, int size) const { return impl_->laid_text_width(text, size, ""); }
 
 int Renderer::font_text_width(const std::string& text, int size, const std::string& font,
                               const std::filesystem::path& folder) const {
   impl_->ui_fonts.set_directory(folder);
+  return impl_->laid_text_width(text, size, font);
+}
+
+int Renderer::Impl::laid_text_width(const std::string& text, int size, const std::string& font) {
   const float pixels = static_cast<float>(size);
-  return static_cast<int>(
-      std::ceil(MeasureTextEx(impl_->ui_fonts.get(font, text), text.c_str(), pixels, pixels * kUiLetterSpacing).x));
+  return static_cast<int>(std::ceil(laid_out_width(ui_fonts.layout(font, text, pixels, pixels * kUiLetterSpacing))));
 }
 
 void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {

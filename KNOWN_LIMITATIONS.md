@@ -235,8 +235,9 @@ not a promise of how it will be closed.
   desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
-- Text fields take single key presses: there is no input-method composition, so languages typed
-  through a composition window cannot be entered even with a game font that draws them.
+- Text fields take single key presses: there is no input-method composition (pre-edit text), so
+  languages typed through a composition window cannot be entered even with a game font that draws
+  them. raylib 5.5 and the GLFW 3.4 inside it expose no pre-edit text to build it on.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
   hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
   by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
@@ -263,10 +264,19 @@ not a promise of how it will be closed.
 
 ### Text
 
-- Text uses individual Unicode glyphs without bidirectional layout, complex-script shaping or
-  automatic font fallback chains. The built-in font supports its own glyphs; other scripts, such as
-  CJK, need a game-provided font. Each face caches at most 2048 codepoints; four named game fonts
-  can be cached at once, with at most 32 MB per font file. Unsupported glyphs show a question mark.
+- Text uses individual Unicode glyphs without complex-script shaping: Arabic letters are drawn in
+  their isolated forms (not joined), Indic scripts without their conjuncts or reordered vowels, and
+  there are no ligatures or kerning. Right-to-left text is put in its order on screen
+  (the Unicode Bidirectional Algorithm, with SheenBidi) one line at a time; the line breaks
+  `UI.wrap` chooses are made before that ordering, and a right-to-left line is still placed by its
+  left edge (use `align: :right`). Texts over 64 KB are drawn as written.
+- The built-in font supports its own glyphs; other scripts, such as CJK, need a game-provided font,
+  and a fallback chain (`UI.font = [:latin, :cjk, :emoji]`) of at most four game faces, then the
+  built-in one, draws each letter with the first face that has it. Color emoji faces (bitmap or
+  color tables) are not drawn: only outline (monochrome) emoji faces. Each face caches at most 2048
+  codepoints; four named game fonts can be cached at once, with at most 32 MB per font file.
+  Glyphs no face of the chain has (or that a full face has no room for) show as the built-in
+  face's question mark.
 
 ### Gameplay API
 

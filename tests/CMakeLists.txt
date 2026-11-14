@@ -111,6 +111,8 @@ add_executable(redgem_tests
   unit/quality_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
+  unit/font_chain_test.cpp
+  unit/bidi_text_test.cpp
   unit/material_alpha_test.cpp
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
@@ -603,7 +605,8 @@ target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SO
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_GAMES_DIR="${CMAKE_SOURCE_DIR}/games"
-  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+  REDGEM_EDITOR_FONTS_DIR="${CMAKE_SOURCE_DIR}/assets/editor/fonts")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 

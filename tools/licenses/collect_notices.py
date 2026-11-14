@@ -59,6 +59,8 @@ PROJECTS = [
     ("FreeType", "Decoding game-provided fonts; copyright © 1996–2026 The FreeType Project, "
      "all rights reserved (FreeType License)", "https://freetype.org",
      os.path.join(DEPS, "freetype-src", "docs", "FTL.TXT")),
+    ("SheenBidi", "Ordering right-to-left text (the Unicode Bidirectional Algorithm)",
+     "https://github.com/Tehreer/SheenBidi", os.path.join(DEPS, "sheenbidi-src", "LICENSE")),
     ("Inter", "The editor's and the games' text font", "https://rsms.me/inter/",
      os.path.join(REPO_ROOT, "assets", "editor", "fonts", "Inter-LICENSE.txt")),
     ("JetBrains Mono", "The editor's code font", "https://www.jetbrains.com/lp/mono/",

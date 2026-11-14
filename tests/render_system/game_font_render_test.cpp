@@ -173,3 +173,84 @@ TEST_CASE("selecting the same font from disk retains the built-in text scale") {
   const auto custom = MeasureTextEx(fonts.get("custom", "Sample"), "Sample", kTextPixels, 0).x;
   CHECK(custom == doctest::Approx(builtin).epsilon(kRoundingTolerance));
 }
+
+namespace {
+constexpr const char* kFullBlock = "█";  // in JetBrains Mono, not in the built-in face
+constexpr int kFullBlockCode = 0x2588;
+constexpr const char* kTurnedE = "Ǝ";  // in the built-in face, not in JetBrains Mono
+constexpr int kTurnedECode = 0x018e;
+constexpr float kChainTextPixels = 28.0f;
+
+// The built-in face as "latin" and the editor's code face as "mono": two faces with different letters.
+class ChainFiles : public FontFiles {
+ public:
+  ChainFiles() {
+    std::filesystem::copy_file(folder / "custom.ttf", folder / "latin.ttf");
+    std::filesystem::copy_file(std::filesystem::path(REDGEM_EDITOR_FONTS_DIR) / "JetBrainsMono-Regular.ttf",
+                               folder / "mono.ttf");
+  }
+};
+unsigned atlas_of(GameFonts& fonts, const std::string& name, const std::string& text) {
+  return fonts.get(name, text).texture.id;
+}
+}  // namespace
+
+TEST_CASE("a font chain draws each letter with the first face that has it") {
+  RenderStage stage;
+  ChainFiles files;
+  GameFonts fonts;
+  fonts.set_directory(files.folder);
+  CHECK(fonts.covers("mono", kFullBlockCode));
+  CHECK_FALSE(fonts.covers("latin", kFullBlockCode));
+  CHECK_FALSE(fonts.covers("mono", kTurnedECode));
+  const auto pieces = fonts.layout("latin:mono", std::string("A") + kFullBlock + "B", kChainTextPixels, 0.0f);
+  REQUIRE(pieces.size() == 3);
+  CHECK(pieces[0].font->texture.id == atlas_of(fonts, "latin", "A"));
+  CHECK(pieces[1].font->texture.id == atlas_of(fonts, "mono", kFullBlock));
+  CHECK(GetGlyphInfo(*pieces[1].font, kFullBlockCode).value == kFullBlockCode);
+  CHECK(pieces[1].at.x == doctest::Approx(pieces[0].width));
+  CHECK(laid_out_width(pieces) == doctest::Approx(pieces[2].at.x + pieces[2].width));
+  // A letter the whole chain lacks comes from the built-in face, tried after the chain.
+  const auto fallback = fonts.layout("mono", kTurnedE, kChainTextPixels, 0.0f);
+  REQUIRE(fallback.size() == 1);
+  CHECK(fallback[0].font->texture.id == atlas_of(fonts, "", kTurnedE));
+  CHECK(GetGlyphInfo(*fallback[0].font, kTurnedECode).value == kTurnedECode);
+}
+
+TEST_CASE("a font chain draws into the HUD and lays lines out below each other") {
+  RenderStage stage;
+  ChainFiles files;
+  std::filesystem::create_directories(files.folder / "images");
+  std::filesystem::create_directories(files.folder / "fonts");
+  std::filesystem::copy_file(files.folder / "mono.ttf", files.folder / "fonts/mono.ttf");
+  stage.set_images_dir(files.folder / "images");
+  const std::string blocks = std::string(kFullBlock) + kFullBlock + kFullBlock;
+  const auto picture = stage.draw_hud({text_item(blocks, 10, "mono:custom")}, "font_chain_blocks");
+  CHECK(picture.find(dark).count > kEnoughPixels);
+  GameFonts fonts;
+  const auto lines = fonts.layout("", "one\ntwo", kChainTextPixels, 0.0f);
+  REQUIRE(lines.size() == 3);
+  CHECK(lines[1].font == nullptr);
+  CHECK(lines[2].at.x == doctest::Approx(0.0f));
+  CHECK(lines[2].at.y > kChainTextPixels);
+}
+
+TEST_CASE("every face of a chain keeps its glyph cache bounded") {
+  constexpr int kRequestedLetters = 4096;
+  constexpr int kFirstRequested = 0x2190;  // arrows, math and box drawing: in both faces' ranges
+  constexpr int kLargestAtlas = 2048;
+  RenderStage stage;
+  ChainFiles files;
+  GameFonts fonts;
+  fonts.set_directory(files.folder);
+  std::string many;
+  for (int i = 0; i < kRequestedLetters; ++i) {
+    int bytes = 0;
+    const char* encoded = CodepointToUTF8(kFirstRequested + i, &bytes);
+    many.append(encoded, static_cast<std::size_t>(bytes));
+  }
+  for (const FontPiece& piece : fonts.layout("latin:mono", many, kChainTextPixels, 0.0f)) {
+    if (piece.font != nullptr) CHECK(piece.font->glyphCount <= kLargestAtlas);
+  }
+  CHECK(atlas_of(fonts, "mono", kFullBlock) != 0);
+}

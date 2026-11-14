@@ -8,8 +8,10 @@
 
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
-#include "render/ui_font.hpp"
+#include "render/bidi_text.hpp"
+#include "render/font_chain.hpp"
 #include "render/font_rasterizer.hpp"
+#include "render/ui_font.hpp"
 
 namespace redgem {
 namespace {
@@ -22,6 +24,7 @@ constexpr std::size_t kMaxFontLetters = 2048;
 constexpr std::size_t kMaxFontBytes = 32u * 1024u * 1024u;
 constexpr const char* kFontExtensions[] = {"", ".ttf", ".otf"};
 constexpr const char* kFontType = ".ttf";  // raylib reads both TrueType and OpenType through this decoder
+constexpr float kLineGap = 2.0f;           // raylib's own space between the lines of one text
 std::vector<std::uint8_t> read_font(const std::filesystem::path& folder, const std::string& name) {
   const auto file = find_asset_file(folder, name, kFontExtensions);
   if (!file) return {};
@@ -37,6 +40,11 @@ bool visible_fallback(const Font& font) {
   const auto glyph = GetGlyphInfo(font, kFallbackLetter);
   const auto rect = GetGlyphAtlasRec(font, kFallbackLetter);
   return glyph.value == kFallbackLetter && rect.width > 0 && rect.height > 0;
+}
+// A game face only draws letters it has (render/font_chain.hpp): the built-in face, tried last,
+// draws the question mark for the rest.
+bool healthy_face(const std::vector<std::uint8_t>& bytes, const Font& font) {
+  return usable_font(font) && (!bytes.empty() || visible_fallback(font));
 }
 bool empty_glyph(const GlyphInfo& glyph) { return glyph.image.width == 0 && glyph.advanceX == 0; }
 void prepare_atlas(Font& font) {
@@ -58,8 +66,67 @@ Font rasterize_face(const std::vector<std::uint8_t>& bytes, const std::set<int>&
                             static_cast<int>(letters.size()));
 }
 
+// A chain's faces by name: at most kMaxChainFaces game faces, then the built-in one.
+std::vector<std::string> chain_faces(const std::string& chain) {
+  std::vector<std::string> names = font_chain_names(chain);
+  if (names.size() > kMaxChainFaces) names.resize(kMaxChainFaces);
+  names.emplace_back();
+  return names;
+}
+void place_pieces(std::vector<FontPiece>& pieces, float size, float spacing) {
+  Vector2 pen{};
+  for (FontPiece& piece : pieces) {
+    piece.at = pen;
+    if (piece.font == nullptr) {
+      pen = {0.0f, pen.y + size + kLineGap};
+      continue;
+    }
+    piece.width = MeasureTextEx(*piece.font, piece.text.c_str(), size, spacing).x;
+    pen.x += piece.width + spacing;
+  }
+}
+// Each face's letters in one string, so its atlas grows once for the whole text.
+std::vector<std::string> letters_by_face(std::size_t faces, const std::vector<FaceRun>& runs) {
+  std::vector<std::string> letters(faces);
+  for (const FaceRun& run : runs) {
+    if (!is_line_break(run.text)) letters[run.face] += run.text;
+  }
+  return letters;
+}
+std::vector<FontPiece> runs_as_pieces(const std::vector<FaceRun>& runs, const std::vector<const Font*>& fonts) {
+  std::vector<FontPiece> laid;
+  laid.reserve(runs.size());
+  for (const FaceRun& run : runs)
+    laid.push_back({is_line_break(run.text) ? nullptr : fonts[run.face], run.text, Vector2{}, 0.0f});
+  return laid;
+}
+
 }  // namespace
 
+bool GameFonts::has_room_for(const Face& face, int codepoint) {
+  return face.letters.count(codepoint) != 0 || face.letters.size() < kMaxFontLetters;
+}
+// Whether a face has a letter and can still add it to its atlas.
+bool GameFonts::can_draw(const Face& face, int codepoint) {
+  return std::binary_search(face.coverage.begin(), face.coverage.end(), codepoint) && has_room_for(face, codepoint);
+}
+
+float laid_out_width(const std::vector<FontPiece>& pieces) {
+  float width = 0.0f;
+  for (const FontPiece& piece : pieces) {
+    if (piece.font != nullptr) width = std::max(width, piece.at.x + piece.width);  // (not a line break)
+  }
+  return width;
+}
+
+void GameFonts::read_coverage(Face& face, const std::string& name) {
+  if (!name.empty()) {
+    face.coverage = font_coverage(face.bytes.data(), face.bytes.size());
+    return;
+  }
+  const EmbeddedFile embedded = embedded_ui_font();
+  face.coverage = font_coverage(embedded.data, static_cast<std::size_t>(embedded.size));
+}
 void GameFonts::read_face(Face& face, const std::string& name) {
   if (name.empty()) return;
   face.bytes = read_font(directory_, name);
@@ -77,6 +144,7 @@ GameFonts::Face& GameFonts::face(const std::string& name) {
   Face& added = faces_[name];
   for (int code = kFirstLetter; code <= kLastInitialLetter; ++code) added.letters.insert(code);
   read_face(added, name);
+  read_coverage(added, name);
   return added;
 }
 bool GameFonts::add_letter(Face& face, int codepoint) {
@@ -115,11 +183,11 @@ void GameFonts::rebuild(Face& face) {
   release_face(face);
   face.font = font;
   face.owned = owns_font(font);
-  face.failed = !usable_font(font) || !visible_fallback(font);
+  face.failed = !healthy_face(face.bytes, font);
   if (face.failed) {
     release_face(face);
     face.font = GetFontDefault();
-    return;
+    face.coverage.clear();  // its letters go to the next face of a chain from now on
   }
 }
 const Font& GameFonts::get(const std::string& name, const std::string& text) {
@@ -133,6 +201,26 @@ const Font& GameFonts::get(const std::string& name, const std::string& text) {
     return get("", text);
   }
   return selected.font;
+}
+bool GameFonts::covers(const std::string& name, int codepoint) { return can_draw(face(name), codepoint); }
+std::vector<FontPiece> GameFonts::pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs) {
+  const std::vector<std::string> letters = letters_by_face(names.size(), runs);
+  std::vector<const Font*> fonts(names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    if (!letters[i].empty()) fonts[i] = &get(names[i], letters[i]);
+  }
+  return runs_as_pieces(runs, fonts);
+}
+std::vector<FontPiece> GameFonts::layout(const std::string& chain, const std::string& text, float size, float spacing) {
+  if (faces_.empty()) face("");
+  const std::vector<std::string> names = chain_faces(chain);
+  std::vector<const Face*> faces;
+  faces.reserve(names.size());
+  for (const std::string& name : names) faces.push_back(&face(name));
+  const auto has_glyph = [&faces](std::size_t index, int codepoint) { return can_draw(*faces[index], codepoint); };
+  std::vector<FontPiece> laid = pieces(names, face_runs(visual_order(text), names.size(), has_glyph));
+  place_pieces(laid, size, spacing);
+  return laid;
 }
 void GameFonts::set_directory(const std::filesystem::path& directory) {
   if (directory == directory_) return;
