@@ -368,6 +368,7 @@ struct Renderer::Impl {
   // Shaders, their uniforms, the shadow map, the reflection targets and the sky.
   void load_pipeline();
   void compile_shaders();
+  void compile_post_shaders();
   // The lit shader with these features (compiled again only when they change: the sky picture or
   // soft shadows switched on or off).
   void compile_lit(const shaders::LitFeatures& features);

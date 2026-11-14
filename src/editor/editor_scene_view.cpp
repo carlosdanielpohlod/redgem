@@ -55,10 +55,7 @@ void EditorApp::render_viewport_texture() {
 void EditorApp::draw_edited_scene() {
   SceneViewport& view = *viewport_;
   aim_viewport_camera();
-  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
-  renderer_->set_motion_blur(kNoMotionBlur);
-  renderer_->set_auto_exposure(AutoExposureOverrides{});  // the scene's own, whatever a game set
-  renderer_->allow_temporal_antialias(false);             // its gizmos and grid test against the scene's depth
+  set_editor_view_options();
   sync_renderer_assets();
   renderer_->draw_world(session_->scene(), view.camera, &view.target);
   std::optional<BrushMark> brush;
@@ -68,6 +65,14 @@ void EditorApp::draw_edited_scene() {
   draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
   EndMode3D();
   EndTextureMode();
+}
+
+// What the editor's view draws differently from the game's.
+void EditorApp::set_editor_view_options() {
+  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
+  renderer_->set_motion_blur(kNoMotionBlur);
+  renderer_->set_auto_exposure(AutoExposureOverrides{});  // the scene's own, whatever a game set
+  renderer_->allow_temporal_antialias(false);             // its gizmos and grid test against the scene's depth
 }
 
 void EditorApp::aim_viewport_camera() {

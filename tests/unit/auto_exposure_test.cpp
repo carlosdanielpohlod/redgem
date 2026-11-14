@@ -23,6 +23,7 @@ constexpr float kBrightScene = 3.0f;    // EV
 constexpr std::uint64_t kCamera = 7;    // a camera object's serial
 constexpr std::uint64_t kOtherCamera = 8;
 constexpr std::uint64_t kScene = 2;  // scenes uploaded so far
+constexpr float kAboveBrightest = kBrightestExposureEv + 2.0f;  // EV: past the default range
 
 // The mean log2 luminance of a scene `ev` doublings brighter than middle grey.
 float mean_log2_of(float ev) { return kMiddleGreyLog2 + ev; }
@@ -108,11 +109,11 @@ TEST_CASE("what a game's camera sets wins over the scene, and what it leaves fol
   CHECK_FALSE(same.enabled);
   CHECK(same.compensation == doctest::Approx(scene.compensation));
   camera.enabled = true;
-  camera.min_ev = 2.0f;  // above the scene's brightest: that is raised to it
+  camera.min_ev = kAboveBrightest;  // above the scene's brightest: that is raised to it
   const AutoExposure changed = with_overrides(scene, camera);
   CHECK(changed.enabled);
-  CHECK(changed.min_ev == doctest::Approx(2.0f));
-  CHECK(changed.max_ev == doctest::Approx(2.0f));
+  CHECK(changed.min_ev == doctest::Approx(kAboveBrightest));
+  CHECK(changed.max_ev == doctest::Approx(kAboveBrightest));
   CHECK(changed.speed_up == doctest::Approx(scene.speed_up));
 }
 

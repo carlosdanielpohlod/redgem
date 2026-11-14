@@ -65,6 +65,14 @@ void Renderer::Impl::compile_shaders() {
   sharpen_shader = compile_shader(nullptr, shaders::kSharpenFragment, "sharpening");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::particle_fragment().c_str(), "particles");
+  antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
+  panorama_shader = compile_shader(nullptr, shaders::kPanoramaFragment, "reflection panorama");
+  occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
+  compile_post_shaders();
+}
+
+// The passes that work on the lit picture: bloom, tone mapping and the exposure.
+void Renderer::Impl::compile_post_shaders() {
   glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
   bright_shader =
       compile_shader(nullptr, shaders::with_adapted_scale(shaders::kBrightFragment).c_str(), "bloom threshold");
@@ -73,9 +81,6 @@ void Renderer::Impl::compile_shaders() {
       compile_shader(nullptr, shaders::with_adapted_scale(shaders::kCompositeFragment).c_str(), "tone mapping");
   luminance_shader = compile_shader(nullptr, shaders::kLuminanceFragment, "brightness measure");
   adapt_shader = compile_shader(nullptr, shaders::kAdaptFragment, "exposure adaptation");
-  antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
-  panorama_shader = compile_shader(nullptr, shaders::kPanoramaFragment, "reflection panorama");
-  occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
 }
 
 void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
