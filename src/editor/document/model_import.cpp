@@ -141,16 +141,21 @@ nlohmann::json imported_material(nlohmann::json material, const JsonOffsets& off
   return material;
 }
 
+void shift_target_accessors(nlohmann::json& primitive, int offset) {
+  if (!primitive.contains(kTargets)) return;
+  for (nlohmann::json& target : primitive[kTargets]) {
+    for (auto& [name, accessor] : target.items()) accessor = shifted_required(accessor, offset);
+  }
+}
+
 nlohmann::json imported_mesh(nlohmann::json mesh, const JsonOffsets& offsets) {
   for (nlohmann::json& primitive : mesh[kPrimitives]) {
     for (auto& [name, accessor] : primitive[kAttributes].items())
       accessor = shifted_required(accessor, offsets.accessors);
     shift_index(primitive, kIndices, offsets.accessors);
     shift_index(primitive, kMaterial, offsets.materials);
-    primitive.erase(kTargets);
+    shift_target_accessors(primitive, offsets.accessors);
   }
-  mesh.erase(kWeights);
-  if (has_object(mesh, kExtras)) mesh[kExtras].erase(kTargetNames);
   return mesh;
 }
 
@@ -158,7 +163,6 @@ nlohmann::json imported_node(nlohmann::json node, const JsonOffsets& offsets) {
   shift_index(node, kMesh, offsets.meshes);
   shift_index(node, kSkin, offsets.skins);
   node.erase(kCamera);
-  node.erase(kWeights);
   node.erase(kExtensions);
   node.erase(kChildren);
   return node;

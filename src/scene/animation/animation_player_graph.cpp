@@ -177,6 +177,18 @@ void AnimationPlayer::pose_graph(ObjectId character, const GraphAnimation& graph
   PoseOptions options = character_options(character, kWhole, scene);
   options.offsets = false;
   apply_animation(pose, 0.0f, scene, options);
+  weigh_graph_samples(character, samples, scene);
+}
+
+void AnimationPlayer::weigh_graph_samples(ObjectId character, const std::vector<AnimationGraphSample>& samples,
+                                          Scene& scene) {
+  for (const AnimationGraphSample& sample : samples) {
+    PoseOptions options = character_options(character, sample.weight, scene);
+    options.offsets = false;
+    options.loop = sample.loop;
+    options.only_shape_keys = true;
+    apply_animation((*clips_)[sample.clip], sample.time, scene, options);
+  }
 }
 
 void AnimationPlayer::advance_graph(ObjectId character, Own& own, float dt, Scene& scene) {

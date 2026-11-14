@@ -39,8 +39,8 @@ constexpr std::size_t kAsked = 300;
 // object without a mesh.
 SceneDesc meadow() {
   SceneDesc desc;
-  desc.meshes = {MeshDesc{"Ground", {make_primitive(PrimitiveShape::Plane)}, {}},
-                 MeshDesc{"Tuft", {make_primitive(PrimitiveShape::Cube)}, {}}};
+  desc.meshes = {MeshDesc{"Ground", {make_primitive(PrimitiveShape::Plane)}, {}, {}, {}},
+                 MeshDesc{"Tuft", {make_primitive(PrimitiveShape::Cube)}, {}, {}, {}}};
   NodeDesc camera;
   camera.name = "Camera";
   camera.camera = CameraDesc{};
