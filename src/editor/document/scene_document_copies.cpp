@@ -49,6 +49,31 @@ bool all_copied(const std::vector<int>& joints, const std::vector<int>& copy_of)
   return std::all_of(joints.begin(), joints.end(), [&copy_of](int joint) { return copied(joint, copy_of); });
 }
 
+// `copy_of` without the copied roots: a copy is put where it is wanted, and the keys of its
+// original's root would pull it back onto the original (as Scene.spawn leaves a copy's root).
+std::vector<int> animated_copies(const std::vector<int>& roots, std::vector<int> copy_of) {
+  for (const int root : roots) copy_of[root] = kNoIndex;
+  return copy_of;
+}
+
+// Whether a node and its copy both have a node of the file behind them.
+bool both_in_file(int source_node, int copy_source_node) {
+  return source_node != kNoIndex && copy_source_node != kNoIndex;
+}
+
+// The source node of each copied node that has one -> the source node of its copy.
+std::map<int, int> copied_sources(const std::vector<NodeDesc>& nodes, const std::vector<int>& source,
+                                  const std::vector<int>& copy_of) {
+  std::map<int, int> sources;
+  for (const int original : source) {
+    if (!copied(original, copy_of)) continue;
+    const int from = nodes[original].source_node;
+    const int to = nodes[copy_of[original]].source_node;
+    if (both_in_file(from, to)) sources[from] = to;
+  }
+  return sources;
+}
+
 }  // namespace
 
 int SceneDocument::duplicate(int index) { return duplicate(std::vector<int>{index}).front(); }
@@ -61,10 +86,11 @@ std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
   const int first_copy = node_count();
   const std::vector<int> copy_of = copy_numbers(source, first_copy, desc_.nodes.size());
   append_copies(source, copy_of);
-  // Each copy is a node of its own in the file too, and a character copied with its bones gets
-  // its own skeleton (its animation is not copied: the copy keeps the pose it was copied in).
+  // Each copy is a node of its own in the file too, a character copied with its bones gets its
+  // own skeleton, and the clips that move the originals move the copies.
   give_copies_own_source_nodes(first_copy, source.size());
   give_copies_own_skins(first_copy, source.size(), copy_of);
+  give_copies_own_channels(source, animated_copies(roots, copy_of));
   touch();
   return copies_of(roots, copy_of);
 }
@@ -127,6 +153,24 @@ std::vector<int> SceneDocument::point_at_copies(SkinDesc& skin, nlohmann::json& 
     json[kJoints][j] = joint_sources.back();
   }
   return joint_sources;
+}
+
+void SceneDocument::give_copies_own_channels(const std::vector<int>& source, const std::vector<int>& copy_of) {
+  const std::map<int, int> sources = copied_sources(desc_.nodes, source, copy_of);
+  for (nlohmann::json& animation : source_animations_) add_channels_for_copies(animation, sources);
+  for (std::size_t a = 0; a < desc_.animations.size(); ++a) copy_described_channels(a, copy_of);
+}
+
+void SceneDocument::copy_described_channels(std::size_t animation, const std::vector<int>& copy_of) {
+  std::vector<AnimationChannel>& channels = desc_.animations[animation].channels;
+  const std::size_t count = channels.size();  // (the copies go after the channels there were)
+  for (std::size_t c = 0; c < count; ++c) {
+    if (!copied(channels[c].node, copy_of)) continue;
+    AnimationChannel copy = channels[c];
+    copy.node = copy_of[copy.node];
+    channel_node_sources_[animation].push_back(desc_.nodes[copy.node].source_node);
+    channels.push_back(std::move(copy));
+  }
 }
 
 }  // namespace redgem

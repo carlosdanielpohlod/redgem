@@ -18,6 +18,17 @@ until 1.0, a release may change what games rely on (see
   artifact, and fails only when a result clearly passes its ceiling in `tests/bench/thresholds.json`
   (see the contributing guide).
 
+- **Mirrored objects**: an object placed with a negative scale on one axis (or three), as
+  Blender's mirror leaves it, is drawn the right way out in every pass (the lit picture, the
+  sun's shadow cascades, the point and spot shadow atlas, motion vectors and see-through
+  surfaces). Mirrored copies of a mesh are batched apart, so the winding changes only between
+  runs of them. A node given as a mirroring matrix is read with a negative x scale.
+
+- **Duplicated characters animate**: duplicating an object in the editor copies the channels of
+  every clip that moves it onto the copy, so a duplicated character plays the original's clips
+  (Wave, Walk...) instead of standing in the pose it was copied in; the copy itself stays where
+  it is put. Undoing the duplicate drops them again.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
@@ -44,6 +55,14 @@ until 1.0, a release may change what games rely on (see
   fractions of the screen with `normalized`. It all goes through the input the game reads, so
   `Input.mouse_*`, actions bound to `mouse:left` or `pad:a`, and gamepad reads see it as a
   player's.
+- **Navigation**: `Navigation.path(from, to)` finds the way around walls, along floors and up
+  stairs and gentle slopes: Vector3 waypoints pulled straight, or nil when there is no way there.
+  `Navigation.nearest(point)`, `Navigation.walkable?(point)`, `Navigation.draw` (the walkable cells
+  around a point, for a frame), `Navigation.bake` and `Navigation.stats`. The walkable area is a
+  2.5D grid baked from the scene's static bodies as each scene loads (or when a script first asks),
+  sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
+  `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
+  (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
