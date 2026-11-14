@@ -299,7 +299,8 @@ class EditorApp {
   void draw_viewport_hint(bool playing);
   void use_viewport_tools();
   // The brush is on, and a terrain is selected.
-  bool sculpting() const;
+  bool using_terrain_brush() const;
+  void apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds);
   void use_brush();
   bool stroke_ends(bool brushing) const { return !brushing && stroke_started_; }
   void draw_gizmo();

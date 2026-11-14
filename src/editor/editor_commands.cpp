@@ -125,11 +125,19 @@ std::optional<Vec3> EditorApp::sculpt_at(float x, float y, float seconds) {
     session_->document().checkpoint();  // one undo step per stroke
     stroke_started_ = true;
   }
+  apply_terrain_brush(terrain, *point, seconds);
+  return point;
+}
+
+void EditorApp::apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds) {
+  if (terrain_tool_.painting) {
+    session_->paint_terrain(terrain, point, terrain_tool_.radius, terrain_tool_.strength * seconds, terrain_tool_.tint);
+    return;
+  }
   // Shift digs with Raise and piles up with Lower.
   const SculptMode mode = keyboard::shift_down() ? editor_logic::reversed(terrain_tool_.mode) : terrain_tool_.mode;
   const float amount = editor_logic::brush_amount(mode, terrain_tool_.strength, seconds);
-  session_->sculpt_terrain(terrain, *point, terrain_tool_.radius, amount, mode);
-  return point;
+  session_->sculpt_terrain(terrain, point, terrain_tool_.radius, amount, mode);
 }
 
 }  // namespace redgem

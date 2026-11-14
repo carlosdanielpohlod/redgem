@@ -229,7 +229,7 @@ bool SceneDocument::sync_for_writing(std::string& error) {
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
-  sync_buffer();  // (a terrain given vertices of its own made the binary chunk longer)
+  sync_buffer();  // terrain edits can append new vertex data
   return true;
 }
 
