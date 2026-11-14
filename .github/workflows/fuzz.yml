@@ -1,6 +1,7 @@
 # The parsers of what comes from outside, fuzzed with libFuzzer (tests/fuzz): the glTF loader,
-# picture headers (PNG, JPEG, WebP, Radiance), the MessagePack messages between machines, answers
-# of web servers and the JSON of a scene's custom properties. Built with clang, AddressSanitizer
+# picture headers (PNG, JPEG, WebP, Radiance), KTX2 textures and their transcoding, the
+# MessagePack messages between machines, answers of web servers, the JSON of a scene's custom
+# properties and built games' archives. Built with clang, AddressSanitizer
 # and UndefinedBehaviorSanitizer. A minute per target on every pull request, ten every night; what
 # the runs find grows a corpus kept between them. An input that crashes a target is kept as the
 # run's artifact: once the code is fixed it goes into tests/fuzz/corpus/<target>, where every

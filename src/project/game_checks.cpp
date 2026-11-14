@@ -35,7 +35,7 @@ namespace fs = std::filesystem;
 // How many names a message that suggests some lists.
 constexpr std::size_t kMostSuggestions = 3;
 // What a sky picture may be named, after its name (as render/sky_picture.cpp looks for it).
-constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
+constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"};
 // What a syntax error starts with, and what goes between a file and its line instead.
 constexpr const char* kLineWord = "line ";
 constexpr const char* kLineJoiner = ":";

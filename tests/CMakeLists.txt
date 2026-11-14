@@ -49,6 +49,7 @@ add_executable(redgem_tests
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/webp_image_test.cpp
+  unit/ktx2_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
@@ -588,6 +589,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/mirrored_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
+               render_system/ktx2_render_test.cpp
                render_system/material_pictures_render_test.cpp
                render_system/morph_render_test.cpp
                render_system/game_font_render_test.cpp

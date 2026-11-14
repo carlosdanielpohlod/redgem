@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
+  (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
+  format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
+  ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
+  file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
+  encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
+
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

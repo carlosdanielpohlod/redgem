@@ -12,8 +12,8 @@
 
 namespace redgem::glb_images {
 
-// glTF's "mimeType" of a picture file's bytes (PNG, JPEG or WebP, by their first bytes); empty
-// for anything else.
+// glTF's "mimeType" of a picture file's bytes (PNG, JPEG, WebP or KTX2, by their first bytes);
+// empty for anything else.
 std::string mime_type_of(const std::vector<std::uint8_t>& bytes);
 
 // Adds a picture to the file: its bytes into the binary chunk, a buffer view over them, and an

@@ -64,8 +64,19 @@ the same pull request.
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
-  be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
-  ordinary pixels; it does not provide GPU texture compression.
+  be Radiance `.hdr`). Animated WebP is not read. WebP is decoded on the CPU and uploaded as
+  ordinary pixels. Scene textures may also be KTX2 (Basis Universal ETC1S or UASTC, through
+  `KHR_texture_basisu`): they stay compressed on the card (BC1/BC3, ASTC 4x4 or ETC1/ETC2) only
+  when the file carries its mipmaps; one without goes up as RGBA8. BC7 is not used (the
+  higher-quality desktop target for UASTC: BC3 is used instead), nor are HDR Basis data, KTX2
+  arrays and cube maps, or KTX2 files that hold other formats than Basis data. KTX2 is
+  transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
+  textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
+  pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too. The
+  scene memory budget counts a KTX2 picture at its RGBA8 size even when it goes up compressed
+  (4 to 8 times smaller). The KTX2 transcoder is opened once per KTX2 texture as the scene is
+  read (to fall back when it refuses the data), and again when it is uploaded.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and
@@ -378,8 +389,8 @@ not a promise of how it will be closed.
 ### Engineering
 
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
-- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
-  most on phones.
+- Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
+  Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
   that open no window, not the system tests; the coverage report is of those tests too, and no
   share of it is required. The load test and the benchmarks print numbers but fail on none.

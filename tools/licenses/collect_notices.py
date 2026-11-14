@@ -59,6 +59,12 @@ PROJECTS = [
     ("FreeType", "Decoding game-provided fonts; copyright © 1996–2026 The FreeType Project, "
      "all rights reserved (FreeType License)", "https://freetype.org",
      os.path.join(DEPS, "freetype-src", "docs", "FTL.TXT")),
+    ("Basis Universal", "Transcoding KTX2 textures (only its transcoder is built in)",
+     "https://github.com/BinomialLLC/basis_universal", os.path.join(DEPS, "basis_universal-src", "LICENSE")),
+    ("Basis Universal notice", "The notice Basis Universal's Apache 2.0 license asks to pass along",
+     "https://github.com/BinomialLLC/basis_universal", os.path.join(DEPS, "basis_universal-src", "NOTICE")),
+    ("Zstandard (inside Basis Universal)", "Decompressing UASTC KTX2 textures (its decoder only)",
+     "https://github.com/facebook/zstd", os.path.join(DEPS, "basis_universal-src", "zstd", "LICENSE")),
     ("Inter", "The editor's and the games' text font", "https://rsms.me/inter/",
      os.path.join(REPO_ROOT, "assets", "editor", "fonts", "Inter-LICENSE.txt")),
     ("JetBrains Mono", "The editor's code font", "https://www.jetbrains.com/lp/mono/",

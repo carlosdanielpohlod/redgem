@@ -181,6 +181,9 @@ redgem_add_library(redgem_core
   core/game_files.cpp
   core/image_header.cpp
   core/webp_image.cpp
+  core/ktx2_header.cpp
+  core/ktx2_image.cpp
+  core/gpu_texture_formats.cpp
   core/float_image.cpp
   core/radiance_header.cpp
   core/radiance_pixels.cpp
@@ -191,6 +194,8 @@ redgem_add_library(redgem_core
   core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
+# (The Basis Universal transcoder: KTX2 textures, see core/ktx2_image.hpp.)
+target_link_libraries(redgem_core PRIVATE basisu_transcoder)
 # (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)
 target_link_libraries(redgem_core PRIVATE redgem_zlib)
 redgem_embed_texts(redgem_core core)
@@ -445,6 +450,7 @@ redgem_add_library(redgem_runtime
   render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
+  render/compressed_textures.cpp
   render/texture_loading.cpp
   render/debug_draw.cpp
   render/renderer_debug.cpp

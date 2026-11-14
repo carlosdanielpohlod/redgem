@@ -1,6 +1,9 @@
 #include "editor/document/material_textures.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
+#include <string>
 
 #include "editor/document/gltf_json.hpp"
 
@@ -55,21 +58,52 @@ std::optional<int> source_of(const Json& holder) {
   return index_from(holder[kSource]);
 }
 
-// The WebP picture of a texture (EXT_texture_webp), when it has one.
-std::optional<int> webp_source(const Json& texture) {
+// The picture a texture shows through one of its extensions, when it has that one.
+std::optional<int> extension_source(const Json& texture, const char* extension) {
   if (!has_object(texture, kExtensions)) return std::nullopt;
-  const auto webp = texture[kExtensions].find(kWebpTextureExtension);
-  return webp == texture[kExtensions].end() ? std::nullopt : source_of(*webp);
+  const auto found = texture[kExtensions].find(extension);
+  return found == texture[kExtensions].end() ? std::nullopt : source_of(*found);
 }
 
-bool is_webp(const Json& doc, int image) {
+// The picture a texture shows, as the engine picks it: its KTX2 one (KHR_texture_basisu), its
+// WebP one (EXT_texture_webp), or its plain one.
+std::optional<int> shown_source(const Json& texture) {
+  if (const auto ktx2 = extension_source(texture, kBasisuTextureExtension)) return ktx2;
+  if (const auto webp = extension_source(texture, kWebpTextureExtension)) return webp;
+  return source_of(texture);
+}
+
+// Whether a texture says it shows `image` in any of the ways it may: its KTX2, WebP or plain
+// picture. (Which one the engine shows depends on whether it reads the KTX2 one, which the
+// document alone does not tell; a texture is the same picture whichever it shows.)
+bool has_source(const Json& texture, int image) {
+  const std::optional<int> sources[] = {extension_source(texture, kBasisuTextureExtension),
+                                        extension_source(texture, kWebpTextureExtension), source_of(texture)};
+  return std::find(std::begin(sources), std::end(sources), std::optional<int>{image}) != std::end(sources);
+}
+
+// The texture extension a picture of this kind is shown through.
+struct ExtensionPicture {
+  const char* mime_type;
+  const char* extension;
+};
+constexpr ExtensionPicture kExtensionPictures[] = {{kWebpMime, kWebpTextureExtension},
+                                                   {kKtx2Mime, kBasisuTextureExtension}};
+
+// The extension a texture shows `image` through; nullptr for a PNG or JPEG one (its plain source).
+const char* texture_extension_of(const Json& doc, int image) {
   const Json* entry = entry_at(doc, kImages, image);
-  return entry != nullptr && text_at(*entry, kMimeType) == kWebpMime;
+  if (entry == nullptr) return nullptr;
+  const std::string mime_type = text_at(*entry, kMimeType);
+  for (const ExtensionPicture& kind : kExtensionPictures) {
+    if (mime_type == kind.mime_type) return kind.extension;
+  }
+  return nullptr;
 }
 
-Json texture_for(const Json& doc, int image) {
-  if (!is_webp(doc, image)) return {{kSource, image}};
-  return {{kExtensions, {{kWebpTextureExtension, {{kSource, image}}}}}};
+Json texture_for(const char* extension, int image) {
+  if (extension == nullptr) return {{kSource, image}};
+  return {{kExtensions, {{extension, {{kSource, image}}}}}};
 }
 
 // A texture that samples its picture the default way: no sampler, or one that says nothing.
@@ -83,7 +117,7 @@ bool plain_sampling(const Json& doc, int texture) {
 
 // A texture of the document can show `image` for a material set in the editor.
 bool reusable(const Json& doc, int texture, int image) {
-  return image_of_texture(doc, texture) == image && plain_sampling(doc, texture);
+  return has_source(doc[kTextures][texture], image) && plain_sampling(doc, texture);
 }
 
 // Whether a texture shows its picture through EXT_texture_webp.
@@ -145,7 +179,7 @@ std::vector<int> images_of(const MaterialDesc& material) {
 int image_of_texture(const Json& doc, int texture) {
   const Json* entry = entry_at(doc, kTextures, texture);
   if (entry == nullptr) return kNoIndex;
-  return webp_source(*entry).value_or(source_of(*entry).value_or(kNoIndex));
+  return shown_source(*entry).value_or(kNoIndex);
 }
 
 int slot_image(const Json& doc, const Json& material, Slot slot) {
@@ -162,9 +196,10 @@ int texture_showing(Json& doc, int image) {
   for (int texture = 0; texture < textures; ++texture) {
     if (reusable(doc, texture, image)) return texture;
   }
-  // (Without a picture another reader can show, a WebP one is required to read the file.)
-  if (is_webp(doc, image)) add_extension_required(doc, kWebpTextureExtension);
-  array_at(doc, kTextures).push_back(texture_for(doc, image));
+  // (Without a picture another reader can show, a WebP or KTX2 one is required to read the file.)
+  const char* extension = texture_extension_of(doc, image);
+  if (extension != nullptr) add_extension_required(doc, extension);
+  array_at(doc, kTextures).push_back(texture_for(extension, image));
   return textures;
 }
 
