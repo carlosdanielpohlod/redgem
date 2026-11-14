@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "render/display_settings.hpp"
@@ -43,6 +44,14 @@ unsigned int window_flags(const WindowSettings& settings);
 enum class CursorChange { None, Capture, Release };
 CursorChange cursor_change(bool captured, bool wanted);
 
+// The environment variable that closes every window once it has shown that many frames, as its
+// close button would: how a download's check (tools/release/smoke.sh) opens the editor and a built
+// game and closes them again, with no one there to press anything.
+inline constexpr const char* kCloseAfterFramesVariable = "REDGEM_CLOSE_AFTER_FRAMES";
+// The frames a window is shown for before it closes, read from that variable's text: none when the
+// text is empty or not a whole number above zero.
+std::optional<long> frames_before_closing(const std::string& text);
+
 // The system's window, and the only thing that opens and closes one: the card it draws with, its
 // size and title, the pace of its frames, its pointer. One at a time; whatever draws in it (a
 // renderer, an interface) is made after it and released before it.
@@ -54,7 +63,8 @@ class Window {
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
 
-  // Whether the person asked for it to close (true for one frame only).
+  // Whether the person asked for it to close (true for one frame only), or it has shown the frames
+  // kCloseAfterFramesVariable gives it (true from then on).
   bool close_requested() const;
   // How long the frame before this one took.
   float frame_seconds() const;
@@ -81,11 +91,14 @@ class Window {
   void follow_monitor();
   void set_vsync(bool on);
   void toggle(WindowMode mode);
+  bool shown_enough() const;
 
   WindowMode mode_ = WindowMode::Windowed;
   SurfaceSize monitor_;  // the monitor's own size, as it was before the window switched it
   SurfaceSize size_;     // the size asked for last (a borderless window is the monitor's)
   bool vsync_ = true;
+  std::optional<long> close_after_;  // frames, from kCloseAfterFramesVariable
+  long frames_shown_ = 0;
 };
 
 }  // namespace redgem

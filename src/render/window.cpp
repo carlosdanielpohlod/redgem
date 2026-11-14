@@ -3,6 +3,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <charconv>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "core/log.hpp"
+#include "core/platform.hpp"
 #include "render/gl_extras.hpp"
 #include "render/render_math.hpp"
 
@@ -114,6 +116,23 @@ void open_window(const WindowSettings& settings) {
 
 }  // namespace
 
+namespace {
+
+// Whether a text that ends at `end` was read whole (`read`), as a number above zero.
+bool positive_whole_number(std::from_chars_result read, const char* end, long number) {
+  return read.ec == std::errc() && read.ptr == end && number > 0;
+}
+
+}  // namespace
+
+std::optional<long> frames_before_closing(const std::string& text) {
+  long frames = 0;
+  const char* end = text.data() + text.size();
+  const std::from_chars_result read = std::from_chars(text.data(), end, frames);
+  if (!positive_whole_number(read, end, frames)) return std::nullopt;
+  return frames;
+}
+
 unsigned int window_flags(const WindowSettings& settings) {
   unsigned int flags = settings.vsync ? static_cast<unsigned int>(FLAG_VSYNC_HINT) : 0U;
   if (settings.resizable) flags |= FLAG_WINDOW_RESIZABLE;
@@ -153,7 +172,10 @@ CursorChange cursor_change(bool captured, bool wanted) {
   return wanted ? CursorChange::Capture : CursorChange::Release;
 }
 
-Window::Window(const WindowSettings& settings) : size_{settings.width, settings.height}, vsync_(settings.vsync) {
+Window::Window(const WindowSettings& settings)
+    : size_{settings.width, settings.height},
+      vsync_(settings.vsync),
+      close_after_(frames_before_closing(platform::environment(kCloseAfterFramesVariable))) {
   prefer_discrete_gpu(settings.gpu);
   open_window(settings);
   SetExitKey(KEY_NULL);  // Esc belongs to what runs in the window: only its close button closes it
@@ -163,7 +185,9 @@ Window::Window(const WindowSettings& settings) : size_{settings.width, settings.
 
 Window::~Window() { CloseWindow(); }
 
-bool Window::close_requested() const { return WindowShouldClose(); }
+bool Window::close_requested() const { return WindowShouldClose() || shown_enough(); }
+
+bool Window::shown_enough() const { return close_after_ && frames_shown_ >= *close_after_; }
 
 float Window::frame_seconds() const { return GetFrameTime(); }
 
@@ -221,7 +245,10 @@ void Window::set_cursor_locked(bool locked) {
 
 void Window::begin_frame() { BeginDrawing(); }
 
-void Window::end_frame() { EndDrawing(); }
+void Window::end_frame() {
+  EndDrawing();
+  ++frames_shown_;
+}
 
 void Window::draw_frame_rate() { DrawFPS(config::kFpsCounterX, config::kFpsCounterY); }
 

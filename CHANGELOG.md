@@ -157,6 +157,17 @@ until 1.0, a release may change what games rely on (see
   for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
   across blends) and keeps the root over it; a `CharacterController` goes there through the
   physics, so walls stop it.
+- **A release opens its windows before it is published**: the release workflow unpacks the Linux
+  and Windows downloads and, with `tools/release/smoke.sh`, builds and plays a demo with the
+  download's player, runs a new game's tests (`redgem check --run-tests`), plays one system test
+  in a window and opens the editor on a demo, on Xvfb with Mesa's llvmpipe on Linux and with
+  Mesa's `opengl32.dll` on Windows. The draft release gets no download unless it passes. On a
+  machine with a graphics card, `tools/release/smoke.sh <download>` does the same by hand.
+- **`REDGEM_CLOSE_AFTER_FRAMES=<n>`**: every window of the engine (the editor, the project hub,
+  a game, a built game's player) closes itself once it has shown that many frames, as its close
+  button would.
+- **The Windows download has `redgem-test.exe`**, so `redgem check --run-tests` runs a game's tests
+  on Windows too.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the

@@ -4,10 +4,12 @@
 # two Mac ones on Macs of each kind. The Linux programs are built on Ubuntu 22.04 with libstdc++
 # linked in, so that they run on glibc 2.35 and later systems (LINUX_GLIBC_FLOOR in
 # tools/release/release_files.sh), and are run again on a bare Ubuntu 22.04 (that glibc). Each download
-# is checked before it is kept (its list of files, and its programs run on its own system). Then
-# all five are checked together, and a release never gets fewer than five. The players' symbols
-# (each as it was linked, before it was stripped: the Linux one is the very player the container
-# built) go beside them as redgem-symbols-<system>.zip, for `redgem symbolize`.
+# is checked before it is kept (its list of files, and its programs run on its own system). The
+# Linux and Windows ones then open their windows (tools/release/smoke.sh): a game played, a system
+# test, the editor. Then all five are checked together, and a release never gets fewer than five,
+# nor any download when one of these checks failed. The players' symbols (each as it was linked,
+# before it was stripped: the Linux one is the very player the container built) go beside them as
+# redgem-symbols-<system>.zip, for `redgem symbolize`.
 #
 # What starts it, and what it does with the downloads (tools/release/plan_release.sh decides):
 # * a pushed tag v<version>: attached to that tag's draft release, which is made when missing.
@@ -261,7 +263,7 @@ jobs:
       - name: Build the Windows programs
         run: |
           tools/windows/build_runtime.sh
-          cmake --build build-windows --target redgem redgem_relay redgem_server
+          cmake --build build-windows --target redgem redgem_relay redgem_server redgem_test_tool
 
       # (As the Linux programs are checked: a release build has no Ruby evaluation.)
       - name: Check that the Windows programs have no Ruby evaluation
@@ -405,12 +407,55 @@ jobs:
           tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
           tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.AppImage
 
-  # The Windows download is packed on Linux: its programs are run here, on Windows.
+  # The Linux downloads open their windows as a user opens them (tools/release/smoke.sh): a demo
+  # built and played by their player, a new game's tests run (redgem check --run-tests), one system
+  # test played in a window, and the editor opened on a demo; the player and the editor close
+  # themselves after a few frames and must end well. On a virtual display drawn by Mesa's software
+  # renderer (llvmpipe: OpenGL 3.3 core, as the engine asks). -noreset: by default the display resets
+  # whenever its last window closes, and the next window opening during that reset cannot connect.
+  linux-open:
+    name: Linux downloads open their windows
+    needs: [plan, linux-windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      # (What a window needs from the system: X11's libraries, OpenGL and Mesa, and a display.)
+      - name: Install a virtual display and Mesa
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libgl1-mesa-dri libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libxext6 \
+            libasound2t64 xvfb xauth
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: redgem-linux-x86_64*
+          path: dist/release
+          merge-multiple: true
+
+      - name: Open the Linux downloads' windows
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          xvfb-run -a -s "-screen 0 1600x900x24 -noreset" \
+            tools/release/smoke.sh dist/release/redgem-linux-x86_64.tar.gz
+          xvfb-run -a -s "-screen 0 1600x900x24 -noreset" \
+            tools/release/smoke.sh dist/release/redgem-linux-x86_64.AppImage
+
+  # The Windows download is packed on Linux: its programs are run here, on Windows, and its windows
+  # opened as on Linux (tools/release/smoke.sh), drawn by Mesa's software renderer (llvmpipe), whose
+  # opengl32.dll is put beside the programs: the runner has no graphics card, and Windows' own
+  # OpenGL is 1.1.
   windows-check:
-    name: Windows download runs
+    name: Windows download runs and opens its windows
     needs: [plan, linux-windows]
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -427,6 +472,14 @@ jobs:
 
       - name: Run the Windows download's programs
         run: tools/release/smoke_test.sh dist/release/redgem-windows-x86_64.zip
+
+      - name: Fetch Mesa
+        run: echo "MESA_DIR=$(tools/windows/fetch_mesa.sh)" >> "${GITHUB_ENV}"
+
+      - name: Open the Windows download's windows
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: tools/release/smoke.sh --gl "${MESA_DIR}" dist/release/redgem-windows-x86_64.zip
 
   macos:
     name: Mac download (${{ matrix.arch }})
@@ -513,7 +566,7 @@ jobs:
   # Runs even when a job above failed, to say which download is missing.
   gather:
     name: All five downloads
-    needs: [plan, linux-build, linux-windows, linux-old-system, windows-check, macos]
+    needs: [plan, linux-build, linux-windows, linux-old-system, linux-open, windows-check, macos]
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
