@@ -68,7 +68,8 @@ class SceneDocument {
   void set_camera(int index, const CameraDesc& camera, bool record = true);
   void remove_prop(int index, const std::string& key, bool record = true);
   // Copies the node and its children next to it. Returns the index of the copy. A skinned
-  // character copied together with its bones gets its own skeleton, in the pose it had.
+  // character copied together with its bones gets its own skeleton, and the clips that move the
+  // original move the copy too.
   int duplicate(int index);
   // The same for several nodes at once, one undo step for all. Returns the copies, in the order
   // of `roots` (none of which may be under another one: see top_level_of in editor/selection.hpp).
@@ -319,6 +320,13 @@ class SceneDocument {
   std::optional<int> copy_skin(int original, const std::vector<int>& copy_of);
   // Points a copied skin and its glTF JSON at the copies of its bones. Returns their source nodes.
   std::vector<int> point_at_copies(SkinDesc& skin, nlohmann::json& json, const std::vector<int>& copy_of) const;
+  // Every clip that moves a copied node moves its copy the same way (a channel of its own per
+  // copied channel), so a duplicated character plays the clips of the original instead of
+  // standing in the pose it was copied in. `source`: the copied nodes, `copy_of` as above but
+  // without the copied roots (a copy's root stays where it is put).
+  void give_copies_own_channels(const std::vector<int>& source, const std::vector<int>& copy_of);
+  // The described channels of clip `animation` copied onto the copied nodes.
+  void copy_described_channels(std::size_t animation, const std::vector<int>& copy_of);
   // False for invalid indices, a move into the node's own subtree and a move to where it already is.
   bool can_reparent(int index, int new_parent) const;
   // The top level, or one of the nodes.
