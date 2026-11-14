@@ -283,6 +283,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `trigger`  | `true`                                         | Trigger volume: fires `on_trigger_enter/exit`, does not collide |
 | `mass`     | number                                         | Mass of dynamic bodies (and of kinematic ones, should a script make them dynamic) |
 | `layer`    | a layer of `game.json`, e.g. `"enemy"`         | Collision layer of the body or trigger: what it meets (see "Collision layers" in the gameplay recipes). Without it, `default` |
+| `joint`    | `fixed`, `hinge`, `slider`, `point`, `distance` | Holds the object to another one or to the world as the scene loads (see "Joints" below) |
 | `tag`      | string                                         | Used by `Scene.find_all(tag)` and `game_object.tag?` |
 | `visible`  | `false`                                        | Hide the mesh (the object still exists) |
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
@@ -296,6 +297,29 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 
 Cameras and lights (sun, point, spot) are taken from the Blender scene; a spot shines within its
 cone. Parenting is preserved.
+
+**Joints.** A door, a drawbridge, a lift or a hanging lamp needs no code: give the moving object
+(which needs a body, `dynamic` at one end at least) `joint = "hinge"` (or another kind), and set it
+up with these numbers. The editor's Inspector does the same with its **Joint** card (Add Component
+> Joint), and draws the joint in the Scene view: a ball at its anchor, its axis, and its limits as
+an arc.
+
+| Property | Meaning |
+|----------|---------|
+| `joint_to` | The `stable_id` of the object at the other end (the editor picks it by name); none: the world |
+| `joint_anchor_x`, `_y`, `_z` | The point it turns around or is held at, in the object's own space (its scale stretches it): `-0.5, 0, 0` is a unit cube's left face |
+| `joint_axis_x`, `_y`, `_z` | Hinges and sliders: the axis, in the object's own space (up unless said) |
+| `joint_low`, `joint_high` | Hinges: degrees from where it starts (low -180 to 0, high 0 to 180); sliders: meters. Both, or it is free |
+| `joint_motor_speed`, `joint_motor_torque` | Hinges: degrees per second, with at most that many newton meters (0: no motor) |
+| `joint_other_anchor_x`, `_y`, `_z` | Distance joints: the point it is kept from, in the other object's space (the object's own for the world) |
+| `joint_min`, `joint_max` | Distance joints: meters; `joint_max` unsaid or 0 is as far apart as the ends start |
+| `joint_spring`, `joint_damping` | Distance joints: a spring (hertz) and its damping |
+| `joint_break_force` | Newtons (or newton meters) that break it; 0 never |
+
+A joint is made after every body, like one from `Physics.joint`, and a script reads it with
+`game_object.joint` (nil without one). A copy made in the editor, pasted, spawned with
+`Scene.spawn` or placed from a prefab together with the object its joint holds to is held to that
+object's copy; otherwise it is held to the same object as the original.
 
 **Vehicles.** Give the chassis `body = "vehicle"` and parent the wheel meshes to it with `wheel = true`.
 Wheels in front of the center (Blender `+Y`) steer, the rear ones get the hand brake, and every axle

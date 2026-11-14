@@ -51,6 +51,7 @@ add_executable(redgem_tests
   unit/webp_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
+  unit/joint_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
   unit/input_bindings_test.cpp
@@ -191,6 +192,7 @@ add_executable(redgem_tests
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
   integration/physics_joint_api_test.cpp
+  integration/scene_joints_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp
@@ -233,6 +235,7 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_joints_test.cpp
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
   integration/game_project_test.cpp

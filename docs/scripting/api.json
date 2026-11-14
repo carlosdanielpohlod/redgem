@@ -212,6 +212,11 @@
           "about": "its custom properties"
         },
         {
+          "name": "joint",
+          "about": "the Joint it came with in the scene (its Joint component, set up in the editor), or nil",
+          "example": "Scene.find(\"Door\").joint.angle"
+        },
+        {
           "name": "alive?",
           "about": "false once it was destroyed"
         },
@@ -1019,7 +1024,7 @@
     },
     {
       "name": "Joint",
-      "about": "What holds two bodies together, or one to the world (made by Physics.joint).",
+      "about": "What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint).",
       "methods": [
         {
           "name": "kind",

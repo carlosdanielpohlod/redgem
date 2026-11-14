@@ -6,6 +6,7 @@
 #include <string>
 
 #include "app/scene_bodies.hpp"
+#include "app/scene_joints.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
@@ -18,6 +19,7 @@ Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 void Engine::make_bodies() {
   physics_ = create_jolt_physics_world(gravity(), collision_layers_);
   bodies::create_all({scene_, scene_desc_}, *physics_);
+  joints::create_all({scene_, scene_desc_}, *physics_, context_.scene_joints);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   navigation_.forget();  // the grid was the old scene's
   if (navigation_.settings().bake_on_load) bake_navigation();
@@ -89,6 +91,8 @@ ObjectId Engine::spawn(const SpawnRequest& request) {
   shape_spawned(created.front(), request);
   if (request.physics) {
     for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
+    // (Once every body of the copy is there: a joint may hold two of its parts.)
+    for (const ObjectId id : created) joints::create({scene_, scene_desc_}, *physics_, id, context_.scene_joints);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   for (const ObjectId id : created) scripts_->attach_object(id);

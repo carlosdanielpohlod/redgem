@@ -316,6 +316,7 @@ redgem_add_library(redgem_runtime
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/joint_config.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -517,6 +518,7 @@ redgem_add_library(redgem_runtime
   app/engine_loading.cpp
   app/scene_loader.cpp
   app/scene_bodies.cpp
+  app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
   app/touch_circles.cpp
@@ -604,6 +606,7 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
+    editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp
@@ -611,6 +614,7 @@ if(NOT ANDROID)
     editor/gizmo.cpp
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
+    editor/joint_gizmo.cpp
     editor/scene_overlays_physics.cpp
     editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
@@ -651,6 +655,7 @@ if(NOT ANDROID)
     editor/ui/inspector_terrain.cpp
     editor/ui/inspector_scripts.cpp
     editor/ui/inspector_physics.cpp
+    editor/ui/inspector_joint.cpp
     editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
     editor/ui/agent_panel.cpp

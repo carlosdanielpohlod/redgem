@@ -10,6 +10,7 @@
 #include "editor/document/model_import.hpp"
 #include "editor/node_tree.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
@@ -133,13 +134,17 @@ void SceneDocument::append_model_assets(const SceneDesc& model, const model_impo
 }
 
 void SceneDocument::append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets) {
+  NewIdentities identities;
   for (const NodeDesc& imported : model.nodes) {
     NodeDesc node = model_import::imported_node(imported, offsets);
     node.name = unique_name(node.name);
     node.stable_id = fresh_id();
+    identities[imported.stable_id] = node.stable_id;
     desc_.nodes.push_back(std::move(node));
     if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
+  // (What was pasted together stays joined together.)
+  for (int i = offsets.nodes; i < node_count(); ++i) follow_new_identities(desc_.nodes[i].props, identities);
   // The imported skeletons and animations point at the imported nodes (now further on in the list).
   const std::size_t first_animation = desc_.animations.size();
   for (const SkinDesc& skin : model.skins) desc_.skins.push_back(model_import::imported_skin(skin, offsets));

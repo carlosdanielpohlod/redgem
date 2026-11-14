@@ -2,6 +2,7 @@
 
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
+#include "editor/joint_gizmo.hpp"
 #include "physics/body_config.hpp"
 #include "render/render_math.hpp"
 
@@ -55,13 +56,28 @@ void draw_mark(const GameObject& object, const Transform& world) {
   }
 }
 
-// What a picture of the scene would not show: triggers, cameras, lights and empty objects.
+void draw_line(Vec3 from, Vec3 to) { DrawLine3D(to_raylib(from), to_raylib(to), rgba(kJointColor)); }
+
+void draw_polyline(const std::vector<Vec3>& points) {
+  for (std::size_t i = 1; i < points.size(); ++i) draw_line(points[i - 1], points[i]);
+}
+
+// A joint: a small ball at its anchor, its axis, its limits, and a line to its other end.
+void draw_joint_mark(const JointGizmo& joint) {
+  DrawSphereWires(to_raylib(joint.anchor), kIconSize * kHalf, kIconRings, kIconSlices, rgba(kJointColor));
+  if (joint.axis_start && joint.axis_end) draw_line(*joint.axis_start, *joint.axis_end);
+  draw_polyline(joint.limits);
+  if (joint.other_end) draw_line(joint.anchor, *joint.other_end);
+}
+
+// What a picture of the scene would not show: triggers, cameras, lights, empty objects and joints.
 void draw_object_marks(const Scene& scene, const SceneDesc& desc) {
   for (const ObjectId id : scene.alive_ids()) {
     const GameObject& object = scene.at(id);
     const Transform world = scene.world_transform(id);
     if (body_config_from_props(object.props).trigger) draw_box(world, bounds_of(object, desc), rgba(kTriggerColor));
     draw_mark(object, world);
+    if (const auto joint = joint_gizmo(scene, id)) draw_joint_mark(*joint);
   }
 }
 

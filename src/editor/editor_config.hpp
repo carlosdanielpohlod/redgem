@@ -137,5 +137,6 @@ inline constexpr unsigned char kSelectionColor[4] = {255, 160, 0, 255};
 inline constexpr unsigned char kTriggerColor[4] = {60, 220, 120, 255};
 inline constexpr unsigned char kIconColor[4] = {240, 240, 240, 255};
 inline constexpr unsigned char kSunColor[4] = {255, 220, 80, 255};
+inline constexpr unsigned char kJointColor[4] = {255, 140, 60, 255};  // a joint's anchor, axis and limits
 
 }  // namespace redgem::editor_config

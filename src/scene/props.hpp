@@ -67,6 +67,44 @@ inline constexpr const char* kColliderMesh = "mesh";
 // Every collider, as lists show them. The first is what a body without a collider gets.
 inline constexpr const char* kColliders[] = {kColliderBox, kColliderSphere, kColliderCapsule, kColliderMesh};
 
+// --- Joints: what holds an object to another one, or to the world (the editor's Joint card) ---
+// Its kind, one of kJointKinds (in the order of physics' JointKind).
+inline constexpr const char* kJoint = "joint";
+inline constexpr const char* kJointFixed = "fixed";
+inline constexpr const char* kJointHinge = "hinge";
+inline constexpr const char* kJointSlider = "slider";
+inline constexpr const char* kJointPoint = "point";
+inline constexpr const char* kJointDistance = "distance";
+inline constexpr const char* kJointKinds[] = {kJointFixed, kJointHinge, kJointSlider, kJointPoint, kJointDistance};
+// The stable id of the object at its other end; none: the world.
+inline constexpr const char* kJointTo = "joint_to";
+// Points in the object's own space (its scale stretches them): where it turns or is held, and for
+// a distance joint the point it is kept from, in the other object's space (the object's own for
+// the world). The axis a hinge turns around or a slider slides along, in the object's own space.
+inline constexpr const char* kJointAnchor[] = {"joint_anchor_x", "joint_anchor_y", "joint_anchor_z"};
+inline constexpr const char* kJointOtherAnchor[] = {"joint_other_anchor_x", "joint_other_anchor_y",
+                                                    "joint_other_anchor_z"};
+inline constexpr const char* kJointAxis[] = {"joint_axis_x", "joint_axis_y", "joint_axis_z"};
+// Hinges, degrees from where it starts (low -180..0, high 0..180); sliders, meters. Both or none.
+inline constexpr const char* kJointLow = "joint_low";
+inline constexpr const char* kJointHigh = "joint_high";
+// Hinges: degrees per second, and newton meters at most (0: no motor).
+inline constexpr const char* kJointMotorSpeed = "joint_motor_speed";
+inline constexpr const char* kJointMotorTorque = "joint_motor_torque";
+// Distance joints: meters (max unsaid or 0: as far apart as the ends start), and a spring (hertz) with
+// its damping (0 bounces on, 1 settles at once).
+inline constexpr const char* kJointMin = "joint_min";
+inline constexpr const char* kJointMax = "joint_max";
+inline constexpr const char* kJointSpring = "joint_spring";
+inline constexpr const char* kJointDamping = "joint_damping";
+// Newtons (or newton meters) it takes to break it; 0: it never breaks.
+inline constexpr const char* kJointBreakForce = "joint_break_force";
+// Every property of a joint but its vectors' numbers, which kJointAnchor, kJointOtherAnchor and
+// kJointAxis list.
+inline constexpr const char* kJointScalars[] = {kJoint,      kJointTo,  kJointLow,    kJointHigh,
+                                                kJointMotorSpeed, kJointMotorTorque, kJointMin,
+                                                kJointMax,   kJointSpring, kJointDamping, kJointBreakForce};
+
 // --- Environment: the look of a scene beyond its objects ---------------------------
 // True on the object whose other properties describe the environment (see render/environment.hpp).
 inline constexpr const char* kEnvironment = "environment";

@@ -3,13 +3,16 @@
 // the scene switched), the joint is too, whatever the new scene's joints are numbered.
 
 #include <mruby.h>
+#include <mruby/array.h>
 #include <mruby/variable.h>
 
+#include <iterator>
 #include <string>
 #include <variant>
 
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "physics/joint_config.hpp"
 #include "script/bindings/joint_args.hpp"
 
 namespace redgem {
@@ -94,6 +97,19 @@ mrb_value joint_angle(mrb_state* mrb, mrb_value self) {
   return mrb_float_value(mrb, radians_to_degrees(physics(mrb).hinge_angle(joint_of(mrb, self))));
 }
 
+// GameObject#__scene_joint: [id, kind, other] of the joint the object came with (its Joint
+// component), or nil when it has none (or it could not be made).
+mrb_value game_object_scene_joint(mrb_state* mrb, mrb_value self) {
+  const SceneJoints& joints = context(mrb).scene_joints;
+  const auto found = joints.find(scene(mrb).handle(alive_id(mrb, self)));
+  if (found == joints.end()) return mrb_nil_value();
+  const SceneJoint& joint = found->second;
+  const mrb_value parts[] = {mrb_int_value(mrb, static_cast<mrb_int>(joint.id)),
+                             mrb_str_new_cstr(mrb, joint_kind_name(joint.kind)),
+                             object_or_nil(mrb, scene(mrb).resolve(joint.other))};
+  return mrb_ary_new_from_values(mrb, static_cast<mrb_int>(std::size(parts)), parts);
+}
+
 }  // namespace
 
 void install_joint_bindings(mrb_state* mrb) {
@@ -108,6 +124,8 @@ void install_joint_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, joint, "break_force=", joint_set_break_force, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, joint, "__motor", joint_motor, MRB_ARGS_REQ(2));
   mrb_define_method(mrb, joint, "__angle", joint_angle, MRB_ARGS_NONE());
+  mrb_define_method(mrb, mrb_class_get(mrb, "GameObject"), "__scene_joint", game_object_scene_joint,
+                    MRB_ARGS_NONE());
 }
 
 }  // namespace redgem

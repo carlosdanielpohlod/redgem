@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Joints set up in the editor**: Add Component > Joint gives an object a fixed, hinge, slider,
+  point or distance joint to another object (picked by name) or to the world, with its anchor,
+  axis, limits, motor, lengths, spring and break force, saved in the scene as the object's `joint`
+  properties (Blender can set them too). The joint is made as the scene loads, like one from
+  `Physics.joint`, and `GameObject#joint` returns it. The Scene view draws its anchor, its axis and
+  its limits as an arc. Undo, copy and paste, duplication, prefabs and `Scene.spawn` keep it, a
+  copy made with its other end holding to that end's copy.
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden
