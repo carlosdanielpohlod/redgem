@@ -21,6 +21,17 @@ until 1.0, a release may change what games rely on (see
   for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
   across blends) and keeps the root over it; a `CharacterController` goes there through the
   physics, so walls stop it.
+- **Mirrored objects**: an object placed with a negative scale on one axis (or three), as
+  Blender's mirror leaves it, is drawn the right way out in every pass (the lit picture, the
+  sun's shadow cascades, the point and spot shadow atlas, motion vectors and see-through
+  surfaces). Mirrored copies of a mesh are batched apart, so the winding changes only between
+  runs of them. A node given as a mirroring matrix is read with a negative x scale.
+
+- **Duplicated characters animate**: duplicating an object in the editor copies the channels of
+  every clip that moves it onto the copy, so a duplicated character plays the original's clips
+  (Wave, Walk...) instead of standing in the pose it was copied in; the copy itself stays where
+  it is put. Undoing the duplicate drops them again.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
