@@ -28,8 +28,12 @@ icons):
   one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission
   and their pictures, see [Material pictures](#material-pictures)),
   Light (type, color, intensity, range and spot cones), Camera (field of view, clipping), one card per Ruby script,
-  Physics (body, trigger, collider, layer, mass), vehicle wheels and custom properties. **Add Component**
-  adds scripts (existing or new), a physics body, a trigger or a property. With several objects
+  Physics (body, trigger, collider, layer, mass), Joint (kind, the object it is connected to, anchor,
+  axis, limits, motor, a distance joint's lengths and spring, break force; see
+  [Levels](levels.md#editing-the-level-in-blender) for what each means), vehicle wheels and custom
+  properties. **Add Component** adds scripts (existing or new), a physics body, a trigger, a joint
+  or a property. The Scene view draws each joint: a ball at its anchor, its axis, its limits as an
+  arc and a line to what it holds to. With several objects
   selected it shows what they have in common: tag, visible, *Template* and the Transform, a dash
   where their values differ. An edit applies to all of them.
 * **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty
@@ -62,6 +66,11 @@ icons):
 * **Ctrl+Z / Ctrl+Y** undo and redo, **Ctrl+D** duplicate, **Del** delete, **Ctrl+X / Ctrl+C /
   Ctrl+V** cut, copy and paste, **Ctrl+S** save. Help > Keyboard Shortcuts lists them all. File >
   New / Open Game goes back to the hub.
+
+**Edit > Preferences** sets the scene camera's fly speed and the move, rotate and scale snap
+steps. The fly camera accepts six distinct letter or arrow keys. Choosing an assigned key swaps
+its direction with the key you replaced. Save applies the values and keeps them for the next session. Restore defaults fills the
+original values; Cancel discards changes.
 
 ## Material pictures
 
@@ -176,7 +185,9 @@ use a denser framebuffer. Moving between monitors rebuilds spacing from the orig
 The font atlas rasterizes interface text, code and icons at the current density without replacing
 their font handles. Pointer coordinates, scene picking and the game's preview keep their existing
 coordinate system. The scene preview still renders at its logical viewport resolution, so its
-image does not yet gain the extra pixel density of Retina text. There is no manual scale override.
+image does not yet gain the extra pixel density of Retina text. In **Edit > Preferences**, turn
+off **Follow monitor scale** to set an editor scale from 75% to 200%. Save applies the scale to
+the editor immediately and remembers it for the next session. The project hub follows the monitor.
 
 ## Spot lights
 

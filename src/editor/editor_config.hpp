@@ -43,6 +43,8 @@ inline constexpr float kStatusBarHeight = 26.0f;
 inline constexpr float kToolbarGroupGap = 18.0f;
 inline constexpr float kIconButtonWidth = 1.3f;  // icon buttons are this many frame heights wide
 
+inline constexpr float kDefaultFlySpeed = 8.0f;  // meters per second
+
 // Gizmo snapping (hold Ctrl, or toggle it in the toolbar).
 inline constexpr float kTranslateSnap = 0.5f;
 inline constexpr float kRotateSnapDegrees = 15.0f;
@@ -137,5 +139,6 @@ inline constexpr unsigned char kSelectionColor[4] = {255, 160, 0, 255};
 inline constexpr unsigned char kTriggerColor[4] = {60, 220, 120, 255};
 inline constexpr unsigned char kIconColor[4] = {240, 240, 240, 255};
 inline constexpr unsigned char kSunColor[4] = {255, 220, 80, 255};
+inline constexpr unsigned char kJointColor[4] = {255, 140, 60, 255};  // a joint's anchor, axis and limits
 
 }  // namespace redgem::editor_config

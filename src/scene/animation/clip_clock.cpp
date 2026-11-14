@@ -18,7 +18,21 @@ bool has_ended(const ClipClock& clock, float duration, bool loop, bool backwards
   return backwards ? clock.time <= 0.0f : clock.time >= duration;
 }
 
+// How many laps a looping clock went round going `expected` seconds from `from` to `after`.
+double laps_gone(double from, double after, double expected, double duration) {
+  if (duration <= 0.0) return 0.0;
+  return std::round((from + expected - after) / duration);
+}
+
 }  // namespace
+
+ClockSpan advance_spanning(ClipClock& clock, float duration, float dt) {
+  const double from = clock.time;
+  const double expected = clock.playing ? static_cast<double>(dt) * clock.speed : 0.0;
+  advance(clock, duration, dt);
+  if (!clock.loop) return {from, clock.time, 0.0};
+  return {from, clock.time, laps_gone(from, clock.time, expected, duration)};
+}
 
 void advance(ClipClock& clock, float duration, float dt) {
   if (!clock.playing) return;

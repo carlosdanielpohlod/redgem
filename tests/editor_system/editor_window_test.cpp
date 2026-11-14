@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <future>
 #include <chrono>
@@ -25,7 +26,9 @@
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
 #include "scene/props.hpp"
+#include "physics/joint_config.hpp"
 #include "editor/editor_app.hpp"
+#include "editor/ui/dpi.hpp"
 #include "project/project_hub.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/object_clipboard.hpp"
@@ -536,6 +539,22 @@ TEST_CASE("scripts open in tabs that split side by side, and the side panels hid
   std::filesystem::remove_all(game);
 }
 
+namespace {
+
+void paint_terrain_in_view(EditorApp& app, ObjectId terrain, float x, float y, float seconds) {
+  app.terrain_tool().painting = true;
+  REQUIRE(app.sculpt_at(x, y, seconds).has_value());
+  const SceneDocument& document = app.session().document();
+  const auto mesh = static_cast<std::size_t>(document.node(terrain).mesh);
+  const auto& colors = document.desc().meshes.at(mesh).primitives.front().colors;
+  REQUIRE_FALSE(colors.empty());
+  CHECK(*std::min_element(colors.begin(), colors.end()) < config::kMaxColorByte);
+  take_picture(app, screenshot("editor_terrain_tint"));
+  app.terrain_tool().painting = false;
+}
+
+}  // namespace
+
 TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and things land on its hills") {
   constexpr float kBrushSeconds = 1.0f;
   constexpr float kMinHill = 2.0f;  // meters raised by a second of the default brush
@@ -588,6 +607,7 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   CHECK(top->y - shoulder->y < kRestTolerance);  // level around the middle
   run(app, kFrameFrames);                        // the renderer picks the new shape up
   take_picture(app, screenshot("editor_terrain"));
+  paint_terrain_in_view(app, terrain, center_x, center_y, kBrushSeconds);
 
   // A crate dropped over the hill comes to rest on its top, not on the flat ground the terrain
   // started as: the collider follows the sculpted shape.
@@ -611,6 +631,48 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   REQUIRE(flat.has_value());
   CHECK(std::fabs(flat->y) < kTolerance);
   CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}
+
+namespace {
+
+class PreferencesHome {
+ public:
+  explicit PreferencesHome(const std::filesystem::path& directory) { platform::set_user_data_dir(directory); }
+  ~PreferencesHome() { platform::set_user_data_dir({}); }
+};
+
+void check_compact_preferences(EditorApp& app) {
+  app.open_preferences();
+  run(app, kWarmupFrames);
+  CHECK(ui::scaled(1.0f) == kMaxEditorScale);
+  const auto* popup = ImGui::FindWindowByName("Preferences###editor_preferences");
+  REQUIRE(popup != nullptr);
+  REQUIRE(popup->Active);
+  CHECK(popup->Size.y <= ImGui::GetMainViewport()->WorkSize.y);
+  CHECK(popup->ScrollMax.y > 0.0f);
+  take_picture(app, screenshot("editor_preferences_200"));
+}
+
+}  // namespace
+
+TEST_CASE("Preferences can scroll on a compact window at 200 percent") {
+  constexpr int kCompactWidth = 900;
+  constexpr int kCompactHeight = 520;
+  const auto game = copy_game();
+  const PreferencesHome home(game / "user-data");
+  const EditorPreferences defaults;
+  auto manual = defaults;
+  manual.interface_scale = kMaxEditorScale;
+  std::string error;
+  REQUIRE_MESSAGE(write_editor_preferences(editor_preferences_file(), defaults, manual, error), error);
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* failure = std::get_if<std::string>(&created)) FAIL(*failure);
+  auto& app = std::get<std::unique_ptr<EditorApp>>(created);
+  SetWindowSize(kCompactWidth, kCompactHeight);
+  run(*app, kWarmupFrames);
+  check_compact_preferences(*app);
+  app.reset();
   std::filesystem::remove_all(game);
 }
 
@@ -895,4 +957,43 @@ TEST_CASE("MCP controls real editor play and returns a bounded viewport image") 
   std::filesystem::create_directories(file.parent_path());
   CHECK(write_bytes_file(file, *bytes, error));
   app.set_frame_hook({});
+}
+
+TEST_CASE("a hinge added in the Inspector holds a lid that swings to its limit on Play") {
+  constexpr double kLimit = 45.0;     // degrees the lid may fall
+  constexpr float kLidHeight = 6.0f;  // meters above the spawn point, clear of the level
+  constexpr float kSettled = 0.1f;    // meters
+  const std::filesystem::path game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+
+  // Add Component > Joint > hinge on a dynamic cube, then the Joint card's anchor, axis and limits.
+  const Vec3 spot = app.spawn_point() + Vec3::up() * kLidHeight;
+  const ObjectId lid = session.create_primitive(PrimitiveShape::Cube, spot);
+  SceneDocument& doc = session.document();
+  doc.set_prop(lid, props::kBody, PropertyValue(std::string(props::kBodyDynamic)));
+  session.add_joint(lid, JointKind::Hinge);
+  doc.set_prop(lid, props::kJointAnchor[0], -0.5);
+  doc.set_prop(lid, props::kJointAxis[1], 0.0);
+  doc.set_prop(lid, props::kJointAxis[2], 1.0);
+  doc.set_prop(lid, props::kJointLow, -kLimit);
+  doc.set_prop(lid, props::kJointHigh, 0.0);
+  session.refresh_preview();
+  session.select(lid);
+  run(app, kFrameFrames);  // the Inspector shows its Joint card, the Scene view its hinge
+  take_picture(app, screenshot("editor_joint"));
+
+  const std::string name = doc.node(lid).name;
+  app.play();
+  REQUIRE(session.play_state() == PlayState::Playing);
+  run(app, kPlayFrames * 2);
+  const float drop = std::sin(degrees_to_radians(static_cast<float>(kLimit))) * 0.5f;
+  CHECK(std::fabs(y_of(session, name) - (spot.y - drop)) < kSettled);
+  app.stop();
+  CHECK(y_of(session, name) == doctest::Approx(spot.y));
+  CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
 }

@@ -325,6 +325,10 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
   kept in `settings.json` in the game's folder (see `studio` above). A built game also reads the
   graphics card (`"gpu"`) and the language (`"language"`) from that file, and never RedGem's own
   settings.
+- `"ui": {"reference": [1920, 1080], "match": "height"}` names the screen the game's interface is
+  laid out for (`"match"`: `"width"`, `"height"` or `"fit"`): `UI` sizes are in its units, and
+  scale to the player's screen (see [At any screen size](scripting/gameplay.md#at-any-screen-size-the-reference-screen)).
+  Without it, the reference is the game's own window, its height matched.
 
 - Everything in the game folder that ships is packed, including the scripts, as their `.rb`
   source (compressed, not compiled nor encrypted).

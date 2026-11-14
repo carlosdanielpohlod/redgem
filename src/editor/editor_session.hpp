@@ -122,6 +122,7 @@ class EditorSession {
   // meters (Raise, Lower) or as a 0..1 share (Smooth, Flatten). Call document().checkpoint() once
   // when a stroke begins. False when nothing changed or while playing.
   bool sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode);
+  bool paint_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, Color tint);
   // An object whose properties set the scene's sky, fog and effects (see render/environment.hpp),
   // filled with a sunset to start from. Selects the existing one if the scene already has it.
   ObjectId create_environment();
@@ -142,6 +143,15 @@ class EditorSession {
   void reparent_selection(ObjectId parent);
   // Adds a script file (scripts/<file>) to the object's script list.
   void attach_script(ObjectId id, const std::string& file);
+  // Gives the object a joint of that kind to the world (Add Component > Joint), or takes its joint
+  // away, one undo step each (editor_session_joints.cpp).
+  void add_joint(ObjectId id, JointKind kind);
+  // Changes the kind of its joint: what the old kind alone took goes (a hinge's limits in degrees
+  // are not a slider's in meters), its other end, anchor, axis and break force stay.
+  void set_joint_kind(ObjectId id, JointKind kind);
+  void remove_joint(ObjectId id);
+  // Holds the object's joint to `other` (kNoObject: the world).
+  void set_joint_partner(ObjectId id, ObjectId other);
   void undo();
   void redo();
   // Writes the scene being edited back to its file.

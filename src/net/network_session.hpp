@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -12,6 +14,7 @@
 #include "core/math.hpp"
 #include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
+#include "net/movement_validator.hpp"
 #include "net/pose_baselines.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
@@ -45,6 +48,13 @@ inline constexpr int kMaxWaitingLinks = 32;
 // and [fade, layer weight, own clip, mixed clip] after them when it carries the object's
 // animation (a clip: [name, time, speed, loops, plays], or nil; see animation_codec.hpp).
 inline constexpr const char* kPoseMessageName = "$sync";
+// What the host tells a machine whose object it did not believe moved where it said (movement
+// validation): a Message event of this name (Network::CORRECT), whose data is [key, position],
+// from the host. The object's machine puts it there.
+inline constexpr const char* kCorrectionMessageName = "$correct";
+// The objects of one machine the host remembers the others place where it believes them (see
+// relay_pose); past that, a new one is placed where its machine says again from its next whole pose on.
+inline constexpr std::size_t kMaxDivergedObjects = kMaxCheckedObjects;
 
 struct NetworkEvent {
   enum class Kind {
@@ -54,7 +64,12 @@ struct NetworkEvent {
     PeerJoined,    // someone else arrived
     PeerLeft,      // someone else is gone
     Message,       // `peer` sent `name` with `data`
-    Approval       // a newcomer asks to come in as `peer`, with `data`: the game decides (see decide)
+    Approval,      // a newcomer asks to come in as `peer`, with `data`: the game decides (see decide)
+    // Reconnecting (allow_reconnect): on the machine whose connection dropped, about itself; on
+    // the game's host, about the machine that dropped.
+    Reconnecting,  // `peer`'s connection dropped: its place is held while it calls again
+    Reconnected,   // `peer` is back in its place, with its id
+    Lost           // this machine could not get back in time (`name` says why): the game is gone for it
   };
   Kind kind = Kind::Message;
   int peer = 0;
@@ -79,7 +94,9 @@ struct NetworkEvent {
 // with no player of its own: the server hands the room the machines that asked for it.
 class NetworkSession {
  public:
-  enum class State { Offline, Connecting, Online };
+  // Reconnecting: in the game still, with its id and the others, while its connection that
+  // dropped is made again (nothing can be sent meanwhile).
+  enum class State { Offline, Connecting, Online, Reconnecting };
 
   // Starts a game others can join on `port` (0 picks a free one, see port()), with at most
   // `waiting_per_address` machines from one address waiting to be let in at once.
@@ -109,7 +126,9 @@ class NetworkSession {
   // Lets a machine that asked the dedicated server for this room in: it is told its id, and the
   // others of its arrival (with the next poll's events). With no place left it is let go. When
   // the game decides who comes in, it is asked first, with `auth` from the machine's hello.
-  void admit_arrival(Connection connection, const nlohmann::json& auth = nullptr);
+  // A machine that asks for the place held for it gives its `token` instead (see
+  // allow_reconnect): it gets it back, or is turned away.
+  void admit_arrival(Connection connection, const nlohmann::json& auth = nullptr, const std::string& token = {});
   // Connection approval, on the machine hosting (directly, a room it opened on a relay, or a
   // dedicated server's room): with it, a newcomer is not let in until the game decides (an
   // Approval event, then decide()), and is turned away when the game has not decided within
@@ -120,6 +139,27 @@ class NetworkSession {
   // turned away with `reason` (cut to kMaxReasonBytes). False when there is nobody to decide on any
   // more: the newcomer left, was decided on already, or the time to decide ran out.
   bool decide(int ticket, bool accepted, const std::string& reason = {});
+  // Reconnecting, on the machine hosting (directly, or a dedicated server's room): a machine whose
+  // connection drops keeps its place and id for `seconds` (at most kMostReconnectWindowSeconds; 0,
+  // the default, turns it off), and gets them back by calling again with the token its welcome
+  // gave it. The others hear it left only once that time is over. It lasts while hosting other
+  // games, until changed. (A room on a relay holds no place: see KNOWN_LIMITATIONS.md.)
+  void allow_reconnect(float seconds);
+  float reconnect_window() const { return reconnect_window_; }
+  // Movement validation (see MovementValidator), on the machine hosting directly or a dedicated
+  // server's room: the poses of the machines that joined are checked against `rules` before
+  // anyone hears them. One that is not believed reaches everyone (the host's scripts too) where
+  // the host believes the object is, its machine is told so (kCorrectionMessageName), and the
+  // violation counts against it, up to the rules' kick_after. Rules that check nothing turn it
+  // off (as it starts). It lasts while hosting other games, until turned off. (In a room on a
+  // relay the relay passes the poses on: nothing is checked there.)
+  void validate_movement(const MovementRules& rules);
+  const MovementRules& movement_rules() const { return movement_.rules(); }
+  // How many violations of the movement rules machine `peer` was caught at in this game.
+  int movement_violations(int peer) const { return movement_.violations(peer); }
+  // The object that goes by `key` is new on this machine, or gone (its NetworkSync started or
+  // stopped): when its moves are checked, it starts where its machine next says.
+  void forget_movement_of_object(const std::string& key) { movement_.forget_object(key); }
   // The code of the room this game is in, on a relay or a dedicated server; empty for a game
   // hosted directly.
   const std::string& room() const { return room_; }
@@ -149,8 +189,8 @@ class NetworkSession {
 
   State state() const { return state_; }
   bool hosting() const { return state_ == State::Online && id_ == kHostId; }
-  // This machine's id in the game; 0 while not in one.
-  int id() const { return state_ == State::Online ? id_ : 0; }
+  // This machine's id in the game (kept while reconnecting); 0 while not in one.
+  int id() const { return in_game() ? id_ : 0; }
   // Everyone else's ids.
   const std::vector<int>& peers() const { return peers_; }
   // Whether this machine is a dedicated server's room: the game's host, with no player.
@@ -182,6 +222,8 @@ class NetworkSession {
     int asking_as = 0;      // the id a newcomer would have, while the game decides on it
     int ticket = 0;         // ... and what the decision names
     float asking_for = 0.0f;
+    std::string token{};  // what gets its place back should it drop (empty: none is held for it)
+    float window = 0.0f;  // ... and for how long, as its welcome said
 
     bool let_in() const { return peer != 0; }
     bool asking() const { return asking_as != 0; }
@@ -195,6 +237,29 @@ class NetworkSession {
     bool waiting() const { return !let_in() && !connection.closed(); }
   };
 
+  // A place the host holds for a machine whose connection dropped (allow_reconnect).
+  struct Held {
+    int peer = 0;
+    std::string token{};
+    float held_for = 0.0f;
+    std::vector<int> departed{};  // who left meanwhile (an id may be someone else's by its return)
+    float window = 0.0f;          // how long it is held, as the machine was told
+  };
+
+  // How a guest calls its host again, with what, and for how long (allow_reconnect).
+  struct Rejoin {
+    std::string address;
+    TlsTrust trust = TlsTrust::plaintext();
+    std::string token;        // from the last welcome: empty when the host holds no place
+    float window = 0.0f;      // seconds the host holds it
+    float trying_for = 0.0f;  // seconds since the connection dropped
+    float redial_in = 0.0f;   // seconds until the next call
+  };
+
+  // Whether the game is a room on a relay (a dedicated server's room is joined the same way).
+  bool on_relay() const { return through_relay_ && !server_hosted_; }
+  // In the game, connected or reconnecting.
+  bool in_game() const { return state_ == State::Online || state_ == State::Reconnecting; }
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, const TlsTrust& trust,
                    std::string& error);
   // Whether this machine passes the others' messages on itself (a host reached directly).
@@ -250,14 +315,20 @@ class NetworkSession {
   void peer_gone(int peer, std::vector<NetworkEvent>& events);
   // The ids of the others in the game and of the newcomers the game is deciding on.
   std::vector<int> ids_taken() const;
-  // What a newcomer let in as `peer` is told: its id and who else is here (and, on a dedicated
-  // server, the room's code and that its host plays nobody).
-  nlohmann::json welcome_for(int peer, const std::vector<int>& already_here) const;
+  // What a machine let in (or back) through `link` is told: its id and who else is here (and, on
+  // a dedicated server, the room's code and that its host plays nobody; and the token that gets
+  // its place back).
+  nlohmann::json welcome_for(const Link& link) const;
+  // The host and everyone in the game but `peer`.
+  std::vector<int> others_than(int peer) const;
   void drop_silent_newcomers(float seconds);
   void await_connection(float seconds, std::vector<NetworkEvent>& events);
   void handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void handle_as_host(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What a machine in the game said, as the host passes it on (`passed`): to whom it is for, the
+  // host included, and a pose checked first when movement is validated.
+  void take_from_game(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
   // Sends a peer's message on to whom it is for; true when that includes this machine.
   bool pass_on(int from, int to, const nlohmann::json& message);
   void handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events);
@@ -270,6 +341,8 @@ class NetworkSession {
   void enter_game(const nlohmann::json& welcome, std::vector<NetworkEvent>& events);
   // What a machine in the game hears from its host: who came, who went, what the others said.
   void hear_of_the_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // ... that someone reconnected (kBack), or that the game is over (kBye).
+  void hear_of_reconnects(const std::string& kind, const nlohmann::json& message);
   // Whether a welcome can be believed: an id this machine can have, which the list of the others lacks.
   bool believable_welcome(int given, const std::vector<int>& others) const;
   // Whether a host's word that `peer` arrived can be believed: nobody arrives twice, as this
@@ -279,12 +352,88 @@ class NetworkSession {
   // (network_session_poses.cpp).
   void hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events);
+  // ... on the host, with movement validation: whether a message a machine sent is a pose to check.
+  // (Also once turned off, while the others place an object where the host believed it.)
+  bool checks_movement(const nlohmann::json& message) const {
+    return message[wire::kKind] == wire::kPose && (movement_.enabled() || !diverged_.empty());
+  }
+  // A pose from the machine at `link`, checked, passed on to everyone as the host believes it.
+  void relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
+  // Passes a checked pose on: as it came while the others place the object where its machine
+  // does, whole and where the host believes it once they no longer do (until the next whole pose
+  // its machine sends that is believed: from then on they place it alike again).
+  void relay_pose(int from, const PoseUpdate& update, const Pose& shown, const nlohmann::json& passed, bool valid);
+  // Whether a checked pose goes on as its machine sent it: believed, and the others place the
+  // object where its machine does (or will, from this whole pose on).
+  bool passes_as_sent(const std::pair<int, std::string>& source, const PoseUpdate& update, bool valid) const;
+  // Tells the machine at `link` where its object `key` is believed to be; lets it go on `kick`.
+  static void correct(Link& link, const std::string& key, Vec3 position, bool kick);
+  // Forgets what was checked of the moves of a machine that left.
+  void forget_movement_of(int peer);
+  // How many objects of `peer` the others place where the host believes them, and where they start.
+  std::size_t diverged_of(int peer) const;
+  std::set<std::pair<int, std::string>>::const_iterator first_diverged_of(int peer) const {
+    return diverged_.lower_bound({peer, std::string()});
+  }
   // The host turned this machine away: the game it was joining ends, saying why (in its own words
   // when the two speak different versions of the protocol).
   void turned_away(const nlohmann::json& refusal);
   void peer_arrived(int peer, std::vector<NetworkEvent>& events);
   void peer_left(int peer, std::vector<NetworkEvent>& events);
   void drop_closed_links(std::vector<NetworkEvent>& events);
+  // What a poll does while this machine is on its way into the game (joining, or reconnecting).
+  void on_the_way(float seconds, std::vector<NetworkEvent>& events);
+  // What a poll does after every link had its turn: the links that closed are let go, and the
+  // places held for too long too.
+  void after_serving(float seconds, std::vector<NetworkEvent>& events);
+  // Says goodbye on the way out: to the host (so that no place is held), or to everyone (the game is over).
+  void say_bye();
+  // Reconnecting, on the host (network_session_held.cpp).
+  // Gives a machine let in (or back) a token, when places are held (none otherwise), and the
+  // window its welcome tells it: its place is held that long, whatever the game sets later.
+  void issue_token(Link& link) const;
+  // Whether the place of a link that closed is held: it was in the game with a token, and it was
+  // lost.
+  static bool place_held_for(const Link& link) {
+    return link.let_in() && !link.token.empty() && link.connection.lost();
+  }
+  void hold_place(const Link& link, std::vector<NetworkEvent>& events);
+  // A machine that said goodbye.
+  void let_go(Link& link);
+  // Tells the others `peer` left, and the game.
+  void farewell(int peer, std::vector<NetworkEvent>& events);
+  void expire_held_places(float seconds, std::vector<NetworkEvent>& events);
+  // A newcomer that asks for a held place back with `token`.
+  void resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events);
+  // The place `token` gets back (held, or of a link still open the host has not seen drop yet,
+  // which is let go, the game hearing it dropped); one of peer 0 for none.
+  Held claim_place(const std::string& token, std::vector<NetworkEvent>& events);
+  Held claim_held(const std::string& token);
+  Held claim_open(const std::string& token, std::vector<NetworkEvent>& events);
+  // Tells a machine back in its place who left while it was away (and who has their id now).
+  void tell_departures(Link& link, const std::vector<int>& departed);
+  // Reconnecting, on the machine whose connection dropped (network_session_reconnect.cpp).
+  // Whether the link to the host that closed can be made again: it was lost, in a game that holds places.
+  bool can_reconnect() const;
+  void start_reconnecting(std::vector<NetworkEvent>& events);
+  void keep_reconnecting(float seconds, std::vector<NetworkEvent>& events);
+  // Calls the host again, saying the token.
+  void redial();
+  // The link of a call that did not work out is let go (a refusal ends it all).
+  void call_failed(std::vector<NetworkEvent>& events);
+  void hear_while_reconnecting(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void accept_welcome_back(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // Whether a welcome back can be believed: to this machine's own id, with a list of the others
+  // that can be true.
+  bool believable_welcome_back(int given, const std::vector<int>& others) const;
+  // The others as the welcome back lists them: who left meanwhile and who arrived are told.
+  void catch_up_with(const std::vector<int>& others, std::vector<NetworkEvent>& events);
+  // The game is gone for this machine: it could not get back in.
+  void lose(const std::string& why, std::vector<NetworkEvent>& events);
+  // Notes the token and window a welcome gave.
+  void keep_resume(const nlohmann::json& welcome);
+  // `peer` reconnected: poses start over between it and this machine.
+  void hear_back(int peer);
   // The host's part of it: the others hear who left.
   void farewell_closed_links(std::vector<NetworkEvent>& events);
   void end_game_if_host_gone(std::vector<NetworkEvent>& events);
@@ -292,8 +441,8 @@ class NetworkSession {
   bool host_gone() const;
   // Why it closed, when anything says: the host's refusal, or the connection's TLS.
   std::string why_host_gone() const;
-  // Forgets the links that closed; whose they were, in the order they were held (0: never let in).
-  std::vector<int> take_closed_links();
+  // Forgets the links that closed, and hands them over in the order they were held.
+  std::vector<Link> take_closed_links();
   // Whether a message may go out: from a machine in a game, to someone else, within what a message may be.
   bool can_send(const std::string& name, const nlohmann::json& data, int to) const;
   // Whether a pose may go out: from a machine in a game, of an object whose key a pose can carry,
@@ -310,6 +459,9 @@ class NetworkSession {
   void queue_for_everyone_but(int peer, const nlohmann::json& message);
   Link* link_to(int peer);
   void go_offline();
+  void forget_game_state();
+  // What this machine knew of the objects in the game it was in is forgotten.
+  void forget_objects();
 
   State state_ = State::Offline;
   int id_ = 0;
@@ -329,7 +481,14 @@ class NetworkSession {
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
+  float reconnect_window_ = 0.0f;             // seconds a dropped machine's place is held (allow_reconnect)
+  std::vector<Held> held_;                    // ... on the host
+  Rejoin rejoin_;                             // ... on a guest
   PoseBaselines poses_;
+  MovementValidator movement_;  // its rules last while hosting other games, until turned off
+  // The objects (machine, key) the others place where the host believes them, not where their
+  // machine does (see relay_pose).
+  std::set<std::pair<int, std::string>> diverged_;
 };
 
 }  // namespace redgem::net
