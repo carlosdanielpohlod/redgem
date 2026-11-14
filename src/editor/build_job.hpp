@@ -82,7 +82,7 @@ class BuildJob {
   bool busy_ = false;
   std::string target_;
   const Clock& clock_;
-  double started_ = 0.0;  // on clock_
+  double started_ = 0.0;                 // on clock_
   mutable std::mutex lock_;              // guards the two below, which both threads use
   std::string step_;                     // what the build said it began last
   std::optional<BuildOutcome> outcome_;  // set by the build's thread as it ends

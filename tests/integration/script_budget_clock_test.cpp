@@ -79,11 +79,10 @@ bool timed_out(const RubyResult& result) {
 
 TEST_CASE("the budget reads the clock it is given: real time spent is not a call's time on it") {
   ClockedVm clocked;
-  const std::string spin = "t = Time.now; nil while Time.now - t < " +
-                           std::to_string(kRealSpinBudgets * kBudgetSeconds) + "; :done";
+  const std::string spin =
+      "t = Time.now; nil while Time.now - t < " + std::to_string(kRealSpinBudgets * kBudgetSeconds) + "; :done";
   CHECK(clocked.vm.eval(spin, "spin.rb").ok);
-  CHECK(clocked.vm.budget_keeper().now() ==
-        static_cast<std::int64_t>(test::kFakeClockStart * kMillisecondsPerSecond));
+  CHECK(clocked.vm.budget_keeper().now() == static_cast<std::int64_t>(test::kFakeClockStart * kMillisecondsPerSecond));
 }
 
 TEST_CASE("a call is stopped once the given clock has passed its budget, and not before") {
