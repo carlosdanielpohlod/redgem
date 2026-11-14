@@ -24,8 +24,8 @@ constexpr bool kOpenGlEs = false;
 // How OpenGL and raylib name each compressed format, in GpuBlockFormat's order. (The extensions'
 // names for them, which not every header defines.)
 struct GlFormat {
-  GLenum internal_format;
-  int pixel_format;
+  GLenum internal_format = 0;
+  int pixel_format = 0;
 };
 constexpr GLenum kRgbS3tcDxt1 = 0x83F0;
 constexpr GLenum kRgbaS3tcDxt5 = 0x83F3;
