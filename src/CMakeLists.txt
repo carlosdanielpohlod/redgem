@@ -11,6 +11,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/nav_agent.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
@@ -345,6 +346,7 @@ redgem_add_library(redgem_runtime
   navigation/nav_physics_probe.cpp
   navigation/nav_path.cpp
   navigation/nav_queries.cpp
+  navigation/nav_steering.cpp
   navigation/navigation.cpp
   audio/audio.cpp
   audio/mixed_audio.cpp
@@ -406,6 +408,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/navigation_crowd_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp

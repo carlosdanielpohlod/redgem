@@ -21,6 +21,18 @@ std::vector<Vec3> positions(const NavGrid& grid, const std::vector<NavGrid::Node
   return points;
 }
 
+// The obstacles a path goes around: all but those its goal is beside (a character sent next to one
+// goes there).
+std::vector<NavObstacle> clear_of(Vec3 goal, const std::vector<NavObstacle>& obstacles, const NavSettings& settings) {
+  std::vector<NavObstacle> kept;
+  for (const NavObstacle& obstacle : obstacles) {
+    if (nav_obstacle_depth(goal, obstacle, settings.agent_radius, settings.agent_height) <= 0.0f) {
+      kept.push_back(obstacle);
+    }
+  }
+  return kept;
+}
+
 }  // namespace
 
 const NavBakeReport& Navigation::bake(const PhysicsWorld& physics) {
@@ -44,15 +56,25 @@ const NavGrid& Navigation::grid() const {
   return grid_ ? *grid_ : kNothing;
 }
 
-std::optional<std::vector<Vec3>> Navigation::path(Vec3 from, Vec3 to) const {
+std::optional<std::vector<Vec3>> Navigation::path(Vec3 from, Vec3 to, const std::vector<NavObstacle>& around) const {
   const NavGrid& walked = grid();
   const std::optional<NavGrid::Node> start = nearest_nav_node(walked, from);
   const std::optional<NavGrid::Node> goal = nearest_nav_node(walked, to);
   if (!start) return std::nullopt;
   if (!goal) return std::nullopt;
-  const NavGridPath found = find_nav_path(walked, *start, *goal);
+  const NavBlocked blocked(walked, clear_of(walked.position(*goal), around, settings_), settings_.agent_radius,
+                           settings_.agent_height);
+  const NavGridPath found = find_nav_path(walked, *start, *goal, nav::kMaxSearchNodes, blocked);
   if (found.status != NavPathStatus::Found) return std::nullopt;
-  return positions(walked, pull_straight(walked, found.nodes));
+  return positions(walked, pull_straight(walked, found.nodes, blocked));
+}
+
+Vec3 Navigation::steer(const SteeringAgent& agent, const std::vector<SteeringObstacle>& others) const {
+  if (!walkable(agent.position)) return redgem::steer(agent, others);  // off the grid: anywhere goes
+  const VelocityCheck stays_on = [this, &agent](Vec3 velocity) {
+    return walkable(agent.position + velocity * nav::kSteeringLookahead);
+  };
+  return redgem::steer(agent, others, stays_on);
 }
 
 std::optional<Vec3> Navigation::nearest(Vec3 point) const {

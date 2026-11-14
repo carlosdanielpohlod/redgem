@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
