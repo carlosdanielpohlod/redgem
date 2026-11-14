@@ -156,6 +156,7 @@ add_executable(redgem_tests
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
+  unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp
@@ -227,6 +228,7 @@ add_executable(redgem_tests
   integration/http_client_test.cpp
   integration/http_game_test.cpp
   integration/network_session_test.cpp
+  integration/network_reconnect_test.cpp
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp

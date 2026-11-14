@@ -31,6 +31,9 @@ constexpr EventName kEventNames[] = {
     {net::NetworkEvent::Kind::PeerLeft, "left"},
     {net::NetworkEvent::Kind::Message, kMessageEvent},
     {net::NetworkEvent::Kind::Approval, "approval"},
+    {net::NetworkEvent::Kind::Reconnecting, "reconnecting"},
+    {net::NetworkEvent::Kind::Reconnected, "reconnected"},
+    {net::NetworkEvent::Kind::Lost, "lost"},
 };
 
 const char* network_event_name(net::NetworkEvent::Kind kind) {

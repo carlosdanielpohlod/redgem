@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Reconnecting after a drop**: `Network.reconnect_window = seconds` on the machine hosting
+  (directly, or a dedicated server's room) holds the place and id of a player whose connection
+  drops. That player stays in the game (`Network.reconnecting?`) and calls back every second with
+  a secret token from its welcome, single use, getting the same id back; a token that holds no
+  place, an old one, or one past the window is turned away. New events: `on_reconnecting`,
+  `on_reconnected` (on the host and on the machine that dropped) and `on_lost` (it could not get
+  back in time). The others hear the player left only once the window is over, and on its return
+  the host shows it the spawned objects as they are now. A player who leaves, and a host that
+  leaves, now say goodbye, so no place is held for them. Not in rooms on a relay, and there is
+  no host migration (see KNOWN_LIMITATIONS.md).
+
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

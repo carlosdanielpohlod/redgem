@@ -44,7 +44,7 @@ void Lobby::accept_newcomers(const AddressCount& in_rooms) {
   for (Socket guest; listener_.accept(guest) == IoStatus::Ok;) {
     if (!room_to_wait(guest.peer_address(), in_rooms)) continue;  // hung up on
     newcomers_.push_back(
-        {Connection::accepted(std::move(guest), kMaxPendingPerServed, identity_), std::nullopt, nullptr});
+        {Connection::accepted(std::move(guest), kMaxPendingPerServed, identity_), std::nullopt, nullptr, {}});
   }
 }
 
@@ -73,13 +73,15 @@ void Lobby::hear(Newcomer& newcomer, float seconds) {
   }
   newcomer.wants = message->value(kRoom, std::string());
   newcomer.auth = message->value(kAuth, nlohmann::json());
+  newcomer.resume = message->value(kResume, std::string());
 }
 
 std::vector<Arrival> Lobby::take_arrivals() {
   std::vector<Arrival> arrivals;
   for (Newcomer& newcomer : newcomers_) {
     if (newcomer.ready()) {
-      arrivals.push_back({std::move(newcomer.connection), newcomer.wants.value_or(""), std::move(newcomer.auth)});
+      arrivals.push_back({std::move(newcomer.connection), newcomer.wants.value_or(""), std::move(newcomer.auth),
+                          std::move(newcomer.resume)});
     }
   }
   newcomers_.erase(

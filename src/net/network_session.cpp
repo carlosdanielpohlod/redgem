@@ -72,6 +72,8 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
   if (!socket.valid()) return false;
   links_.push_back({Connection::calling(std::move(socket), trust), kHostId});
   links_.front().connection.send(hello);  // goes out once the connection is made
+  rejoin_.address = address;
+  rejoin_.trust = trust;
   port_ = port;
   connecting_for_ = 0.0f;
   state_ = State::Connecting;
@@ -108,6 +110,7 @@ bool NetworkSession::join_room(const std::string& address, std::uint16_t port, c
 }
 
 void NetworkSession::leave() {
+  if (in_game()) say_bye();
   // A last try to deliver what was already said.
   for (Link& link : links_) link.connection.flush();
   go_offline();
@@ -125,10 +128,26 @@ void NetworkSession::go_offline() {
   through_relay_ = false;
   opening_room_ = false;
   server_hosted_ = false;
+  forget_game_state();
+}
+
+void NetworkSession::forget_game_state() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();
   poses_ = PoseBaselines();
+  held_.clear();
+  rejoin_ = Rejoin();
+}
+
+void NetworkSession::say_bye() {
+  // (A relay hears no goodbye: it tells the others itself.)
+  if (on_relay()) return;
+  if (relaying()) {
+    queue_for_everyone_but(id_, word(kBye));
+  } else if (!links_.empty()) {
+    links_.front().connection.send(word(kBye));
+  }
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
@@ -136,12 +155,23 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   if (offline()) return events;
   events.swap(pending_events_);
   tend_newcomers(seconds);
-  if (state_ == State::Connecting) await_connection(seconds, events);
+  on_the_way(seconds, events);
   // By index: handling a message may add nothing to links_, but keep it obvious. (And any of
   // them may end the game: nobody after that gets a turn.)
   for (std::size_t i = 0; still_serving(i); ++i) serve(links_[i], seconds, events);
-  if (!offline()) drop_closed_links(events);
+  after_serving(seconds, events);
   return events;
+}
+
+void NetworkSession::on_the_way(float seconds, std::vector<NetworkEvent>& events) {
+  if (state_ == State::Connecting) await_connection(seconds, events);
+  if (state_ == State::Reconnecting) keep_reconnecting(seconds, events);
+}
+
+void NetworkSession::after_serving(float seconds, std::vector<NetworkEvent>& events) {
+  if (offline()) return;
+  drop_closed_links(events);
+  if (relaying()) expire_held_places(seconds, events);
 }
 
 bool NetworkSession::still_serving(std::size_t link) const { return link < links_.size() && !offline(); }

@@ -4,6 +4,7 @@
 #include "net/network_session.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace redgem::net {
 
@@ -47,6 +48,7 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
     hear_newcomer(link, message, events);
     return;
   }
+  if (message[kKind] == kBye) return let_go(link);
   if (!is_game_message(message)) return;
   link.idle_for = 0.0f;
   // Who it is from is what the host knows, not what the message claims.
@@ -60,6 +62,7 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
     link.connection.close();
     return;
   }
+  if (message.contains(kResume)) return resume(link, message[kResume].get<std::string>(), events);
   consider(link, message.value(kAuth, nlohmann::json()), events);
 }
 
@@ -74,17 +77,27 @@ void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& eve
     link.connection.close();  // full
     return;
   }
-  std::vector<int> already_here{kHostId};
-  already_here.insert(already_here.end(), peers_.begin(), peers_.end());
-  link.connection.send(welcome_for(link.peer, already_here));
-  queue_for_everyone_but(link.peer, {{kKind, kArrived}, {kFrom, link.peer}});
+  issue_token(link);
+  link.connection.send(welcome_for(link));
+  queue_for_everyone_but(link.peer, word_about(kArrived, link.peer));
   poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(link.peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, link.peer));
 }
 
-nlohmann::json NetworkSession::welcome_for(int peer, const std::vector<int>& already_here) const {
-  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}, {kVersion, kProtocolVersion}};
+std::vector<int> NetworkSession::others_than(int peer) const {
+  std::vector<int> others{kHostId};
+  std::copy_if(peers_.begin(), peers_.end(), std::back_inserter(others), [peer](int other) { return other != peer; });
+  return others;
+}
+
+nlohmann::json NetworkSession::welcome_for(const Link& link) const {
+  nlohmann::json welcome = {
+      {kKind, kWelcome}, {kTo, link.peer}, {kPeers, others_than(link.peer)}, {kVersion, kProtocolVersion}};
+  if (!link.token.empty()) {
+    welcome[kResume] = link.token;
+    welcome[kWindow] = link.window;
+  }
   if (!server_hosted_) return welcome;
   welcome[kRoom] = room_;
   welcome[kServer] = true;
@@ -99,20 +112,33 @@ bool NetworkSession::pass_on(int from, int to, const nlohmann::json& message) {
 }
 
 void NetworkSession::farewell_closed_links(std::vector<NetworkEvent>& events) {
-  for (const int peer : take_closed_links()) {
-    if (peer == 0) continue;  // never let in: nobody heard of it
-    queue_for_everyone_but(peer, {{kKind, kGone}, {kFrom, peer}});
-    peer_left(peer, events);
+  for (const Link& link : take_closed_links()) {
+    if (!link.let_in()) continue;  // never let in: nobody heard of it
+    if (place_held_for(link)) {
+      hold_place(link, events);
+    } else {
+      farewell(link.peer, events);
+    }
   }
 }
 
-std::vector<int> NetworkSession::take_closed_links() {
-  std::vector<int> gone;
-  for (const Link& link : links_) {
-    if (link.connection.closed()) gone.push_back(link.peer);
-  }
-  links_.erase(std::remove_if(links_.begin(), links_.end(), [](const Link& link) { return link.connection.closed(); }),
-               links_.end());
+void NetworkSession::let_go(Link& link) {
+  // It left: no place is held for it, and its token gets nothing back any more.
+  link.token.clear();
+  link.connection.close();
+}
+
+void NetworkSession::farewell(int peer, std::vector<NetworkEvent>& events) {
+  queue_for_everyone_but(peer, word_about(kGone, peer));
+  for (Held& held : held_) held.departed.push_back(peer);  // (they hear when they are back)
+  peer_left(peer, events);
+}
+
+std::vector<NetworkSession::Link> NetworkSession::take_closed_links() {
+  const auto open_end =
+      std::stable_partition(links_.begin(), links_.end(), [](const Link& link) { return !link.connection.closed(); });
+  std::vector<Link> gone(std::make_move_iterator(open_end), std::make_move_iterator(links_.end()));
+  links_.erase(open_end, links_.end());
   return gone;
 }
 

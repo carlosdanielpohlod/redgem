@@ -3,6 +3,7 @@ module Network
   @spawned = {}      # key => { template:, owner:, object: }
   @spawnable = []    # the templates other machines may make this one spawn
   @spawn_count = 0   # what this machine spawned so far: the keys it gives end with it
+  @despawned_away = []   # keys of this machine's objects that went while it was reconnecting
 
   class << self
     # Copies a template (see Scene.spawn) on every machine in the game, now and for whoever joins
@@ -34,6 +35,7 @@ module Network
 
     def enter_game(_peer)
       @my_id = id
+      @despawned_away = []
       adopt_local_objects
     end
 
@@ -96,13 +98,49 @@ module Network
     # The game is gone: what this machine was moving stays, as its own; the rest leaves with the
     # others.
     def keep_only_my_objects(_peer)
+      @despawned_away = []  # (no game to tell any more)
       @spawned.to_a.each do |key, entry|
         sync = entry[:object].get_component(NetworkSync)
-        next remove(key) unless sync.owner == @my_id
+        next remove(key) unless mine?(entry)
 
         entry[:owner] = LOCAL
         sync.owner = LOCAL
       end
+    end
+
+    # Someone got its place back after its connection dropped. The host shows it the objects as
+    # they are now; the machine that was away catches up.
+    def welcome_back(peer)
+      return greet(peer) if host?
+
+      catch_up_after_drop if peer == id
+    end
+
+    # Nothing this machine said while away went out: the others hear now which of its objects went
+    # and which it made, and it starts the others' objects over from the host's list (it missed
+    # what was spawned and removed meanwhile).
+    def catch_up_after_drop
+      tell_what_changed_away
+      @spawned.to_a.each { |key, entry| remove(key) unless mine?(entry) }
+    end
+
+    def tell_what_changed_away
+      # (Kept until the host's list comes: an object listed there that went meanwhile stays gone.)
+      __deliver(DESPAWN, @despawned_away, :all) unless @despawned_away.empty?
+      spawned_by(@my_id).each { |key, entry| __deliver(SPAWN, record_of(key, entry), :all) if entry[:object].alive? }
+    end
+
+    # Whether a spawned object is this machine's (as it was known in the game, even out of it now).
+    def mine?(entry) = entry[:owner] == @my_id
+
+    # One of this machine's objects went while it was reconnecting: the others hear once it is back.
+    def note_despawned_away(key, owner)
+      @despawned_away << key if reconnecting? && owner == @my_id
+    end
+
+    # A level loaded while reconnecting takes every object of this machine's with it.
+    def note_scene_reset_away
+      @despawned_away.concat(keys_spawned_by(@my_id)) if reconnecting?
     end
 
     def announce_scene_reset

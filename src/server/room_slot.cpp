@@ -18,7 +18,12 @@ std::size_t RoomSlot::places_taken() const {
   return places_taken_locked();
 }
 
-std::size_t RoomSlot::places_taken_locked() const { return players_ + deciding_ + arrivals_.size(); }
+std::size_t RoomSlot::places_taken_locked() const {
+  // (One that comes back counts already: its place is held among the players.)
+  const auto newcomers =
+      std::count_if(arrivals_.begin(), arrivals_.end(), [](const net::Arrival& arrival) { return !arrival.resumes(); });
+  return players_ + deciding_ + static_cast<std::size_t>(newcomers);
+}
 
 std::size_t RoomSlot::players() const {
   const Hold hold(lock_);
@@ -60,7 +65,8 @@ bool RoomSlot::visit(const std::function<void(Engine&)>& visitor) {
 void RoomSlot::admit_arrivals(net::NetworkSession& network) {
   // (All under the lock: the lobby never sees a newcomer in neither place.)
   const Hold hold(lock_);
-  for (net::Arrival& arrival : arrivals_) network.admit_arrival(std::move(arrival.connection), arrival.auth);
+  for (net::Arrival& arrival : arrivals_)
+    network.admit_arrival(std::move(arrival.connection), arrival.auth, arrival.resume_token());
   arrivals_.clear();
   census_locked(network);
 }

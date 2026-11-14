@@ -37,6 +37,14 @@
 # A message carries nil, true/false, numbers, texts, Vector3, and arrays and hashes of those.
 # Messages arrive whole and in the order they were sent. What Network.on and the on_... calls
 # register lasts until the next level is loaded.
+#
+# A player whose connection drops for a moment can get back in, with the same id, when the game
+# hosting it says so (directly, or on a dedicated server; not in a room on a relay):
+#
+#   Network.reconnect_window = 20           # on the host: seconds a dropped player's place is held
+#   Network.on_reconnecting { |peer| ... }  # its connection dropped (on the host: someone's did)
+#   Network.on_reconnected { |peer| ... }   # it is back in its place
+#   Network.on_lost { |reason| ... }        # it could not get back in time: the game is gone
 module Network
   DEFAULT_PORT = 7777
   DEFAULT_RELAY_PORT = 7778
@@ -61,10 +69,13 @@ module Network
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
-    connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
+    connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects,
+    reconnected: :welcome_back, lost: :keep_only_my_objects
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
-  AFTERWARDS = { left: :forget_player, disconnected: :forget_players }.freeze
+  AFTERWARDS = { left: :forget_player, disconnected: :forget_players, lost: :forget_players }.freeze
+  # The events whose handlers get why, instead of a peer.
+  REASONED = %i[failed lost].freeze
 
   # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
   # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)
@@ -124,9 +135,9 @@ module Network
     end
 
     def leave
-      was_online = online?
+      was_in_game = online? || reconnecting?
       __leave
-      __event(:disconnected, 0, "", nil) if was_online
+      __event(:disconnected, 0, "", nil) if was_in_game
     end
 
     # Sends a message. False when it could not be sent (offline, or nobody with that id).
@@ -145,6 +156,9 @@ module Network
     def on_disconnect(&block) = listen(:disconnected, block)  # the game is gone
     def on_join(&block) = listen(:joined, block)              # |peer| someone arrived
     def on_leave(&block) = listen(:left, block)               # |peer| someone left
+    def on_reconnecting(&block) = listen(:reconnecting, block) # |peer| a connection dropped: the place is held
+    def on_reconnected(&block) = listen(:reconnected, block)   # |peer| it is back in its place, with its id
+    def on_lost(&block) = listen(:lost, block)                 # |reason| this machine could not get back in
 
     # Called by the engine for everything that happens on the network.
     def __event(kind, peer, name, data, ticket = 0)
@@ -159,6 +173,7 @@ module Network
     # objects this machine should see again.
     def __scene_reset
       announce_scene_reset if online?
+      note_scene_reset_away
       @handlers = {}
       @listeners = {}
       @synced = {}
@@ -183,9 +198,10 @@ module Network
       __send__(AFTERWARDS[kind], peer) if AFTERWARDS[kind]
     end
 
-    # What the handlers of an event get: the peer, or why a join failed (nil when nobody said).
+    # What the handlers of an event get: the peer, or why a join failed or this machine could not
+    # get back in (nil when nobody said).
     def told_about(kind, peer, name)
-      return peer unless kind == :failed
+      return peer unless REASONED.include?(kind)
 
       name.to_s.empty? ? nil : name
     end

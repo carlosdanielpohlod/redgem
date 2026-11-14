@@ -161,6 +161,12 @@ what the host decides (scores, a door opening, the end of a match) is decided th
 open on a server. Call `Game.quit` on the server when a match is over to give its room to the next
 players.
 
+A room can hold the place of a player whose connection drops for a moment (a phone changing
+networks): `Network.reconnect_window = 20` in a script the server runs (a manager's `start`)
+keeps the player's place and id for 20 seconds, and the player's game calls back by itself, even
+into a full room (see [Reconnecting after a drop](scripting/multiplayer.md#reconnecting-after-a-drop)).
+A room whose last player dropped stays open for that long too.
+
 `Save` on the server is the server's own: a SQLite database in its data folder (`--data`),
 shared by all its rooms and kept across restarts. Each key is a row of its own, written as soon as
 it changes, in a transaction (a crash keeps every change made before it, never half of one), and

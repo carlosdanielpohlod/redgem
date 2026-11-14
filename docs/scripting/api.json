@@ -2678,6 +2678,22 @@
           "about": "whether a join is on its way"
         },
         {
+          "name": "reconnecting?",
+          "static": true,
+          "about": "whether this machine's connection dropped and it is getting back in"
+        },
+        {
+          "name": "reconnect_window",
+          "static": true,
+          "about": "seconds the game hosted here holds a dropped player's place (0: none)"
+        },
+        {
+          "name": "reconnect_window=",
+          "static": true,
+          "args": "seconds",
+          "about": "holds a dropped player's place and id that long, up to 300 (0 turns it off)"
+        },
+        {
           "name": "host?",
           "static": true,
           "about": "whether this machine hosts"
@@ -2795,6 +2811,24 @@
           "static": true,
           "args": "&block",
           "about": "a join did not work out: |reason|"
+        },
+        {
+          "name": "on_reconnecting",
+          "static": true,
+          "args": "&block",
+          "about": "a connection dropped and its place is held: |peer|"
+        },
+        {
+          "name": "on_reconnected",
+          "static": true,
+          "args": "&block",
+          "about": "a dropped machine is back in its place: |peer|"
+        },
+        {
+          "name": "on_lost",
+          "static": true,
+          "args": "&block",
+          "about": "this machine could not get back in time: |reason|"
         },
         {
           "name": "authenticate",

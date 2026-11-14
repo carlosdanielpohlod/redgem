@@ -230,6 +230,9 @@ redgem_add_library(redgem_net
   net/network_session_approval.cpp
   net/network_session_room_approval.cpp
   net/network_session_poses.cpp
+  net/network_session_held.cpp
+  net/network_session_reconnect.cpp
+  net/resume_token.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp

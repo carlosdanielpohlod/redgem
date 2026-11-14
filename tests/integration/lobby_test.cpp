@@ -218,3 +218,26 @@ TEST_CASE("a server's lobby turns away a machine of another version of the proto
   for (int i = 0; i < kSettleRounds; ++i) door.round();  // (a while: nobody comes out of the lobby)
   CHECK(door.arrivals.empty());
 }
+
+TEST_CASE("a machine that reconnects to a server comes out with the room it names and its token") {
+  Door door;
+  std::string error;
+  Connection caller = Connection::calling(Socket::connect_to(kLocalhost, door.lobby.port(), error));
+  const std::string token(kResumeTokenDigits, 'a');
+  nlohmann::json hello = wire::resume_hello(token);
+  hello[wire::kRoom] = kSomeRoom;
+  caller.send(hello);
+  REQUIRE(door.until([&] {
+    caller.pump();
+    return door.arrivals.size() == 1;
+  }));
+  CHECK(door.arrivals.front().room == kSomeRoom);
+  CHECK(door.arrivals.front().resume == token);
+  CHECK(door.arrivals.front().resumes());
+  CHECK(door.arrivals.front().resume_token() == token);
+  // A token without a room to go back to asks for nothing in particular.
+  Arrival anywhere;
+  anywhere.resume = token;
+  CHECK_FALSE(anywhere.resumes());
+  CHECK(anywhere.resume_token().empty());  // (its room's game checks none)
+}
