@@ -1,6 +1,7 @@
 #include "editor/editor_app.hpp"
 
 #include <algorithm>
+#include <cfloat>
 
 #include <imgui.h>
 
@@ -15,6 +16,14 @@ namespace {
 constexpr float kFieldWidth = 180.0f;
 constexpr const char* kValueFormat = "%.2f";
 constexpr float kPercent = 100.0f;
+constexpr float kPopupMargin = 24.0f;
+
+bool begin_preferences_dialog(const char* popup) {
+  if (!ImGui::IsPopupOpen(popup)) return false;
+  const float height = std::max(1.0f, ImGui::GetMainViewport()->WorkSize.y - ui::scaled(kPopupMargin));
+  ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, height));
+  return ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+}
 
 void preference_field(const char* key, float& value, float min, float max) {
   ImGui::SetNextItemWidth(ui::scaled(kFieldWidth));
@@ -90,7 +99,7 @@ void EditorApp::draw_preferences_dialog() {
     preferences_error_.clear();
     ImGui::OpenPopup(popup);
   }
-  if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (!begin_preferences_dialog(popup)) return;
   draw_fields(edited_preferences_);
   draw_interface_scale(edited_preferences_.interface_scale);
   draw_fly_bindings(edited_preferences_.fly_bindings);

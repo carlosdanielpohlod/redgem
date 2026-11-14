@@ -91,10 +91,11 @@ void merge_changes(nlohmann::json& json, const EditorPreferences& previous, cons
 
 void merge_interface_scale(nlohmann::json& json, std::optional<float> previous, std::optional<float> value) {
   if (previous == value) return;
-  if (value)
+  if (value) {
     json[kInterfaceScale] = *value;
-  else
+  } else {
     json.erase(kInterfaceScale);
+  }
 }
 
 }  // namespace
