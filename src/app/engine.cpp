@@ -25,13 +25,19 @@
 namespace redgem {
 namespace {
 
+// Logs each warning.
+void warn_of_all(const std::vector<std::string>& warnings) {
+  for (const std::string& warning : warnings) log::warning(warning);
+}
+
 // What game.json says that cannot be used, and what the game does instead.
 void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
-  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
-  for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
-  for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
+  warn_of_all(physics_problems(manifest));
+  warn_of_all(manifest.servers_warnings);
+  warn_of_all(manifest.navigation_warnings);
+  warn_of_all(manifest.movement_warnings);
 }
 
 // What the game's scripts are told of what game.json says.
@@ -101,14 +107,20 @@ void Engine::initialize() {
   fill_context(manifest.settings);
   connect_display();
   take_identity(identity);
-  if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
+  open_network(manifest.settings);
   start_scripts(std::chrono::milliseconds(manifest.settings.script_budget_ms));
   network_watch_.restart();  // the network's time starts with the game, not with its loading
+}
+
+void Engine::open_network(const GameSettings& settings) {
+  network_.validate_movement(settings.movement);
+  if (serves_a_room()) network_.serve_room(options_.server_room);
 }
 
 void Engine::build_world(const GameSettings& settings) {
   collision_layers_ = settings.collision_layers;
   physics_threads_ = chosen_physics_threads(settings);
+  max_bodies_ = settings.max_bodies;
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
@@ -116,6 +128,7 @@ void Engine::build_world(const GameSettings& settings) {
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
+  find_water();
 }
 
 int Engine::chosen_physics_threads(const GameSettings& settings) const {
@@ -243,6 +256,7 @@ void Engine::connect_world() {
   context_.scene = &scene_;
   context_.physics = physics_.get();
   context_.navigation = &navigation_;
+  context_.water = &water_.surfaces();
   context_.bake_navigation = [this] { bake_navigation(); };
 }
 
@@ -281,6 +295,9 @@ void Engine::connect_context() {
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
   context_.spawn = [this](const SpawnRequest& request) { return spawn(request); };
+  context_.spawn_prefab = [this](const std::string& file, const SpawnRequest& request) {
+    return spawn_prefab(file, request);
+  };
   context_.scene_exists = [this](const std::string& name) { return has_scene_file(options_.game_dir, name); };
 }
 

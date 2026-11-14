@@ -37,12 +37,13 @@ std::unique_ptr<JPH::JobSystem> job_system_for(int threads) {
 
 }  // namespace
 
-World::World(Vec3 gravity, const CollisionLayers& layers, int threads)
+World::World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodies, int threads)
     : gravity_(gravity),
       layers_(layers),
-      temp_allocator_(config::kPhysicsTempAllocatorBytes),
+      capacity_(body_capacity(max_bodies)),
+      temp_allocator_(static_cast<JPH::uint>(capacity_.scratch_bytes)),  // (160 MB at most: kMostMaxBodies)
       job_system_(job_system_for(threads)) {
-  system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs, config::kMaxContactConstraints,
+  system_.Init(capacity_.bodies, config::kNumBodyMutexes, capacity_.body_pairs, capacity_.contact_constraints,
                broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
   system_.SetGravity(to_jolt(gravity));
   system_.SetContactListener(this);
@@ -176,8 +177,9 @@ std::optional<Transform> World::simulated_pose(ObjectId object) const {
 
 }  // namespace jolt
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers, int threads) {
-  return std::make_unique<jolt::World>(gravity, layers, threads);
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers,
+                                                        std::uint32_t max_bodies, int threads) {
+  return std::make_unique<jolt::World>(gravity, layers, max_bodies, threads);
 }
 
 }  // namespace redgem

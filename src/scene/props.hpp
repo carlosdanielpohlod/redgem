@@ -13,6 +13,8 @@ inline constexpr const char* kCollider = "collider";
 inline constexpr const char* kTrigger = "trigger";
 inline constexpr const char* kTag = "tag";
 inline constexpr const char* kMass = "mass";
+// Kilograms per cubic meter, as a whole: a body less dense than water (1000) floats in it.
+inline constexpr const char* kDensity = "density";
 // The collision layer of its body, one of game.json's physics layers (physics/collision_layers.hpp).
 inline constexpr const char* kLayer = "layer";
 inline constexpr const char* kVisible = "visible";

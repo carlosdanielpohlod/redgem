@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <variant>
@@ -29,6 +30,7 @@
 #include "scene/water_interactions.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/prefab_import.hpp"
 #include "app/game_display.hpp"
 #include "app/game_settings.hpp"
 #include "app/game_identity.hpp"
@@ -123,6 +125,9 @@ class Engine {
   // Copies a prefab (or any object) into the running game with physics and scripts, as the request
   // says (see SpawnRequest). Returns the new root object.
   ObjectId spawn(const SpawnRequest& request);
+  ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
+  const prefabs::Source& load_runtime_prefab(const std::string& file);
+  ObjectId finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   //
@@ -191,6 +196,9 @@ class Engine {
   void keep_bindings();
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
+  // The network's movement checks (game.json's, which a script may change later), and the
+  // dedicated server's room, before any script asks for either.
+  void open_network(const GameSettings& settings);
   void connect_effects();
   // The scene, its bodies and its navigation, for the scripts.
   void connect_world();
@@ -242,6 +250,13 @@ class Engine {
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
   int fixed_steps_due(float frame_seconds, float scale);
   void update_frame(float delta);
+  // Moves each character by how far its clips moved their root (Animator root motion): a
+  // character controller goes there through the physics, sliding along walls; anything else is
+  // moved there.
+  void apply_root_motion();
+  void move_by(ObjectId object, const RootMotion& motion);
+  // Hands the moments the characters' clips went past to the scripts listening (animation.on).
+  void hand_on_animation_events();
   void switch_scene_if_asked();
   bool is_loading_scene() const;
   bool deterministic_scene_load() const;
@@ -269,6 +284,13 @@ class Engine {
   int chosen_physics_threads(const GameSettings& settings) const;
   // The world for the scene in place, solved on the threads the game asked for.
   std::unique_ptr<PhysicsWorld> make_physics_world();
+  // Before a physics step: the water notes bodies that appeared or jumped, the bodies take the poses
+  // scripts gave them, and the water holds up what floats (its forces turn the bodies about where
+  // they are now, not where they were before a script moved them).
+  void push_poses_and_float();
+  // The water of a world just made, and the bodies in it: found at once, so its scripts' first calls
+  // and a game that starts paused (no fixed step yet) see it.
+  void find_water();
   // Whether a contact is between two objects that are both still there to hear of it.
   bool both_alive(const ContactEvent& event) const;
   void process_destroyed();
@@ -279,8 +301,12 @@ class Engine {
   Presenter* presenter_ = nullptr;
   std::shared_ptr<SceneLoad> scene_load_;
   SceneDesc scene_desc_;
+  std::map<std::string, prefabs::Source> runtime_prefabs_;
+  std::uint64_t runtime_prefab_bytes_ = 0;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
+  // game.json's: every scene's physics world holds as many bodies.
+  std::uint32_t max_bodies_ = kDefaultMaxBodies;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
   Navigation navigation_;             // where characters walk in the running scene
   // How many threads solve the physics (game.json's, or the options'); and, with more than one:

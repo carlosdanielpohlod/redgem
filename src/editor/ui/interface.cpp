@@ -21,14 +21,19 @@ Interface::Interface(const Window&, Layout layout, ScaleReader read_scale) : rea
 Interface::~Interface() { rlImGuiShutdown(); }
 
 void Interface::begin_frame() {
-  const auto asked = read_scale_ ? read_scale_() : GetWindowScaleDPI().y;
-  const bool logical = !read_scale_ && native_dpi_window();
-  const auto scale = interface_scale(asked, logical);
+  const auto scale = preferred_scale();
   if (scale != scale_) {
     scale_ = scale;
     apply_interface_scale(scale_);
   }
   rlImGuiBegin();
+}
+
+float Interface::preferred_scale() const {
+  if (scale_override_) return interface_scale(*scale_override_, false);
+  const auto asked = read_scale_ ? read_scale_() : GetWindowScaleDPI().y;
+  const bool logical = !read_scale_ && native_dpi_window();
+  return interface_scale(asked, logical);
 }
 
 void Interface::end_frame() { rlImGuiEnd(); }
