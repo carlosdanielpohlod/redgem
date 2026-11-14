@@ -44,6 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
@@ -216,6 +217,8 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/movement_validator.cpp
+  net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
   net/secure/tls_identity.cpp
@@ -308,6 +311,9 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/animation/animation_player_graph.cpp
+  scene/animation/animation_player_events.cpp
+  scene/animation/animation_player_root_motion.cpp
+  scene/animation/animation_markers.cpp
   scene/camera_ray.cpp
   scene/particle_emitters.cpp
   scene/particles.cpp
@@ -320,6 +326,7 @@ redgem_add_library(redgem_runtime
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/body_limit.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -382,6 +389,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
   script/bindings/bindings.cpp
@@ -427,6 +435,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_state_bindings.cpp
   script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
+  script/bindings/network_movement_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
@@ -519,6 +528,7 @@ redgem_add_library(redgem_runtime
   app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
+  app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
   app/scene_bodies.cpp
@@ -600,6 +610,9 @@ if(NOT ANDROID)
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
     editor/editor_camera.cpp
+    editor/editor_fly_bindings.cpp
+    editor/editor_preferences.cpp
+    editor/editor_preferences_dialog.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp

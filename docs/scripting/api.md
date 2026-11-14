@@ -28,6 +28,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
 | [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
 | [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
+| [`Animation::Event`](#animationevent) | What the block of an animation event is given (animation.on). |
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
@@ -188,6 +189,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
 - `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+- `Scene.spawn_prefab(file, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
 
 ## SceneScript
 
@@ -416,7 +418,7 @@ The scene's own animations (exported from Blender), by name. See [animation.md](
 
 game_object.animation (animation in a behaviour): an object's own clips. See [animation.md](animation.md).
 
-- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`: plays a clip, fading from the last one
+- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil)`: plays a clip, fading from the last one; root_motion: true lets the clip move the object
 - `mix(name, weight: 1.0, loop: true, speed: 1.0)`: plays a clip over the one playing
 - `unmix`: stops the clip mixed over
 - `pause`: pauses its clips
@@ -427,6 +429,11 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `use(graph)`: installs an Animation::Graph
 - `set(parameter, value)`: sets a parameter of the graph
 - `state`: the graph's state, or nil
+- `on(clip, at: nil, seconds: nil, &block)`: calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+- `on_marker(name, &block)`: calls the block each time a clip passes a marker of that name authored in Blender
+- `off(listener)`: stops calling a block that on or on_marker returned
+- `root_motion = on`: whether all its clips move the object by their root's horizontal motion and turning
+- `root_motion?`: whether all its clips move the object
 
 ## Animation::Graph
 
@@ -437,6 +444,15 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 - `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
 - `blend_2d(name, parameters:, clips:, loop: true, speed: 1.0)`: a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
 - `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
+
+## Animation::Event
+
+What the block of an animation event is given (animation.on). See [animation.md#events](animation.md#events).
+
+- `game_object`: the object that listened
+- `clip`: the clip's name
+- `name`: the marker's name, or nil for a moment the script named
+- `at`: where in the clip, from 0 (its start) to 1 (its end)
 
 ## Audio
 
@@ -730,6 +746,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.id`: this machine's peer id
 - `Network.peers`: the peers of the game
 - `Network.players`: the peers without a dedicated server
+- `Network.validate_movement(max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false)`: on the host: corrects the others' objects that move faster or further than this (no limits: off)
+- `Network.movement_rules`: the movement validation settings, as a hash
+- `Network.movement_violations(peer)`: how many moves of a machine the host did not believe in this game
 - `Network.port`: the port of the game
 - `Network.room`: the room code, on a relay
 - `Network.relay`: the relay's address

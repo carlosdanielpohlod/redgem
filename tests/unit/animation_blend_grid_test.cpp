@@ -18,7 +18,7 @@ struct GridStage {
   std::string error;
 
   GridStage() {
-    for (int i = 1; i <= 4; ++i) clips.push_back({std::to_string(i), static_cast<float>(i), {}});
+    for (int i = 1; i <= 4; ++i) clips.push_back({std::to_string(i), static_cast<float>(i), {}, {}});
     graph.initial = "Move";
     graph.parameters = {{"x", kMiddle}, {"y", kMiddle}};
     graph.states = {{"Move", "x", {{1, "4", 1}, {0, "1", 0}, {0, "3", 1}, {1, "2", 0}}, true, 1, "y"}};

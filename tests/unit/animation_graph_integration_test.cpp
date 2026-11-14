@@ -20,7 +20,7 @@ AnimationDesc constant_clip(const std::string& name, Vec3 position) {
   channel.node = kBone;
   channel.times = {0.0f};
   channel.values = {position.x, position.y, position.z};
-  return {name, kDuration, {channel}};
+  return {name, kDuration, {channel}, {}};
 }
 
 struct GraphScene {

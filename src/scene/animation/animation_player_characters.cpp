@@ -82,7 +82,7 @@ bool AnimationPlayer::play_on(const Scene& scene, ObjectId object, const std::st
     start(*current, duration_of(*index), how.loop, how.speed, how.restart);  // no fade to itself
     return true;
   }
-  Track next{*index, ClipClock{}};
+  Track next{*index, ClipClock{}, ClockSpan{}};
   start(next.clock, duration_of(*index), how.loop, how.speed, true);
   fade_to(own, next, detached ? 0.0f : how.fade);
   return true;

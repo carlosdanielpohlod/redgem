@@ -36,6 +36,27 @@ void draw_brush_mode(TerrainTool& tool) {
   choose(kBrushModeId, tool.mode, kSculptModes);
 }
 
+void draw_brush_tools(TerrainTool& tool) {
+  property_label(tr("editor.inspector.terrain.sculpt"));
+  if (ImGui::Checkbox(kSculptId, &tool.sculpting)) tool.painting = false;
+  property_label(tr("editor.inspector.terrain.paint"));
+  if (ImGui::Checkbox("##paint", &tool.painting)) tool.sculpting = false;
+}
+
+const char* brush_help(const TerrainTool& tool) {
+  if (tool.painting) return "editor.inspector.terrain.paint_help";
+  return tool.sculpting ? kSculptingHelp : kSculptOffHelp;
+}
+
+void draw_brush_kind(TerrainTool& tool) {
+  if (!tool.painting) {
+    draw_brush_mode(tool);
+    return;
+  }
+  property_label(tr("editor.inspector.terrain.tint"));
+  edit_rgb("##terrain_tint", tool.tint, ImGuiColorEditFlags_Float);
+}
+
 void draw_brush_size(TerrainTool& tool) {
   property_label(tr("editor.inspector.terrain.radius"));
   ImGui::SetNextItemWidth(kFillWidth);
@@ -51,12 +72,11 @@ void draw_terrain(PanelContext& context, int index) {
   if (!has_terrain_card(context, index)) return;
   if (!component_header(ICON_FA_MOUNTAIN, tr("editor.inspector.terrain.title"))) return;
   TerrainTool& tool = *context.terrain;
-  property_label(tr("editor.inspector.terrain.sculpt"));
-  ImGui::Checkbox(kSculptId, &tool.sculpting);
+  draw_brush_tools(tool);
   ImGui::PushTextWrapPos();
-  ImGui::TextColored(muted_color(), "%s", tr(tool.sculpting ? kSculptingHelp : kSculptOffHelp));
+  ImGui::TextColored(muted_color(), "%s", tr(brush_help(tool)));
   ImGui::PopTextWrapPos();
-  draw_brush_mode(tool);
+  draw_brush_kind(tool);
   draw_brush_size(tool);
 }
 

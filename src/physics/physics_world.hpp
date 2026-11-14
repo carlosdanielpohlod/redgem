@@ -10,6 +10,7 @@
 
 #include "core/math.hpp"
 #include "physics/body_config.hpp"
+#include "physics/body_limit.hpp"
 #include "physics/debug_geometry.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
@@ -146,6 +147,9 @@ class PhysicsWorld {
 
   // Characters. The horizontal velocity persists until changed; gravity is applied by the engine.
   virtual void set_character_move(ObjectId object, Vec3 horizontal_velocity) = 0;
+  // Moves a character this much further (horizontally) during its next step, on top of its move:
+  // it slides along what it meets on the way. Offsets add up until a step goes through them.
+  virtual void add_character_displacement(ObjectId object, Vec3 offset) = 0;
   // Jumps on the next step if the character is grounded then.
   virtual void character_jump(ObjectId object, float speed) = 0;
   virtual bool character_grounded(ObjectId object) const = 0;
@@ -231,6 +235,8 @@ class PhysicsWorld {
   virtual float hinge_angle(JointId joint) const = 0;
 };
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {});
+// A world of at most `max_bodies` bodies (physics/body_limit.hpp; kept within its bounds).
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {},
+                                                        std::uint32_t max_bodies = kDefaultMaxBodies);
 
 }  // namespace redgem

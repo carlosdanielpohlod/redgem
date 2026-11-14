@@ -12,7 +12,7 @@ void register_animations(SceneDesc& target, Source& source, const Instance& inst
                                        [&name](const auto& clip) { return clip.name == name; });
     if (collision) throw std::runtime_error("prefab animation name collision: " + name);
     source.animations.push_back(target.animations.size());
-    target.animations.push_back({name, animation.duration, {}});
+    target.animations.push_back({name, animation.duration, {}, animation.markers});
   }
 }
 }  // namespace

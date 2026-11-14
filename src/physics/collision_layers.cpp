@@ -11,7 +11,7 @@ namespace {
 // What game.json's "physics" section says.
 constexpr const char* kLayersKey = "layers";
 constexpr const char* kCollidesKey = "collides";
-constexpr const char* kSection = "game.json physics: ";
+constexpr const char* kSection = kPhysicsSection;
 constexpr const char* kNameSeparator = ", ";
 
 bool listed_text(const nlohmann::json& entry) { return entry.is_string() && !entry.get<std::string>().empty(); }

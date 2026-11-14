@@ -26,7 +26,7 @@ AnimationDesc clip(const char* name, std::size_t axis) {
   channel.times = {0.0f, kDuration};
   channel.values = {0, 0, 0, 0, 0, 0};
   channel.values[3 + axis] = kDistance;
-  return AnimationDesc{name, kDuration, {channel}};
+  return AnimationDesc{name, kDuration, {channel}, {}};
 }
 
 // One machine's view of a scene of one character and two clips.
