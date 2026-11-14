@@ -34,7 +34,7 @@ class Interactor < Behaviour
   def pad = prop(:pad, Input::FIRST_PAD)
 
   # What the prompt says for a target: "[E] Talk", or the target's text alone when the action is
-  # bound to nothing a player could press (or on a phone, where the prompt itself is tapped).
+  # bound to nothing.
   def prompt_label(target)
     binding = binding_shown
     text = target.prompt_text
@@ -74,10 +74,8 @@ class Interactor < Behaviour
   end
 
   # The name of the :interact binding the player would reach for: a gamepad's while one is
-  # plugged in, a key's or the mouse's otherwise; nil on a phone or when nothing is bound.
+  # plugged in, a key's or the mouse's otherwise; nil when nothing is bound.
   def binding_shown
-    return nil if Input.touch_controls?
-
     bindings = Input.bindings(Interaction::ACTION, pad: pad)
     pad_first = Input.gamepad?(pad: pad)
     chosen = bindings.find { |binding| binding.start_with?(Input::PAD_PREFIX) == pad_first } || bindings.first

@@ -275,8 +275,10 @@ not a promise of how it will be closed.
   between the actor's and the target's positions (a target whose position is inside the ground or
   a wall is never in sight, and a thin gap can show something mostly hidden), there is no
   hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
-  screen. Over the network the host runs every use, checking sight from the hero's late pose: a
-  client hears of what it did only through the game's own messages. The built-in `:interact` takes
+  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
+  the on-screen controls being turned on). Over the network the host runs every use, checking
+  sight from the hero's late pose: a client hears of what it did only through the game's own
+  messages. The built-in `:interact` takes
   E and a gamepad's Y in every game: a game that binds them to an action of its own rebinds one.
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.

@@ -75,8 +75,8 @@ game binds it anew as any other action:
 { "input": { "actions": { "interact": ["key:f", "pad:x"] } } }
 ```
 
-With the on-screen touch controls showing (`Input.touch_controls = true`), the prompt shows the
-text alone, and tapping it uses the focus. A click on it does the same with a mouse.
+On a phone, tapping the prompt uses the focus; a click on it does the same with a mouse. The prompt
+shows the text alone when `:interact` is bound to nothing.
 
 A game that draws its own prompt turns the engine's off and reads the focus:
 
