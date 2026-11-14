@@ -123,17 +123,18 @@ class GameMenu < Behaviour
   # where there is no screen.
   def scale = [height_share, width_share].compact.min || 1.0
 
+  # A size of the menu's, as it is drawn on this screen.
+  def scaled(size) = (size * scale).to_i
+
+  private
+
+  # The menu's scale as the room in height allows (nil with no screen), and as the width does.
   def height_share
     room = [UI.reference[1], UI.height].select(&:positive?).min
     room && room.to_f / REFERENCE_HEIGHT
   end
 
   def width_share = UI.width.positive? ? UI.width.to_f / REFERENCE_WIDTH : nil
-
-  # A size of the menu's, as it is drawn on this screen.
-  def scaled(size) = (size * scale).to_i
-
-  private
 
   def first_button_share = open_screen&.first_button_share || FIRST_BUTTON_SHARE
 
