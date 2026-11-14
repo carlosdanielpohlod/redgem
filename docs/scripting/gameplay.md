@@ -1277,7 +1277,7 @@ Save.restore_checkpoint         # after the scene loads (its SceneScript#setup, 
 `Save.checkpoint(key = :checkpoint)` keeps, under that key of `Save`, every spawned object of the
 scene that carries such a behaviour: its template, its name, its pose and look (its
 [checkpoint](#object-checkpoints)) and the persisted fields of each of those behaviours. Their
-values are what `Save` can keep. Objects destroyed by then are not kept, nor are objects of the
+values are what `Save` can keep (a Symbol comes back as a String; a `GameObject` cannot be kept). Objects destroyed by then are not kept, nor are objects of the
 scene file, spawned objects with no persisting behaviour, or parts of a bigger spawned copy.
 
 `Save.restore_checkpoint(key = :checkpoint)` spawns each one again from its template, poses it,

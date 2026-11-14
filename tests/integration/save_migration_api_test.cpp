@@ -119,7 +119,7 @@ TEST_CASE("a hook must give the new values back as a Hash") {
   patched.ruby("Save.version = 2; Save.migrate(from: 1) { |data| nil }");
   CHECK(contains(patched.ruby(kRefused), "must return the new values as a Hash"));
   CHECK(patched.ruby("begin; Save.version = 0; rescue ArgumentError; 'bad'; end") == "bad");
-  CHECK(patched.ruby("begin; Save.migrate(from: 1) { |d| d }; rescue ArgumentError; 'twice'; end") == "twice");
+  CHECK(patched.ruby("begin; Save.migrate(from: 0) { |d| d }; rescue ArgumentError; 'bad'; end") == "bad");
 }
 
 TEST_CASE("a server's database slot is migrated in one transaction") {

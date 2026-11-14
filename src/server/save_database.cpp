@@ -172,17 +172,29 @@ bool SaveDatabase::in_transaction(const std::function<bool()>& work) {
   bool done = false;
   try {
     done = work();
-  } catch (...) {  // (a key another room holds too long, see SaveKeyBusy: nothing is kept)
+  } catch (...) {
     executed(database_, kRollback);
     throw;
   }
-  if (done) return executed(database_, kCommit);
+  // (A COMMIT that fails leaves the transaction open: it is rolled back, never left to the next write.)
+  if (done && executed(database_, kCommit)) return true;
   executed(database_, kRollback);
   return false;
 }
 
+// (Straight to the table, without the keys' locks: set takes a key's lock before lock_, and taking
+// them under lock_ here would be the other way round. The version key's update keeps migrations
+// of the save apart.)
 bool SaveDatabase::replace(const Values& values) {
-  return in_transaction([&] { return SaveStore::replace(values); });
+  return in_transaction([&] {
+    bool written = executed(database_, kClear);
+    for (const auto& [key, value] : values) {
+      if (value.is_null()) continue;
+      const std::string text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+      written = written && write_.use().bind(kKeyPlace, key).bind(kValuePlace, text).run();
+    }
+    return written;
+  });
 }
 
 }  // namespace redgem::server

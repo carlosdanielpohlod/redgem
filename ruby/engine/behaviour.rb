@@ -55,8 +55,9 @@ class Behaviour
   #   class Crate < Behaviour
   #     persist :health, :loot
   #   end
+  # A class says them in one persist line: another replaces it (a reloaded script's does).
   def self.persist(*fields)
-    @persisted_fields = (@persisted_fields || []) + fields.map(&:to_sym)
+    @persisted_fields = fields.map(&:to_sym).uniq
   end
 
   # What persist named, in this class and in those it comes from.

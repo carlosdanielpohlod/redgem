@@ -50,7 +50,7 @@ class SaveFile final : public SaveStore {
   bool clear() override;
   std::vector<std::string> keys() override;
   // (A player's machine runs one game: nothing else reads or writes in between.)
-  bool update(const std::string& key, const Change& change) override { return set(key, change(get(key))); }
+  bool update(const std::string& key, const Change& change) override;
   // (One write of the whole file: a crash keeps either the old values or the new ones.)
   bool replace(const Values& values) override;
   std::string where() const override { return file_.string(); }
@@ -70,6 +70,8 @@ class SaveFile final : public SaveStore {
   std::optional<std::filesystem::path> set_aside(const std::filesystem::path& damaged);
   void refuse_writes(const std::string& why);
   bool write();
+  // Whether `made` is the value the file already holds as `current`.
+  bool unchanged(const std::optional<nlohmann::json>& current, const nlohmann::json& made) const;
   void back_up_previous() const;
   bool in_memory() const { return file_.empty(); }
 
@@ -81,6 +83,8 @@ class SaveFile final : public SaveStore {
   std::string on_disk_;  // what the file holds, as written: what the next write keeps as the backup
   // A save that cannot be read or moved aside is in the way: it is not written over.
   bool writes_refused_ = false;
+  // Whether the values are what the file holds (the last write, if any, went through).
+  bool in_step_ = true;
 };
 
 }  // namespace redgem

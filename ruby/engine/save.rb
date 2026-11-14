@@ -33,15 +33,17 @@ module Save
 
   # What turns a slot of version `from` into one of version from + 1: the block is given the slot's
   # values (a Hash with String keys) and returns the new ones. Versions that changed nothing need none.
+  # Declaring `from` again replaces its hook (a script reloaded while the game runs does).
   def self.migrate(from:, &hook)
     raise ArgumentError, "Save.migrate needs a block making the new values" unless hook
 
     __require_version(from, "Save.migrate from:")
-    raise ArgumentError, "Save.migrate from: #{from} is declared twice" if @migrations.key?(from)
-
+    Debug.warn("Save.migrate(from: #{from}) came after slot #{slot} was checked: declare it first") if __late?(from)
     @migrations[from] = hook
-    Debug.warn("Save.migrate(from: #{from}) came after slot '#{slot}' was checked: declare hooks first") if @checked
   end
+
+  # (A hook new since the slot was checked is too late for it.)
+  def self.__late?(from) = @checked && !@migrations.key?(from)
 
   def self.get(key, default = nil)
     __ready
@@ -135,12 +137,10 @@ module Save
   def self.__check
     return unless @version
 
-    @checked = true
     stored = __get(VERSION_KEY)
     @stamped = !stored.nil?
-    return if __fresh?(stored)
-
-    __settle(stored || FIRST_VERSION)
+    __settle(stored || FIRST_VERSION) unless __fresh?(stored)
+    @checked = true  # (only once it was read: a read that raised is tried again on the next use)
   end
 
   def self.__fresh?(stored) = stored.nil? && __keys.empty?

@@ -75,12 +75,24 @@ class DatabaseSlot final : public SaveStore {
     const KeyLocks::Hold updating = owner_.key_locks_.hold(name_, key);
     return set(key, change(get(key)));
   }
+  // (Without the keys' locks, as SaveDatabase::replace.)
   bool replace(const Values& values) override {
-    return owner_.in_transaction([&] { return SaveStore::replace(values); });
+    return owner_.in_transaction([&] {
+      bool written = statements_->clear.use().bind(kSlot, name_).run();
+      for (const auto& [key, value] : values) written = written && write_row(key, value);
+      return written;
+    });
   }
   std::string where() const override { return owner_.where() + " (slot " + name_ + ")"; }
 
  private:
+  // (Under the owner's lock: a null value is none.)
+  bool write_row(const std::string& key, const nlohmann::json& value) {
+    if (value.is_null()) return true;
+    const auto text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+    return statements_->write.use().bind(kSlot, name_).bind(kKey, key).bind(kValue, text).run();
+  }
+
   SaveDatabase& owner_;
   std::string name_;
   std::unique_ptr<SlotStatements> statements_;
