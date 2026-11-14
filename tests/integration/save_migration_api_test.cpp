@@ -134,3 +134,14 @@ TEST_CASE("a server's database slot is migrated in one transaction") {
   CHECK(patched.ruby("Save[:coins]") == "5");
   CHECK(patched.ruby("$ran") == "[1, 2]");
 }
+
+TEST_CASE("clearing a refused slot starts it again at the current version") {
+  MigrationData data;
+  MigrationGame(data.file).ruby("Save.version = 4; Save[:gold] = 5");
+  MigrationGame older(data.file);
+  older.ruby("Save.version = 2");
+  CHECK(contains(older.ruby(kRefused), "newer version"));
+  older.ruby("Save.clear; Save[:gold] = 1");
+  CHECK(older.ruby(kRefused) == "loaded");
+  CHECK(older.ruby("Save.__get(:__save_version)") == "2");
+}

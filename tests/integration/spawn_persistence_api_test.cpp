@@ -106,3 +106,17 @@ TEST_CASE("a checkpoint of another scene or naming an unknown behaviour changes 
   frames(*engine, 1);
   CHECK(ruby(*engine, kCopies) == "1");
 }
+
+TEST_CASE("a copy spawned without physics comes back without a body") {
+  const TempGame game(kShooterGame);
+  PropertyMap props = moving("dynamic");
+  props["prefab"] = true;
+  auto desc = scene_with({node("Crate", {0, 1, 0}, {1, 1, 1}, props)});
+  assign_scene_ids(desc);
+  auto engine = engine_for(game, desc);
+  ruby(*engine, kClasses);
+  ruby(*engine, "Scene.spawn(Scene.find('Crate'), physics: false).add_component(Loot).health = 4");
+  CHECK(ruby(*engine, "Save.checkpoint") == "1");
+  CHECK(ruby(*engine, "$made = Save.restore_checkpoint; $made.first.rigidbody.nil?") == "true");
+  CHECK(ruby(*engine, "$made.first.get_component(Loot).health") == "4");
+}

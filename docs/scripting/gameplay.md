@@ -1249,7 +1249,10 @@ new ones; a version that changed nothing needs no hook. The first use of a slot 
 - a hook that raises (or returns something that is not a Hash) leaves the slot as it was: the log
   says why, and the slot is refused the same way.
 
-`Save.slot =` that meets a refused slot raises and keeps the slot that was selected. A slot
+`Save.slot =` that meets a refused slot raises and keeps the slot that was selected;
+`Save.clear` empties a refused slot, which then starts again at the current version. Declare the
+hooks before the version is first used: a step with no hook counts as one that changed nothing,
+and a hook declared after the slot was checked is too late for it (the log says so). A slot
 written before the game declared a version counts as version 1, and a new slot is stamped with
 the current version on its first write. The version is kept in the slot under the key
 `__save_version`, which `Save.keys` does not list. A game that declares no version gets its
@@ -1283,8 +1286,10 @@ it is added). It returns the new copies, and replaces the spawned objects that p
 now rather than adding to them, so restoring twice leaves one set. A checkpoint of another scene,
 or one naming a template or behaviour class the game no longer has, raises an `ArgumentError`
 before anything is spawned or destroyed. Fields a class no longer persists are left as it starts
-them. A spawned copy put under another spawned copy is not kept; one under an object of the
-scene file is spawned under it again.
+them. A copy spawned with `physics: false` comes back without one. A spawned copy put under
+another spawned copy is not kept; one under an object of the scene file is spawned under it
+again. Only the behaviours of the spawned object itself are looked at, not those of its parts.
+Objects of `Network.spawn` are the network's: a checkpoint is for what one machine spawns.
 
 ### Keeping references to scene objects
 

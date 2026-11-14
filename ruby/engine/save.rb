@@ -40,6 +40,7 @@ module Save
     raise ArgumentError, "Save.migrate from: #{from} is declared twice" if @migrations.key?(from)
 
     @migrations[from] = hook
+    Debug.warn("Save.migrate(from: #{from}) came after slot '#{slot}' was checked: declare hooks first") if @checked
   end
 
   def self.get(key, default = nil)
@@ -68,9 +69,11 @@ module Save
     __delete(key)
   end
 
+  # (Also what makes a refused slot usable again: it starts from nothing, at the current version.)
   def self.clear
-    __ready
     __clear
+    @checked = !@version.nil?
+    @refusal = nil
     @stamped = false
   end
 
@@ -164,7 +167,8 @@ module Save
     return stored unless from < @version
 
     data = (from...@version).inject(__values) { |values, step| __migrated(values, step) }
-    __replace(data.merge(VERSION_KEY => @version))
+    raise "the migrated values could not be written" unless __replace(data.merge(VERSION_KEY => @version))
+
     @version
   rescue StandardError => e
     __refuse("could not be migrated to save version #{@version}: #{e.class}: #{e.message}; it is left as it was")

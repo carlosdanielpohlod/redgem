@@ -7,6 +7,8 @@
 #   Save.restore_checkpoint         # after the scene loads (its SceneScript#setup, say)
 module Save
   CHECKPOINT_KEY = :checkpoint
+  # What an object checkpoint says of an object without a physics body.
+  NO_BODY = "none".freeze
 
   # Keeps this scene's spawned objects that persist something under `key`; returns how many.
   def self.checkpoint(key = CHECKPOINT_KEY)
@@ -51,7 +53,11 @@ module Save
 
     def self.fields_of(behaviour)
       fields = behaviour.class.persisted_fields.to_h { |field| [field.to_s, field_value(behaviour, field)] }
-      { "class" => behaviour.class.name, "fields" => fields }
+      { "class" => class_name(behaviour.class), "fields" => fields }
+    end
+
+    def self.class_name(klass)
+      klass.name || raise(ArgumentError, "Save.checkpoint: a class with no name cannot persist fields")
     end
 
     def self.field_value(behaviour, field) = behaviour.instance_variable_get(:"@#{field}")
@@ -105,8 +111,10 @@ module Save
       raise
     end
 
+    # (A copy spawned without physics has no body in its checkpoint, and gets none again.)
     def self.spawned(plan)
-      Scene.spawn(plan[:template], name: plan[:name], parent: plan[:parent]) ||
+      physics = plan[:state]["body"] != NO_BODY
+      Scene.spawn(plan[:template], name: plan[:name], parent: plan[:parent], physics: physics) ||
         raise(ArgumentError, "the checkpoint's #{plan[:name]} could not be spawned again")
     end
 
