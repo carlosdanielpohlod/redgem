@@ -2783,13 +2783,23 @@
         {
           "name": "group",
           "static": true,
-          "args": "name, parent: :effects, volume: 1.0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "parent", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "nil"},
           "about": "makes a mix group of the game's own under another (or moves it, or changes its volume)"
         },
         {
           "name": "effects",
           "static": true,
-          "args": "group, low_pass: nil, reverb: 0.0",
+          "params": [
+            {"name": "group", "type": "Symbol"},
+            {"name": "low_pass", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "reverb", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off"
         },
         {
