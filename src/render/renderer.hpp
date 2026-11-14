@@ -35,16 +35,21 @@ class Renderer {
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  // Uploads meshes, materials and textures, replacing the previous scene's assets.
+  // Uploads meshes, materials and textures, replacing the previous scene's assets. What was staged
+  // is dropped.
   void upload(const SceneDesc& desc);
+  // The same for the scene staged under `scene` (see stage): its staged assets are taken instead of
+  // being sent again; what was staged under another is dropped.
+  void upload(const SceneDesc& desc, int scene);
   // Uploads assets added to `desc` since the last upload/sync and refreshes every material's values
   // (cheap enough to call every frame in the editor).
   void sync(const SceneDesc& desc);
   // Readies the textures and meshes of the scene to be shown next on the graphics card, a share at
   // a time, while the scene uploaded before is still drawn: about `bytes` a call, within
-  // `budget`, at least one asset. True once all of them are; the next upload takes them instead
-  // of sending them again.
-  bool stage(const SceneDesc& desc, std::size_t bytes, const FrameBudget& budget);
+  // `budget`, at least one asset. `scene` is what the caller calls that scene (a generation): what
+  // was staged under another is dropped first. True once all of them are.
+  bool stage(const SceneDesc& desc, int scene, std::size_t bytes, const FrameBudget& budget);
+  static constexpr int kNoStagedScene = -1;  // (what stage is never called with)
   // Releases what stage readied (a scene that will not be shown after all).
   void drop_staged();
   // Borrows an uploaded image for this frame, or returns an empty texture. Never unload it.

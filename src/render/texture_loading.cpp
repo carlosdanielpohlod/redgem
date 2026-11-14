@@ -85,7 +85,7 @@ Texture2D load_scene_texture(const ImageData& image) {
 Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decoded) {
   if (decoded.unreadable) {
     log::warning("scene picture is unreadable; using a checkerboard");
-    return missing_picture_texture();
+    return with_smaller_copies(missing_picture_texture());
   }
   if (decoded.empty()) return load_scene_texture(image);
   // (raylib only reads the pixels of an image it uploads.)

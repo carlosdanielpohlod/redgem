@@ -19,15 +19,14 @@ bool SceneActivation::advance(const FrameBudget& budget, Presenter& presenter, s
   if (!bodies_made()) {
     make_bodies(budget);
     // (The frame the last bodies took all of uploads nothing: the next one does.)
-    if (!time_left_to_upload(budget)) return false;
+    if (!bodies_made()) return false;
+    if (budget.spent()) return false;
   }
   if (!presenter.prepare_scene(desc_, generation_, upload_bytes, budget)) return false;
   // A presenter that draws the pictures has them on the graphics card by now.
   if (presenter.draws_pictures()) desc_.decoded_images = {};
   return true;
 }
-
-bool SceneActivation::time_left_to_upload(const FrameBudget& budget) const { return bodies_made() && !budget.spent(); }
 
 void SceneActivation::make_all_bodies() {
   while (!bodies_made()) make_next_body();

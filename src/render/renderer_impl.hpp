@@ -289,7 +289,8 @@ struct Renderer::Impl {
   struct StagedAssets {
     std::vector<Texture2D> textures;
     std::vector<std::vector<GpuPrimitive>> meshes;
-    std::vector<float> morph_deltas;  // of the staged meshes' parts
+    std::vector<float> morph_deltas;       // of the staged meshes' parts
+    int scene = Renderer::kNoStagedScene;  // what Renderer::stage was told the scene is
   };
   StagedAssets staged;
   Mesh sky_mesh{};

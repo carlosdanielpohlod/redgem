@@ -3,21 +3,14 @@
 namespace redgem {
 
 bool FramePainter::prepare(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget) {
-  if (generation != prepared_generation_) drop_prepared();
-  prepared_generation_ = generation;
-  return renderer_.stage(desc, bytes, budget);
+  return renderer_.stage(desc, generation, bytes, budget);
 }
 
-void FramePainter::drop_prepared() {
-  renderer_.drop_staged();
-  prepared_generation_ = kNothingUploaded;
-}
+void FramePainter::drop_prepared() { renderer_.drop_staged(); }
 
 void FramePainter::take_scene(const FrameView& view) {
-  if (view.scene_generation != prepared_generation_) renderer_.drop_staged();
-  renderer_.upload(view.scene_desc);  // (with what was readied for it)
+  renderer_.upload(view.scene_desc, view.scene_generation);  // (with what was readied for it)
   uploaded_generation_ = view.scene_generation;
-  prepared_generation_ = kNothingUploaded;
 }
 
 void FramePainter::follow_game(const FrameView& view) {

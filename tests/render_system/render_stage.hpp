@@ -50,9 +50,10 @@ class RenderStage {
   // every frame (new pictures and materials, and their values).
   void sync(const SceneDesc& desc) { renderer_->sync(desc); }
   // Readies the next scene's assets ahead of its upload, about `bytes` a call (Renderer::stage).
-  bool stage(const SceneDesc& desc, std::size_t bytes) {
-    return renderer_->stage(desc, bytes, FrameBudget({}, kStageSeconds));
+  bool stage(const SceneDesc& desc, int scene, std::size_t bytes) {
+    return renderer_->stage(desc, scene, bytes, FrameBudget({}, kStageSeconds));
   }
+  void upload(const SceneDesc& desc, int scene) { renderer_->upload(desc, scene); }
   void drop_staged() { renderer_->drop_staged(); }
   void begin_scene_texture_use() { renderer_->begin_scene_texture_use(); }
   void end_scene_texture_use() { renderer_->end_scene_texture_use(); }

@@ -56,7 +56,10 @@ Renderer::~Renderer() {
   impl_->release();
 }
 
-void Renderer::upload(const SceneDesc& desc) {
+void Renderer::upload(const SceneDesc& desc) { upload(desc, kNoStagedScene); }
+
+void Renderer::upload(const SceneDesc& desc, int scene) {
+  if (impl_->staged.scene != scene) impl_->release_staged();
   impl_->release_assets();
   impl_->reset_water_ripples();
   impl_->faces_captured = 0;  // do not reflect the previous scene while the new one is captured
@@ -72,7 +75,9 @@ bool share_used(std::size_t sent, std::size_t bytes, const FrameBudget& budget) 
 }
 }  // namespace
 
-bool Renderer::stage(const SceneDesc& desc, std::size_t bytes, const FrameBudget& budget) {
+bool Renderer::stage(const SceneDesc& desc, int scene, std::size_t bytes, const FrameBudget& budget) {
+  if (impl_->staged.scene != scene) impl_->release_staged();
+  impl_->staged.scene = scene;
   std::size_t sent = 0;
   while (!impl_->staged_all(desc)) {
     sent += impl_->stage_next(desc);  // (one at least, whatever is left of the frame)

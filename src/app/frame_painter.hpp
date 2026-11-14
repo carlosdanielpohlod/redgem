@@ -42,7 +42,6 @@ class FramePainter {
 
   Renderer& renderer_;
   int uploaded_generation_ = kNothingUploaded;
-  int prepared_generation_ = kNothingUploaded;
   std::filesystem::path images_dir_;
 };
 

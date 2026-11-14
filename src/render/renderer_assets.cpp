@@ -96,6 +96,10 @@ Texture2D blank_map(int slot) {
   return Texture2D{rlGetTextureIdDefault(), 1, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
 }
 
+// A texture's smaller copies add about a third to what its picture sends.
+constexpr std::size_t kMipChainNumerator = 4;
+constexpr std::size_t kMipChainDenominator = 3;
+
 template <typename Element>
 std::size_t bytes_of(const std::vector<Element>& elements) {
   return elements.size() * sizeof(Element);
@@ -115,9 +119,11 @@ bool has_decoded(const SceneDesc& desc, std::size_t image) {
   return image < desc.decoded_images.size() && !desc.decoded_images[image].empty();
 }
 
-// Roughly what a picture sends: its pixels, or its file's bytes when it was not decoded yet.
+// Roughly what a picture sends: its pixels and their smaller copies, or its file's bytes when it
+// was not decoded yet.
 std::size_t picture_bytes(const SceneDesc& desc, std::size_t image) {
-  if (has_decoded(desc, image)) return desc.decoded_images[image].pixels.size();
+  if (has_decoded(desc, image))
+    return desc.decoded_images[image].pixels.size() * kMipChainNumerator / kMipChainDenominator;
   return desc.images[image].encoded.size();
 }
 
