@@ -24,13 +24,12 @@ unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   return buffer;
 }
 
-// Lets go of the errors earlier calls left, so that the next check is of a call's own.
+}  // namespace
+
 void forget_errors() {
   while (glGetError() != GL_NO_ERROR) {
   }
 }
-
-}  // namespace
 
 int largest_target_side() {
   GLint texture = 0;

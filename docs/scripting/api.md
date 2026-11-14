@@ -62,6 +62,8 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_collision_enter(other)`: this object's body touched another
 - `on_collision_exit(other)`: this object's body stopped touching another
 - `on_destroy`: the object is being destroyed
+- `Behaviour.persist(*fields)`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
+- `Behaviour.persisted_fields`: what persist named, in this class and those above it
 - `game_object`: the object this behaviour is attached to
 - `name`: the object's name
 - `transform`: the object's Transform
@@ -242,6 +244,8 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.gamepad_down?(button)`: whether a gamepad button (:a, :b, :x, :y...) is held
 - `Input.gamepad_pressed?(button)`: whether a gamepad button went down this frame
 - `Input.gamepad_released?(button)`: whether a gamepad button went up this frame
+- `Input.rumble?`: whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)
+- `Input.rumble(pad, strength, seconds)`: rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)
 - `Input.text`: what was typed this frame
 - `Input.touch_controls = on`: shows the on-screen stick and buttons of a phone
 - `Input.touch_controls?`: whether they are shown
@@ -706,8 +710,13 @@ What the game keeps between runs. See [online-services.md#saving-on-a-server](on
 - `Save.slot`: the selected save slot name; default keeps the existing save file
 - `Save.slot = name`: selects a named slot for this engine; default restores the original store
 - `Save.slots`: sorted names of persisted slots and slots opened in this run, including default
+- `Save.version`: the version of the saved data this game writes, or nil
+- `Save.version = number`: declares that version (1 or more): older slots are migrated, newer ones refused
+- `Save.migrate(from:, &block)`: the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one
+- `Save.checkpoint(key = :checkpoint)`: keeps this scene's spawned objects whose behaviours persist fields; returns how many
+- `Save.restore_checkpoint(key = :checkpoint)`: spawns them again in place of the current ones; returns the new copies
 
-Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata.
+Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Each slot records the Save.version that wrote it: the first use of a slot (or Save.slot =) runs the migration hooks it needs, in order, and writes the result back at once; a slot from a newer game, or one a hook raised on, is left untouched and every use of it raises a RuntimeError saying why (Save.slot = then keeps the previous slot). A slot written before the game declared a version counts as version 1.
 
 ## HTTP
 
@@ -752,6 +761,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.leave`: leaves the game
 - `Network.online?`: whether this machine is in a game
 - `Network.connecting?`: whether a join is on its way
+- `Network.reconnecting?`: whether this machine's connection dropped and it is getting back in
+- `Network.reconnect_window`: seconds the game hosted here holds a dropped player's place (0: none)
+- `Network.reconnect_window = seconds`: holds a dropped player's place and id that long, up to 300 (0 turns it off)
 - `Network.host?`: whether this machine hosts
 - `Network.server?`: whether this machine is a dedicated server
 - `Network.id`: this machine's peer id
@@ -777,6 +789,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.on_join(&block)`: someone arrived: |peer|
 - `Network.on_leave(&block)`: someone left: |peer|
 - `Network.on_fail(&block)`: a join did not work out: |reason|
+- `Network.on_reconnecting(&block)`: a connection dropped and its place is held: |peer|
+- `Network.on_reconnected(&block)`: a dropped machine is back in its place: |peer|
+- `Network.on_lost(&block)`: this machine could not get back in time: |reason|
 - `Network.authenticate(&block)`: decides who gets in: |peer, auth, decide|
 - `Network.identity(peer)`: who a peer was accepted as
 - `Network.player_name(peer)`: a peer's name
@@ -802,4 +817,4 @@ A behaviour: the same object in the same place on every machine. See [multiplaye
 
 ## Notes
 
-Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
+Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
