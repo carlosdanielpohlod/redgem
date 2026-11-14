@@ -20,9 +20,9 @@
 using namespace redgem;
 
 namespace {
-constexpr int kCrates = 600;             // far more bodies than one frame's share makes
-constexpr double kWorkTick = 0.0005;     // each reading of the work clock: one piece of work done
-constexpr int kFrameLimit = 100000;      // a load that never finishes fails instead of hanging
+constexpr int kCrates = 600;          // far more bodies than one frame's share makes
+constexpr double kWorkTick = 0.0005;  // each reading of the work clock: one piece of work done
+constexpr int kFrameLimit = 100000;   // a load that never finishes fails instead of hanging
 constexpr float kCrateSpacing = 2.0f;
 constexpr const char* kLevel = "level2";  // (its scene script is the sandbox's)
 
@@ -107,7 +107,7 @@ TEST_CASE("a big level is made ready over many frames, none taking more than its
   }
   REQUIRE(engine->scene_name() == kLevel);
   CHECK(loading_frames > 2);
-  CHECK(longest <= kActivationSecondsPerFrame + kWorkTick);  // the margin: the piece that ran over
+  CHECK(longest <= kActivationSecondsPerFrame + kWorkTick);                      // the margin: the piece that ran over
   CHECK(ruby(*engine, "$loading_draws") == std::to_string(loading_frames - 1));  // all but the swap's
   CHECK(every_crate_has_a_body(*engine));
 }
@@ -153,7 +153,8 @@ TEST_CASE("cancelling a level while it is made ready keeps the running scene") {
 }
 
 TEST_CASE("a scene read for a game that draws it has its pictures decoded in the background") {
-  const auto bytes = read_file_up_to(std::filesystem::path(test::fixture("images")) / "sniff.png", kMaxEncodedImageBytes);
+  const auto bytes =
+      read_file_up_to(std::filesystem::path(test::fixture("images")) / "sniff.png", kMaxEncodedImageBytes);
   REQUIRE(bytes.has_value());
   SceneLoader loader([&](const auto&, const auto&) {
     LoadResult result;

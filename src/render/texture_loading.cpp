@@ -89,8 +89,7 @@ Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decod
   }
   if (decoded.empty()) return load_scene_texture(image);
   // (raylib only reads the pixels of an image it uploads.)
-  const Image rows{const_cast<std::uint8_t*>(decoded.pixels.data()), decoded.width, decoded.height, 1,
-                   decoded.format};
+  const Image rows{const_cast<std::uint8_t*>(decoded.pixels.data()), decoded.width, decoded.height, 1, decoded.format};
   return with_smaller_copies(LoadTextureFromImage(rows));
 }
 

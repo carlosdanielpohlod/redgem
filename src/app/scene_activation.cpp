@@ -27,9 +27,7 @@ bool SceneActivation::advance(const FrameBudget& budget, Presenter& presenter, s
   return true;
 }
 
-bool SceneActivation::time_left_to_upload(const FrameBudget& budget) const {
-  return bodies_made() && !budget.spent();
-}
+bool SceneActivation::time_left_to_upload(const FrameBudget& budget) const { return bodies_made() && !budget.spent(); }
 
 void SceneActivation::make_all_bodies() {
   while (!bodies_made()) make_next_body();

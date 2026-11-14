@@ -105,8 +105,8 @@ std::size_t bytes_of(const std::vector<Element>& elements) {
 std::size_t mesh_bytes(const MeshDesc& mesh) {
   std::size_t bytes = 0;
   for (const PrimitiveDesc& piece : mesh.primitives) {
-    bytes += bytes_of(piece.positions) + bytes_of(piece.normals) + bytes_of(piece.texcoords) +
-             bytes_of(piece.colors) + bytes_of(piece.indices) + bytes_of(piece.joints) + bytes_of(piece.weights);
+    bytes += bytes_of(piece.positions) + bytes_of(piece.normals) + bytes_of(piece.texcoords) + bytes_of(piece.colors) +
+             bytes_of(piece.indices) + bytes_of(piece.joints) + bytes_of(piece.weights);
   }
   return bytes;
 }

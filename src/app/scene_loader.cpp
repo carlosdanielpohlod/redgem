@@ -35,8 +35,8 @@ LoadResult read_and_decode(const SceneLoader::Reader& reader, const std::filesys
   return loaded;
 }
 
-LoadResult invoke_reader(const SceneLoader::Reader& reader, const std::filesystem::path& game,
-                         const std::string& name, bool decode_pictures) {
+LoadResult invoke_reader(const SceneLoader::Reader& reader, const std::filesystem::path& game, const std::string& name,
+                         bool decode_pictures) {
   try {
     return read_and_decode(reader, game, name, decode_pictures);
   } catch (const std::exception& error) {
@@ -145,7 +145,8 @@ LoadResult read_scene_data(const std::filesystem::path& game, const std::string&
 void decode_scene_pictures(SceneDesc& scene) {
   scene.decoded_images.clear();
   scene.decoded_images.reserve(scene.images.size());
-  for (const ImageData& image : scene.images) scene.decoded_images.push_back(render_detail::decode_scene_picture(image));
+  for (const ImageData& image : scene.images)
+    scene.decoded_images.push_back(render_detail::decode_scene_picture(image));
 }
 
 SceneLoader& shared_scene_loader() {

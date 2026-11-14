@@ -52,6 +52,7 @@ Renderer::Renderer(const Window&) : impl_(std::make_unique<Impl>()) {
 
 Renderer::~Renderer() {
   end_scene_texture_use();
+  impl_->release_staged();  // (assets readied for a scene never shown)
   impl_->release();
 }
 

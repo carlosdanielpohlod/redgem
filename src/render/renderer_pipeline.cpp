@@ -108,7 +108,6 @@ void Renderer::Impl::release() {
   release_previous_texels();
   release_particle_buffer(particle_buffer);
   release_assets();
-  release_staged();
   release_targets();
   free_maps(fallback_material);
   release_sky();
