@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <string>
 
@@ -184,9 +185,9 @@ bool SaveFile::write() {
   std::filesystem::create_directories(file_.parent_path(), fs_error);
   const std::string text = saved::written(as_json(values_), kIndent) + "\n";
   back_up_previous();
-  if (!durable::replace_file(file_, text, flush_)) return false;
-  on_disk_ = text;
-  return true;
+  in_step_ = durable::replace_file(file_, text, flush_);
+  if (in_step_) on_disk_ = text;
+  return in_step_;
 }
 
 std::optional<nlohmann::json> SaveFile::get(const std::string& key) {
@@ -213,6 +214,32 @@ bool SaveFile::clear() {
   load();
   values_.clear();
   return write();
+}
+
+// (What could not be written is not kept either: the values stay as the file has them.)
+bool SaveFile::replace(const Values& values) {
+  load();
+  std::map<std::string, nlohmann::json> previous = std::move(values_);
+  values_.clear();
+  for (const auto& [key, value] : values) {
+    if (!value.is_null()) values_[key] = saved::kept(value).value_or(nlohmann::json());
+  }
+  if (write()) return true;
+  values_ = std::move(previous);
+  return false;
+}
+
+// (A change that leaves the value as the file already has it writes nothing, and so keeps the
+// backup of the save before: a migration's update of its version, say.)
+bool SaveFile::update(const std::string& key, const Change& change) {
+  const auto current = get(key);
+  const nlohmann::json made = change(current);
+  if (unchanged(current, made)) return true;
+  return set(key, made);
+}
+
+bool SaveFile::unchanged(const std::optional<nlohmann::json>& current, const nlohmann::json& made) const {
+  return in_step_ && !writes_refused_ && saved::kept(made) == current;
 }
 
 std::vector<std::string> SaveFile::keys() {

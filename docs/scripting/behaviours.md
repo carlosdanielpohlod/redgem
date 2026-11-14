@@ -102,6 +102,20 @@ end
 `find!` is `find` that stops with a clear error when the object is missing. With a scene script
 the level file says what is there and where, and Ruby says what it does.
 
+## Keeping spawned objects in the save
+
+A behaviour of an object `Scene.spawn` made can ask for the object to be saved, with the fields
+it names:
+
+```ruby
+class DroppedItem < Behaviour
+  persist :kind, :count
+end
+```
+
+`Save.checkpoint` keeps such objects, and `Save.restore_checkpoint` spawns them again, giving the
+fields back before `start` runs. See [Keep spawned objects](gameplay.md#keep-spawned-objects).
+
 ## When a script fails
 
 An error in a behaviour does not stop the game. That behaviour is switched off, and the Console

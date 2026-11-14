@@ -56,10 +56,11 @@ module UI
     end
   end
 
-  # Whether one of the keys or gamepad buttons of `controls` ([keys, buttons]) was pressed this frame.
-  def self.pressed_any?(controls)
+  # Whether one of the keys or gamepad buttons of `controls` ([keys, buttons]) was pressed this frame
+  # (the buttons on gamepad `pad`).
+  def self.pressed_any?(controls, pad: Input::FIRST_PAD)
     keys, buttons = controls
-    keys.any? { |key| Input.pressed?(key) } || buttons.any? { |button| Input.gamepad_pressed?(button) }
+    keys.any? { |key| Input.pressed?(key) } || buttons.any? { |button| Input.gamepad_pressed?(button, pad: pad) }
   end
 
   # 1 when `forth` was pressed this frame, -1 for `back`, 0 for neither (or both).
