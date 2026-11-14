@@ -63,6 +63,11 @@ struct GameObject {
   PropertyMap props;
   bool visible = true;
   Vec3 tint = Vec3::one();  // multiplies the colors of this object's mesh (prop `tint = "#rrggbb"`)
+  // The shape keys (morph targets) of its mesh by name, and how much of each it shows: the mesh's
+  // own weights at first, then what clips (weights channels) and scripts (GameObject#morph) set.
+  std::vector<std::string> morph_names;
+  std::vector<float> morph_weights;
+  std::vector<float> morph_rest;  // the mesh's own weights: what a clip laid over by less than whole starts from
   // Drawn only while this far from the camera, in meters (props `visible_from`, `visible_to`).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
@@ -109,13 +114,26 @@ class Scene {
   ObjectId find_by_stable_id(const std::string& identity) const;
   std::vector<ObjectId> find_all_by_tag(const std::string& tag) const;
   std::vector<ObjectId> alive_ids() const;
-  // First alive object holding a camera, or kNoObject.
+  // The camera the game is seen through: the one chosen (choose_main_camera) while it is alive and
+  // still a camera, else the first alive object holding a camera, or kNoObject.
   ObjectId main_camera() const;
+  // Chooses the camera the game is seen through; kNoObject goes back to the first one. The choice
+  // is the scene's: a scene loaded anew starts with none.
+  void choose_main_camera(ObjectId id);
 
   Transform world_transform(ObjectId id) const;
   void set_world_transform(ObjectId id, const Transform& world);
   void set_world_position(ObjectId id, Vec3 position);
   void set_world_rotation(ObjectId id, Quat rotation);
+
+  // Whether putting `id` under `parent` would make it its own ancestor: `parent` is `id` or one of
+  // the objects under it.
+  bool would_cycle(ObjectId id, ObjectId parent) const;
+  // Puts an object under another one (kNoObject: at the root of the scene), at the end of its
+  // children. keep_world keeps where it is in the world; otherwise it keeps its local transform and
+  // moves with the new parent. A part of a copy becomes the root of a copy of its own. The caller
+  // refuses a parent that would_cycle.
+  void set_parent(ObjectId id, ObjectId parent, bool keep_world);
 
   // True for objects marked `prefab = true` and their descendants.
   bool is_prefab(ObjectId id) const { return valid(id) && objects_[id].prefab; }
@@ -153,6 +171,16 @@ class Scene {
   // lies outside the copy, and unchanged (finding nothing) when the bone is gone.
   ObjectHandle copied_joint(ObjectHandle joint, const std::vector<std::pair<ObjectId, ObjectId>>& copies) const;
   bool valid(ObjectId id) const { return is_index_of(id, objects_.size()); }
+  // The first alive object holding a camera, or kNoObject.
+  ObjectId first_camera() const;
+  // Whether an id is an alive camera of the game (not a template's).
+  bool is_live_camera_id(ObjectId id) const;
+  // Whether an object is inside a copy, not its root (see GameObject::copy_root).
+  static bool is_part_of_copy(const GameObject& object);
+  // A part taken out of a copy is the root of a copy of its own from then on, with what it carries:
+  // the clip of the copy it left no longer poses it, and nothing of it names that copy's root,
+  // whose slot may hold another object later. Changes `from` to `to` in `id`'s subtree.
+  void move_copy_root(ObjectId id, ObjectId from, ObjectId to);
   // A slot for a new copy: one a destroyed copy left, else a new one at the end.
   ObjectId free_slot();
   // The handles of the bones of a node's skin, which must all be in the scene by then.
@@ -171,6 +199,7 @@ class Scene {
   std::vector<ObjectId> free_slots_;  // left by destroyed copies, used again last in first out
   std::unordered_map<ObjectId, std::vector<ObjectId>> copies_;  // original -> its copies not finalized
   Scattered scattered_;
+  ObjectHandle chosen_camera_;  // the camera a script chose to see through (Camera.main =)
 };
 
 }  // namespace redgem

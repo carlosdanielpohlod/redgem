@@ -86,6 +86,10 @@ class GltfReader {
   std::nullopt_t dropped(const std::string& mesh_name, const std::string& why);
   // A mesh exported without normals is lit as if it faced up everywhere.
   void ensure_normals(PrimitiveDesc& primitive, const std::string& mesh_name);
+  // The shape keys of a mesh's parts, their names and starting weights. Keys that do not fit
+  // every part alike (a different number of them, or not one delta per vertex) are left out of
+  // the whole mesh with a warning.
+  void keep_targets(MeshDesc& mesh, const cgltf_mesh& source);
 
   // The tree of objects.
   void load_nodes();

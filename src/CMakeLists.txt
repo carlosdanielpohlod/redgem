@@ -7,6 +7,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/components.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/physics.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/joint.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/navigation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
@@ -34,6 +35,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_orbit.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_shake.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_rig.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera_cut.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation_graph.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
@@ -188,7 +190,8 @@ redgem_add_library(redgem_core
   core/math.cpp
   core/fixed_clock.cpp
   core/frame_profiler.cpp
-  core/stopwatch.cpp)
+  core/stopwatch.cpp
+  core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
 # (The Basis Universal transcoder: KTX2 textures, see core/ktx2_image.hpp.)
@@ -333,6 +336,13 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_joints.cpp
   physics/jolt/jolt_physics_world_queries.cpp
   physics/jolt/jolt_physics_world_debug.cpp
+  navigation/nav_settings.cpp
+  navigation/nav_grid.cpp
+  navigation/nav_bake.cpp
+  navigation/nav_physics_probe.cpp
+  navigation/nav_path.cpp
+  navigation/nav_queries.cpp
+  navigation/navigation.cpp
   audio/audio.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
@@ -376,6 +386,7 @@ redgem_add_library(redgem_runtime
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
   script/bindings/object_state_bindings.cpp
+  script/bindings/shape_key_bindings.cpp
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
@@ -388,6 +399,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_args.cpp
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
+  script/bindings/navigation_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -465,6 +477,7 @@ redgem_add_library(redgem_runtime
   render/texel_rows.cpp
   render/instance_records.cpp
   render/instance_batches.cpp
+  render/morph_shapes.cpp
   render/scatter_chunks.cpp
   render/capture_views.cpp
   render/shader_source.cpp

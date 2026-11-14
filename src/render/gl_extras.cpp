@@ -95,6 +95,8 @@ void set_alpha_to_coverage(bool on) {
   }
 }
 
+void set_clockwise_front_faces(bool clockwise) { glFrontFace(clockwise ? GL_CW : GL_CCW); }
+
 void filter_cube_maps_across_seams() {
 #if !defined(GRAPHICS_API_OPENGL_ES3)
   glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);

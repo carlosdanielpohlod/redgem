@@ -16,6 +16,34 @@ until 1.0, a release may change what games rely on (see
   ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
   file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
   encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
+
+- **Benchmarks and a server load test with thresholds**: `redgem_bench` times the hot paths that
+  need no window (script updates, the physics step, loading a `.glb`, the network frame, JSON
+  saves, HTTP parsing) and reports each one's median and 95th percentile; `redgem_server_load` fills
+  a dedicated server's rooms with bots and reads its status port for its frame time, bytes a second
+  and dropped clients. A new `Benchmarks` CI workflow runs both on Linux, keeps the results as an
+  artifact, and fails only when a result clearly passes its ceiling in `tests/bench/thresholds.json`
+  (see the contributing guide).
+
+- **Mirrored objects**: an object placed with a negative scale on one axis (or three), as
+  Blender's mirror leaves it, is drawn the right way out in every pass (the lit picture, the
+  sun's shadow cascades, the point and spot shadow atlas, motion vectors and see-through
+  surfaces). Mirrored copies of a mesh are batched apart, so the winding changes only between
+  runs of them. A node given as a mirroring matrix is read with a negative x scale.
+
+- **Duplicated characters animate**: duplicating an object in the editor copies the channels of
+  every clip that moves it onto the copy, so a duplicated character plays the original's clips
+  (Wave, Walk...) instead of standing in the pose it was copied in; the copy itself stays where
+  it is put. Undoing the duplicate drops them again.
+
+- **Shape keys (morph targets)**: a mesh's shape keys are read from glTF with their names, starting
+  weights, position and normal deltas, and clips' `weights` channels play them. The vertex shader
+  applies them as it does bones: every part's deltas in one float texture and, per drawn copy,
+  its eight heaviest keys in the frame's texels, so copies drawn in one call each show their own
+  weights (lit, shadow, motion and see-through passes alike, desktop and OpenGL ES). Scripts set
+  them by name: `face.morph(:Smile, 0.7)`, `face.morph(:Smile)`, `face.morph_names`. Imported
+  models keep their shape keys in the editor.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
@@ -42,7 +70,33 @@ until 1.0, a release may change what games rely on (see
   fractions of the screen with `normalized`. It all goes through the input the game reads, so
   `Input.mouse_*`, actions bound to `mouse:left` or `pad:a`, and gamepad reads see it as a
   player's.
+- **Navigation**: `Navigation.path(from, to)` finds the way around walls, along floors and up
+  stairs and gentle slopes: Vector3 waypoints pulled straight, or nil when there is no way there.
+  `Navigation.nearest(point)`, `Navigation.walkable?(point)`, `Navigation.draw` (the walkable cells
+  around a point, for a frame), `Navigation.bake` and `Navigation.stats`. The walkable area is a
+  2.5D grid baked from the scene's static bodies as each scene loads (or when a script first asks),
+  sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
+  `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
+  (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
 
+- **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
+  scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
+  to the scene's first. `Camera.cut_to(camera, fade: seconds)` cuts through black: the picture
+  darkens over the first half, the cut happens at the darkest frame, and it comes back over the
+  second half, also while the game is paused, under the UI; `Camera.cutting?` says whether one is
+  playing. A camera switched away from keeps its follow or orbit for when it is back. The
+  view natives (`screen_ray`, `world_to_screen`, `fov`) and the helpers (`follow`, `orbit`,
+  `shake`) act on the camera switched to. A scene loaded anew starts at its own first camera.
+  Temporal anti-aliasing and motion blur take any switch for a cut, however near the cameras are,
+  so nothing of the last shot smears into the next.
+- **Parents from scripts**: `Scene.spawn(..., name:, parent:)` names the copy (so `Scene.find`
+  finds it) and puts it under an object, keeping its place in the world. `GameObject#parent =`
+  moves an object under another one at runtime, keeping its place in the world, or at the root
+  with `nil`; `set_parent(object, keep_world: false)` keeps its local transform instead. An object
+  never goes under itself or what it carries, nor under a template, and a vehicle's wheel stays on
+  it; a part taken out of a spawned copy leaves that copy's animation. A kinematic body under a parent
+  goes where it takes it; a dynamic one keeps its own motion, and is taken to its new place
+  (stopped, as when a script sets its position) when `keep_world: false` moves it.
 - **Packed games**: `redgem build` packs a game's scripts, scenes, pictures, sounds, music, fonts,
   `game.json` and translations into one file, `game.rgpak`, beside the executable (inside the Mac
   app, and as one asset of the Android app), compressed where that makes a file smaller. The
@@ -203,6 +257,10 @@ until 1.0, a release may change what games rely on (see
 - **`Audio.music` with a missing file** leaves the track playing as it was, instead of stopping it.
 - **`Audio.stop_sources`** stops every sound with an id, flat ones included. A game's sounds stop
   when it ends (the editor's Stop included), and so do its player's group volumes.
+- **The network tests no longer time the real clock**: the relay, a dedicated server's turns and
+  rooms, and HTTP timeouts read time from a small `Clock` (`core/clock.hpp`, the steady clock by
+  default), which tests replace with a fake one they move by hand. A server room thread now stops
+  within one turn's wait instead of at once.
 
 ### Fixed
 

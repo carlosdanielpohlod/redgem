@@ -104,6 +104,9 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
   `coverage` artifact. The system tests are not run there: drawn by a software renderer, they
   would take hours with sanitizers on.
 
+* **Benchmarks** (`bench.yml`): the benchmarks and the server load test below, on Linux, in a job
+  of its own that builds only what it runs. It fails when a result clearly passes its ceiling.
+
 * **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on a pull request, ten minutes
   each every night.
 
@@ -152,6 +155,41 @@ crashes it, fix the code and add the input to the target's corpus: its replay ke
 new parser of untrusted input gets a target of its own (`redgem_add_fuzz_target` in
 `tests/fuzz/CMakeLists.txt`).
 
+### Benchmarks
+
+`redgem_bench` times the engine's hot paths that need no window and no graphics card: the script
+VM updating 1000 behaviours, a physics step of 400 falling boxes, loading and parsing the
+platformer's `scene.glb`, encoding and decoding a network frame (a full room's poses and a few game
+messages), writing and reading a JSON save, and parsing a chunked HTTP answer. Each benchmark
+takes repeated samples (microseconds per operation) and reports their median and 95th percentile.
+`redgem_server_load` fills a `redgem-server` with K rooms of bots that play for T seconds over
+loopback, and reads its [status port](dedicated-server.md#status) every second: the server's frame
+time (average and worst), bytes a second in and out, its processor time per tick, the clients it
+dropped and the rooms that never opened. Neither is built with the tests:
+
+```bash
+cmake --build build --target redgem_bench redgem_server redgem_server_load
+./build/tests/redgem_bench --out bench-results/bench.json        # --runs 30, --only physics
+tests/load/run_server_load.sh build/src/redgem-server build/tests/redgem_server_load games/platformer \
+  4 4 20 --out bench-results/load.json                           # rooms, bots per room, seconds
+python3 -I tools/bench/check_thresholds.py bench-results/*.json
+```
+
+Run them on an otherwise quiet machine: the numbers are the machine's as much as the engine's.
+Both print a table and write their results as JSON. `tools/bench/check_thresholds.py` holds them to
+the ceilings in `tests/bench/thresholds.json`: a value over its ceiling is a warning, and one over
+the ceiling plus the file's `tolerance` (a share of the ceiling) fails, as does a ceiling whose
+result is missing. The CI's `Benchmarks` workflow runs all three and keeps the results as the run's
+`bench-results` artifact (90 days), to compare runs over time.
+
+The ceilings are generous on purpose: GitHub's runners are shared, and a check that fails on noise
+gets ignored. They were set from the first CI results with ample headroom (about three times the
+median). To update them, download `bench-results` from a few recent runs on `main`, take the
+largest value of each, and set its ceiling well above that, never just above it. Raise a ceiling
+when a change makes something slower on purpose, and say why in the pull request; lower one when a
+change makes it clearly faster, so that the gain is kept. A new benchmark gets its ceiling once its
+first CI numbers are in (until then it is listed as having none, and passes).
+
 ### Releases
 
 The downloads of a release (`redgem-linux-x86_64.tar.gz`, `redgem-windows-x86_64.zip`,
@@ -185,6 +223,7 @@ src/scene     scene graph (objects, transforms, copies), particles, the custom p
               animations, Blender extras), animation/ (clips and their playback), shapes/
               (primitives and terrain)
 src/physics   PhysicsWorld interface + Jolt implementation
+src/navigation the walkable grid baked from the static bodies, paths on it (A*, pulled straight)
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources; a touch
               screen's on-screen controls (touch_input_source.hpp), which only the program for
               a touch screen puts in front of the others
@@ -233,8 +272,8 @@ cmake         dependencies (pinned versions) and file embedding
 ```
 
 The folders of `src` are layers, in the order above: each includes only itself and what is below
-it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `render` and
-`script`; then `app`; then `server`, `editor`, `project`; `testing` sees everything and nothing
+it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `navigation`
+(above `physics`) and `render`; then `script`; then `app`; then `server`, `editor`, `project`; `testing` sees everything and nothing
 sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 
