@@ -64,7 +64,7 @@ NodeDesc instance_root(const SceneDesc& source, NodeDesc authored, const Assets&
   auto root = instance_node_desc(source.nodes.front(), source, assets, instance);
   root.name = std::move(authored.name);
   if (root.name.empty()) root.name = source.nodes.front().name;
-  root.local = checked_placement(combine(authored.local, source.local));
+  root.local = checked_placement(combine(authored.local, source.nodes.front().local));
   root.parent = authored.parent;
   root.stable_id = std::move(authored.stable_id);
   root.source_node = authored.source_node;
