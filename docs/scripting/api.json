@@ -2771,7 +2771,12 @@
         {
           "name": "ducking",
           "static": true,
-          "args": "volume: 0.4, attack: 0.15, release: 0.6",
+          "params": [
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.4"},
+            {"name": "attack", "type": "Numeric", "keyword": true, "optional": true, "default": "0.15"},
+            {"name": "release", "type": "Numeric", "keyword": true, "optional": true, "default": "0.6"}
+          ],
+          "returns": {"type": "bool"},
           "about": "how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off"
         },
         {
