@@ -18,6 +18,7 @@ constexpr const char* kFly = "fly_speed";
 constexpr const char* kTranslate = "translate_snap";
 constexpr const char* kRotate = "rotate_snap";
 constexpr const char* kScale = "scale_snap";
+constexpr const char* kInterfaceScale = "interface_scale";
 
 bool in_range(double value, float min, float max) { return std::isfinite(value) && value >= min && value <= max; }
 
@@ -25,6 +26,11 @@ float number(const nlohmann::json& json, const char* key, float fallback, float 
   if (!holds_number(json, key)) return fallback;
   const auto value = json.at(key).get<double>();
   return in_range(value, min, max) ? static_cast<float>(value) : fallback;
+}
+
+std::optional<float> read_interface_scale(const nlohmann::json& json) {
+  const float scale = number(json, kInterfaceScale, 0, kMinEditorScale, kMaxEditorScale);
+  return scale > 0 ? std::optional<float>{scale} : std::nullopt;
 }
 
 FlyBindings read_fly_bindings(const nlohmann::json& json) {
@@ -63,6 +69,7 @@ EditorPreferences read_editor_preferences(const std::filesystem::path& file) {
   values.rotate_snap = number(json, kRotate, values.rotate_snap, kMinSnapStep, kMaxRotateSnap);
   values.scale_snap = number(json, kScale, values.scale_snap, kMinSnapStep, kMaxSnapStep);
   if (json.contains(kFlyKeys)) values.fly_bindings = read_fly_bindings(json.at(kFlyKeys));
+  values.interface_scale = read_interface_scale(json);
   return values;
 }
 
@@ -80,6 +87,15 @@ void merge_changes(nlohmann::json& json, const EditorPreferences& previous, cons
   if (previous.translate_snap != values.translate_snap) json[kTranslate] = values.translate_snap;
   if (previous.rotate_snap != values.rotate_snap) json[kRotate] = values.rotate_snap;
   if (previous.scale_snap != values.scale_snap) json[kScale] = values.scale_snap;
+}
+
+void merge_interface_scale(nlohmann::json& json, std::optional<float> previous, std::optional<float> value) {
+  if (previous == value) return;
+  if (value) {
+    json[kInterfaceScale] = *value;
+  } else {
+    json.erase(kInterfaceScale);
+  }
 }
 
 }  // namespace
@@ -105,9 +121,14 @@ bool validate_preferences(const EditorPreferences& values, std::string& error) {
     error = tr("editor.preferences.invalid_motion");
     return false;
   }
-  if (valid_fly_bindings(values.fly_bindings)) return true;
-  error = tr("editor.preferences.invalid_keys");
-  return false;
+  if (!valid_fly_bindings(values.fly_bindings)) {
+    error = tr("editor.preferences.invalid_keys");
+    return false;
+  }
+  const auto scale = values.interface_scale;
+  const bool valid_scale = !scale || in_range(*scale, kMinEditorScale, kMaxEditorScale);
+  if (!valid_scale) error = tr("editor.preferences.invalid_interface_scale");
+  return valid_scale;
 }
 
 }  // namespace
@@ -121,6 +142,7 @@ bool write_editor_preferences(const std::filesystem::path& file, const EditorPre
   if (!json) return false;
   merge_changes(*json, previous, values);
   merge_fly_bindings(*json, previous.fly_bindings, values.fly_bindings);
+  merge_interface_scale(*json, previous.interface_scale, values.interface_scale);
   return write_json_file(file, *json, error);
 }
 

@@ -125,6 +125,7 @@ class EditorApp {
   void stop();
   void toggle_pause();
   void save();
+  void open_preferences() { preferences_requested_ = true; }
   // Restores the offered recovery copy as dirty work; the original stays untouched.
   bool recover_scene();
   // The game's scenes, by the names scripts load them with ("main" is scene.glb). Opens another

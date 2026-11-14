@@ -1,9 +1,13 @@
 #include "editor/editor_app.hpp"
 
+#include <algorithm>
+#include <cfloat>
+
 #include <imgui.h>
 
 #include "core/translations.hpp"
 #include "editor/ui/dpi.hpp"
+#include "editor/ui/interface.hpp"
 #include "editor/ui/labels.hpp"
 
 namespace redgem {
@@ -11,6 +15,15 @@ namespace {
 
 constexpr float kFieldWidth = 180.0f;
 constexpr const char* kValueFormat = "%.2f";
+constexpr float kPercent = 100.0f;
+constexpr float kPopupMargin = 24.0f;
+
+bool begin_preferences_dialog(const char* popup) {
+  if (!ImGui::IsPopupOpen(popup)) return false;
+  const float height = std::max(1.0f, ImGui::GetMainViewport()->WorkSize.y - ui::scaled(kPopupMargin));
+  ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, height));
+  return ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+}
 
 void preference_field(const char* key, float& value, float min, float max) {
   ImGui::SetNextItemWidth(ui::scaled(kFieldWidth));
@@ -45,12 +58,29 @@ void draw_fields(EditorPreferences& values) {
   preference_field("editor.preferences.scale", values.scale_snap, kMinSnapStep, kMaxSnapStep);
 }
 
+void draw_interface_scale(std::optional<float>& scale) {
+  bool automatic = !scale.has_value();
+  const bool toggled = ImGui::Checkbox(tr("editor.preferences.auto_interface_scale"), &automatic);
+  if (automatic) {
+    scale.reset();
+    return;
+  }
+  if (toggled) scale = std::clamp(ui::scaled(1.0f), kMinEditorScale, kMaxEditorScale);
+  float percent = *scale * kPercent;
+  ImGui::SetNextItemWidth(ui::scaled(kFieldWidth));
+  const bool changed =
+      ImGui::SliderFloat(tr("editor.preferences.interface_scale"), &percent, kMinEditorScale * kPercent,
+                         kMaxEditorScale * kPercent, "%.0f%%", ImGuiSliderFlags_AlwaysClamp);
+  if (changed) scale = percent / kPercent;
+}
+
 }  // namespace
 
 void EditorApp::apply_preferences(const EditorPreferences& values) {
   preferences_ = values;
   camera_.set_fly_speed(values.fly_speed);
   gizmo_.set_preferences(values);
+  interface_->set_scale_override(values.interface_scale);
 }
 
 void EditorApp::save_preferences() {
@@ -69,8 +99,9 @@ void EditorApp::draw_preferences_dialog() {
     preferences_error_.clear();
     ImGui::OpenPopup(popup);
   }
-  if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (!begin_preferences_dialog(popup)) return;
   draw_fields(edited_preferences_);
+  draw_interface_scale(edited_preferences_.interface_scale);
   draw_fly_bindings(edited_preferences_.fly_bindings);
   draw_preferences_actions();
   ImGui::EndPopup();

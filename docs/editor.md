@@ -181,7 +181,9 @@ use a denser framebuffer. Moving between monitors rebuilds spacing from the orig
 The font atlas rasterizes interface text, code and icons at the current density without replacing
 their font handles. Pointer coordinates, scene picking and the game's preview keep their existing
 coordinate system. The scene preview still renders at its logical viewport resolution, so its
-image does not yet gain the extra pixel density of Retina text. There is no manual scale override.
+image does not yet gain the extra pixel density of Retina text. In **Edit > Preferences**, turn
+off **Follow monitor scale** to set an editor scale from 75% to 200%. Save applies the scale to
+the editor immediately and remembers it for the next session. The project hub follows the monitor.
 
 ## Spot lights
 

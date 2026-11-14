@@ -223,8 +223,8 @@ not a promise of how it will be closed.
   loadable when reopening. Linked images keep their existing paths; scripts and external assets
   are not backed up. See [scene recovery](docs/editor.md#scene-recovery).
 - No animation preview. Only fly camera movement keys can be rebound; dark theme only.
-- Automatic monitor scaling applies to editor text and spacing. The scene preview renders at
-  logical viewport resolution, and there is no manual scale override.
+- The scene preview renders at logical viewport resolution. The editor has a manual interface
+  scale, while the project hub uses automatic monitor scaling.
 
 ### What a shipped game offers its players
 
