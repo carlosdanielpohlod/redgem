@@ -55,9 +55,7 @@ void EditorApp::render_viewport_texture() {
 void EditorApp::draw_edited_scene() {
   SceneViewport& view = *viewport_;
   aim_viewport_camera();
-  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
-  renderer_->set_motion_blur(kNoMotionBlur);
-  renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
+  set_editor_look();
   sync_renderer_assets();
   renderer_->draw_world(session_->scene(), view.camera, &view.target);
   std::optional<BrushMark> brush;
@@ -67,6 +65,13 @@ void EditorApp::draw_edited_scene() {
   draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
   EndMode3D();
   EndTextureMode();
+}
+
+void EditorApp::set_editor_look() {
+  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
+  renderer_->set_motion_blur(kNoMotionBlur);
+  renderer_->set_underwater({});               // the editor's camera flies through water without the look
+  renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
 }
 
 void EditorApp::aim_viewport_camera() {
@@ -122,8 +127,9 @@ void EditorApp::draw_viewport_hint(bool playing) {
   const SceneViewport& view = *viewport_;
   const bool terrain_selected = session_->is_terrain(session_->selection());
   const Hint& shown = kViewportHints[static_cast<int>(
-      editor_logic::viewport_hint({playing, view.focused, terrain_selected, terrain_tool_.sculpting}))];
-  const char* hint = ui::icon_label(shown.icon, shown.text);
+      editor_logic::viewport_hint({playing, view.focused, terrain_selected, using_terrain_brush()}))];
+  const bool paint_hint = !playing && terrain_selected && terrain_tool_.painting;
+  const char* hint = ui::icon_label(shown.icon, paint_hint ? "editor.inspector.terrain.paint_help" : shown.text);
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
       editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y, ui::scaled(1));

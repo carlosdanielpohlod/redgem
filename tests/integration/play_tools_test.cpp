@@ -8,9 +8,12 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "core/exit_codes.hpp"
 #include "core/files.hpp"
 #include "core/message_lines.hpp"
+#include "physics/body_limit.hpp"
 #include "project/game_checks.hpp"
 #include "project/game_tests.hpp"
 #include "project/script_messages.hpp"
@@ -46,6 +49,15 @@ class GameCopy {
   GameCopy& operator=(const GameCopy&) = delete;
 
   std::string dir() const { return dir_.string(); }
+  // Sets one key of game.json's "physics" section, keeping what else the file says.
+  void set_physics(const char* key, const nlohmann::json& value) const {
+    std::string error;
+    const auto text = read_text_file(dir_ / "game.json", error);
+    REQUIRE_MESSAGE(text, error);
+    nlohmann::json settings = nlohmann::json::parse(*text);
+    settings["physics"][key] = value;
+    write("game.json", settings.dump());
+  }
   void write(const std::string& file, const std::string& text) const {
     std::string error;
     fs::create_directories((dir_ / file).parent_path());
@@ -372,4 +384,17 @@ TEST_CASE("printed temporary values stay alive through their inspect and can rej
       tool({"run", game.dir(), "--frames", "1", "--print", "Class.new { def inspect = 42 }.new"});
   CHECK(invalid.exit_code == kExitFailure);
   CHECK(has(invalid.err, "inspect must return a string"));
+}
+
+TEST_CASE("a check refuses a body limit out of bounds, and passes one within them") {
+  GameCopy game("bodies");
+  for (const std::uint32_t refused : {kFewestMaxBodies - 1, kMostMaxBodies + 1}) {
+    game.set_physics(kMaxBodiesKey, refused);
+    const ToolResult checked = tool({"check", game.dir()});
+    CHECK(checked.exit_code == kExitFailure);
+    CHECK(has(checked.out, std::string("error game.json physics: ") + kMaxBodiesKey + " must be a whole number"));
+    CHECK(has(checked.out, "check: 1 errors"));
+  }
+  game.set_physics(kMaxBodiesKey, kMostMaxBodies);
+  CHECK(tool({"check", game.dir()}).exit_code == kExitSuccess);
 }

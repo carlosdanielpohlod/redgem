@@ -17,6 +17,46 @@ until 1.0, a release may change what games rely on (see
   file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
   encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
 
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
+  displace and drags as they move, so bodies bob, settle and flat ones right themselves. The new
+  `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep a body
+  floats; denser than water's 1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, fading in as the camera goes under the waves so crossing the surface
+  never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
@@ -297,6 +337,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries opening a window loads now stay
+  loaded until the program ends. A system test opens, draws in and closes 300 windows in one
+  process.
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).

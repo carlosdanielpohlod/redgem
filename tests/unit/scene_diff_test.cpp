@@ -174,7 +174,7 @@ TEST_CASE("scene diff reports animation keyframes and skin binding changes") {
   channel.node = 1;
   channel.times = {0, 1};
   channel.values = {0, 0, 0, 1, 0, 0};
-  before.animations = {{"Walk", 1, {channel}}};
+  before.animations = {{"Walk", 1, {channel}, {}}};
   SceneDesc after = before;
   after.skins[0].inverse_bind[0][0] = 1;
   after.animations[0].channels[0].values.back() = 2;
