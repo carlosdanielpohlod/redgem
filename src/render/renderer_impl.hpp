@@ -638,6 +638,8 @@ struct Renderer::Impl {
   // --- Over the picture (renderer_overlay.cpp) --------------------------------------------------
 
   void draw_hud_text(const HudItem& item);
+  // How wide a text is drawn, in whole pixels, with a font chain ("" for the built-in face).
+  int laid_text_width(const std::string& text, int size, const std::string& font);
   void draw_hud_image(const HudItem& item);
   // Draws a text, a rectangle or an image, or starts or ends a clip; returns whether what follows
   // is clipped (`clipped`: whether it was before).

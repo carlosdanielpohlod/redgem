@@ -1,11 +1,16 @@
 // UI natives: what scripts draw over the game.
 
 #include <algorithm>
+#include <cstddef>
+#include <string>
+#include <vector>
 
 #include <mruby.h>
+#include <mruby/array.h>
 #include <mruby/string.h>
 
 #include "core/safe_path.hpp"
+#include "render/font_chain.hpp"
 
 #include "scene/scene_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -95,17 +100,44 @@ mrb_value ui_unclip(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
-bool valid_font_name(const std::string& name) { return name.empty() || safe_asset_name(name); }
+constexpr const char* kFontRefusal = "UI.font must name a file in fonts/, or a list of up to %d of them";
+
+[[noreturn]] void refuse_font(mrb_state* mrb) {
+  mrb_raisef(mrb, E_ARGUMENT_ERROR, kFontRefusal, static_cast<int>(kMaxChainFaces));
+}
+
+bool valid_font_name(const std::string& name) { return !name.empty() && safe_asset_name(name); }
+std::string font_name(mrb_state* mrb, mrb_value value) {
+  std::string name = to_name(mrb, value);
+  if (!valid_font_name(name)) refuse_font(mrb);
+  return name;
+}
+// A list of faces, the first that has a letter drawing it (render/font_chain.hpp).
+std::string chain_of(mrb_state* mrb, mrb_value list) {
+  const mrb_int count = RARRAY_LEN(list);
+  if (static_cast<std::size_t>(count) > kMaxChainFaces) refuse_font(mrb);
+  std::vector<std::string> names;
+  for (mrb_int i = 0; i < count; ++i) names.push_back(font_name(mrb, mrb_ary_ref(mrb, list, i)));
+  return font_chain(names);
+}
+bool empty_string(mrb_value value) { return mrb_string_p(value) && RSTRING_LEN(value) == 0; }
+bool builtin_face(mrb_value value) { return mrb_nil_p(value) || empty_string(value); }
 
 mrb_value ui_font(mrb_state* mrb, mrb_value) {
-  const auto& name = context(mrb).ui_font;
-  return name.empty() ? mrb_nil_value() : mrb_str_new_cstr(mrb, name.c_str());
+  const std::vector<std::string> names = font_chain_names(context(mrb).ui_font);
+  if (names.empty()) return mrb_nil_value();
+  if (names.size() == 1) return mrb_str_new_cstr(mrb, names.front().c_str());
+  mrb_value list = mrb_ary_new_capa(mrb, static_cast<mrb_int>(names.size()));
+  for (const std::string& name : names) mrb_ary_push(mrb, list, mrb_str_new_cstr(mrb, name.c_str()));
+  return list;
 }
+// A face's name, a list of them (a fallback chain), or nil (or "") for the built-in face.
 mrb_value ui_set_font(mrb_state* mrb, mrb_value) {
   const auto value = single_arg(mrb);
-  const std::string name = mrb_nil_p(value) ? "" : to_name(mrb, value);
-  if (!valid_font_name(name)) mrb_raise(mrb, E_ARGUMENT_ERROR, "UI.font must name a file in fonts/");
-  context(mrb).ui_font = name;
+  if (builtin_face(value))
+    context(mrb).ui_font.clear();
+  else
+    context(mrb).ui_font = mrb_array_p(value) ? chain_of(mrb, value) : font_name(mrb, value);
   return value;
 }
 

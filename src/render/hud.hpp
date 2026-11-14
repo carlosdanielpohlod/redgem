@@ -15,7 +15,7 @@ struct HudItem {
   enum class Kind { Text, Rect, Image, Clip, Unclip };
   Kind kind = Kind::Text;
   std::string text;  // the text, or the image's name (a file in the game's images/ folder)
-  std::string font;  // UI text face in fonts/; empty selects the built-in face
+  std::string font;  // UI text face in fonts/, or a chain of them (font_chain.hpp); empty: the built-in face
   int x = 0;
   int y = 0;
   int width = 0;  // rectangles, images and clips

@@ -150,6 +150,14 @@ FetchContent_Declare(freetype
   URL https://codeload.github.com/freetype/freetype/tar.gz/${REDGEM_FREETYPE_COMMIT}
   URL_HASH SHA256=${REDGEM_FREETYPE_SHA256})
 
+# --- SheenBidi (orders right-to-left text for the games' UI; Apache 2.0) -----------
+# Only its single-file (unity) C source is built: its own CMake project adds tests and tools.
+set(REDGEM_SHEENBIDI_COMMIT "83f77108a2873600283f6da4b326a2dca7a3a7a6") # v2.9.0
+set(REDGEM_SHEENBIDI_SHA256 "821534a7a175a09b3d40d231ebf2800ffcdf23defc4fb2ca7582701cec8861ea")
+FetchContent_Declare(sheenbidi
+  URL https://codeload.github.com/Tehreer/SheenBidi/tar.gz/${REDGEM_SHEENBIDI_COMMIT}
+  URL_HASH SHA256=${REDGEM_SHEENBIDI_SHA256})
+
 # --- WebP (static image decoding; no conversion tools or encoder linked) ----------
 set(REDGEM_WEBP_COMMIT "4fa21912338357f89e4fd51cf2368325b59e9bd9") # 1.6.0
 set(REDGEM_WEBP_SHA256 "923f3382a47a2af185c3240c954cf004428b237bd7317413a95146d01eb4b94b")
@@ -210,7 +218,7 @@ if(WIN32)
   target_compile_options(Jolt PUBLIC "SHELL:-include type_traits")
 endif()
 # These ship no (usable) CMake project: only fetch their sources.
-foreach(dep imgui rlimgui imguizmo zlib)
+foreach(dep imgui rlimgui imguizmo zlib sheenbidi)
   FetchContent_GetProperties(${dep})
   if(NOT ${dep}_POPULATED)
     FetchContent_Populate(${dep})
@@ -245,6 +253,12 @@ add_library(redgem_zlib STATIC
   ${zlib_SOURCE_DIR}/zutil.c)
 target_include_directories(redgem_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
 target_compile_definitions(redgem_zlib PUBLIC Z_PREFIX ZLIB_CONST)
+
+# The Unicode Bidirectional Algorithm, as one C file (SB_CONFIG_UNITY keeps its internals static).
+add_library(redgem_sheenbidi STATIC ${sheenbidi_SOURCE_DIR}/Source/SheenBidi.c)
+target_include_directories(redgem_sheenbidi SYSTEM PUBLIC ${sheenbidi_SOURCE_DIR}/Headers)
+target_include_directories(redgem_sheenbidi PRIVATE ${sheenbidi_SOURCE_DIR}/Source)
+target_compile_definitions(redgem_sheenbidi PRIVATE SB_CONFIG_UNITY)
 
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
