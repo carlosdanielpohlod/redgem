@@ -17,7 +17,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Input`](#input) | Keyboard, mouse, gamepad and touch, read every frame. |
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
-| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
+| [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
@@ -91,6 +91,7 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `tag`: its tag property
 - `tag?(value)`: whether its tag is value
 - `props`: its custom properties
+- `joint`: the Joint it came with in the scene (its Joint component, set up in the editor), or nil
 - `alive?`: false once it was destroyed
 - `destroy`: removes it at the end of the step
 - `visible`: whether it is drawn
@@ -276,7 +277,7 @@ Questions to the physics world: rays, moving shapes and shapes in place. See [ga
 
 ## Joint
 
-What holds two bodies together, or one to the world (made by Physics.joint). See [gameplay.md](gameplay.md).
+What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). See [gameplay.md](gameplay.md).
 
 - `kind`: :fixed, :hinge, :slider, :point or :distance
 - `object`: the object it holds
