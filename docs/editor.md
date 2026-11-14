@@ -63,6 +63,10 @@ icons):
   Ctrl+V** cut, copy and paste, **Ctrl+S** save. Help > Keyboard Shortcuts lists them all. File >
   New / Open Game goes back to the hub.
 
+**Edit > Preferences** sets the scene camera's fly speed and the move, rotate and scale snap
+steps. Save applies the values and keeps them for the next session. Restore defaults fills the
+original values; Cancel discards changes.
+
 ## Material pictures
 
 Under a material's color, metallic, roughness and emission, the Inspector lists its five texture
