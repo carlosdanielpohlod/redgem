@@ -191,6 +191,28 @@ TEST_CASE("a player binds an action anew, takes bindings away and goes back to t
   CHECK(bindings.changes(0).empty());
 }
 
+TEST_CASE("a player binds a second key beside the first, and takes either away") {
+  PlayerBindings bindings;
+  CHECK(bindings.bind(0, "run", Key::K, std::nullopt));
+  CHECK(listed(bindings.action(0, "run")) == std::vector<InputBinding>{Key::LeftShift, Key::K, GamepadButton::B});
+  CHECK(bindings.bind(0, "run", GamepadButton::Y, std::nullopt));
+  CHECK(listed(bindings.action(0, "run")) ==
+        std::vector<InputBinding>{Key::LeftShift, Key::K, GamepadButton::B, GamepadButton::Y});
+  CHECK(bindings.unbind(0, "run", InputBinding(Key::K), std::nullopt));
+  CHECK(bindings.unbind(0, "run", InputBinding(GamepadButton::Y), std::nullopt));
+  CHECK(listed(bindings.action(0, "run")) == std::vector<InputBinding>{Key::LeftShift, GamepadButton::B});
+  CHECK(bindings.unbind(0, "vertical", InputBinding(Key::Up), AxisSide::Positive));
+  CHECK(bindings.axis(0, "vertical")->positive.all() == std::vector<InputBinding>{Key::W});
+  CHECK(bindings.axis(0, "vertical")->negative.all() == std::vector<InputBinding>{Key::S, Key::Down});
+}
+
+TEST_CASE("a player's first key replaced keeps the second where it was when bound back in order") {
+  PlayerBindings bindings;
+  for (const Key key : {Key::W, Key::Up}) bindings.unbind(0, "vertical", InputBinding(key), AxisSide::Positive);
+  for (const Key key : {Key::I, Key::Up}) bindings.bind(0, "vertical", key, AxisSide::Positive);
+  CHECK(bindings.axis(0, "vertical")->positive.all() == std::vector<InputBinding>{Key::I, Key::Up});
+}
+
 TEST_CASE("a player binds each side of an axis; its stick stays") {
   PlayerBindings bindings;
   CHECK_FALSE(bindings.bind(0, "horizontal", Key::J, std::nullopt));  // which way, though?

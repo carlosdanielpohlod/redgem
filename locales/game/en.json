@@ -21,6 +21,7 @@
   "game.controls.button_start": "Start button",
   "game.controls.button_x": "X button",
   "game.controls.button_y": "Y button",
+  "game.controls.clear_note": "Delete, Backspace or Y clears a cell",
   "game.controls.conflict_note": "! is on another action too: both get it",
   "game.controls.gamepad": "Gamepad",
   "game.controls.heading": "Controls",

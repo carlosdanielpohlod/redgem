@@ -10,6 +10,15 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **A second key or button per action on the controls page**: each row of the menu's controls
+  page has two cells of keys and two of gamepad buttons, so a player binds W and Up both to
+  "Move up". A key caught for the second cell is added beside the first, one caught for the first
+  keeps the second in its place, Delete, Backspace or a gamepad's Y clears the focused cell, and a
+  key the row already has changes nothing. Both are kept for the next runs.
+- **`Input.rumble(pad, strength, seconds)` and `Input.rumble?`**: a hook for gamepad vibration
+  that does nothing yet (raylib 5.5 has none on desktops or Android) and says so: `rumble?` is
+  false and `rumble` returns false, checking its arguments all the same.
+
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

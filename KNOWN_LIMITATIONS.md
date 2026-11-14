@@ -229,10 +229,12 @@ not a promise of how it will be closed.
 
 ### What a shipped game offers its players
 
-- The menu's controls page binds one key and one button to a row: rebinding a cell replaces all it
-  had, so a second key for one action comes only from a game's script (`Input.bind`). It lists
-  every action and axis the game declared. Gamepads cannot rumble (neither the
-  desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
+- The menu's controls page has two cells of keys and two of buttons on a row: a third key for one
+  action comes only from a game's script (`Input.bind`), and shows in the row's second cell, which
+  rebinding replaces whole. Keys are listed before mouse buttons, whatever cell caught them. It
+  lists every action and axis the game declared. Gamepads cannot rumble (raylib 5.5 has no
+  vibration on desktops nor on Android): `Input.rumble` is a hook that does nothing and
+  `Input.rumble?` is false. A capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
 - Text fields take single key presses: there is no input-method composition, so languages typed

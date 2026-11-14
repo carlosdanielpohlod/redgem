@@ -239,6 +239,8 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.gamepad_down?(button)`: whether a gamepad button (:a, :b, :x, :y...) is held
 - `Input.gamepad_pressed?(button)`: whether a gamepad button went down this frame
 - `Input.gamepad_released?(button)`: whether a gamepad button went up this frame
+- `Input.rumble?`: whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)
+- `Input.rumble(pad, strength, seconds)`: rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)
 - `Input.text`: what was typed this frame
 - `Input.touch_controls = on`: shows the on-screen stick and buttons of a phone
 - `Input.touch_controls?`: whether they are shown

@@ -1,6 +1,7 @@
 # The menu's controls page as it holds and does things, without a game and without drawing: its
 # rows and what their cells show, a capture filling a cell (or called off), each player's own
-# bindings, going back to the game's, and keys bound to two rows. (Drawn and worked by keys, a
+# bindings, going back to the game's, and keys bound to two rows. (A second key or button in a row's
+# second cells, and clearing a cell: game_menu_second_bindings_test.rb.) (Drawn and worked by keys, a
 # gamepad and the mouse: game_menu_controls_test.rb, and with a game running, kept for the next
 # run: tests/system/platformer/display_settings_test.rb.)
 class GameMenuControlsPageTest < RedGemTest::Case
@@ -12,6 +13,7 @@ class GameMenuControlsPageTest < RedGemTest::Case
   RUN = Row.new(:run, nil)
   LEFT = Row.new(:horizontal, :negative)
   RIGHT = Row.new(:horizontal, :positive)
+  FIRST = 0
 
   def setup
     Input.cancel_capture
@@ -59,7 +61,7 @@ class GameMenuControlsPageTest < RedGemTest::Case
     rebinding = page
     rebinding.capture(JUMP, KEYS)
     assert Input.capturing?
-    assert_equal [JUMP, KEYS], rebinding.waiting
+    assert_equal [JUMP, KEYS, FIRST], rebinding.waiting
     Input.__captured("key:k", nil)
     assert_equal ["key:k", "pad:a"], Input.bindings(:jump)
     refute rebinding.capturing?
