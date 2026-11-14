@@ -45,7 +45,8 @@ Every frame, the Interactor looks at the scene's Interactables and keeps those t
    the hero faces, measured across the ground;
 4. **in sight**: a ray from the hero's position to the object's hits nothing else first. Triggers
    never block it, what the hero carries (the objects under it) is seen through, and the object's
-   own collider, or one of an object under it (a character's body), counts as reaching it.
+   own collider, one of an object under it (a character's body), or one of the object it is under
+   (the door of a handle), counts as reaching it.
 
 Of those, the one with the highest `priority` wins, then the nearest. That one is the **focus**:
 its behaviours hear `on_focus(actor)` when it becomes the focus, and `on_blur(actor)` when another
@@ -120,7 +121,7 @@ and runs `on_interact` and the `:interact` handlers there. A modified client can
 hero is not near.
 
 - The hero needs a `NetworkSync` that is its machine's (as every hero of a networked game has): the
-  host knows it by that key, and believes only its owner.
+  host knows it by that key, and believes only its owner. A use asked by a hero with none raises.
 - The target is found on the host by its `NetworkSync` key when it has one, by its name otherwise
   (of several Interactables with that name, the one in the hero's reach), and needs its
   Interactable on the host too: give every machine the same scene script.

@@ -13,8 +13,8 @@
 # registers lasts until the next level is loaded.
 module Interaction
   ACTION = :interact          # the input action that uses what is in focus
-  EVENTS = %i[interact focus blur].freeze
   CALLBACKS = { interact: :on_interact, focus: :on_focus, blur: :on_blur }.freeze
+  EVENTS = CALLBACKS.keys.freeze
   # How much more the host allows a client's hero, which it sees a moment late: meters past a
   # target's range, and degrees past its angle.
   NETWORK_SLACK = 1.0
@@ -119,22 +119,23 @@ module Interaction
       return true if length < NEAR
 
       direction = (target.transform.position - actor.transform.position) / length
-      hit = Physics.raycast(actor.transform.position, direction, length, ignore: carried(actor))
+      hit = Physics.raycast(actor.transform.position, direction, length, ignore: actor.__with_children)
       clear_hit?(hit, target, length)
     end
 
     def clear_hit?(hit, target, length)
-      hit.nil? || hit[:distance] >= length - SIGHT_TOLERANCE || part_of?(hit[:object], target.game_object)
+      hit.nil? || hit[:distance] >= length - SIGHT_TOLERANCE || related?(hit[:object], target.game_object)
     end
+
+    # Whether what a ray hit is the target, is under it (a character's collider on a child), or
+    # carries it (a door, for its handle).
+    def related?(hit, target) = part_of?(hit, target) || part_of?(target, hit)
 
     # Whether an object is the target, or is under it (a character's collider on a child).
     def part_of?(object, whole)
       object = object.parent until object.nil? || object == whole
       !object.nil?
     end
-
-    # An object and everything under it.
-    def carried(object) = [object] + object.children.flat_map { |child| carried(child) }
 
     def interactable_of(target)
       target.is_a?(Interactable) ? target : target&.get_component(Interactable)
@@ -145,6 +146,7 @@ module Interaction
     # The host is asked, by the names the two machines know the actor and the target by.
     def request(actor, target)
       keys = [actor.get_component(NetworkSync)&.key, Network.__key_of(target.game_object)]
+      raise ArgumentError, "#{actor.name} needs a NetworkSync of its own to interact over the network" if keys[0].nil?
       return false unless Network::Said.interaction?(keys)
 
       Network.__deliver(Network::INTERACT, keys, :host)

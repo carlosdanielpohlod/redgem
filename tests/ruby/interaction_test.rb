@@ -41,6 +41,8 @@ class StandInObject
   def __add_behaviour(behaviour) = @behaviours << behaviour
   def __notify(callback, actor) = @behaviours.each { |behaviour| behaviour.__send__(callback, actor) }
 
+  def __with_children = [self] + @children.flat_map(&:__with_children)
+
   def carry(child)
     child.parent = self
     @children << child
@@ -153,6 +155,14 @@ class InteractionTest < RedGemTest::Case
     body = target.game_object.carry(StandInObject.new("GuardBody", ahead(NEAR)))
     Physics.in_the_way = { object: body, distance: NEAR / 2 }
     picks target, [target], "a character's collider on a child"
+  end
+
+  def test_what_carries_the_target_does_not_hide_it
+    door = interactable("Door", ahead(NEAR)).game_object
+    handle = interactable("Handle", ahead(NEAR))
+    door.carry(handle.game_object)
+    Physics.in_the_way = { object: door, distance: NEAR / 2 }
+    picks handle, [handle], "a door's handle"
   end
 
   def test_what_the_actor_carries_hides_nothing
