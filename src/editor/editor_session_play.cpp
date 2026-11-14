@@ -85,7 +85,7 @@ void EditorSession::apply_layer_settings() {
     log::warning("game.json must be a valid JSON object; keeping the last collision layers");
     return;
   }
-  for (const auto& warning : manifest.physics_warnings) log::warning(warning);
+  for (const auto& problem : physics_problems(manifest)) log::warning(problem);
   collision_layers_ = std::move(manifest.settings.collision_layers);
 }
 

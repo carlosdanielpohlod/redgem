@@ -114,6 +114,9 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   CollisionLayersReading reading = collision_layers_from_json(json[kPhysicsKey]);
   manifest.settings.collision_layers = std::move(reading.layers);
   manifest.physics_warnings = std::move(reading.warnings);
+  const BodyLimitReading limit = body_limit_from_json(json[kPhysicsKey]);
+  manifest.settings.max_bodies = limit.max_bodies;
+  manifest.max_bodies_error = limit.error;
 }
 
 void read_servers(const nlohmann::json& json, GameManifest& manifest) {
@@ -168,6 +171,12 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   read_sections(json, manifest);
   return manifest;
+}
+
+std::vector<std::string> physics_problems(const GameManifest& manifest) {
+  std::vector<std::string> problems = manifest.physics_warnings;
+  if (!manifest.max_bodies_error.empty()) problems.push_back(manifest.max_bodies_error);
+  return problems;
 }
 
 bool valid_game_id(const std::string& id) {

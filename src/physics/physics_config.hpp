@@ -13,10 +13,8 @@ inline constexpr float kDefaultColliderHalfExtent = 0.5f;
 // --- World and bodies -----------------------------------------------------------
 inline constexpr float kGravityY = -20.0f;
 inline constexpr float kDefaultBodyMass = 1.0f;
-inline constexpr std::uint32_t kMaxBodies = 4096;
 inline constexpr std::uint32_t kNumBodyMutexes = 0;  // 0 = Jolt picks a default
-inline constexpr std::uint32_t kMaxBodyPairs = 4096;
-inline constexpr std::uint32_t kMaxContactConstraints = 4096;
+// A step's scratch memory for a world of kDefaultMaxBodies (physics/body_limit.hpp): it grows with them.
 inline constexpr std::size_t kPhysicsTempAllocatorBytes = 10u * 1024u * 1024u;
 inline constexpr std::uint32_t kMaxPhysicsJobs = 1024;
 inline constexpr int kPhysicsCollisionSteps = 1;

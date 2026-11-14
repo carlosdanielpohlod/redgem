@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
 - **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
   of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
   pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what

@@ -147,7 +147,7 @@ the same pull request.
   no longer restores.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
-- Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
+- Limits a game can reach: 65,536 physics bodies a scene (`max_bodies`), 64 hits per physics query, 4096 live particles and 256 emitters, 4096
   `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
@@ -280,10 +280,11 @@ not a promise of how it will be closed.
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
-- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
-  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
-  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
-  longer needs.
+- A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
+  (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
+  that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
+  first happens. A game that keeps spawning (bullets, debris) has to destroy what it no longer
+  needs.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.

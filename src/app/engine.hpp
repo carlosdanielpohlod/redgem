@@ -258,6 +258,8 @@ class Engine {
   std::uint64_t runtime_prefab_bytes_ = 0;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
+  // game.json's: every scene's physics world holds as many bodies.
+  std::uint32_t max_bodies_ = kDefaultMaxBodies;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
   Navigation navigation_;             // where characters walk in the running scene
   InputState input_;
