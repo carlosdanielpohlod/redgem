@@ -55,6 +55,8 @@ class ScriptHost {
   void fixed_update(float dt);
   void update(float dt);
   void draw_loading(float unscaled_delta);
+  // A frame of the network game's level change, while the world is held for it (Network.__level_tick).
+  void wait_for_level(float unscaled_delta);
   void begin_loading_screen() { loading_screen_failed_ = false; }
   void dispatch(const ContactEvent& event);
   // Hands something that happened on the network to the scripts listening for it (Network.on...).

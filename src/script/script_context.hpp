@@ -147,6 +147,9 @@ struct ScriptContext {
   bool cancel_scene_load = false;
   std::string loading_scene;  // nonempty while the current world is frozen for a background read
   std::string loading_error;  // last failed read, retained until the next request
+  // The world is frozen as while loading, until every machine of a network game has the level it
+  // changes to (Game.__hold, from Network's level change).
+  bool level_held = false;
   std::function<bool(const std::string&)> scene_exists;
 };
 

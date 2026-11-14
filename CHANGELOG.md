@@ -10,6 +10,16 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Changing level together in a network game**: on the host (a player's or a dedicated server's
+  room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
+  connection that stays up. Each machine loads it in the background and waits, frozen, until all
+  have it; a machine still loading after `Network.level_timeout` seconds (30) is let go. The
+  objects of the old level, spawned ones included, are gone everywhere, and nothing said about
+  them on the way reaches the new level. `Network.on_level_loading` and `Network.on_level_ready`
+  tell every machine, and `Network.changing_level?` says a change is going on. A machine that joins
+  loads the level the game plays. Only the host changes the level: elsewhere `Game.load_scene`
+  returns `false`. A room's opener on a relay can now have the relay let a machine go.
+
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
   passes (timer queries read back a frame late, so the game never waits for the card; hidden
@@ -226,6 +236,10 @@ until 1.0, a release may change what games rely on (see
   `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
 
 ### Changed
+
+- In a network game, a machine that is not the host can no longer load a level on its own
+  (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
+  objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
 
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of

@@ -33,6 +33,13 @@ void RelayServer::hear_opener(Member& opener, const nlohmann::json& message) {
   const std::string kind = message[kKind];
   if (kind == kGuarded) opener.guarded = says_yes(message);
   if (kind == kVerdict) settle(opener.room, message);
+  if (kind == kDismiss) dismiss(opener.room, message.value(kTo, 0));
+}
+
+void RelayServer::dismiss(const std::string& room, int peer) {
+  for (Member* member : entered(room)) {
+    if (member->guest_of(room, peer)) member->connection.close();  // (the room hears it is gone)
+  }
 }
 
 void RelayServer::settle(const std::string& room, const nlohmann::json& verdict) {

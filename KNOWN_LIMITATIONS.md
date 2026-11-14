@@ -425,6 +425,11 @@ not a promise of how it will be closed.
   check movement, so a modified client can move anywhere.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
   connection through home routers (no STUN or hole punching).
+- A change of level is the host's alone, one at a time, and waits for every machine
+  (`Network.level_timeout`) before anyone plays: there is no streaming of levels or seamless
+  travel, and the players load the whole level. A game's own messages (`Network.emit`) are not
+  held across a change: one sent as it starts reaches handlers of whichever level the receiver has
+  by then.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,

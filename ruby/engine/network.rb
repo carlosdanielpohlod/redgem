@@ -36,7 +36,8 @@
 #
 # A message carries nil, true/false, numbers, texts, Vector3, and arrays and hashes of those.
 # Messages arrive whole and in the order they were sent. What Network.on and the on_... calls
-# register lasts until the next level is loaded.
+# register lasts until the next level is loaded. On a network game the host changes the level for
+# everyone (Game.load_scene, see network_levels.rb).
 module Network
   DEFAULT_PORT = 7777
   DEFAULT_RELAY_PORT = 7778
@@ -53,18 +54,22 @@ module Network
   SPAWN = "$spawn".freeze        # an object to create: [key, template, owner, position, rotation]
   SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
   DESPAWN = "$despawn".freeze    # objects that are gone: their keys
-  RESEND = "$resend".freeze      # to the host: send the spawned objects again (after loading a level)
+  LEVEL = "$level".freeze        # the host to everyone: [change, name] load that level (network_levels.rb)
+  LEVEL_PLAYED = "$played".freeze  # the host to a newcomer: [change, name] the level the game plays
+  LEVEL_READY = "$ready".freeze  # to the host: change, this machine has the level of that change
+  LEVEL_GO = "$go".freeze        # the host to everyone (or a newcomer): change, everyone has it, play
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
-    SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned,
-    DESPAWN => :receive_despawn, RESEND => :receive_resend
+    SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned, DESPAWN => :receive_despawn,
+    LEVEL => :receive_level, LEVEL_PLAYED => :receive_level_played, LEVEL_READY => :receive_level_ready,
+    LEVEL_GO => :receive_level_go
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
     connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
-  AFTERWARDS = { left: :forget_player, disconnected: :forget_players }.freeze
+  AFTERWARDS = { left: :forget_player, disconnected: :forget_game }.freeze
 
   # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
   # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)
@@ -154,19 +159,21 @@ module Network
       happened(kind, peer, name)
     end
 
-    # Called by the engine when a level is loaded: its objects and handlers are gone. The others
-    # are told that this machine's spawned objects went with it, and the host is asked for the
-    # objects this machine should see again.
+    # Called by the engine when a level is loaded: its objects and handlers are gone, and so are the
+    # objects spawned in it, on every machine (all of them change level together).
     def __scene_reset
-      announce_scene_reset if online?
+      Level.arrived
       @handlers = {}
       @listeners = {}
       @synced = {}
       @spawned = {}
     end
 
-    # Sends any message, the engine's own included (emit is the one for games).
+    # Sends any message, the engine's own included (emit is the one for games). What is said about
+    # the objects of the next level waits until every machine has it (Level.holds?).
     def __deliver(name, data, to)
+      return Level.hold_back(name, data, to) if Level.holds?(name)
+
       __emit(name, data, { all: EVERYONE, host: HOST }.fetch(to) { to.to_i })
     end
 
@@ -214,8 +221,10 @@ module Network
     end
 
     # A message came: one of the engine's own, or one for the game's handlers.
+    # (What is said about objects between two levels is of a level this machine does not have.)
     def receive(name, data, from)
       engine_message = ENGINE_MESSAGES[name]
+      return if Level.holds?(name)
       return __send__(engine_message, data, from) if engine_message
 
       (@handlers[name] || []).dup.each { |block| block.call(data, from) }

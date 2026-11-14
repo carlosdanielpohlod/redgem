@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <initializer_list>
 #include <thread>
 
 #include <mruby.h>
@@ -520,6 +521,41 @@ TEST_CASE("a character's animation passes through a dedicated server's room to t
   online_game.round();
   ruby(first, "$hero.animation.play(:Attack)");
   CHECK(online_game.until([&] { return ruby(second, "$hero.animation.clip.inspect") == "\"Attack\""; }));
+}
+
+namespace {
+
+// Every machine of a room plays `name`, its change of level over: the server's game and its players.
+bool room_plays(Online& online_game, std::initializer_list<Engine*> players, const std::string& name) {
+  const std::string state = "[Game.scene_name, Network.changing_level?].inspect";
+  const std::string playing = "[\"" + name + "\", false]";
+  for (Engine* player : players) {
+    if (ruby(*player, state) != playing) return false;
+  }
+  return online_game.served(**players.begin(), state) == playing;
+}
+
+}  // namespace
+
+TEST_CASE("a dedicated server changes the level of a room, its players with it, and only it can") {
+  Online online_game(kRoomy);
+  Engine& first = online_game.join();
+  Engine& second = online_game.join();
+  const std::string watch = "$changes = []; Network.on_level_ready { |name| $changes << name }";
+  for (Engine* player : {&first, &second}) ruby(*player, watch);
+  online_game.served(first, watch + "; $kept = 3");
+  CHECK(online_game.served(first, "Game.load_scene('level2')") == "true");
+  REQUIRE(online_game.until([&] { return room_plays(online_game, {&first, &second}, "level2"); }));
+  for (Engine* player : {&first, &second}) {
+    CHECK(ruby(*player, "[$changes, Network.online?].inspect") == "[[\"level2\"], true]");
+  }
+  CHECK(online_game.served(first, "[$changes, $kept, Network.players.sort].inspect") == "[[\"level2\"], 3, [2, 3]]");
+
+  // A player can neither ask for a level nor order one as the server would.
+  CHECK(ruby(first, "Game.load_scene('main')") == "false");
+  ruby(first, "Network.__deliver(Network::LEVEL, [9, 'main'], :all)");
+  for (int turn = 0; turn < kServedTurns; ++turn) online_game.round();
+  CHECK(room_plays(online_game, {&first, &second}, "level2"));
 }
 
 TEST_CASE("a dedicated server's status port answers an HTTP GET with how busy the server is") {

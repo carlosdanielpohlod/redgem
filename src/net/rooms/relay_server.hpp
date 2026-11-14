@@ -116,6 +116,8 @@ class RelayServer {
     // Whether it opened a room and still holds it: a room ends with whoever opened it.
     bool holds_room() const { return peer == kHostId && !connection.closed(); }
     bool inside(const std::string& code) const { return in_room() && !connection.closed() && room == code; }
+    // In room `code` as `id`, which is not its opener's.
+    bool guest_of(const std::string& code, int id) const { return inside(code) && peer == id && id != kHostId; }
     // Gone, with the others in its room not told yet.
     bool left_untold() const { return connection.closed() && !farewelled; }
   };
@@ -150,6 +152,8 @@ class RelayServer {
   void ask(Member& member, Member& opener, int id, const nlohmann::json& auth);
   void hear_opener(Member& opener, const nlohmann::json& message);
   void settle(const std::string& room, const nlohmann::json& verdict);
+  // The opener's game lets one of its room's guests go.
+  void dismiss(const std::string& room, int peer);
   static void await_verdict(Member& member, float seconds);
   Member* asking_member(const std::string& room, int id);
   Member* opener_of(const std::string& room);
