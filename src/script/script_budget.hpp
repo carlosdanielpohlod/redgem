@@ -9,6 +9,8 @@
 
 namespace redgem {
 
+class ScriptSampler;
+
 // How long one call from the engine into the scripts may run before it is stopped: a script that
 // never returns (`loop {}`, `while true; end`) must not freeze the game, the editor or a room of
 // a server. A call that runs past it is ended with a ScriptTimeout, which the engine treats as
@@ -53,6 +55,10 @@ class ScriptBudget {
   // zero, the watchdog no longer looks at the interpreter (which can then be closed).
   void set_limit(Milliseconds limit);
   Milliseconds limit() const { return Milliseconds(limit_ms_.load(std::memory_order_relaxed)); }
+  // The scripts' sampling profiler the hook feeds, or none (on the interpreter's thread, between
+  // calls). The hook is set while there is a limit or a sampler.
+  void set_sampler(ScriptSampler* sampler);
+  ScriptSampler* sampler() const { return sampler_; }
 
   // A call from the engine begins and ends (on the interpreter's thread).
   void begin_call() { push(true); }
@@ -97,11 +103,13 @@ class ScriptBudget {
   void step_up(Frame& frame, std::int64_t now);
   void raise(mrb_state* mrb, const mrb_code* pc, const Frame& frame, std::int64_t now);
   void silence() { stop_.store(false, std::memory_order_relaxed); }
+  void refresh_hook();
   // How much of `away` is not the frame's time: what is left of what it may be forgiven.
   std::int64_t forgivable(const Frame& frame, std::int64_t away) const;
 
   mrb_state* mrb_ = nullptr;
   RClass* timeout_class_ = nullptr;
+  ScriptSampler* sampler_ = nullptr;
   std::atomic<long long> limit_ms_{0};
   std::vector<Frame> frames_;  // the calls in calls, innermost last (the interpreter's thread)
   std::atomic<std::int64_t> deadline_{kNever};

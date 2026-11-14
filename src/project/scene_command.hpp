@@ -10,6 +10,7 @@
 //   redgem scene set    <game> <object> key=value... [--scene name]
 //   redgem scene add    <game> <name> [--from <object>] [--parent <object>] [key=value...] [--scene name]
 //   redgem scene remove <game> <object> [--scene name]
+//   redgem scene compact <game> [--scene name]
 //
 // <object> is an id (#12), a path (Level/Wall) or a name that one object alone has.
 
