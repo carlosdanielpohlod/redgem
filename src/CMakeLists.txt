@@ -369,6 +369,8 @@ redgem_add_library(redgem_runtime
   script/ruby_classes.cpp
   script/reload_ownership.cpp
   script/script_budget.cpp
+  script/script_profile.cpp
+  script/script_sampler.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp
   script/script_host_reload.cpp
@@ -435,6 +437,7 @@ redgem_add_library(redgem_runtime
   render/shadow_cascades.cpp
   render/temporal.cpp
   render/gl_extras.cpp
+  render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
@@ -508,6 +511,7 @@ redgem_add_library(redgem_runtime
   app/engine_saves.cpp
   app/engine_object_state.cpp
   app/profile_overlay.cpp
+  app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/engine_loading.cpp
@@ -564,6 +568,7 @@ if(NOT ANDROID)
     editor/document/material_textures.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
+    editor/document/glb_dedup.cpp
     editor/document/gltf_json.cpp
     editor/document/gltf_json_entries.cpp
     editor/document/glb_geometry.cpp

@@ -4,6 +4,7 @@
 
 #include <cstring>
 
+#include "editor/document/glb_dedup.hpp"
 #include "editor/document/glb_geometry.hpp"
 #include "editor/document/gltf_json.hpp"
 #include "scene/props.hpp"
@@ -86,7 +87,17 @@ std::vector<int> SceneDocument::take_changed_meshes() {
   return changed;
 }
 
+void SceneDocument::own_vertices(int mesh) {
+  nlohmann::json& attributes =
+      glb_.json.at(kMeshes).at(static_cast<std::size_t>(mesh)).at(kPrimitives).at(kOnlyPrimitive).at(kAttributes);
+  for (const char* stream : {kPositionAttribute, kNormalAttribute}) {
+    const std::optional<int> copy = unshared_copy(glb_, attributes.at(stream).get<std::size_t>());
+    if (copy) attributes[stream] = *copy;
+  }
+}
+
 bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
+  own_vertices(mesh);
   const MeshDesc& source = desc_.meshes.at(static_cast<std::size_t>(mesh));
   nlohmann::json& attributes =
       glb_.json[kMeshes][static_cast<std::size_t>(mesh)][kPrimitives][kOnlyPrimitive][kAttributes];

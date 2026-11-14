@@ -105,12 +105,15 @@ void Renderer::draw_plain(const Scene& scene, const Camera3D& camera, const Rend
   const Environment env = within_quality(scene_environment(scene), impl_->quality, impl_->gpu);
   impl_->ensure_targets(width, height, env.msaa);
   impl_->temporal.viewer = viewer_of(scene);
-  impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height), particles);
-  impl_->draw_lit_scene(camera, particles);
-  impl_->post_process(env, output);
+  const float aspect = static_cast<float>(width) / static_cast<float>(height);
+  impl_->draw_timed_passes(scene, camera, env, aspect, particles, output);
   impl_->end_temporal();
   impl_->previous_water_ripples = impl_->water_ripples;
 }
+
+void Renderer::set_gpu_timing(bool on) { impl_->gpu_timers.set_enabled(on); }
+
+GpuTimings Renderer::gpu_timings() const { return impl_->gpu_timers.timings(); }
 
 void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);

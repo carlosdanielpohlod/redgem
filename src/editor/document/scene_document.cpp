@@ -5,6 +5,7 @@
 #include <exception>
 #include <optional>
 #include <set>
+#include <string>
 #include <utility>
 
 #include "core/log.hpp"
@@ -22,6 +23,13 @@ namespace redgem {
 using namespace gltf_json;
 
 namespace {
+
+// What follows the number of bytes a save left out, in the line it logs.
+constexpr const char* kLeftOutReport = " bytes of unused or repeated data left out of the saved scene";
+
+// Whether a save left out data the one before it did not (each save after a deletion leaves the
+// same data out again: logged once).
+bool left_out_more(std::size_t left_out, std::size_t before) { return left_out > before; }
 
 // An image's or buffer's "uri" ("" without one).
 std::string uri_of(const nlohmann::json& entry) {
@@ -47,7 +55,7 @@ bool recovery_size(const GlbFile& glb, std::string& error) {
   return false;
 }
 std::optional<GlbFile> lean_recovery(const GlbFile& glb, std::string& error) {
-  auto lean = without_unused(glb);
+  auto lean = compacted(glb);
   if (lean) {
     if (!recovery_size(*lean, error)) return std::nullopt;
     return lean;
@@ -221,21 +229,32 @@ bool SceneDocument::sync_for_writing(std::string& error) {
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
-  sync_buffer();
+  sync_buffer();  // terrain edits can append new vertex data
   return true;
 }
 
 bool SceneDocument::save_file(const std::filesystem::path& path, std::string& error) {
   if (!sync_for_writing(error)) return false;
-  // What nothing uses any more (a deleted object's mesh, an import that was undone) stays out of
-  // the file. It stays in the document: undo and redo can bring back what used it.
-  std::optional<GlbFile> lean = without_unused(glb_);
-  material_textures::forget_unused_webp(lean ? lean->json : glb_.json);
-  if (!write_glb(path, lean ? *lean : glb_, error)) return false;
+  // Repeated data (a model imported twice) is written once, and what nothing uses any more (a
+  // deleted object's mesh, an import that was undone) stays out of the file. Both stay in the
+  // document: undo and redo can bring back what used them, numbered as they were.
+  std::optional<GlbFile> lean = compacted(glb_);
+  GlbFile& written = lean ? *lean : glb_;
+  material_textures::forget_unused_webp(written.json);
+  if (!write_glb(path, written, error)) return false;
+  report_save(path, written.bin.size());
   unsaved_meshes_.clear();
   path_ = path;
   saved_version_ = version_;
   return true;
+}
+
+void SceneDocument::report_save(const std::filesystem::path& path, std::size_t written_bytes) {
+  const std::size_t held = glb_.bin.size();
+  const std::size_t left_out_before = last_save_.left_out_bytes;
+  last_save_ = {written_bytes, held > written_bytes ? held - written_bytes : 0};
+  if (!left_out_more(last_save_.left_out_bytes, left_out_before)) return;
+  log::info(path.filename().string() + ": " + std::to_string(last_save_.left_out_bytes) + kLeftOutReport);
 }
 
 std::optional<GlbFile> SceneDocument::recovery_copy(std::string& error) {
