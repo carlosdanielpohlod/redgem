@@ -1,6 +1,5 @@
 #pragma once
 
-#include <condition_variable>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -8,23 +7,25 @@
 #include <vector>
 
 #include "app/engine.hpp"
+#include "core/clock.hpp"
 #include "server/room_slot.hpp"
 
 namespace redgem::server {
 
 // What every room of a server starts from, shared by its threads, which only read it: the game,
-// its first scene (read once, copied into each room's game), and the saves (SaveDatabase, which
-// takes one call at a time from any thread).
+// its first scene (read once, copied into each room's game), the saves (SaveDatabase, which
+// takes one call at a time from any thread), and the clock the rooms' turns keep to.
 struct RoomStart {
   std::filesystem::path game_dir;
   const SceneDesc* scene = nullptr;
   SaveStore* save = nullptr;
+  Clock* clock = &steady_clock();
 };
 
 // One of a dedicated server's threads: it runs the rooms it is given, each a frame every turn,
-// on the real clock, until it is stopped. A room's game is made here, its levels loaded here,
-// so a level that takes long to load holds up only the rooms of this thread. A room's game is
-// its thread's alone; the lobby reaches the room through its RoomSlot.
+// on the clock it is given (the real one, but in tests), until it is stopped. A room's game is made here, its levels
+// loaded here, so a level that takes long to load holds up only the rooms of this thread. A room's game is its thread's
+// alone; the lobby reaches the room through its RoomSlot.
 class RoomThread {
  public:
   explicit RoomThread(RoomStart start);
@@ -34,6 +35,9 @@ class RoomThread {
 
   // Gives the thread a room to run, from its next turn (from the lobby's thread).
   void add(std::shared_ptr<RoomSlot> slot);
+  // Asks the thread to end, without waiting for it: after its turn's wait, at most a tick, it
+  // ends the matches of its rooms. (A server asks all its threads before it waits for any.)
+  void ask_to_stop();
   // Ends the matches of its rooms (their players are told the game is gone) and waits for the
   // thread to end.
   void stop();
@@ -45,7 +49,7 @@ class RoomThread {
   };
 
   void run();
-  // Waits `seconds` for the next turn; false when the thread is to stop instead.
+  // Sleeps `seconds` (a turn at most) for the next turn; false when the thread is to stop instead.
   bool wait_for_turn(double seconds);
   void take_new_rooms();
   // A frame of every room, and how long that took noted in each.
@@ -62,7 +66,6 @@ class RoomThread {
 
   const RoomStart start_;
   std::mutex lock_;  // guards the two below
-  std::condition_variable wake_;
   bool stopping_ = false;
   std::vector<std::shared_ptr<RoomSlot>> new_rooms_;
   std::vector<Room> rooms_;       // the thread's own

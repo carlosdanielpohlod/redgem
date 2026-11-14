@@ -63,6 +63,11 @@ struct GameObject {
   PropertyMap props;
   bool visible = true;
   Vec3 tint = Vec3::one();  // multiplies the colors of this object's mesh (prop `tint = "#rrggbb"`)
+  // The shape keys (morph targets) of its mesh by name, and how much of each it shows: the mesh's
+  // own weights at first, then what clips (weights channels) and scripts (GameObject#morph) set.
+  std::vector<std::string> morph_names;
+  std::vector<float> morph_weights;
+  std::vector<float> morph_rest;  // the mesh's own weights: what a clip laid over by less than whole starts from
   // Drawn only while this far from the camera, in meters (props `visible_from`, `visible_to`).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();

@@ -35,7 +35,7 @@ using namespace redgem;
 
 namespace {
 
-using Clock = std::chrono::steady_clock;
+using SteadyClock = std::chrono::steady_clock;
 
 // The longest a test of the guard may take: one whose script the guard failed to stop ends the
 // test program here, failing, instead of spinning for as long as nobody stops it.
@@ -155,10 +155,10 @@ std::string ruby(Engine& engine, const std::string& code) {
 }
 
 // Runs frames; how long they took.
-Clock::duration frames(Engine& engine, int count) {
-  const Clock::time_point start = Clock::now();
+SteadyClock::duration frames(Engine& engine, int count) {
+  const SteadyClock::time_point start = SteadyClock::now();
   for (int i = 0; i < count; ++i) engine.frame(config::kFixedDeltaSeconds);
-  return Clock::now() - start;
+  return SteadyClock::now() - start;
 }
 
 // Whether a script stuck in `script` is stopped on its first frame, reported as such, and the game
@@ -218,9 +218,9 @@ TEST_CASE("code the engine runs (a scene script, a console line) is stopped the 
   const std::filesystem::path game = budget_game("eval", budget_settings());
   const SceneDesc scene = scene_of({"counter.rb"});
   std::unique_ptr<Engine> engine = started(game, scene);
-  const Clock::time_point start = Clock::now();
+  const SteadyClock::time_point start = SteadyClock::now();
   const RubyResult stuck = engine->scripts().eval("x = 0\nloop { x += 1 }", "stuck.rb");
-  CHECK(Clock::now() - start < kStoppedWell);
+  CHECK(SteadyClock::now() - start < kStoppedWell);
   CHECK_FALSE(stuck.ok);
   CHECK(stuck.error.find("ScriptTimeout") != std::string::npos);
   // The next call has a budget of its own.

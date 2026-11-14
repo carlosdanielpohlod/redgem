@@ -5,7 +5,17 @@
 #include <string>
 #include <vector>
 
+#include "core/clock.hpp"
+
 namespace redgem::net {
+
+// The longest a wait sleeps: one asked to last longer is cut to this.
+inline constexpr float kLongestWaitSeconds = 3600.0f;
+
+// A wait's length as the system takes it: whole milliseconds, rounded up so that a short wait
+// still sleeps, never more than kLongestWaitSeconds, and 0 (no sleep) for a wait of no time or of
+// a length that is no number (never negative, which the system reads as "for ever").
+int wait_milliseconds(float seconds);
 
 enum class IoStatus {
   Ok,
@@ -72,8 +82,9 @@ class Socket {
   // Sleeps until something happens on one of `sockets` (bytes arrive, someone connects, the other
   // side hangs up, or one that is `sending` can send again), for `seconds` at most. True when a
   // socket ended the wait, false when the time did. For a program with nothing else to do
-  // meanwhile (a relay): a game, which draws frames, never calls it.
-  static bool wait(const std::vector<Watched>& sockets, float seconds);
+  // meanwhile (a relay): a game, which draws frames, never calls it. With no socket to watch it
+  // sleeps on `clock` (only the time can end it then).
+  static bool wait(const std::vector<Watched>& sockets, float seconds, Clock& clock = steady_clock());
 
  private:
   static constexpr std::intptr_t kNoHandle = -1;
