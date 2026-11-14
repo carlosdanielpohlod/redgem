@@ -62,9 +62,9 @@ std::optional<JointKind> joint_kind_named(const std::string& name);
 std::string joint_kind_list();
 
 // What each kind takes besides its ends and anchor.
-bool joint_has_axis(JointKind kind);    // hinges and sliders (with their limits)
-bool joint_has_motor(JointKind kind);   // hinges
-bool joint_is_distance(JointKind kind); // a rope or a spring
+bool joint_has_axis(JointKind kind);     // hinges and sliders (with their limits)
+bool joint_has_motor(JointKind kind);    // hinges
+bool joint_is_distance(JointKind kind);  // a rope or a spring
 
 // Every property a joint is made of, as an object has them.
 std::vector<std::string> joint_property_keys();

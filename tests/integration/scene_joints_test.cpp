@@ -112,8 +112,8 @@ TEST_CASE("a scene's joint that cannot be made is said, and the scene still play
   lost[props::kJointTo] = std::string("nowhere");
   PropertyMap unknown = dynamic_box();
   unknown[props::kJoint] = std::string("rope");
-  const SceneDesc scene = scene_with({node("Lost", {0, 3, 0}, {1, 1, 1}, lost),
-                                      node("Odd", {3, 3, 0}, {1, 1, 1}, unknown)});
+  const SceneDesc scene =
+      scene_with({node("Lost", {0, 3, 0}, {1, 1, 1}, lost), node("Odd", {3, 3, 0}, {1, 1, 1}, unknown)});
   auto engine = engine_for(game, scene);
   CHECK(log.contains("is not in the scene"));
   CHECK(log.contains("unknown joint 'rope'"));

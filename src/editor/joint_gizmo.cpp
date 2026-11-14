@@ -1,6 +1,7 @@
 #include "editor/joint_gizmo.hpp"
 
 #include <cmath>
+#include <utility>
 
 #include "physics/joint_config.hpp"
 
@@ -16,9 +17,9 @@ Vec3 across(Vec3 axis, Vec3 toward) {
   return normalize(cross(axis, other));
 }
 
-std::vector<Vec3> hinge_arc(const JointDesc& desc, Vec3 center) {
+std::vector<Vec3> hinge_arc(const JointDesc& desc, Vec3 center, std::pair<float, float> limits) {
   const Vec3 start = across(desc.axis, center - desc.anchor) * kJointArcRadius;
-  const auto [low, high] = *desc.limits;
+  const auto [low, high] = limits;
   std::vector<Vec3> arc;
   for (int step = 0; step <= kJointArcSegments; ++step) {
     const float angle = low + (high - low) * static_cast<float>(step) / static_cast<float>(kJointArcSegments);
@@ -29,8 +30,9 @@ std::vector<Vec3> hinge_arc(const JointDesc& desc, Vec3 center) {
 
 std::vector<Vec3> limit_marks(const JointDesc& desc, Vec3 center) {
   if (!desc.limits) return {};
-  if (desc.kind == JointKind::Hinge) return hinge_arc(desc, center);
-  return {desc.anchor + desc.axis * desc.limits->first, desc.anchor + desc.axis * desc.limits->second};
+  const std::pair<float, float> limits = *desc.limits;
+  if (desc.kind == JointKind::Hinge) return hinge_arc(desc, center, limits);
+  return {desc.anchor + desc.axis * limits.first, desc.anchor + desc.axis * limits.second};
 }
 
 void add_axis(const JointDesc& desc, Vec3 center, JointGizmo& gizmo) {

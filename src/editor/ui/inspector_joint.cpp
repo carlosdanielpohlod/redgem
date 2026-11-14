@@ -22,9 +22,9 @@ using namespace editor_config;
 using namespace inspector_logic;
 
 // The keys of what each of props::kJointKinds is for, in their order.
-constexpr const char* kKindDescriptions[] = {
-    "editor.inspector.joint.fixed_kind", "editor.inspector.joint.hinge_kind", "editor.inspector.joint.slider_kind",
-    "editor.inspector.joint.point_kind", "editor.inspector.joint.distance_kind"};
+constexpr const char* kKindDescriptions[] = {"editor.inspector.joint.fixed_kind", "editor.inspector.joint.hinge_kind",
+                                             "editor.inspector.joint.slider_kind", "editor.inspector.joint.point_kind",
+                                             "editor.inspector.joint.distance_kind"};
 static_assert(std::size(kKindDescriptions) == std::size(props::kJointKinds), "a description for every joint kind");
 constexpr const char* kKindId = "##joint_kind";
 constexpr const char* kPartnerId = "##joint_to";
@@ -147,7 +147,7 @@ void draw_limit_numbers(PanelContext& context, int index, std::pair<float, float
 bool draw_limit_rows(PanelContext& context, int index, const JointConfig& joint) {
   bool limited = joint.limits.has_value();
   property_label(tr(joint.kind == JointKind::Hinge ? "editor.inspector.joint.limits_degrees"
-                                                  : "editor.inspector.joint.limits_meters"));
+                                                   : "editor.inspector.joint.limits_meters"));
   if (ImGui::Checkbox(kLimitedId, &limited)) {
     set_limits(context.session, index, limited ? std::optional(default_joint_limits(joint.kind)) : std::nullopt);
     return true;
@@ -157,25 +157,29 @@ bool draw_limit_rows(PanelContext& context, int index, const JointConfig& joint)
 }
 
 void draw_motor_rows(PanelContext& context, int index, const JointConfig& joint) {
-  number_row(context, index, {"editor.inspector.joint.motor_speed", kMotorSpeedId, props::kJointMotorSpeed,
-                              joint.motor_speed, -FLT_MAX, "%.1f deg/s"});
-  number_row(context, index, {"editor.inspector.joint.motor_torque", kMotorTorqueId, props::kJointMotorTorque,
-                              joint.motor_torque, 0.0f, "%.1f N m"});
+  number_row(context, index,
+             {"editor.inspector.joint.motor_speed", kMotorSpeedId, props::kJointMotorSpeed, joint.motor_speed, -FLT_MAX,
+              "%.1f deg/s"});
+  number_row(context, index,
+             {"editor.inspector.joint.motor_torque", kMotorTorqueId, props::kJointMotorTorque, joint.motor_torque, 0.0f,
+              "%.1f N m"});
   tooltip(tr("editor.inspector.joint.motor_tooltip"));
 }
 
 void draw_distance_rows(PanelContext& context, int index, const JointConfig& joint) {
   vector_row(context, index, "editor.inspector.joint.other_anchor", kOtherAnchorId, props::kJointOtherAnchor,
              joint.other_anchor);
-  number_row(context, index, {"editor.inspector.joint.min", kMinId, props::kJointMin, joint.min_distance, 0.0f,
-                              "%.2f m"});
-  number_row(context, index, {"editor.inspector.joint.max", kMaxId, props::kJointMax,
-                              joint.max_distance.value_or(0.0f), 0.0f, "%.2f m"});
+  number_row(context, index,
+             {"editor.inspector.joint.min", kMinId, props::kJointMin, joint.min_distance, 0.0f, "%.2f m"});
+  number_row(
+      context, index,
+      {"editor.inspector.joint.max", kMaxId, props::kJointMax, joint.max_distance.value_or(0.0f), 0.0f, "%.2f m"});
   tooltip(tr("editor.inspector.joint.max_tooltip"));
-  number_row(context, index, {"editor.inspector.joint.spring", kSpringId, props::kJointSpring,
-                              joint.spring_frequency, 0.0f, "%.2f Hz"});
-  number_row(context, index, {"editor.inspector.joint.damping", kDampingId, props::kJointDamping,
-                              joint.spring_damping, 0.0f, "%.2f"});
+  number_row(
+      context, index,
+      {"editor.inspector.joint.spring", kSpringId, props::kJointSpring, joint.spring_frequency, 0.0f, "%.2f Hz"});
+  number_row(context, index,
+             {"editor.inspector.joint.damping", kDampingId, props::kJointDamping, joint.spring_damping, 0.0f, "%.2f"});
 }
 
 // The rows of what the kind takes, until one of them changes what the card shows.
@@ -205,8 +209,9 @@ void draw_joint_rows(PanelContext& context, int index, const JointConfig& joint)
   if (draw_kind_row(context.session, index, joint)) return;
   if (draw_partner_row(context.session, index, joint)) return;
   if (joint.known_kind && draw_kind_settings(context, index, joint)) return;
-  number_row(context, index, {"editor.inspector.joint.break_force", kBreakForceId, props::kJointBreakForce,
-                              joint.break_force, 0.0f, "%.0f N"});
+  number_row(context, index,
+             {"editor.inspector.joint.break_force", kBreakForceId, props::kJointBreakForce, joint.break_force, 0.0f,
+              "%.0f N"});
   tooltip(tr("editor.inspector.joint.break_force_tooltip"));
   draw_joint_warnings(context.session.document().node(index).props, joint);
 }

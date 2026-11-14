@@ -900,9 +900,9 @@ TEST_CASE("MCP controls real editor play and returns a bounded viewport image") 
 }
 
 TEST_CASE("a hinge added in the Inspector holds a lid that swings to its limit on Play") {
-  constexpr double kLimit = 45.0;    // degrees the lid may fall
+  constexpr double kLimit = 45.0;     // degrees the lid may fall
   constexpr float kLidHeight = 6.0f;  // meters above the spawn point, clear of the level
-  constexpr float kSettled = 0.1f;   // meters
+  constexpr float kSettled = 0.1f;    // meters
   const std::filesystem::path game = copy_game();
   auto created = EditorApp::create(game, even_pace());
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);

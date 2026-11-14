@@ -27,9 +27,9 @@ const std::set<std::string>& reserved_props() {
   return with_joints;
 }
 
-constexpr float kDefaultRopeLength = 2.0f;    // meters above the object a new distance joint hangs it from
-constexpr float kDefaultHingeLimit = 90.0f;   // degrees
-constexpr float kDefaultSlideLimit = 1.0f;    // meters
+constexpr float kDefaultRopeLength = 2.0f;   // meters above the object a new distance joint hangs it from
+constexpr float kDefaultHingeLimit = 90.0f;  // degrees
+constexpr float kDefaultSlideLimit = 1.0f;   // meters
 
 }  // namespace
 
@@ -109,8 +109,8 @@ PropertyMap new_joint_props(JointKind kind) {
 }
 
 bool kept_across_joint_kinds(const std::string& key) {
-  const bool anchor = std::find(std::begin(props::kJointAnchor), std::end(props::kJointAnchor), key) !=
-                      std::end(props::kJointAnchor);
+  const bool anchor =
+      std::find(std::begin(props::kJointAnchor), std::end(props::kJointAnchor), key) != std::end(props::kJointAnchor);
   return anchor || key == props::kJointTo || key == props::kJointBreakForce;
 }
 

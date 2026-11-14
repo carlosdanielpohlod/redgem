@@ -17,8 +17,7 @@ void warn(const GameObject& object, const std::string& warning) {
 
 // The copy made of `end`, or `end` itself when it was not copied.
 ObjectId copy_or_same(const CopyPairs& copies, ObjectId end) {
-  const auto copied =
-      std::find_if(copies.begin(), copies.end(), [end](const auto& pair) { return pair.first == end; });
+  const auto copied = std::find_if(copies.begin(), copies.end(), [end](const auto& pair) { return pair.first == end; });
   return copied != copies.end() ? copied->second : end;
 }
 
@@ -35,7 +34,8 @@ std::optional<JointEnds> ends_of(const Scene& scene, ObjectId id, ObjectId other
   JointEnds ends{id, scene.world_transform(id), kNoObject, {}};
   if (config.other.empty()) return ends;
   if (other_end == kNoObject) {
-    log::error("object '" + scene.at(id).name + "': its joint's other object (" + config.other + ") is not in the scene");
+    log::error("object '" + scene.at(id).name + "': its joint's other object (" + config.other +
+               ") is not in the scene");
     return std::nullopt;
   }
   ends.b = other_end;

@@ -102,9 +102,9 @@ inline constexpr const char* kJointDamping = "joint_damping";
 inline constexpr const char* kJointBreakForce = "joint_break_force";
 // Every property of a joint but its vectors' numbers, which kJointAnchor, kJointOtherAnchor and
 // kJointAxis list.
-inline constexpr const char* kJointScalars[] = {kJoint,      kJointTo,  kJointLow,    kJointHigh,
-                                                kJointMotorSpeed, kJointMotorTorque, kJointMin,
-                                                kJointMax,   kJointSpring, kJointDamping, kJointBreakForce};
+inline constexpr const char* kJointScalars[] = {kJoint,           kJointTo,          kJointLow,       kJointHigh,
+                                                kJointMotorSpeed, kJointMotorTorque, kJointMin,       kJointMax,
+                                                kJointSpring,     kJointDamping,     kJointBreakForce};
 
 // --- Environment: the look of a scene beyond its objects ---------------------------
 // True on the object whose other properties describe the environment (see render/environment.hpp).

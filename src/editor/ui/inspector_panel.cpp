@@ -31,8 +31,9 @@ void draw_component_choices(PanelContext& context, int index) {
     set_or_remove(session, index, props::kTrigger, PropertyValue(true));
   }
   const bool no_joint = !inspector_logic::has_joint(session.document().node(index).props);
-  menu(icon_label(ICON_FA_LINK, "editor.inspector.add.joint"), [&session, index] { add_joint_menu(session, index); },
-       no_joint);
+  menu(
+      icon_label(ICON_FA_LINK, "editor.inspector.add.joint"), [&session, index] { add_joint_menu(session, index); },
+      no_joint);
   menu(icon_label(ICON_FA_SLIDERS, "editor.inspector.add.property"),
        [&context, index] { add_property_menu(context, index); });
 }

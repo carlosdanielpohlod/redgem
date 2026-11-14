@@ -33,6 +33,18 @@ std::optional<GlbFile> read_importable_glb(const std::filesystem::path& path, st
   return std::nullopt;
 }
 
+// The pasted nodes' joints hold the pasted copies of what they held in `model`. (The pasted
+// nodes are those from `first` on, in the model's order.)
+void follow_pasted_joints(const SceneDesc& model, std::vector<NodeDesc>& nodes, int first) {
+  NewIdentities identities;
+  for (std::size_t i = 0; i < model.nodes.size(); ++i) {
+    identities[model.nodes[i].stable_id] = nodes[static_cast<std::size_t>(first) + i].stable_id;
+  }
+  for (std::size_t i = static_cast<std::size_t>(first); i < nodes.size(); ++i) {
+    follow_new_identities(nodes[i].props, identities);
+  }
+}
+
 }  // namespace
 
 int SceneDocument::import_model(const std::filesystem::path& path, std::string& error, int parent) {
@@ -134,17 +146,14 @@ void SceneDocument::append_model_assets(const SceneDesc& model, const model_impo
 }
 
 void SceneDocument::append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets) {
-  NewIdentities identities;
   for (const NodeDesc& imported : model.nodes) {
     NodeDesc node = model_import::imported_node(imported, offsets);
     node.name = unique_name(node.name);
     node.stable_id = fresh_id();
-    identities[imported.stable_id] = node.stable_id;
     desc_.nodes.push_back(std::move(node));
     if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
-  // (What was pasted together stays joined together.)
-  for (int i = offsets.nodes; i < node_count(); ++i) follow_new_identities(desc_.nodes[i].props, identities);
+  follow_pasted_joints(model, desc_.nodes, offsets.nodes);  // what was pasted together stays joined
   // The imported skeletons and animations point at the imported nodes (now further on in the list).
   const std::size_t first_animation = desc_.animations.size();
   for (const SkinDesc& skin : model.skins) desc_.skins.push_back(model_import::imported_skin(skin, offsets));

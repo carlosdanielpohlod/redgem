@@ -19,8 +19,8 @@ std::optional<float> number_of(const PropertyMap& props, const char* key) {
 }
 
 Vec3 vector_of(const PropertyMap& props, const char* const (&keys)[kVectorParts], Vec3 fallback) {
-  return {number_of(props, keys[0]).value_or(fallback.x), number_of(props, keys[1]).value_or(fallback.y),
-          number_of(props, keys[2]).value_or(fallback.z)};
+  return {number_of(props, keys[kXOffset]).value_or(fallback.x), number_of(props, keys[kYOffset]).value_or(fallback.y),
+          number_of(props, keys[kZOffset]).value_or(fallback.z)};
 }
 
 // A number that is never below zero.

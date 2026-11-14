@@ -151,8 +151,7 @@ TEST_CASE("a hinge set up in the editor swings within its limits when the game p
   REQUIRE(playing != kNoObject);
   // A unit cube a meter wide: its middle half a meter out from the hinge, turned down by the limit.
   const float drop = std::sin(degrees_to_radians(static_cast<float>(kLimit))) * 0.5f;
-  CHECK(session->scene().world_transform(playing).position.y ==
-        doctest::Approx(kLidSpot.y - drop).epsilon(kTolerance));
+  CHECK(session->scene().world_transform(playing).position.y == doctest::Approx(kLidSpot.y - drop).epsilon(kTolerance));
   session->stop();
   CHECK(session->scene().world_transform(lid).position.y == doctest::Approx(kLidSpot.y));
   session.reset();

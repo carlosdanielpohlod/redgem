@@ -51,8 +51,8 @@ TEST_CASE("an object without a joint property has no joint, and one with it has 
 
 TEST_CASE("what is out of range in a joint's properties is brought back, with a warning") {
   PropertyMap props = hinge_props();
-  props[props::kJointLow] = 10.0;  // above 0
-  props[props::kJointHigh] = 400.0;  // past half a turn
+  props[props::kJointLow] = 10.0;     // above 0
+  props[props::kJointHigh] = 400.0;   // past half a turn
   props[props::kJointAxis[1]] = 0.0;  // a zero axis
   props[props::kJointMotorTorque] = -1.0;
   const auto clamped = joint_config_from_props(props);
