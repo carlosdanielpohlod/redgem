@@ -25,6 +25,12 @@ std::filesystem::path game_saying(const std::string& json) {
   return dir;
 }
 
+// The game.json written in the folder, read whole and closed again (Windows removes no open file).
+std::string saved_text(const std::filesystem::path& game) {
+  std::ifstream file(game / kGameSettingsFile);
+  return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+}
+
 }  // namespace
 
 TEST_CASE("a game that says nothing is named after its folder and gets the engine's window") {
@@ -203,8 +209,7 @@ TEST_CASE("the physics' threads go into game.json and come back, and the default
 
   settings.physics_threads = config::kDefaultPhysicsThreads;
   REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
-  std::ifstream file(game / kGameSettingsFile);
-  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  const std::string text = saved_text(game);
   CHECK(text.find("threads") == std::string::npos);
   CHECK(read_game_settings(game).physics_threads == config::kDefaultPhysicsThreads);
   CHECK(read_game_settings(game).collision_layers.count() == 2);
@@ -215,8 +220,7 @@ TEST_CASE("a game that never said how many threads solve its physics is saved wi
   const std::filesystem::path game = game_saying(R"({"title": "Plain"})");
   std::string error;
   REQUIRE_MESSAGE(write_game_settings(game, read_game_settings(game), error), error);
-  std::ifstream file(game / kGameSettingsFile);
-  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  const std::string text = saved_text(game);
   CHECK(text.find("physics") == std::string::npos);
   std::filesystem::remove_all(game.parent_path());
 }
@@ -228,8 +232,7 @@ TEST_CASE("a physics section that is no object is left as it is when the threads
   settings.physics_threads = kFourThreads;
   std::string error;
   REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
-  std::ifstream file(game / kGameSettingsFile);
-  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  const std::string text = saved_text(game);
   CHECK(text.find("player") != std::string::npos);
   CHECK(text.find("threads") == std::string::npos);
   std::filesystem::remove_all(game.parent_path());

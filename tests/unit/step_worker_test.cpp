@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <future>
+#include <ostream>  // (doctest prints a std::thread::id through it)
 #include <thread>
 #include <vector>
 
