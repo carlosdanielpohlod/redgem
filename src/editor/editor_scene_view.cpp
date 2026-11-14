@@ -57,6 +57,7 @@ void EditorApp::draw_edited_scene() {
   aim_viewport_camera();
   renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
   renderer_->set_motion_blur(kNoMotionBlur);
+  renderer_->set_underwater({});               // the editor's camera flies through water without the look
   renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
   sync_renderer_assets();
   renderer_->draw_world(session_->scene(), view.camera, &view.target);

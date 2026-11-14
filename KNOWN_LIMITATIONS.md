@@ -53,8 +53,13 @@ the same pull request.
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback, shore foam and local impact/wake ripples
-  from physical bodies. It has no underwater camera mode, fluid simulation,
-  buoyancy, breaking waves or planar reflections. Shore foam estimates horizontal distance
+  from physical bodies, buoyancy and an underwater camera look. It has no fluid simulation,
+  breaking waves or planar reflections, and no cheaper view of coasts far away (both follow-ups).
+  Buoyancy samples each body's world-aligned collider box as 2 × 2 columns against the calm
+  surface: waves do not lift bodies, a rotated body floats as its box does, characters do not
+  swim, and `density` is a custom property only (no script setter yet). The underwater look is
+  one blend for the whole picture: a camera half through the surface sees no waterline across the
+  screen, the surface itself is not drawn from below, and there are no caustics or light shafts. Shore foam estimates horizontal distance
   to the intersection of visible bottom and water tangent planes, with filtered pores and partial transmission.
   It is a local screen-space approximation, not a global shoreline-distance field. Missing geometry,
   depth discontinuities and nearly parallel planes suppress coverage; curved shores can deviate

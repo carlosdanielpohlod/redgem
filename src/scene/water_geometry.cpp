@@ -179,7 +179,8 @@ void append_surface(std::vector<WaterSurface>& out, const Scene& scene, const Sc
                     std::size_t index, std::size_t& triangles) {
   const auto& primitive = desc.meshes[static_cast<std::size_t>(scene.at(id).mesh)].primitives[index];
   if (!water_primitive(primitive, desc)) return;
-  WaterSurface surface{scene.handle(id), index, {}, {}, {}};
+  const WaterDesc& water = desc.materials[static_cast<std::size_t>(primitive.material)].water;
+  WaterSurface surface{scene.handle(id), index, {}, {}, {}, water};
   append_triangles(surface, primitive, scene.world_transform(id), kMaxWaterTriangles - triangles);
   if (!horizontal_surface(surface)) return;
   triangles += surface.triangles.size();
@@ -280,6 +281,33 @@ std::optional<WaterSweep> sweep_in_node(const WaterSurface& surface, std::size_t
   return sweep_leaf(surface, node, before, after);
 }
 
+bool column_in(const Bounds& bounds, Vec3 point) {
+  const bool across = point.x >= bounds.min.x && point.x <= bounds.max.x;
+  const bool along = point.z >= bounds.min.z && point.z <= bounds.max.z;
+  return across && along;
+}
+
+float triangle_height(const WaterTriangle& triangle) {
+  constexpr float kCornerShare = 1.0f / static_cast<float>(kWaterTriangleCorners);
+  return (triangle.points[0].y + triangle.points[1].y + triangle.points[2].y) * kCornerShare;
+}
+
+std::optional<float> height_in_leaf(const WaterSurface& surface, const WaterBvhNode& node, Vec3 point) {
+  for (std::size_t i = node.first; i < node.first + node.count; ++i) {
+    const auto& triangle = surface.triangles[i];
+    if (inside_triangle(point, triangle)) return triangle_height(triangle);
+  }
+  return std::nullopt;
+}
+
+std::optional<float> height_in_node(const WaterSurface& surface, std::size_t index, Vec3 point) {
+  const auto& node = surface.nodes[index];
+  if (!column_in(node.bounds, point)) return std::nullopt;
+  if (node.count != 0) return height_in_leaf(surface, node, point);
+  const auto left = height_in_node(surface, node.left, point);
+  return left ? left : height_in_node(surface, node.right, point);
+}
+
 bool same_transform(const Transform& a, const Transform& b) {
   const bool position = a.position.x == b.position.x && a.position.y == b.position.y && a.position.z == b.position.z;
   const bool scale = a.scale.x == b.scale.x && a.scale.y == b.scale.y && a.scale.z == b.scale.z;
@@ -337,6 +365,11 @@ std::optional<WaterSweep> water_swept_contact(const WaterSurface& surface, const
   swept.include(after.max);
   if (swept.max.y < surface.bounds.min.y || swept.min.y > surface.bounds.max.y) return std::nullopt;
   return sweep_in_node(surface, 0, before, after, swept);
+}
+
+std::optional<float> water_surface_height(const WaterSurface& surface, float x, float z) {
+  if (surface.nodes.empty()) return std::nullopt;
+  return height_in_node(surface, 0, Vec3{x, 0.0f, z});
 }
 
 std::vector<WaterGeometryCache::Key> WaterGeometryCache::collect_keys(const Scene& scene, const SceneDesc& desc) {

@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body is sampled as a 2 × 2 grid of columns that water pushes up by what they displace and drags
+  as they move, so bodies bob, settle and right themselves. The new `density` custom property
+  (kilograms per cubic meter, 500 unless said) sets how deep a body floats; denser than water's
+  1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, blended over the waves' height as the camera crosses the surface so
+  it never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a

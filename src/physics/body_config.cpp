@@ -1,5 +1,6 @@
 #include "physics/body_config.hpp"
 
+#include <cmath>
 #include <optional>
 
 #include "physics/physics_config.hpp"
@@ -127,6 +128,17 @@ void read_mass(const PropertyMap& props, BodyConfig& config) {
   }
 }
 
+bool usable_density(float density) { return std::isfinite(density) && density > 0.0f; }
+
+void read_density(const PropertyMap& props, BodyConfig& config) {
+  const std::optional<double> density = get_number(props, props::kDensity);
+  if (!density) return;
+  config.density = static_cast<float>(*density);
+  if (usable_density(config.density)) return;
+  config.warnings.push_back("density must be positive, using " + std::to_string(kDefaultBodyDensity));
+  config.density = kDefaultBodyDensity;
+}
+
 void read_layer(const PropertyMap& props, BodyConfig& config) {
   const std::optional<std::string> layer = get_string(props, props::kLayer);
   if (layer) config.layer = *layer;
@@ -159,6 +171,7 @@ BodyConfig body_config_from_props(const PropertyMap& props) {
   apply_trigger(config);
   settle_collider(config);
   read_mass(props, config);
+  read_density(props, config);
   read_layer(props, config);
   return config;
 }

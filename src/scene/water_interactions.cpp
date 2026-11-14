@@ -258,10 +258,12 @@ void WaterInteractions::step(const Scene& scene, const SceneDesc& desc, const st
   if (!enabled_) return;
   if (!std::isfinite(delta) || delta < 0.0f) return;
   discard_dead(scene);
-  if (delta == 0.0f)
-    prime(scene, bodies);
-  else
+  if (delta > 0.0f) {
     simulate(scene, desc, bodies, delta);
+    return;
+  }
+  geometry_.refresh(scene, desc);
+  prime(scene, bodies);
 }
 
 }  // namespace redgem

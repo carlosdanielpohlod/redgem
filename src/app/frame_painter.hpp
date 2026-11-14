@@ -32,6 +32,7 @@ class FramePainter {
 
  private:
   void follow_game(const FrameView& view);
+  static UnderwaterView underwater_of(const FrameView& view, const Camera3D& camera);
 
   Renderer& renderer_;
   int uploaded_generation_ = kNothingUploaded;

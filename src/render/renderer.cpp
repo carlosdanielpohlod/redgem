@@ -105,6 +105,8 @@ void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
 
+void Renderer::set_underwater(const UnderwaterView& view) { impl_->underwater = view; }
+
 void Renderer::set_quality(const QualityCaps& caps) { impl_->quality = caps; }
 
 void Renderer::allow_temporal_antialias(bool allowed) { impl_->temporal_allowed = allowed; }

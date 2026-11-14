@@ -41,6 +41,7 @@
 #include "render/environment.hpp"
 #include "render/gl_extras.hpp"
 #include "render/instance_batches.hpp"
+#include "render/underwater.hpp"
 #include "render/water_ripple_packet.hpp"
 #include "render/instance_records.hpp"
 #include "render/local_shadows.hpp"
@@ -278,6 +279,7 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
   float motion_blur = 0.0f;         // 0..1 (Camera.motion_blur)
+  UnderwaterView underwater;        // where the camera is against the water (Renderer::set_underwater)
   std::optional<double> clock;      // seconds (Renderer::set_clock); nothing: the real time
   float now() const { return static_cast<float>(clock ? *clock : GetTime()); }
   // The frame being drawn.
@@ -630,6 +632,7 @@ struct Renderer::Impl {
   void blur(const RenderTexture2D& picture, const RenderTexture2D& scratch);
   void tone_map(const Environment& env);
   void send_grade(const Environment& env);
+  void send_underwater();
   void antialias(const RenderTexture2D* output);
   // The last pass's shader, its values set: smoothing, or after the frames are mixed, sharpening.
   const Shader& begin_finish(int width, int height);
