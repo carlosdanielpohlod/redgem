@@ -95,3 +95,24 @@ TEST_CASE("interface scale changes keep fonts alive and viewport mouse coordinat
     CHECK(test::save_window_picture(std::filesystem::path(REDGEM_SCREENSHOT_DIR) / "editor" / name));
   }
 }
+
+TEST_CASE("manual interface scaling overrides monitor changes until automatic scaling is restored") {
+  constexpr float kManualScale = 1.5f;
+  constexpr float kOtherMonitorScale = 2.0f;
+  Window window(settings());
+  float monitor_scale = 1.0f;
+  ui::Interface interface(window, ui::Interface::Layout::Fixed, [&monitor_scale] { return monitor_scale; });
+  SceneViewport view;
+  view.resize(kViewWidth, kViewHeight);
+
+  interface.set_scale_override(kManualScale);
+  frame(window, interface, view);
+  CHECK(ui::scaled(1.0f) == kManualScale);
+  monitor_scale = kOtherMonitorScale;
+  frame(window, interface, view);
+  CHECK(ui::scaled(1.0f) == kManualScale);
+
+  interface.set_scale_override(std::nullopt);
+  frame(window, interface, view);
+  CHECK(ui::scaled(1.0f) == kOtherMonitorScale);
+}

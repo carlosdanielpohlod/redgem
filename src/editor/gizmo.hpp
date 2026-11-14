@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "editor/editor_preferences.hpp"
 #include "editor/group_transform.hpp"
 #include "scene/transform.hpp"
 
@@ -12,7 +13,7 @@ struct SceneViewport;
 enum class GizmoMode { Translate, Rotate, Scale };
 
 // How far the handles jump while snapping: half a meter, a few degrees, a tenth of the size.
-float snap_step(GizmoMode mode);
+float snap_step(GizmoMode mode, const EditorPreferences& preferences = {});
 
 // The gizmo of the Scene view: handles that move, turn or scale the selected objects around a
 // pivot, on the world's axes or the first object's own, snapping to steps or not.
@@ -23,6 +24,7 @@ class Gizmo {
   group_transform::PivotMode pivot_mode() const { return pivot_; }
   // W, E and R pick a mode.
   void use_keys();
+  void set_preferences(const EditorPreferences& values) { preferences_ = values; }
   // The toolbar's buttons: the mode, the axes, the pivot and snapping.
   void draw_tools();
   // Draws the handles over a pivot placed at `world`, in the Scene view, and lets the mouse
@@ -39,6 +41,7 @@ class Gizmo {
   // Lets the mouse move the handles of `model` (the 16 numbers of a world matrix).
   void drag(float* model, const SceneViewport& view) const;
 
+  EditorPreferences preferences_;
   GizmoMode mode_ = GizmoMode::Translate;
   bool local_ = false;  // axes of the object instead of the world
   bool snapping_ = false;

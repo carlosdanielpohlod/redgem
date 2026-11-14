@@ -21,8 +21,11 @@ std::uint64_t node_bytes(const NodeDesc& node) {
          bytes(node.children) + property_bytes(node.props);
 }
 std::uint64_t primitive_bytes(const PrimitiveDesc& primitive) {
-  return bytes(primitive.positions) + bytes(primitive.normals) + bytes(primitive.texcoords) + bytes(primitive.colors) +
-         bytes(primitive.indices) + bytes(primitive.joints) + bytes(primitive.weights);
+  std::uint64_t size = bytes(primitive.positions) + bytes(primitive.normals) + bytes(primitive.texcoords) +
+                       bytes(primitive.colors) + bytes(primitive.indices) + bytes(primitive.joints) +
+                       bytes(primitive.weights) + bytes(primitive.targets);
+  for (const auto& target : primitive.targets) size += bytes(target.positions) + bytes(target.normals);
+  return size;
 }
 int shifted(int index, int offset) { return index == kNoIndex ? kNoIndex : index + offset; }
 void move_material(SceneDesc& target, MaterialDesc material, int offset) {
@@ -51,7 +54,8 @@ std::uint64_t asset_bytes(const SceneDesc& scene) {
   std::uint64_t size = bytes(scene.images) + bytes(scene.materials) + bytes(scene.meshes);
   for (const auto& image : scene.images) size += bytes(image.encoded);
   for (const auto& mesh : scene.meshes) {
-    size += mesh.name.size() + bytes(mesh.primitives);
+    size += mesh.name.size() + bytes(mesh.primitives) + bytes(mesh.target_names) + bytes(mesh.target_weights);
+    for (const auto& name : mesh.target_names) size += name.size();
     for (const auto& primitive : mesh.primitives) size += primitive_bytes(primitive);
   }
   return size + gltf_budget::decoded_bytes(scene.images);
