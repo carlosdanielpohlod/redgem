@@ -9,7 +9,7 @@ namespace redgem::net {
 
 void MovementValidator::configure(const MovementRules& rules) {
   rules_ = rules;
-  clear();
+  if (!enabled()) clear();
 }
 
 void MovementValidator::clear() {
@@ -18,6 +18,7 @@ void MovementValidator::clear() {
 }
 
 void MovementValidator::forgive(float seconds, float most_seconds) {
+  if (!forgives(seconds)) return;  // (called every frame, it would walk every track for nothing)
   const float most = most_seconds * allowed_speed();
   const float earned = seconds * allowed_speed();
   for (auto& entry : tracks_) entry.second.forgiven = std::min(entry.second.forgiven + earned, most);

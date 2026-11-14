@@ -58,7 +58,9 @@ struct MovementVerdict {
 
 class MovementValidator {
  public:
-  // From now on, these rules (everything followed so far, and every count, starts over).
+  // From now on, these rules. What is followed, and every count, stays (a script raising the top
+  // speed mid-game does not let every object start over anywhere, nor a cheater's count go back to
+  // nothing); turned off, everything starts over.
   void configure(const MovementRules& rules);
   const MovementRules& rules() const { return rules_; }
   bool enabled() const { return rules_.enabled(); }
@@ -108,6 +110,8 @@ class MovementValidator {
   bool teleports(float moved) const;
   bool too_fast(const Track& track, float moved) const;
   bool checks_speed() const { return rules_.max_speed > 0.0f; }
+  // Whether a stall of `seconds` earns the objects anything: only when there is a speed to hold them to.
+  bool forgives(float seconds) const { return checks_speed() && seconds > 0.0f; }
   void spend(Track& track, float moved);
   MovementVerdict accept(Track& track, Vec3 position, float moved);
   MovementVerdict refuse(int peer, Track& track, Vec3 position, float moved);

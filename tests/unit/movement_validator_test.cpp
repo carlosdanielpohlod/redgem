@@ -32,6 +32,7 @@ constexpr float kNear = 0.001f;
 constexpr int kBunchedPoses = 4;  // arriving at once after a pause as long as they took
 constexpr float kFarAway = 3.0f;  // times the teleport distance
 constexpr float kStallSeconds = 2.0f;
+constexpr float kPastCorrection = kCorrectionSeconds + kTick;  // the last violation's correction is over
 constexpr int kStaleTicks = static_cast<int>(redgem::net::kStaleTrackSeconds / kTick) + 2;  // past it
 constexpr float kWeeksOfSeconds = 3.0e6f;                                                   // about five weeks
 
@@ -195,4 +196,26 @@ TEST_CASE("the host's clock stays precise after weeks of a dedicated server") {
   MovementValidator validator = validating(rules(kMaxSpeed, 0.0f));
   validator.advance(kWeeksOfSeconds);
   CHECK(refused_while_moving(validator, kFairStep, kTicks) == 0);
+}
+
+TEST_CASE("changing the rules mid-game keeps what was followed and counted") {
+  MovementValidator validator = validating(rules(0.0f, kTeleport, kKickAfter));
+  validator.check(kPeer, kHero, along_x(0.0f));
+  validator.check(kPeer, kHero, along_x(kTeleport * kFarAway));
+  REQUIRE(validator.violations(kPeer) == 1);
+  validator.configure(rules(kMaxSpeed, kTeleport, kKickAfter));  // a sprint power-up, say
+  CHECK(validator.violations(kPeer) == 1);
+  // The hero is still held to where it was believed: a teleport after the change is no fresh start.
+  validator.advance(kPastCorrection);
+  CHECK_FALSE(validator.check(kPeer, kHero, along_x(kTeleport * kFarAway)).valid);
+  CHECK(validator.violations(kPeer) == 2);
+}
+
+TEST_CASE("turning validation off forgets what was followed and counted") {
+  MovementValidator validator = validating(rules(0.0f, kTeleport));
+  validator.check(kPeer, kHero, along_x(0.0f));
+  validator.check(kPeer, kHero, along_x(kTeleport * kFarAway));
+  REQUIRE(validator.violations(kPeer) == 1);
+  validator.configure(MovementRules{});
+  CHECK(validator.violations(kPeer) == 0);
 }
