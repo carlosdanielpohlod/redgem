@@ -9,6 +9,8 @@
     "Camera::Follow",
     "Camera::Rig",
     "Camera::Shake",
+    "Dialogue::Rules",
+    "Dialogue::VariableQuests",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -3015,6 +3017,242 @@
         "update"
       ],
       "guide": "interaction.md"
+    },
+    {
+      "name": "Dialogue",
+      "about": "Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.",
+      "methods": [
+        {
+          "name": "start",
+          "static": true,
+          "args": "name, actor:, speaker: nil",
+          "about": "starts a conversation of the actor (a player's hero) with the speaker, on that player's machine; raises on a client"
+        },
+        {
+          "name": "current",
+          "static": true,
+          "about": "the conversation this machine's player is in, or nil"
+        },
+        {
+          "name": "stop",
+          "static": true,
+          "about": "ends the conversation this machine's player is in"
+        },
+        {
+          "name": "on",
+          "static": true,
+          "args": "event, &block",
+          "about": ":start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen"
+        },
+        {
+          "name": "load",
+          "static": true,
+          "args": "name",
+          "about": "the dialogue of that name, read from its file once (raises for one that is not there or not well made)"
+        },
+        {
+          "name": "quests",
+          "static": true,
+          "about": "what reads and moves quest stages (GameVariables \"quest.<name>\" unless a game says)"
+        },
+        {
+          "name": "quests=",
+          "static": true,
+          "args": "quests",
+          "about": "what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)"
+        }
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "Dialogue::Conversation",
+      "about": "One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.",
+      "methods": [
+        {
+          "name": "text",
+          "about": "the line, in the language in use"
+        },
+        {
+          "name": "text_key",
+          "about": "the I18n key of the line"
+        },
+        {
+          "name": "speaker_name",
+          "about": "who says it, in the language in use (nil when the node names nobody)"
+        },
+        {
+          "name": "speaker_key",
+          "about": "the I18n key of who says it, or nil"
+        },
+        {
+          "name": "voice",
+          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+        },
+        {
+          "name": "choices",
+          "about": "the choices offered now: those whose conditions hold"
+        },
+        {
+          "name": "choosing?",
+          "about": "whether the player answers this line by choosing"
+        },
+        {
+          "name": "continue",
+          "about": "on from a line with no choices: to what follows, or the end; false when it waits for a choice"
+        },
+        {
+          "name": "choose",
+          "args": "choice",
+          "about": "takes a choice (a Choice or its index): its effects happen, and it goes where the choice leads; false for one not offered"
+        },
+        {
+          "name": "stop",
+          "about": "ends it where it is"
+        },
+        {
+          "name": "over?",
+          "about": "whether it ended"
+        },
+        {
+          "name": "node",
+          "about": "the node it is at (a Hash), or nil once it is over"
+        },
+        {
+          "name": "node_id",
+          "about": "the id of the node it is at, or nil"
+        },
+        {
+          "name": "script",
+          "about": "its dialogue"
+        },
+        {
+          "name": "actor",
+          "about": "the hero of the player in it"
+        },
+        {
+          "name": "speaker",
+          "about": "who talks to that player, or nil"
+        },
+        {
+          "name": "deciding?",
+          "about": "whether its effects happen on this machine (offline, and on the host)"
+        }
+      ],
+      "internal": [
+        "begin",
+        "inspect"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Conversation::Choice",
+      "about": "An answer the player may give.",
+      "methods": [
+        {
+          "name": "index",
+          "about": "its place among the node's choices (what choose takes)"
+        },
+        {
+          "name": "key",
+          "about": "the I18n key of its text"
+        },
+        {
+          "name": "text",
+          "about": "its text, in the language in use"
+        }
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Script",
+      "about": "A dialogue file as it was read.",
+      "methods": [
+        {
+          "name": "name",
+          "about": "its name: that of its file in dialogues/, without .json"
+        },
+        {
+          "name": "start",
+          "about": "where it starts: a node's id, or branches"
+        },
+        {
+          "name": "node",
+          "args": "id",
+          "about": "the node of that id (a Hash), or nil"
+        },
+        {
+          "name": "node?",
+          "args": "id",
+          "about": "whether it has a node of that id"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "GameVariables",
+      "about": "The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.",
+      "methods": [
+        {
+          "name": "[]",
+          "static": true,
+          "args": "name",
+          "about": "the value of a variable, or nil when it was never set"
+        },
+        {
+          "name": "[]=",
+          "static": true,
+          "args": "name, value",
+          "about": "sets a variable (nil, true, false, a number or a text); raises on a client"
+        },
+        {
+          "name": "to_h",
+          "static": true,
+          "about": "every variable that was set, by name (what to save)"
+        },
+        {
+          "name": "replace",
+          "static": true,
+          "args": "values",
+          "about": "puts these in the place of every variable (a save read back)"
+        },
+        {
+          "name": "on_change",
+          "static": true,
+          "args": "&block",
+          "about": "|name, value| on every change"
+        },
+        {
+          "name": "value?",
+          "static": true,
+          "args": "value",
+          "about": "whether a variable can hold a value"
+        },
+        {
+          "name": "name?",
+          "static": true,
+          "args": "name",
+          "about": "whether a variable can be called so"
+        }
+      ],
+      "guide": "dialogue.md#gamevariables"
+    },
+    {
+      "name": "Talkable",
+      "about": "A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt \"Talk\" when it has none) starts its dialogue.",
+      "methods": [
+        {
+          "name": "dialogue",
+          "about": "the name of its dialogue file"
+        }
+      ],
+      "internal": [
+        "start",
+        "on_interact"
+      ],
+      "guide": "dialogue.md"
     },
     {
       "name": "Interaction",

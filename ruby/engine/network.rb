@@ -56,18 +56,29 @@ module Network
   RESEND = "$resend".freeze      # to the host: send the spawned objects again (after loading a level)
   INTERACT = "$interact".freeze  # to the host: a client's hero uses something: [actor key, target key]
   CORRECT = "$correct".freeze    # from the host: where an object of ours is believed to be: [key, position]
+  # Conversations and GameVariables (see network_dialogues.rb).
+  TALK = "$talk".freeze            # host to a client: talk: [dialogue, actor key, speaker key or nil]
+  STEP = "$step".freeze            # client to host: [dialogue, from node, choice index or nil, to node or nil]
+  TALK_AT = "$talk_at".freeze      # host to a client: be at this node (nil: the end): [dialogue, node]
+  TALK_LEFT = "$talk_left".freeze  # client to host: the player left the conversation: [dialogue]
+  VARIABLE = "$variable".freeze    # host to everyone: [name, value]
+  VARIABLES = "$variables".freeze  # host to a newcomer, or everyone: every variable, [[name, value]...]
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned,
     DESPAWN => :receive_despawn, RESEND => :receive_resend, INTERACT => :receive_interact,
-    CORRECT => :receive_correction
+    CORRECT => :receive_correction, TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at,
+    TALK_LEFT => :receive_talk_left, VARIABLE => :receive_variable, VARIABLES => :receive_variables
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
-    connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
+    connected: %i[enter_game], joined: %i[greet tell_variables], left: %i[remove_objects_of],
+    disconnected: %i[keep_only_my_objects]
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
-  AFTERWARDS = { left: :forget_player, disconnected: :forget_players }.freeze
+  AFTERWARDS = {
+    left: %i[forget_player forget_talks_of], disconnected: %i[forget_players forget_all_talks]
+  }.freeze
 
   # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
   # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)
@@ -180,10 +191,10 @@ module Network
     # Someone came, went, or the game started or ended: the engine reacts, then the game's handlers
     # hear of it (a failed join's with its reason, when there is one).
     def happened(kind, peer, name)
-      __send__(REACTIONS[kind], peer) if REACTIONS[kind]
+      REACTIONS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
       told = told_about(kind, peer, name)
       (@listeners[kind] || []).dup.each { |block| block.call(told) }
-      __send__(AFTERWARDS[kind], peer) if AFTERWARDS[kind]
+      AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
     end
 
     # What the handlers of an event get: the peer, or why a join failed (nil when nobody said).

@@ -269,8 +269,13 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
-  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
+- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
+  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
+  yet. Dialogue has no box or choice list on screen yet (a game draws its own from
+  `Dialogue.current`), a line's `voice` plays nothing, and quest stages are GameVariables until a
+  game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
+  hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
+  An Interactor's line of sight is one ray
   between the actor's and the target's positions (a target whose position is inside the ground or
   a wall is never in sight, and a thin gap can show something mostly hidden), there is no
   hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the

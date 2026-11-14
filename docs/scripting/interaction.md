@@ -140,3 +140,6 @@ end
 
 Offline, and on the host itself, a use happens right away. `on_focus` and `on_blur` are only ever
 heard on the machine whose hero it is.
+
+Someone to talk to is an Interactable with a dialogue: see [Dialogue](dialogue.md), whose
+`Talkable` starts a conversation on the machine of the player who used it.

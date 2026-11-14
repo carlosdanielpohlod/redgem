@@ -91,6 +91,8 @@ class ScriptHost {
   // The game's own translations (I18n), read from its locales folder as the host starts; none for
   // scripts that are not a game's.
   const GameLocales& locales() const { return locales_; }
+  // The folder of the game whose scripts these are (that holds its scripts folder).
+  std::filesystem::path game_dir() const { return scripts_dir_.parent_path(); }
   // The language the scripts' texts are shown in (I18n.locale), as a game's file or a script
   // names it: of the game's languages, the one that best serves the user's, else the engine's
   // (see core/translations.hpp), until a script picks another. Each host has its own, so each

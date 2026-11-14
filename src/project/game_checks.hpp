@@ -1,7 +1,7 @@
 #pragma once
 
-// What `redgem check` looks at in a game's folder, without playing it: its game.json, its scripts
-// and its scenes.
+// What `redgem check` looks at in a game's folder, without playing it: its game.json, its scripts,
+// its scenes and its dialogues.
 
 #include <cstddef>
 #include <filesystem>
@@ -35,5 +35,11 @@ void check_scripts(const std::filesystem::path& game_dir, CheckReport& report);
 // is named for (as the engine finds out: it runs them, as playing does, in its sandbox); the sky
 // picture it names is in the images folder.
 void check_scenes(const std::filesystem::path& game_dir, CheckReport& report);
+
+// Every dialogue of the game (dialogues/*.json, and the folders in it) reads and is well made
+// (every node it names is there, every node leads somewhere, every condition and effect is one it
+// can have); every I18n key it shows has a text in the game's locales (a warning for each language
+// that lacks one); every quest it names is in quests/, when the game has that folder.
+void check_dialogues(const std::filesystem::path& game_dir, CheckReport& report);
 
 }  // namespace redgem::tools
