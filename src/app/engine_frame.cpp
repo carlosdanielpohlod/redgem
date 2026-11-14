@@ -18,7 +18,6 @@ bool Engine::finished() const { return context_.quit_requested || !presenter_->o
 
 void Engine::frame(float frame_seconds) {
   profiler_.begin_frame();
-  settle_physics();
   prepare_frame();
   poll_network();
   answer_requests();
@@ -104,6 +103,7 @@ void Engine::advance_game(float frame_seconds) {
   // Time.scale slows or stops the simulation (0 pauses it); behaviours still get their update,
   // with a shorter delta, so menus work while the game is paused.
   const float scale = context_.time.scale;
+  settle_physics();  // (where the step would have run in place: after the frame's start and its callbacks)
   run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
@@ -133,9 +133,6 @@ void Engine::settle_physics() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
   step_in_flight_ = false;
   overlapped_->finish_step();
-  // (Behaviours added since the step began start before they hear of its contacts, as they would
-  // with the step taken in place, after the next frame's start.)
-  if (!is_loading_scene()) scripts_->start_pending();
   finish_fixed_step(config::kFixedDeltaSeconds);
 }
 

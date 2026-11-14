@@ -242,3 +242,26 @@ TEST_CASE("a game drawn while its physics steps can destroy and spawn objects wi
   CHECK(game::ruby(*overlapped, "Scene.find('Crate').nil?") == "false");  // (the copy, by its name)
   CHECK(game::number(*overlapped, "$copy.transform.position.y") < kDropHeight);
 }
+
+TEST_CASE("what a contact's callback draws in a game drawn while its physics steps is shown in that frame") {
+  const game::TempGame folder(R"({"title": "Overlap"})");
+  const SceneDesc scene = falling_crate();
+  auto overlapped = engine_on(folder, scene, kManyThreads);
+  game::ruby(*overlapped, R"(
+    $drawn = false
+    class Drawer < Behaviour
+      def on_collision_enter(_other)
+        UI.text('Landed', x: 1, y: 1)
+        $drawn = true
+      end
+    end
+    Scene.find('Crate').add_component(Drawer)
+  )");
+  int frames = 0;
+  while (game::ruby(*overlapped, "$drawn") != "true" && frames < game::kTwoSeconds) {
+    overlapped->frame(kDt);
+    ++frames;
+  }
+  REQUIRE(game::ruby(*overlapped, "$drawn") == "true");
+  CHECK_FALSE(overlapped->script_context().hud.empty());  // (not cleared by the frame's start)
+}

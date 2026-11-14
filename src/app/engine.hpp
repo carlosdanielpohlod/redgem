@@ -129,11 +129,13 @@ class Engine {
   // A game whose physics is solved on more than one thread draws frame N while the physics steps
   // frame N+1: the frame's last fixed step runs its scripts (fixed_update) in place, as every step
   // does, and once the frame's update has run too, the world takes that step on a thread of its
-  // own, with what the scripts left it, while the frame is handed to the presenter. The next frame
-  // starts by waiting for it (the sync point), and only then puts the objects where their bodies
-  // went and tells the scripts of the contacts. The scene's transforms are the scripts' copy of the bodies, and the
-  // world the physics thread's: no script ever runs while the world steps, and the frame drawn shows the transforms as
-  // they were before the step. With one thread every step is done in place.
+  // own, with what the scripts left it, while the frame is handed to the presenter. The next
+  // frame's game update waits for it first (the sync point: after the frame's input, network and
+  // web callbacks, where the step would have run in place, and never while a scene loads), and
+  // only then puts the objects where their bodies went and tells the scripts of the contacts. The
+  // scene's transforms are the scripts' copy of the bodies, and the world the physics thread's: no
+  // script ever runs while the world steps, and the frame drawn shows the transforms as they were
+  // before the step. With one thread every step is done in place.
   void frame(float frame_seconds);
   // Hands the game as it is now to the presenter again, without advancing it (a paused game
   // whose view has to be drawn anew).

@@ -7,6 +7,7 @@
 
 #include "app/game_settings.hpp"
 #include "app/app_config.hpp"
+#include "physics/physics_config.hpp"
 
 using namespace redgem;
 
@@ -235,5 +236,19 @@ TEST_CASE("a physics section that is no object is left as it is when the threads
   const std::string text = saved_text(game);
   CHECK(text.find("player") != std::string::npos);
   CHECK(text.find("threads") == std::string::npos);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("threads below the fewest are saved as the default, and threads above the most as the most") {
+  constexpr int kNoThreads = 0;
+  const std::filesystem::path game = game_saying(R"({"physics": {"threads": 2}})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kNoThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(saved_text(game).find("threads") == std::string::npos);
+  settings.physics_threads = config::kMaxPhysicsThreads + 1;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).physics_threads == config::kMaxPhysicsThreads);
   std::filesystem::remove_all(game.parent_path());
 }

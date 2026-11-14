@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <future>
+#include <stdexcept>
 #include <ostream>  // (doctest prints a std::thread::id through it)
 #include <thread>
 #include <vector>
@@ -66,4 +67,15 @@ TEST_CASE("waiting for a step worker with nothing to do returns at once") {
   const StepWorker worker;
   worker.wait();
   CHECK_FALSE(worker.busy());
+}
+
+TEST_CASE("what a step worker's work throws comes out of the wait, once, and the worker goes on") {
+  StepWorker worker;
+  worker.start([] { throw std::runtime_error("the step failed"); });
+  CHECK_THROWS_AS(worker.wait(), std::runtime_error);
+  CHECK_NOTHROW(worker.wait());
+  int result = 0;
+  worker.start([&result] { result = 1; });
+  worker.wait();
+  CHECK(result == 1);
 }

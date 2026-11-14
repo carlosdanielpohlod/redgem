@@ -1,6 +1,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -20,7 +21,8 @@ class StepWorker {
 
   // Hands the thread `work` and returns at once (after the work before it, if that was still under way).
   void start(std::function<void()> work);
-  // Returns once no work is under way.
+  // Returns once no work is under way. What the work threw comes out of here, once, on the
+  // caller's thread (the worker goes on taking work).
   void wait() const;
   // Whether work is under way now.
   bool busy() const;
@@ -33,6 +35,7 @@ class StepWorker {
   mutable std::mutex mutex_;
   mutable std::condition_variable changed_;
   std::function<void()> work_;
+  mutable std::exception_ptr failure_;  // what the last work threw, until wait() hands it on
   bool busy_ = false;
   bool stopping_ = false;
   std::thread thread_;  // last: it starts once the rest is there

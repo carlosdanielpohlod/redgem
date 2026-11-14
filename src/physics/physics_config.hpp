@@ -27,17 +27,20 @@ inline constexpr int kPhysicsCollisionSteps = 1;
 // more run Jolt's thread pool (the stepping thread one of them), and a game's world then steps on
 // a thread of its own while the frame before it is drawn (see app/engine.hpp).
 inline constexpr int kDefaultPhysicsThreads = 1;
+inline constexpr int kMinPhysicsThreads = 1;
 inline constexpr int kMaxPhysicsThreads = 32;
+// The thread that steps a world, which solves its share of the step besides Jolt's pool.
+inline constexpr int kSteppingThreads = 1;
 // The barriers Jolt's thread pool keeps (one for each step running at once: a world runs one).
 inline constexpr std::uint32_t kMaxPhysicsBarriers = 8;
 
-// What a setting asks for, within what a world can be given: 1 for anything below it.
+// What a setting asks for, within what a world can be given: the fewest for anything below it.
 constexpr int bounded_physics_threads(int requested) {
-  return std::clamp(requested, kDefaultPhysicsThreads, kMaxPhysicsThreads);
+  return std::clamp(requested, kMinPhysicsThreads, kMaxPhysicsThreads);
 }
 
-// Whether a world given that many threads solves its steps on more than one.
-constexpr bool solves_in_parallel(int threads) { return threads > kDefaultPhysicsThreads; }
+// Whether a world given that many threads solves its steps on more than the one that steps it.
+constexpr bool solves_in_parallel(int threads) { return threads > kSteppingThreads; }
 
 // --- Colliders ------------------------------------------------------------------
 // Smallest half extent accepted for a collider (degenerate meshes such as planes).

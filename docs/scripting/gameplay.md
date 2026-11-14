@@ -360,8 +360,9 @@ never run while it does: `fixed_update`, `update` and every callback see the wor
 steps. That last step is taken after `update`, so it is a little later than with one thread:
 
 - the frame drawn shows the objects where they were before it;
-- the next frame starts by putting them where their bodies went and calling `on_collision_enter`
-  and the others for it, so collisions reach scripts a frame later;
+- the next frame, after its input, network and web callbacks and before its own steps, puts them
+  where their bodies went and calls `on_collision_enter` and the others for it (where that step
+  would have run with one thread), so collisions reach scripts a frame later;
 - a force, an impulse or a velocity set in `update` acts in that step, one step sooner than with
   one thread (set them in `fixed_update` for the same game on any number of threads);
 - `Time.elapsed` during `update` counts the steps finished, not that last one.

@@ -122,7 +122,7 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
 // the default). The rest of the section stays as it is, and so does a section that is no object.
 void write_physics_threads(nlohmann::json& json, int threads) {
   if (!json.contains(kPhysicsKey)) {
-    if (threads == config::kDefaultPhysicsThreads) return;
+    if (config::bounded_physics_threads(threads) == config::kDefaultPhysicsThreads) return;
     json[kPhysicsKey] = nlohmann::json::object();
   }
   if (json[kPhysicsKey].is_object()) physics_threads_to_json(threads, json[kPhysicsKey]);

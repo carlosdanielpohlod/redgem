@@ -31,7 +31,7 @@ std::unique_ptr<JPH::JobSystem> job_system_for(int threads) {
   if (!config::solves_in_parallel(bounded)) {
     return std::make_unique<JPH::JobSystemSingleThreaded>(config::kMaxPhysicsJobs);
   }
-  const int workers = bounded - config::kDefaultPhysicsThreads;  // (the stepping thread works too)
+  const int workers = bounded - config::kSteppingThreads;  // (the stepping thread works too)
   return std::make_unique<JPH::JobSystemThreadPool>(config::kMaxPhysicsJobs, config::kMaxPhysicsBarriers, workers);
 }
 
