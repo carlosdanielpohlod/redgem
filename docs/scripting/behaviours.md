@@ -17,6 +17,9 @@ class Door < Behaviour
   def on_collision_enter(other); end  # this object's body touched another
   def on_collision_exit(other); end
   def on_destroy; end
+  def on_interact(actor); end         # the player used it (it has an Interactable: see Interaction)
+  def on_focus(actor); end            # its prompt shows
+  def on_blur(actor); end             # ... and no longer does
 end
 ```
 
@@ -145,9 +148,10 @@ so it can put back what it changed. If it is still running after that (an `ensur
 `rescue Exception` that carries on), it is stopped again at every step until it has returned.
 
 What counts is the time spent in the call's own Ruby. Not counted: the work of the engine known
-to take long (spawning objects, placing scatter copies), and the calls the engine makes into the
-scripts from inside it, such as the `start` of a behaviour a spawned object brings, which each
-have a budget of their own. Up to four budgets of that are forgiven in one call: a loop that does
+to take long (spawning objects, placing scatter copies, reading and writing the save with `Save`
+and its slots, `Settings.save`), and the calls the engine makes into the scripts from inside it,
+such as the `start` of a behaviour a spawned object brings, which each have a budget of their
+own. The block of `Save.update` is the call's own time. Up to four budgets of that are forgiven in one call: a loop that does
 nothing but spawn is stopped after about five. The engine's methods are never cut off halfway: the call stops at its
 next line of Ruby.
 

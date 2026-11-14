@@ -5,11 +5,19 @@
 
 namespace redgem {
 
+bool FramePainter::prepare(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget) {
+  return renderer_.stage(desc, generation, bytes, budget);
+}
+
+void FramePainter::drop_prepared() { renderer_.drop_staged(); }
+
+void FramePainter::take_scene(const FrameView& view) {
+  renderer_.upload(view.scene_desc, view.scene_generation);  // (with what was readied for it)
+  uploaded_generation_ = view.scene_generation;
+}
+
 void FramePainter::follow_game(const FrameView& view) {
-  if (view.scene_generation != uploaded_generation_) {
-    renderer_.upload(view.scene_desc);
-    uploaded_generation_ = view.scene_generation;
-  }
+  if (view.scene_generation != uploaded_generation_) take_scene(view);
   // (Naming the folder again would drop the pictures already loaded from it.)
   if (view.images_dir != images_dir_) {
     images_dir_ = view.images_dir;
