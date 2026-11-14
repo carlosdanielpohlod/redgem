@@ -29,6 +29,11 @@ bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pa
          render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 
+// Whether a view draws an object (see `seen`) and its winding is the one asked for.
+bool seen_wound(const ObjectSight& sight, const render_math::View& view, bool depth_pass, bool mirrored) {
+  return sight.mirrored == mirrored && seen(sight, view, depth_pass);
+}
+
 // Whether the picture's samples smooth a material's cut-out edges (alpha to coverage): one cut out
 // by a cutoff, not a dithered one or one mixed with what is behind it.
 bool smooths_edges(const render_math::AlphaTest& test) {
@@ -141,28 +146,50 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
   gather_copies(view, depth_pass);
   const std::size_t first = append_slots(slots, batches.slots());
-  ObjectPass objects{
-      begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
-      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
-      depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
+  ObjectPass objects = object_pass(depth_pass, view);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
+  face_forward(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
 }
 
+Renderer::Impl::ObjectPass Renderer::Impl::object_pass(bool depth_pass, const render_math::View& view) {
+  return ObjectPass{
+      begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
+      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
+      depth_pass ? MorphLocations{depth_uniforms.morph_first, depth_uniforms.morph_vertices}
+                 : MorphLocations{lit_uniforms.morph_first, lit_uniforms.morph_vertices},
+      depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
+}
+
 void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {
   batches.start();
-  for (std::size_t slot = 0; slot < sights.size(); ++slot) {
-    if (seen(sights[slot], view, depth_pass)) batches.add(sights[slot].mesh, scattered_records + slot);
-  }
+  // The unmirrored objects first, then the mirrored ones (each in the order they come): copies of
+  // a mesh mirrored every other one still make two batches, and the winding turns once a pass.
+  gather_wound(view, depth_pass, false);
+  gather_wound(view, depth_pass, true);
   gather_scattered(view, depth_pass);
+}
+
+void Renderer::Impl::gather_wound(const render_math::View& view, bool depth_pass, bool mirrored) {
+  for (std::size_t slot = 0; slot < sights.size(); ++slot) {
+    const ObjectSight& sight = sights[slot];
+    if (seen_wound(sight, view, depth_pass, mirrored)) batches.add(sight.mesh, scattered_records + slot, mirrored);
+  }
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {
   const InstanceRun run{slots.id, first + batch.first, batch.count};
+  face_by_winding(batch.mirrored, pass);
   for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(batch.mesh)])
     draw_primitive(primitive, run, pass);
+}
+
+void Renderer::Impl::face_by_winding(bool mirrored, ObjectPass& pass) {
+  if (pass.mirrored == mirrored) return;
+  set_clockwise_front_faces(mirrored);
+  pass.mirrored = mirrored;
 }
 
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {
@@ -170,12 +197,20 @@ void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Instanc
   use_material(primitive.material, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
+  send_part(primitive, pass);
+  draw_instances(pass.meshes, primitive.mesh, run);
+  if (two_sided) rlEnableBackfaceCulling();
+}
+
+void Renderer::Impl::send_part(const GpuPrimitive& primitive, const ObjectPass& pass) {
   // Per part: a skinned object may still have parts without bone weights, which stay rigid. (So
   // does a copy whose skeleton could not be posed: it has no first bone.)
   const float skinning = primitive.skinned ? kOn : kOff;
   rlSetUniform(pass.skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
-  draw_instances(pass.meshes, primitive.mesh, run);
-  if (two_sided) rlEnableBackfaceCulling();
+  // A part's shape keys: where their deltas start, and how many vertices each key moves.
+  const auto vertices = static_cast<float>(primitive.mesh.vertexCount);
+  rlSetUniform(pass.morph.first, &primitive.morph_first, SHADER_UNIFORM_FLOAT, 1);
+  rlSetUniform(pass.morph.vertices, &vertices, SHADER_UNIFORM_FLOAT, 1);
 }
 
 }  // namespace redgem

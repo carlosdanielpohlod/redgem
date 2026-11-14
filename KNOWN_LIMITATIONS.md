@@ -74,10 +74,16 @@ the same pull request.
   (no fade), and every shadowed light is drawn again each frame, moving or not. Lights beyond the
   budget, and every light on a card that cannot make the atlas, light through walls. Particles
   are lit by spots within their cones but receive no point or spot shadows.
-- An object mirrored with a negative scale in Blender is drawn inside out (the editor and the
-  command-line tools refuse negative scales).
-- Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
-  with cubic-spline interpolation are skipped with a warning (export linear or step keys).
+- Mirrored objects (a negative scale) are drawn the right way out, but only Blender makes them:
+  the Inspector keeps a mirror it is given and the command-line tools refuse negative scales. A
+  skeleton that mirrors a skinned mesh through its bones alone, and a mirrored parent of
+  scattered copies, still draw those inside out.
+- Shape keys (glTF morph targets) move positions and normals; their tangents are not morphed. A
+  copy of a mesh shows its eight heaviest keys at once, and is culled by where its keys can take
+  it with weights between -1 and 1 (weights beyond that may be culled early). Their weights are
+  not sent to the other machines of a network game, and a node's own `weights` are ignored for
+  the mesh's. Animation keys with cubic-spline interpolation are skipped with a warning (export
+  linear or step keys).
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
@@ -174,7 +180,6 @@ the same pull request.
   leaves its data in the scene's file (only pictures no material shows are dropped on save).
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
-- A character duplicated in the editor keeps the pose it was copied in.
 - Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
   no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
   is an ordinary mesh.

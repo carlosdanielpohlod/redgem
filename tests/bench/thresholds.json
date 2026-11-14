@@ -1,0 +1,21 @@
+{
+  "about": "Ceilings for redgem_bench (microseconds per operation) and redgem_server_load, set for GitHub's ubuntu-24.04 runners at about three times their first results (more for disk and worst-frame numbers). A value fails only past its ceiling plus the tolerance. See docs/contributing.md, Benchmarks.",
+  "tolerance": 0.25,
+  "ceilings": {
+    "script.update_behaviours": {"median": 2600, "p95": 3500},
+    "physics.step_bodies": {"median": 2100, "p95": 2800},
+    "scene.load_glb": {"median": 550, "p95": 750},
+    "net.frame_encode": {"median": 50, "p95": 70},
+    "net.frame_decode": {"median": 30, "p95": 40},
+    "save.json_write": {"median": 4000, "p95": 6000},
+    "save.json_read": {"median": 3000, "p95": 4500},
+    "http.parse_response": {"median": 20, "p95": 30},
+    "load.server_frame_ms": {"median": 2, "p95": 3},
+    "load.server_frame_worst_ms": {"median": 5, "p95": 10},
+    "load.server_bytes_in_per_s": {"median": 40000},
+    "load.server_bytes_out_per_s": {"median": 120000},
+    "load.server_cpu_ms_per_tick": {"median": 8},
+    "load.dropped_clients": {"median": 0},
+    "load.rooms_missing": {"median": 0}
+  }
+}

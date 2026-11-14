@@ -9,7 +9,7 @@
 using namespace redgem;
 
 namespace {
-struct Clock {
+struct ReadingClock {
   double now = 0.0;
   int reads = 0;
   double read() {
@@ -21,7 +21,7 @@ std::size_t column(ProfilePhase phase) { return static_cast<std::size_t>(phase);
 }  // namespace
 
 TEST_CASE("disabled profiling never reads the clock and empty summaries are finite") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.begin_frame();
   {
@@ -34,7 +34,7 @@ TEST_CASE("disabled profiling never reads the clock and empty summaries are fini
 }
 
 TEST_CASE("profile phases accumulate, nest inclusively and use real time") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
@@ -72,7 +72,7 @@ TEST_CASE("profile phases accumulate, nest inclusively and use real time") {
 }
 
 TEST_CASE("the rolling profile window drops old peaks and stays bounded") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
@@ -91,7 +91,7 @@ TEST_CASE("the rolling profile window drops old peaks and stays bounded") {
 }
 
 TEST_CASE("disabled and cleared frames discard outstanding scopes") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
@@ -112,7 +112,7 @@ TEST_CASE("disabled and cleared frames discard outstanding scopes") {
 }
 
 TEST_CASE("disabling retains the last summary and re-enabling starts a new session") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
@@ -129,7 +129,7 @@ TEST_CASE("disabling retains the last summary and re-enabling starts a new sessi
 }
 
 TEST_CASE("invalid clock readings and invalid phase ids cannot yield invalid metrics") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   clock.now = std::numeric_limits<double>::quiet_NaN();
@@ -148,7 +148,7 @@ TEST_CASE("invalid clock readings and invalid phase ids cannot yield invalid met
 }
 
 TEST_CASE("profile scopes unwind on errors and snapshots expose completed frames only") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
@@ -171,7 +171,7 @@ TEST_CASE("profile scopes unwind on errors and snapshots expose completed frames
 }
 
 TEST_CASE("a scope outliving its frame cannot contaminate the next frame") {
-  Clock clock;
+  ReadingClock clock;
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();

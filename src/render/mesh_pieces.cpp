@@ -49,6 +49,7 @@ class PrimitiveSplitter {
   void start_piece() {
     piece_ = PrimitiveDesc{};
     piece_.material = source_.material;
+    piece_.targets.resize(source_.targets.size());  // (each piece has every shape key, for its own vertices)
     remap_.clear();
   }
 
@@ -66,9 +67,20 @@ class PrimitiveSplitter {
     append_vertex_values(piece_.normals, source_.normals, vertex, config::kFloatsPerNormal);
     if (has_.texcoords) append_vertex_values(piece_.texcoords, source_.texcoords, vertex, config::kFloatsPerTexcoord);
     if (has_.colors) append_vertex_values(piece_.colors, source_.colors, vertex, config::kChannelsPerColor);
+    copy_target_deltas(vertex);
     if (!has_.skin) return;
     append_vertex_values(piece_.joints, source_.joints, vertex, config::kJointsPerVertex);
     append_vertex_values(piece_.weights, source_.weights, vertex, config::kJointsPerVertex);
+  }
+
+  void copy_target_deltas(std::uint32_t vertex) {
+    for (std::size_t t = 0; t < source_.targets.size(); ++t) {
+      const MorphTarget& from = source_.targets[t];
+      append_vertex_values(piece_.targets[t].positions, from.positions, vertex, config::kFloatsPerPosition);
+      if (!from.normals.empty()) {
+        append_vertex_values(piece_.targets[t].normals, from.normals, vertex, config::kFloatsPerNormal);
+      }
+    }
   }
 
   const PrimitiveDesc& source_;

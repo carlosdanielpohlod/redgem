@@ -198,6 +198,7 @@ void install_game_object_bindings(mrb_state* mrb) {
   install_look_bindings(game_object, mrb);
   install_component_bindings(game_object, mrb);
   install_object_state_bindings(mrb);
+  install_shape_key_bindings(mrb);
 }
 
 }  // namespace redgem
