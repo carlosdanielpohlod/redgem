@@ -28,7 +28,7 @@ Also in RedGem.app/Contents/MacOS/:
   redgem-server   runs a game on a server, for players to join
   redgem-test     runs a game's tests
 
-The manual: https://carlosdanielpohlod.github.io/redgem-site/manual/
+The manual: https://www.redgem-engine.org/manual/
 
 RedGem is MIT licensed (LICENSE). It is built on open source projects, listed with their
 licenses in THIRD_PARTY_LICENSES.md.
