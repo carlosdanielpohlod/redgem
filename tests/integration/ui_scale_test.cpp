@@ -147,6 +147,9 @@ TEST_CASE("the screen, the pointer and the scale are told in units of the refere
   CHECK(ruby(*engine, "[UI.pixel_width, UI.pixel_height]") == "[3840, 2160]");
   CHECK(ruby(*engine, "UI.reference") == "[1280, 720]");
   CHECK(ruby(*engine, "[UI.mouse_x, UI.mouse_y]") == "[200.0, 80.0]");
+  // The camera's points of the screen are in units too: its middle is the middle of 1280x720.
+  CHECK(ruby(*engine, "Camera.world_to_screen(Vector3.new(0, 0, -10)).map(&:round)") == "[640, 360]");
+  CHECK(ruby(*engine, "Camera.screen_ray(640, 360)[1].approx?(Vector3.forward, 0.001)") == "true");
 }
 
 TEST_CASE("a click or a tap lands on a button where it is drawn, at any size") {
