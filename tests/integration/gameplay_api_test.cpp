@@ -10,6 +10,7 @@
 #include "core/config.hpp"
 #include "core/game_files.hpp"
 #include "editor/document/scene_document.hpp"
+#include "scene/props.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
