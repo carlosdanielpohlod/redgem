@@ -184,6 +184,7 @@ void install_network_bindings(mrb_state* mrb) {
   install_network_search_bindings(network_module, mrb);
   install_network_state_bindings(network_module, mrb);
   install_network_pose_bindings(network_module, mrb);
+  install_network_movement_bindings(network_module, mrb);
 }
 
 }  // namespace redgem

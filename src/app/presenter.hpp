@@ -8,6 +8,7 @@
 #include "render/hud.hpp"
 #include "render/window.hpp"
 #include "scene/particles.hpp"
+#include "scene/water_geometry.hpp"
 #include "scene/water_ripples.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -42,6 +43,8 @@ struct FrameView {
   const WaterRippleSnapshot* water_ripples = nullptr;  // transient simulation state; drawing never ages it
   bool statistics_overlay = false;                     // replaces the developer window's basic FPS counter
   const DebugDrawBuffer* debug_draw = nullptr;         // frame-local world primitives, never scene objects
+  // The scene's water as the simulation last found it: the camera under it looks underwater.
+  const std::vector<WaterSurface>* water_surfaces = nullptr;
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

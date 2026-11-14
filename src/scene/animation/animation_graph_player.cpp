@@ -130,7 +130,8 @@ const CompiledAnimationState& AnimationGraphPlayer::state_of(const StateClock& c
 }
 
 AnimationGraphPlayer::StateClock AnimationGraphPlayer::start(std::size_t state) const {
-  return {state, installed_graph().states[state].speed < 0.0f ? kFullPhase : 0.0};
+  const double phase = installed_graph().states[state].speed < 0.0f ? kFullPhase : 0.0;
+  return {state, phase, phase, 0.0};
 }
 
 std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock& clock) const {
@@ -143,7 +144,7 @@ std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock
 bool AnimationGraphPlayer::representable_speeds() const {
   // Check every state so a later transition cannot produce an unsendable snapshot.
   for (std::size_t state = 0; state < installed_graph().states.size(); ++state) {
-    const auto evaluated = samples({state, 0.0});
+    const auto evaluated = samples({state, 0.0, 0.0, 0.0});
     if (!std::all_of(evaluated.begin(), evaluated.end(), representable_speed)) return false;
   }
   return true;
@@ -153,11 +154,28 @@ double AnimationGraphPlayer::duration(const StateClock& clock) const {
   return weighted_duration(state_of(clock), samples(clock));
 }
 
+void AnimationGraphPlayer::hold(StateClock& clock) {
+  clock.from = clock.phase;
+  clock.laps = 0.0;
+}
+
+void AnimationGraphPlayer::hold_clocks() {
+  hold(current_);
+  if (source_) hold(*source_);
+}
+
+std::optional<ClockSpan> AnimationGraphPlayer::source_span() const {
+  return source_ ? std::optional<ClockSpan>(span_of(*source_)) : std::nullopt;
+}
+
 void AnimationGraphPlayer::tick(StateClock& clock, float dt) {
+  hold(clock);
   const double seconds = duration(clock);
   if (seconds <= 0.0) return;
   const auto& state = state_of(clock);
-  clock.phase = bounded_phase(clock.phase + static_cast<double>(dt) * state.speed / seconds, state.loop);
+  const double unbounded = clock.phase + static_cast<double>(dt) * state.speed / seconds;
+  clock.phase = bounded_phase(unbounded, state.loop);
+  if (state.loop) clock.laps = std::floor(unbounded);
 }
 
 void AnimationGraphPlayer::take_transition(const CompiledAnimationTransition& transition) {
@@ -186,6 +204,7 @@ void AnimationGraphPlayer::finish_fade(float dt) {
 bool AnimationGraphPlayer::advance(float dt) {
   if (!valid_time_step(dt)) return false;
   if (!graph_) return false;
+  hold_clocks();
   if (paused_) return true;
   choose_transition();
   tick(current_, dt);

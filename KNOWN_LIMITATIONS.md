@@ -35,6 +35,19 @@ the same pull request.
 
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
+- Animation events and root motion come from a character's own clips only: the scene's clips
+  (`Animation`) fire no events and move nothing, and a graph received from another machine fires
+  no events there. In a blend only the clip with the most weight fires events; a clip a
+  character fades from is silent. At most eight laps of a clip fire per frame.
+- Authored markers are read from one string custom property of the action (`redgem_events`):
+  Blender's timeline and pose markers are not exported by its glTF exporter.
+- Root motion takes the horizontal travel and the yaw of each clip's highest moving node; its
+  vertical motion stays in the pose (a jump lifts the mesh, not the character). A clip mixed
+  over a character (`mix`) adds none, a clip that moves the character's own object has none, and
+  a character controller follows it one frame late. Dynamic rigid bodies and vehicles are moved by
+  the physics only: root motion leaves them alone. Root motion is not sent over the network:
+  `NetworkSync` sends where the owner's character went, and on the other machines a character
+  following a graph received from the owner is not pinned (its root moves in the pose).
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -53,8 +66,14 @@ the same pull request.
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback, shore foam and local impact/wake ripples
-  from physical bodies. It has no underwater camera mode, fluid simulation,
-  buoyancy, breaking waves or planar reflections. Shore foam estimates horizontal distance
+  from physical bodies, buoyancy and an underwater camera look. It has no fluid simulation,
+  breaking waves or planar reflections, and no cheaper view of coasts far away (both follow-ups).
+  Buoyancy samples each body's collider box (spheres and capsules too) as 2 × 2 columns against
+  the calm surface: waves do not lift bodies, characters do not swim, and `density` is a custom
+  property only (no script setter yet). Water fills a column down to the next surface below or
+  forever: a dry tunnel under a lake counts as under water. The underwater look is
+  one blend for the whole picture: a camera half through the surface sees no waterline across the
+  screen, the surface itself is not drawn from below, and there are no caustics or light shafts. Shore foam estimates horizontal distance
   to the intersection of visible bottom and water tangent planes, with filtered pores and partial transmission.
   It is a local screen-space approximation, not a global shoreline-distance field. Missing geometry,
   depth discontinuities and nearly parallel planes suppress coverage; curved shores can deviate
@@ -64,8 +83,19 @@ the same pull request.
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
-  be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
-  ordinary pixels; it does not provide GPU texture compression.
+  be Radiance `.hdr`). Animated WebP is not read. WebP is decoded on the CPU and uploaded as
+  ordinary pixels. Scene textures may also be KTX2 (Basis Universal ETC1S or UASTC, through
+  `KHR_texture_basisu`): they stay compressed on the card (BC1/BC3, ASTC 4x4 or ETC1/ETC2) only
+  when the file carries its mipmaps; one without goes up as RGBA8. BC7 is not used (the
+  higher-quality desktop target for UASTC: BC3 is used instead), nor are HDR Basis data, KTX2
+  arrays and cube maps, or KTX2 files that hold other formats than Basis data. KTX2 is
+  transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
+  textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
+  pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too. The
+  scene memory budget counts a KTX2 picture at its RGBA8 size even when it goes up compressed
+  (4 to 8 times smaller). The KTX2 transcoder is opened once per KTX2 texture as the scene is
+  read (to fall back when it refuses the data), and again when it is uploaded.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and
@@ -117,8 +147,9 @@ the same pull request.
   `Proxy-Authorization` are dropped: other headers a game sets (an `X-Api-Key`) go along. Pass
   `redirects: false` to see the redirect and decide.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
-  for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
-  thread ends on its own).
+  for can outlast its timeout by that long. A game that ends gives its requests up, hangs up
+  their connections and joins their threads, 2 seconds at most: a request still looking its name
+  up then is left behind, its thread ending on its own once the lookup does.
 - On Windows the certificates come from the system's ROOT store, which Windows fills on demand:
   an authority no program on the machine has used yet may be missing. Not tried on a real Windows
   machine, nor on a real Android device (whose system certificates the engine reads).
@@ -147,7 +178,7 @@ the same pull request.
   no longer restores.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
-- Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
+- Limits a game can reach: 65,536 physics bodies a scene (`max_bodies`), 64 hits per physics query, 4096 live particles and 256 emitters, 4096
   `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
@@ -169,7 +200,7 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
-- Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
+- Terrain is one 100 m square with vertex tint painting and one material, no texture-layer painting,
   no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
   is an ordinary mesh.
 
@@ -207,7 +238,7 @@ not a promise of how it will be closed.
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
-  script cannot spawn a prefab file by its path (only a placement in the scene), and a running
+  scripted prefab imports are synchronous and support rigid hierarchies only, and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
   descendant-only animation; it does not replace the original selection with a reference or
   overwrite an existing source file. (Loading, nesting, root overrides, previews, placement from
@@ -222,10 +253,9 @@ not a promise of how it will be closed.
   synchronous, limited to 64 MiB and embedded GLB buffers, and needs the original scene to remain
   loadable when reopening. Linked images keep their existing paths; scripts and external assets
   are not backed up. See [scene recovery](docs/editor.md#scene-recovery).
-- No animation preview; no preferences
-  beyond the graphics card (key bindings, camera speed, snap sizes); dark theme only.
-- Automatic monitor scaling applies to editor text and spacing. The scene preview renders at
-  logical viewport resolution, and there is no manual scale override.
+- No animation preview. Only fly camera movement keys can be rebound; dark theme only.
+- The scene preview renders at logical viewport resolution. The editor has a manual interface
+  scale, while the project hub uses automatic monitor scaling.
 
 ### What a shipped game offers its players
 
@@ -271,7 +301,7 @@ not a promise of how it will be closed.
 ### Gameplay API
 
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
-- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
+- Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
   cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
@@ -294,6 +324,14 @@ not a promise of how it will be closed.
   migrate it one after another. A room writing a key of that slot at the moment another room
   writes the migrated values can make that migration fail as busy: the slot is then refused for
   the migrating room's run, and migrated on its next first use.
+- A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
+  (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
+  that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
+  first happens. A game that keeps spawning (bullets, debris) has to destroy what it no longer
+  needs.
+- `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
+  automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
+  work. Slot selection and storage calls are synchronous.
 - `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
@@ -384,8 +422,8 @@ not a promise of how it will be closed.
 ### Engineering
 
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
-- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
-  most on phones.
+- Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
+  Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
   that open no window, not the system tests; the coverage report is of those tests too, and no
   share of it is required. The load test and the benchmarks print numbers but fail on none.
@@ -403,8 +441,12 @@ not a promise of how it will be closed.
   is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
   then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
   runs while another room clears the save writes its key back afterwards.
-- The threads of web requests are detached: one still running at exit may outlive the program's
-  static objects.
+- A web request still busy 2 seconds after its game ended is left behind: one looking its
+  server's name up (the system's lookup cannot be interrupted), or, on a slow device, loading the
+  system's certificates or decompressing a large answer. If the program exits meanwhile, its
+  thread may outlive the program's static objects. Ending the game waits those 2 seconds then,
+  which on a dedicated server holds up the other rooms of its thread. Every request that is
+  waiting on the network ends at once.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
   shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
   reflections march up to 32 steps, and the shore foam's distance is computed for every water
@@ -434,8 +476,18 @@ not a promise of how it will be closed.
   can announce a game.
 - Plaintext is kept only inside the engine, for its own tests of the protocol: a game, the relay
   and the server have no way to turn encryption off.
-- Clients own the positions of their objects and decide their own collisions: a server cannot
-  check movement, so a modified client can move anywhere.
+- Clients own the positions of their objects and decide their own collisions. Movement
+  validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
+  lets the host or a dedicated server refuse moves faster or further than the game's limits, but
+  it checks positions only: not rotations, animations, collisions (walking through a wall within
+  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  teleport distance hold for every object of the game, and a kicked machine is not told why. In a
+  room on a relay, nothing is checked (the relay passes poses on). An object destroyed and made
+  again under the same key is checked from where it was until the host makes its copy again, so a
+  pose of it that arrives first is corrected (a spawned object gets a new key, and is not). A
+  violation is counted once a second at most, so a connection slower than that may count one
+  correction twice. A correction moves the owner's
+  transform; a physics body or character controller on it follows only if it follows the transform.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
   connection through home routers yet. The engine has the pieces, not the path through them: the
   relay answers STUN on its UDP port (a game can learn the public address its router gives it),
@@ -494,9 +546,16 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   Slash commands and session modes are not offered, and answers are not selectable as text (code
   blocks have a Copy button). Past conversations are reopened through the agent (`session/load`): an
   agent that cannot do that starts anew, and a conversation the agent no longer keeps is gone.
-- An opt-in Ruby eval in a running game (localhost and a token, a timeout, compiled out of
-  release builds). `game_run` expressions cover headless runs; `game_query` covers inspection
-  and physics queries.
+- The opt-in Ruby eval (`game_eval`, [docs/mcp.md](docs/mcp.md#ruby-eval-in-the-playing-game))
+  runs in the game an editor plays, only: not in a game played with `--play`, a built game or a
+  dedicated server. It needs an editor started with `--ruby-eval` and its token, which the editor
+  prints to its terminal (the Agent panel's agent is not handed it). It is in development builds
+  only; the downloads are release builds, so they do not have it. The game waits while a snippet
+  runs: a snippet has 0.4 seconds of Ruby (less when the game's script budget is shorter), and the
+  engine's own work inside it, such as spawning, is not counted up to four times that. An answer is
+  cut at 8 KiB, as any tool's text.
+  Classes a snippet defines or reopens are tracked by hot reload as coming from `(game_eval)`, so
+  hot reloading their script files may not go cleanly afterwards: stop and play again.
 - MCP adds one object per `scene_edit` call; a row of copies takes one call each.
 - Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
   and pass back than the numeric ids of older objects.

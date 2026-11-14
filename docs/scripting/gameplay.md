@@ -345,6 +345,21 @@ bullet.rigidbody.velocity = transform.forward * 40.0
 
 Triggers only notice bodies whose layer meets theirs, and queries look at the layers they are given.
 
+## How many bodies a scene holds
+
+A scene's physics world holds 4096 bodies unless `game.json` asks for another number, from 64 to
+65,536:
+
+```json
+"physics": {"max_bodies": 16384}
+```
+
+An object spawned once the world is full gets no body: it does not collide and raycasts miss it,
+and the engine logs one error the first time. Destroy what a game no longer needs (spent bullets,
+debris) rather than raising the limit for ever: a bigger world takes more memory (about 10 MB of
+scratch memory a step for every 4096 bodies). `redgem check` refuses a number out of bounds; a
+game played with one holds 4096.
+
 ## Drive a car
 
 Give the chassis a **vehicle** body and mark its wheel children with `wheel = true`.
@@ -357,6 +372,29 @@ end
 ```
 
 `vehicle.speed` is in meters per second, negative in reverse.
+
+## Float in water
+
+Dynamic bodies and vehicles float in any water surface (a material with `water = true`, see
+[Water surfaces](../levels.md#water-surfaces)) with no script: water pushes each one up by the
+weight of what it displaces and slows it as it moves through. How deep one sits is its `density`
+custom property, in kilograms per cubic meter: water is 1000, so a crate of `density = 500` (what a
+body that does not say gets) floats half under, one of 250 a quarter under, and a stone of 2500
+sinks. Its mass only says how hard it is to push.
+
+When the camera goes under the surface the picture fades into the water's color with distance and
+wobbles a little; it fades in as the camera goes under the waves, so crossing the surface never
+flickers.
+
+Scripts ask where the water is:
+
+```ruby
+def fixed_update(_dt)
+  @swimming = Water.under?(transform.position + Vector3.new(0, 1.2, 0)) # the head is under
+  depth = Water.depth_at(transform.position) # meters under the surface, nil out of the water
+  level = Water.height_at(transform.position.x, transform.position.z) # nil where it is dry
+end
+```
 
 ## Pickups and zones
 
