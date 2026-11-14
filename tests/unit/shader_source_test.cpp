@@ -44,15 +44,24 @@ constexpr const char* kNoVersion = "void main() {}";
 constexpr const char* kVersionWord = "#version";
 constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
-const std::string kEngineShaders[] = {shaders::lit_vertex(),       shaders::lit_fragment(),
-                                      shaders::depth_fragment(),   shaders::kSkyVertex,
-                                      shaders::kSkyFragment,       shaders::particle_fragment(),
-                                      shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
-                                      shaders::kBrightFragment,    shaders::kBlurFragment,
-                                      shaders::kCompositeFragment, shaders::kAntialiasFragment,
-                                      shaders::motion_vertex(),    shaders::motion_fragment(),
-                                      shaders::kTemporalFragment,  shaders::kSharpenFragment,
-                                      shaders::kLuminanceFragment, shaders::kAdaptFragment};
+const std::string kEngineShaders[] = {shaders::lit_vertex(),
+                                      shaders::lit_fragment(),
+                                      shaders::depth_fragment(),
+                                      shaders::kSkyVertex,
+                                      shaders::kSkyFragment,
+                                      shaders::particle_fragment(),
+                                      shaders::kPanoramaFragment,
+                                      shaders::kAmbientOcclusionFragment,
+                                      shaders::with_adapted_scale(shaders::kBrightFragment),
+                                      shaders::kBlurFragment,
+                                      shaders::with_adapted_scale(shaders::kCompositeFragment),
+                                      shaders::kAntialiasFragment,
+                                      shaders::motion_vertex(),
+                                      shaders::motion_fragment(),
+                                      shaders::kTemporalFragment,
+                                      shaders::kSharpenFragment,
+                                      shaders::kLuminanceFragment,
+                                      shaders::kAdaptFragment};
 
 std::string desktop_source() { return std::string(kNote) + shaders::kDesktopVersionLine + kBody; }
 
@@ -227,10 +236,14 @@ TEST_CASE("the lit shader's shadows of point and spot lights use the renderer's 
 }
 
 TEST_CASE("the tone mapping pass takes auto exposure's adapted brightness, and the lit pass light through leaves") {
-  const std::string composite = shaders::kCompositeFragment;
-  CHECK(contains(composite, std::string("uniform sampler2D ") + shaders::kExposureTexture));
-  CHECK(contains(composite, std::string("uniform float ") + shaders::kAutoExposure));
-  CHECK(contains(composite, std::string("uniform float ") + shaders::kExposureCompensation));
+  for (const char* pass : {shaders::kCompositeFragment, shaders::kBrightFragment}) {
+    const std::string exposed = shaders::with_adapted_scale(pass);
+    CHECK(starts_with(exposed.substr(exposed.find(kVersionWord)), shaders::kDesktopVersionLine));
+    CHECK(contains(exposed, std::string("uniform sampler2D ") + shaders::kExposureTexture));
+    CHECK(contains(exposed, std::string("uniform float ") + shaders::kAutoExposure));
+    CHECK(contains(exposed, std::string("uniform float ") + shaders::kExposureCompensation));
+    CHECK(exposed.find(kVersionWord) < exposed.find(shaders::kExposureTexture));  // after its version line
+  }
   CHECK(contains(shaders::kAdaptFragment, std::string("uniform sampler2D ") + shaders::kLuminanceTexture));
   CHECK(contains(shaders::kLuminanceFragment, std::string("uniform vec2 ") + shaders::kCellSize));
   CHECK(contains(shaders::lit_fragment(), std::string("uniform float ") + shaders::kFoliageTranslucency));

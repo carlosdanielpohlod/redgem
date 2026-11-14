@@ -75,28 +75,26 @@ std::optional<float> finite_number(const PropertyMap& props, const char* key) {
   return static_cast<float>(*value);
 }
 
-// EV, of any sign, within kWidestExposureEv either way.
-void read_ev(const PropertyMap& props, const char* key, float& out) {
-  if (const auto ev = finite_number(props, key)) out = std::clamp(*ev, -kWidestExposureEv, kWidestExposureEv);
-}
-
-// Per second, never below none.
-void read_speed(const PropertyMap& props, const char* key, float& out) {
-  if (const auto speed = finite_number(props, key)) out = std::max(*speed, 0.0f);
-}
-
-// Auto exposure's numbers, and the setting each one is.
+// Auto exposure's numbers, the setting each one is, and the range it is held to: EV within
+// kWidestExposureEv either way, speeds per second.
 struct ExposureProp {
   const char* key;
   float AutoExposure::* value;
+  float low;
+  float high;
 };
 constexpr ExposureProp kExposureProps[] = {
-    {props::environment::kExposureMinEv, &AutoExposure::min_ev},
-    {props::environment::kExposureMaxEv, &AutoExposure::max_ev},
-    {props::environment::kExposureCompensation, &AutoExposure::compensation},
-    {props::environment::kExposureSpeedUp, &AutoExposure::speed_up},
-    {props::environment::kExposureSpeedDown, &AutoExposure::speed_down},
+    {props::environment::kExposureMinEv, &AutoExposure::min_ev, -kWidestExposureEv, kWidestExposureEv},
+    {props::environment::kExposureMaxEv, &AutoExposure::max_ev, -kWidestExposureEv, kWidestExposureEv},
+    {props::environment::kExposureCompensation, &AutoExposure::compensation, -kWidestExposureEv, kWidestExposureEv},
+    {props::environment::kExposureSpeedUp, &AutoExposure::speed_up, kNoExposureSpeed, kFastestExposureSpeed},
+    {props::environment::kExposureSpeedDown, &AutoExposure::speed_down, kNoExposureSpeed, kFastestExposureSpeed},
 };
+
+void read_exposure_number(const PropertyMap& props, const ExposureProp& prop, AutoExposure& settings) {
+  if (const auto number = finite_number(props, prop.key))
+    settings.*prop.value = std::clamp(*number, prop.low, prop.high);
+}
 
 // The sky, the ground and the fog of a clear day.
 Environment day_sky() {
@@ -143,11 +141,7 @@ Environment environment_from_props(const PropertyMap& props) {
 
 void read_auto_exposure(const PropertyMap& props, AutoExposure& settings) {
   settings.enabled = get_bool(props, props::environment::kAutoExposure).value_or(settings.enabled);
-  read_ev(props, props::environment::kExposureMinEv, settings.min_ev);
-  read_ev(props, props::environment::kExposureMaxEv, settings.max_ev);
-  read_ev(props, props::environment::kExposureCompensation, settings.compensation);
-  read_speed(props, props::environment::kExposureSpeedUp, settings.speed_up);
-  read_speed(props, props::environment::kExposureSpeedDown, settings.speed_down);
+  for (const ExposureProp& prop : kExposureProps) read_exposure_number(props, prop, settings);
   settings.max_ev = std::max(settings.max_ev, settings.min_ev);
 }
 

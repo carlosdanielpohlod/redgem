@@ -85,7 +85,10 @@ the same pull request.
   planned follow-up.
 - Auto exposure (`auto_exposure = true`) measures the whole picture, every pixel alike: there is
   no metering that favors the middle of the picture, no histogram that leaves out the darkest and
-  brightest pixels, and no exposure for a part of the screen (a minimap). Its state is one per
+  brightest pixels, and no exposure for a part of the screen (a minimap). It samples a 256 x 256
+  grid of the picture rather than every pixel, so at high resolutions a small, very bright spot
+  (a glint, a distant lamp) can fall between samples as the camera moves; the slow adaptation
+  hides most of it. Its state is one per
   renderer: a game drawn through two cameras in the same frame (a split screen) shares one
   exposure, which starts anew whenever the camera drawn changes. It has been seen on desktop
   OpenGL only.

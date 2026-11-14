@@ -638,16 +638,18 @@ struct Renderer::Impl {
   // screen when null).
   void post_process(const Environment& env, const RenderTexture2D* output);
   void draw_occlusion();
-  void draw_bloom();
+  void draw_bloom(const AutoExposure& exposure);
   // Blurs `picture` across, then down. `scratch` (the same size) holds the half-way result.
   void blur(const RenderTexture2D& picture, const RenderTexture2D& scratch);
-  // Auto exposure: measures the lit picture's brightness and adapts the exposure to it (when the
-  // settings have it on; off, the next time it is on starts anew).
+  // Auto exposure, before bloom (whose threshold is of the exposed picture): measures the lit
+  // picture's brightness and adapts the exposure to it (when the settings have it on; off, the
+  // next time it is on starts anew).
   void adapt_exposure(const AutoExposure& settings);
   void measure_luminance();
   void send_adaptation(const AutoExposure& settings);
-  // What the tone mapping pass takes of auto exposure.
-  void send_exposure(const AutoExposure& settings);
+  // What a pass that exposes the picture (the bloom threshold, tone mapping) takes of auto exposure,
+  // while it is being drawn with.
+  void send_exposure(const Shader& pass, const AutoExposure& settings);
   void tone_map(const Environment& env);
   void send_grade(const Environment& env);
   void antialias(const RenderTexture2D* output);

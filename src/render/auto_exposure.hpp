@@ -22,6 +22,8 @@ inline constexpr float kWidestExposureEv = 16.0f;
 // brighter (EV up) eyes adapt fast; when it got darker (EV down), slowly.
 inline constexpr float kExposureSpeedUp = 3.0f;
 inline constexpr float kExposureSpeedDown = 1.0f;
+inline constexpr float kNoExposureSpeed = 0.0f;         // it never adapts
+inline constexpr float kFastestExposureSpeed = 100.0f;  // per second: past this it is there at once anyway
 
 struct AutoExposure {
   bool enabled = false;                   // off: the environment's `exposure` alone, as before

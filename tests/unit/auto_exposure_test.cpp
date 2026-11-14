@@ -150,12 +150,14 @@ TEST_CASE("a scene's auto exposure settings are held to what makes sense") {
   props["exposure_min_ev"] = -100.0;
   props["exposure_max_ev"] = -200.0;  // below the darkest
   props["exposure_speed_up"] = -1.0;
+  props["exposure_speed_down"] = 1e6;                      // there at once anyway
   props["exposure_compensation"] = std::string("bright");  // not a number: the default stays
   const AutoExposure read = environment_from_props(props).auto_exposure;
   CHECK(read.enabled);
   CHECK(read.min_ev == doctest::Approx(-kWidestExposureEv));
   CHECK(read.max_ev == doctest::Approx(read.min_ev));
   CHECK(read.speed_up == doctest::Approx(0.0f));
+  CHECK(read.speed_down == doctest::Approx(kFastestExposureSpeed));
   CHECK(read.compensation == doctest::Approx(0.0f));
 }
 

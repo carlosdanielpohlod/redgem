@@ -46,7 +46,7 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `local_shadows` | how many point and spot lights may cast shadows at once, 0 to 4 (4 unless given; the player's quality may allow fewer): of the lights whose `cast_shadow` is on, those that matter most to the camera |
 | `auto_exposure` | `true` adapts the exposure to how bright the scene is, as eyes do: brighter in the dark, darker in bright light, over a moment (see "Auto exposure"; off unless given) |
 | `exposure_min_ev`, `exposure_max_ev` | the darkest and brightest scene auto exposure adapts to, in EV (doublings of brightness: 0 is a scene whose average is middle grey; -4 and 4 unless given) |
-| `exposure_speed_up`, `exposure_speed_down` | how fast it adapts, per second, when the scene got brighter and when it got darker (3 and 1 unless given: eyes adapt to light faster than to the dark) |
+| `exposure_speed_up`, `exposure_speed_down` | how fast it adapts, per second (0 to 100), when the scene got brighter and when it got darker (3 and 1 unless given: eyes adapt to light faster than to the dark) |
 | `exposure_compensation` | EV the adapted picture is brightened by (negative: darkened; 0 unless given) |
 | `foliage_translucency` | how much sunlight comes through leaves lit from behind, 0 to 1 (0.5 unless given): foliage between the camera and the sun glows with its own color |
 | `glow_limit` | the brightest glowing particles together make a pixel, in linear light (2 to 4 suits fire): many flames or sparks over each other come near it and keep their color instead of washing out to white (0, the default, sets no limit) |

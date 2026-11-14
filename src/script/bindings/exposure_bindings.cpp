@@ -20,8 +20,6 @@ using namespace binding;
 constexpr mrb_int kPairParts = 2;  // a range is [darkest, brightest], speeds [up, down]
 constexpr mrb_int kFirst = 0;
 constexpr mrb_int kSecond = 1;
-constexpr double kNoSpeed = 0.0;
-constexpr double kFastestSpeed = 100.0;  // per second: past this it is there at once anyway
 
 AutoExposureOverrides& overrides(mrb_state* mrb) { return context(mrb).auto_exposure; }
 
@@ -44,7 +42,7 @@ float ev_from(mrb_state* mrb, mrb_value value, const char* what) {
 }
 
 float speed_from(mrb_state* mrb, mrb_value value, const char* what) {
-  return static_cast<float>(from_to(mrb, mrb_as_float(mrb, value), kNoSpeed, kFastestSpeed, what));
+  return static_cast<float>(from_to(mrb, mrb_as_float(mrb, value), kNoExposureSpeed, kFastestExposureSpeed, what));
 }
 
 using Pair = std::optional<std::pair<float, float>>;

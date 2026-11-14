@@ -66,9 +66,11 @@ void Renderer::Impl::compile_shaders() {
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::particle_fragment().c_str(), "particles");
   glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
-  bright_shader = compile_shader(nullptr, shaders::kBrightFragment, "bloom threshold");
+  bright_shader =
+      compile_shader(nullptr, shaders::with_adapted_scale(shaders::kBrightFragment).c_str(), "bloom threshold");
   blur_shader = compile_shader(nullptr, shaders::kBlurFragment, "blur");
-  composite_shader = compile_shader(nullptr, shaders::kCompositeFragment, "tone mapping");
+  composite_shader =
+      compile_shader(nullptr, shaders::with_adapted_scale(shaders::kCompositeFragment).c_str(), "tone mapping");
   luminance_shader = compile_shader(nullptr, shaders::kLuminanceFragment, "brightness measure");
   adapt_shader = compile_shader(nullptr, shaders::kAdaptFragment, "exposure adaptation");
   antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
