@@ -52,9 +52,9 @@ TEST_CASE("each letter is drawn with the first face of the chain that has it") {
   CHECK(same(runs_of("日本語"), {{kCjk, "日本語"}}));
 }
 
-TEST_CASE("a letter no face has goes to the first face, which shows its fallback glyph") {
-  CHECK(same(runs_of("aΩb"), {{kLatin, "aΩb"}}));
-  CHECK(same(runs_of("日Ω"), {{kCjk, "日"}, {kLatin, "Ω"}}));
+TEST_CASE("a letter no face has goes to the last face, which shows its fallback glyph") {
+  CHECK(same(runs_of("aΩb"), {{kLatin, "a"}, {kEmoji, "Ω"}, {kLatin, "b"}}));
+  CHECK(same(runs_of("😀Ω"), {{kEmoji, "😀Ω"}}));
 }
 
 TEST_CASE("earlier faces win when several have a letter") {

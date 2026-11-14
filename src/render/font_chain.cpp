@@ -11,11 +11,12 @@ namespace {
 constexpr int kFirstPrintable = 0x20;  // below it are control characters, drawn by no face
 constexpr char kLineBreak = '\n';
 
+// The first face with the letter; the last one (the built-in face in a layout) when none has it.
 std::size_t first_face_with(int codepoint, std::size_t faces, const HasGlyph& has_glyph) {
   for (std::size_t face = 0; face < faces; ++face) {
     if (has_glyph(face, codepoint)) return face;
   }
-  return 0;
+  return faces == 0 ? 0 : faces - 1;
 }
 bool is_control(int codepoint) { return codepoint < kFirstPrintable; }
 std::size_t face_before(const std::vector<FaceRun>& runs) { return runs.empty() ? 0 : runs.back().face; }

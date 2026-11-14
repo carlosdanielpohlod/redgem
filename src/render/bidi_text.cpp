@@ -16,6 +16,11 @@ constexpr unsigned char kFirstNonAscii = 0x80;         // below it no letter is 
 constexpr std::size_t kMaxOrderedBytes = 64u * 1024u;  // longer texts are drawn as written
 constexpr SBLevel kRightToLeftBit = 1;                 // odd embedding levels run right to left
 constexpr SBCodepoint kNoMirror = 0;
+constexpr SBCodepoint kZeroWidthJoiner = 0x200d;  // joins emoji into one picture (a family)
+constexpr SBCodepoint kFirstSkinTone = 0x1f3fb;   // emoji modifiers, which tint the emoji before them
+constexpr SBCodepoint kLastSkinTone = 0x1f3ff;
+constexpr SBCodepoint kFirstRegional = 0x1f1e6;  // regional indicators: two of them make a flag
+constexpr SBCodepoint kLastRegional = 0x1f1ff;
 // Codepoints from each limit up take one more UTF-8 byte.
 constexpr SBCodepoint kLengthLimits[] = {0x80, 0x800, 0x10000};
 constexpr unsigned kContinuationBits = 6;
@@ -33,10 +38,13 @@ using Algorithm = Owned<SBAlgorithmRef, SBAlgorithmRelease>;
 using Paragraph = Owned<SBParagraphRef, SBParagraphRelease>;
 using Line = Owned<SBLineRef, SBLineRelease>;
 
-// A letter and the marks after it, as bytes [begin, end) of the text.
+// A letter and the marks after it (or one emoji picture), as bytes [begin, end) of the text; kept
+// whole when a right-to-left run is reversed.
 struct Cluster {
   SBUInteger begin = 0;
   SBUInteger end = 0;
+  bool joining = false;    // it ends in a zero width joiner: the next codepoint belongs to it
+  bool half_flag = false;  // it is one regional indicator: a second one completes the flag
 };
 
 bool plain_ascii(const std::string& text) {
@@ -45,8 +53,22 @@ bool plain_ascii(const std::string& text) {
 bool unordered(const std::string& text) { return plain_ascii(text) || text.size() > kMaxOrderedBytes; }
 bool right_to_left(const SBRun& run) { return (run.level & kRightToLeftBit) != 0; }
 bool is_mark(SBCodepoint codepoint) { return SBGeneralCategoryIsMark(SBCodepointGetGeneralCategory(codepoint)); }
+bool in_range(SBCodepoint codepoint, SBCodepoint first, SBCodepoint last) {
+  return codepoint >= first && codepoint <= last;
+}
+bool is_regional(SBCodepoint codepoint) { return in_range(codepoint, kFirstRegional, kLastRegional); }
+bool continues_letter(SBCodepoint codepoint) {
+  return is_mark(codepoint) || codepoint == kZeroWidthJoiner || in_range(codepoint, kFirstSkinTone, kLastSkinTone);
+}
+bool completes(const Cluster& last, SBCodepoint codepoint) {
+  return last.joining || (last.half_flag && is_regional(codepoint));
+}
 bool attaches(const std::vector<Cluster>& clusters, SBCodepoint codepoint) {
-  return !clusters.empty() && is_mark(codepoint);
+  return !clusters.empty() && (continues_letter(codepoint) || completes(clusters.back(), codepoint));
+}
+void note_end(Cluster& cluster, SBCodepoint codepoint, bool started) {
+  cluster.joining = codepoint == kZeroWidthJoiner;
+  cluster.half_flag = started && is_regional(codepoint);
 }
 bool empty_paragraph(const Paragraph& paragraph) { return !paragraph || SBParagraphGetLength(paragraph.get()) == 0; }
 SBCodepoint next_codepoint(const std::string& text, SBUInteger& index) {
@@ -70,10 +92,12 @@ std::vector<Cluster> clusters_of(const std::string& text, const SBRun& run) {
   while (index < run.offset + run.length) {
     const SBUInteger start = index;
     const SBCodepoint codepoint = next_codepoint(text, index);
-    if (attaches(clusters, codepoint))
-      clusters.back().end = index;
+    const bool started = !attaches(clusters, codepoint);
+    if (started)
+      clusters.push_back({start, index, false, false});
     else
-      clusters.push_back({start, index});
+      clusters.back().end = index;
+    note_end(clusters.back(), codepoint, started);
   }
   return clusters;
 }

@@ -267,7 +267,8 @@ not a promise of how it will be closed.
   built-in one, draws each letter with the first face that has it. Color emoji faces (bitmap or
   color tables) are not drawn: only outline (monochrome) emoji faces. Each face caches at most 2048
   codepoints; four named game fonts can be cached at once, with at most 32 MB per font file.
-  Glyphs no face of the chain has show as the first face's question mark.
+  Glyphs no face of the chain has (or that a full face has no room for) show as the built-in
+  face's question mark.
 
 ### Gameplay API
 

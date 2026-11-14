@@ -36,7 +36,7 @@ class GameFonts {
   // The text laid out with a font chain (render/font_chain.hpp): in the order its letters are
   // drawn (render/bidi_text.hpp), each piece with the first face that has its letters.
   std::vector<FontPiece> layout(const std::string& chain, const std::string& text, float size, float spacing);
-  // Whether a face has a glyph for a letter (the built-in face for an empty name).
+  // Whether a face has a glyph for a letter and room for it (the built-in face for an empty name).
   bool covers(const std::string& name, int codepoint);
   void set_directory(const std::filesystem::path& directory);
   void clear();
@@ -52,6 +52,8 @@ class GameFonts {
     bool full = false;
   };
   Face& face(const std::string& name);
+  static bool has_room_for(const Face& face, int codepoint);
+  static bool can_draw(const Face& face, int codepoint);
   void read_face(Face& face, const std::string& name);
   void read_coverage(Face& face, const std::string& name);
   std::vector<FontPiece> pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs);

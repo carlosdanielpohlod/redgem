@@ -25,8 +25,8 @@ bool is_line_break(const std::string& piece);
 using HasGlyph = std::function<bool(std::size_t face, int codepoint)>;
 
 // The text cut where the face that draws it changes: each letter goes to the first of `faces`
-// faces that has it, or to the first face (which shows its "?") when none has it. Control
-// characters other than line breaks stay with the letter before them.
+// faces that has it, or to the last face (the built-in one, which shows its "?") when none has it.
+// Control characters other than line breaks stay with the letter before them.
 std::vector<FaceRun> face_runs(const std::string& text, std::size_t faces, const HasGlyph& has_glyph);
 
 }  // namespace redgem

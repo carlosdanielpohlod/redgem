@@ -36,6 +36,11 @@ TEST_CASE("brackets in right-to-left text are mirrored") {
 
 TEST_CASE("marks stay on the letter they belong to") { CHECK(visual_order(kArabicMarked) == kArabicDrawn); }
 
+TEST_CASE("emoji joined into one picture stay whole inside right-to-left text") {
+  constexpr const char* kFamily = "👨‍👩";  // man, zero width joiner, woman
+  CHECK(visual_order(std::string(kShalom) + " " + kFamily) == std::string(kFamily) + " " + kShalomDrawn);
+}
+
 TEST_CASE("each line takes its own direction and keeps its line break") {
   const std::string text = std::string(kShalom) + "\nabc " + kShalom;
   CHECK(visual_order(text) == std::string(kShalomDrawn) + "\nabc " + kShalomDrawn);

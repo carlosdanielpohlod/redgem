@@ -41,6 +41,11 @@ bool visible_fallback(const Font& font) {
   const auto rect = GetGlyphAtlasRec(font, kFallbackLetter);
   return glyph.value == kFallbackLetter && rect.width > 0 && rect.height > 0;
 }
+// A game face only draws letters it has (render/font_chain.hpp): the built-in face, tried last,
+// draws the question mark for the rest.
+bool healthy_face(const std::vector<std::uint8_t>& bytes, const Font& font) {
+  return usable_font(font) && (!bytes.empty() || visible_fallback(font));
+}
 bool empty_glyph(const GlyphInfo& glyph) { return glyph.image.width == 0 && glyph.advanceX == 0; }
 void prepare_atlas(Font& font) {
   constexpr int kNoBreakSpace = 0xa0;
@@ -83,9 +88,19 @@ void place_pieces(std::vector<FontPiece>& pieces, float size, float spacing) {
 
 }  // namespace
 
+bool GameFonts::has_room_for(const Face& face, int codepoint) {
+  return face.letters.count(codepoint) != 0 || face.letters.size() < kMaxFontLetters;
+}
+// Whether a face has a letter and can still add it to its atlas.
+bool GameFonts::can_draw(const Face& face, int codepoint) {
+  return std::binary_search(face.coverage.begin(), face.coverage.end(), codepoint) && has_room_for(face, codepoint);
+}
+
 float laid_out_width(const std::vector<FontPiece>& pieces) {
   float width = 0.0f;
-  for (const FontPiece& piece : pieces) width = std::max(width, piece.at.x + piece.width);
+  for (const FontPiece& piece : pieces) {
+    if (piece.font != nullptr) width = std::max(width, piece.at.x + piece.width);  // (not a line break)
+  }
   return width;
 }
 
@@ -153,7 +168,7 @@ void GameFonts::rebuild(Face& face) {
   release_face(face);
   face.font = font;
   face.owned = owns_font(font);
-  face.failed = !usable_font(font) || !visible_fallback(font);
+  face.failed = !healthy_face(face.bytes, font);
   if (face.failed) {
     release_face(face);
     face.font = GetFontDefault();
@@ -172,25 +187,27 @@ const Font& GameFonts::get(const std::string& name, const std::string& text) {
   }
   return selected.font;
 }
-bool GameFonts::covers(const std::string& name, int codepoint) {
-  const Face& found = face(name);
-  return std::binary_search(found.coverage.begin(), found.coverage.end(), codepoint);
-}
+bool GameFonts::covers(const std::string& name, int codepoint) { return can_draw(face(name), codepoint); }
 std::vector<FontPiece> GameFonts::pieces(const std::vector<std::string>& names, const std::vector<FaceRun>& runs) {
   std::vector<std::string> letters(names.size());
-  for (const FaceRun& run : runs) letters[run.face] += run.text;
+  for (const FaceRun& run : runs) {
+    if (!is_line_break(run.text)) letters[run.face] += run.text;
+  }
+  std::vector<const Font*> fonts(names.size());  // each atlas grows once for the whole text
   for (std::size_t i = 0; i < names.size(); ++i) {
-    if (!letters[i].empty()) get(names[i], letters[i]);  // each atlas grows once for the whole text
+    if (!letters[i].empty()) fonts[i] = &get(names[i], letters[i]);
   }
   std::vector<FontPiece> laid;
   for (const FaceRun& run : runs)
-    laid.push_back({is_line_break(run.text) ? nullptr : &get(names[run.face], run.text), run.text});
+    laid.push_back({is_line_break(run.text) ? nullptr : fonts[run.face], run.text, Vector2{}, 0.0f});
   return laid;
 }
 std::vector<FontPiece> GameFonts::layout(const std::string& chain, const std::string& text, float size, float spacing) {
   if (faces_.empty()) face("");
   const std::vector<std::string> names = chain_faces(chain);
-  const auto has_glyph = [this, &names](std::size_t index, int codepoint) { return covers(names[index], codepoint); };
+  std::vector<const Face*> faces;
+  for (const std::string& name : names) faces.push_back(&face(name));
+  const auto has_glyph = [&faces](std::size_t index, int codepoint) { return can_draw(*faces[index], codepoint); };
   std::vector<FontPiece> laid = pieces(names, face_runs(visual_order(text), names.size(), has_glyph));
   place_pieces(laid, size, spacing);
   return laid;
