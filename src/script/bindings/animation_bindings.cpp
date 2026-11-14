@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "scene/animation/animation_markers.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -137,6 +138,51 @@ mrb_value game_object_animation_time(mrb_state* mrb, mrb_value self) {
   return mrb_float_value(mrb, animations(mrb).time_on(scene(mrb), alive_id(mrb, self)));
 }
 
+// --- Events and root motion of the object's own animation ----------------------------------------
+
+mrb_value game_object_animation_listen_at(mrb_state* mrb, mrb_value self) {
+  mrb_value name;
+  mrb_float at = 0.0;
+  mrb_get_args(mrb, "of", &name, &at);
+  at = from_to(mrb, at, kClipStartAt, kClipEndAt, "an event's moment (at:)");
+  const std::string clip = to_name(mrb, name);
+  const std::uint32_t listener =
+      animations(mrb).listen_at(scene(mrb), alive_id(mrb, self), clip, static_cast<float>(at));
+  if (listener == kNoAnimationListener) raise_unknown_clip(mrb, clip);
+  return mrb_int_value(mrb, listener);
+}
+
+mrb_value game_object_animation_listen_marker(mrb_state* mrb, mrb_value self) {
+  const std::string marker = name_arg(mrb);
+  return mrb_int_value(mrb, animations(mrb).listen_marker(scene(mrb), alive_id(mrb, self), marker));
+}
+
+mrb_value game_object_animation_unlisten(mrb_state* mrb, mrb_value) {
+  mrb_int listener = 0;
+  mrb_get_args(mrb, "i", &listener);
+  animations(mrb).unlisten(static_cast<std::uint32_t>(listener));
+  return mrb_nil_value();
+}
+
+mrb_value game_object_animation_set_root_motion(mrb_state* mrb, mrb_value self) {
+  const bool on = bool_arg(mrb);
+  animations(mrb).set_root_motion(scene(mrb), alive_id(mrb, self), on);
+  return mrb_bool_value(on);
+}
+
+mrb_value game_object_animation_root_motion(mrb_state* mrb, mrb_value self) {
+  return mrb_bool_value(animations(mrb).root_motion(scene(mrb), alive_id(mrb, self)));
+}
+
+mrb_value game_object_animation_clip_root_motion(mrb_state* mrb, mrb_value self) {
+  mrb_value name;
+  mrb_bool on = false;
+  mrb_get_args(mrb, "ob", &name, &on);
+  const std::string clip = to_name(mrb, name);
+  if (!animations(mrb).set_clip_root_motion(scene(mrb), alive_id(mrb, self), clip, on)) raise_unknown_clip(mrb, clip);
+  return mrb_nil_value();
+}
+
 void install_scene_clip_bindings(mrb_state* mrb) {
   RClass* animation_module = mrb_define_module(mrb, "Animation");
   mrb_define_module_function(mrb, animation_module, "names", animation_names, MRB_ARGS_NONE());
@@ -162,11 +208,26 @@ void install_object_animation_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "__animation_time", game_object_animation_time, MRB_ARGS_NONE());
 }
 
+// What one object's own animation hands on: events, and root motion (see Animator in the prelude).
+void install_object_animation_event_bindings(mrb_state* mrb) {
+  RClass* game_object = mrb_class_get(mrb, kGameObjectClass);
+  mrb_define_method(mrb, game_object, "__animation_listen_at", game_object_animation_listen_at, MRB_ARGS_REQ(2));
+  mrb_define_method(mrb, game_object, "__animation_listen_marker", game_object_animation_listen_marker,
+                    MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "__animation_unlisten", game_object_animation_unlisten, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "__animation_set_root_motion", game_object_animation_set_root_motion,
+                    MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "__animation_root_motion", game_object_animation_root_motion, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "__animation_clip_root_motion", game_object_animation_clip_root_motion,
+                    MRB_ARGS_REQ(2));
+}
+
 }  // namespace
 
 void install_animation_bindings(mrb_state* mrb) {
   install_scene_clip_bindings(mrb);
   install_object_animation_bindings(mrb);
+  install_object_animation_event_bindings(mrb);
   install_animation_graph_bindings(mrb);
 }
 

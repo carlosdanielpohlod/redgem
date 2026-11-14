@@ -233,6 +233,13 @@ class Engine {
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
   int fixed_steps_due(float frame_seconds, float scale);
   void update_frame(float delta);
+  // Moves each character by how far its clips moved their root (Animator root motion): a
+  // character controller goes there through the physics, sliding along walls; anything else is
+  // moved there.
+  void apply_root_motion();
+  void move_by(ObjectId object, const RootMotion& motion);
+  // Hands the moments the characters' clips went past to the scripts listening (animation.on).
+  void hand_on_animation_events();
   void switch_scene_if_asked();
   bool is_loading_scene() const;
   bool deterministic_scene_load() const;

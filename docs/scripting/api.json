@@ -1529,8 +1529,8 @@
       "methods": [
         {
           "name": "play",
-          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false",
-          "about": "plays a clip, fading from the last one",
+          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil",
+          "about": "plays a clip, fading from the last one; root_motion: true lets the clip move the object",
           "top": 23,
           "example": "animation.play(:Run, fade: 0.2)"
         },
@@ -1577,6 +1577,31 @@
         {
           "name": "state",
           "about": "the graph's state, or nil"
+        },
+        {
+          "name": "on",
+          "args": "clip, at: nil, seconds: nil, &block",
+          "about": "calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes",
+          "example": "animation.on(:Attack, at: 0.4) { |event| hit }"
+        },
+        {
+          "name": "on_marker",
+          "args": "name, &block",
+          "about": "calls the block each time a clip passes a marker of that name authored in Blender"
+        },
+        {
+          "name": "off",
+          "args": "listener",
+          "about": "stops calling a block that on or on_marker returned"
+        },
+        {
+          "name": "root_motion=",
+          "args": "on",
+          "about": "whether all its clips move the object by their root's horizontal motion and turning"
+        },
+        {
+          "name": "root_motion?",
+          "about": "whether all its clips move the object"
         }
       ],
       "guide": "animation.md"
@@ -1613,6 +1638,29 @@
         }
       ],
       "guide": "animation.md"
+    },
+    {
+      "name": "Animation::Event",
+      "about": "What the block of an animation event is given (animation.on).",
+      "methods": [
+        {
+          "name": "game_object",
+          "about": "the object that listened"
+        },
+        {
+          "name": "clip",
+          "about": "the clip's name"
+        },
+        {
+          "name": "name",
+          "about": "the marker's name, or nil for a moment the script named"
+        },
+        {
+          "name": "at",
+          "about": "where in the clip, from 0 (its start) to 1 (its end)"
+        }
+      ],
+      "guide": "animation.md#events"
     },
     {
       "name": "Audio",

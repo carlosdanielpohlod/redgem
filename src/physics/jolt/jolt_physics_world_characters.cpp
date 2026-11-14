@@ -83,6 +83,8 @@ void World::update_character(Record& record, float dt) {
   record.pending_jump.reset();
   velocity += to_jolt(gravity_) * dt;
   velocity += to_jolt(record.desired_move);
+  if (dt > 0.0f) velocity += to_jolt(record.pending_displacement) / dt;
+  record.pending_displacement = Vec3{};
   character.SetLinearVelocity(velocity);
   move_character(record, dt);
 }
@@ -105,6 +107,12 @@ void World::set_character_move(ObjectId object, Vec3 horizontal_velocity) {
   Record* record = find(object);
   if (!is_character(record)) return;
   record->desired_move = {horizontal_velocity.x, 0.0f, horizontal_velocity.z};
+}
+
+void World::add_character_displacement(ObjectId object, Vec3 offset) {
+  Record* record = find(object);
+  if (!is_character(record)) return;
+  record->pending_displacement = record->pending_displacement + Vec3{offset.x, 0.0f, offset.z};
 }
 
 void World::character_jump(ObjectId object, float speed) {

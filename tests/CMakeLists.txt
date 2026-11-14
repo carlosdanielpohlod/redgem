@@ -180,6 +180,9 @@ add_executable(redgem_tests
   unit/graph_animation_codec_test.cpp
   unit/animation_sync_test.cpp
   unit/clip_clock_test.cpp
+  unit/animation_markers_test.cpp
+  unit/animation_events_test.cpp
+  unit/root_motion_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
   unit/build_id_test.cpp
@@ -221,6 +224,7 @@ add_executable(redgem_tests
   integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
+  integration/animation_events_api_test.cpp
   integration/scatter_test.cpp
   integration/native_arguments_test.cpp
   integration/game_translations_test.cpp
