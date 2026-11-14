@@ -165,9 +165,7 @@ module Camera
 
   # An object and everything it carries (its children, theirs...): none for a point.
   def self.__with_children(object)
-    return [] unless object.is_a?(GameObject)
-
-    [object] + object.children.flat_map { |child| __with_children(child) }
+    object.is_a?(GameObject) ? object.__with_children : []
   end
 
   # Turns the camera to look at a point, unless it is right there: it keeps its turn then.

@@ -161,7 +161,7 @@ TEST_CASE("an input map written as JSON reads back the same") {
 
 TEST_CASE("the five built-in names stay, and a game adds its own or binds them anew") {
   PlayerBindings bindings;
-  for (const char* name : {"jump", "fire", "run"}) CHECK(bindings.is_action(name));
+  for (const char* name : {"jump", "fire", "run", "interact"}) CHECK(bindings.is_action(name));
   for (const char* name : {"horizontal", "vertical"}) CHECK(bindings.is_axis(name));
   bindings.declare_action("dash", {{Key::E}, {}});
   bindings.declare_action("jump", {{Key::J}, {}});

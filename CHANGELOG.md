@@ -20,6 +20,43 @@ until 1.0, a release may change what games rely on (see
   loads the level the game plays. Only the host changes the level: elsewhere `Game.load_scene`
   returns `false`. A room's opener on a relay can now have the relay let a machine go.
 
+- **Interaction**: an `Interactable` behaviour makes an object something the player can use or talk
+  to (an I18n prompt, a range, a priority, an enabled flag and an optional facing angle), and an
+  `Interactor` on the hero picks the best one in reach every frame (in range, in front, in line of
+  sight; the highest priority, then the nearest), shows its prompt with the key or button bound to
+  the new built-in `:interact` action (E, a gamepad's Y; rebindable), and uses it on that action or
+  a tap on the prompt. The target's behaviours hear `on_interact(actor)`, `on_focus(actor)` and
+  `on_blur(actor)`, and the game `Interaction.on(:interact) { |actor, target| }`. Over the network
+  a client's use is asked of the host, which checks range and line of sight again and runs it there.
+  See the manual's Interaction page.
+- **Loading a level without a freeze**: after `Game.load_scene_async` reads a level, the engine
+  makes it ready over the next frames while the loading screen keeps drawing: pictures are
+  decoded on the background reader, physics bodies are made in batches of about 4 ms a frame,
+  and textures and meshes go to the graphics card about 8 MiB a frame. The swap happens once all
+  of it is ready, and every script of the new level starts in that frame, so each sees the whole
+  level on its first update. Offline fixed-step runs (`--record`, `redgem run`) still make the
+  level ready all at once, in the same frame as before.
+
+- **Joints set up in the editor**: Add Component > Joint gives an object a fixed, hinge, slider,
+  point or distance joint to another object (picked by name) or to the world, with its anchor,
+  axis, limits, motor, lengths, spring and break force, saved in the scene as the object's `joint`
+  properties (Blender can set them too). The joint is made as the scene loads, like one from
+  `Physics.joint`, and `GameObject#joint` returns it. The Scene view draws its anchor, its axis and
+  its limits as an arc. Undo, copy and paste, duplication, prefabs and `Scene.spawn` keep it, a
+  copy made with its other end holding to that end's copy.
+- **An interface that scales with the screen**: every size, position, margin and font size `UI`
+  takes is in units of a reference screen the game names in `game.json`
+  (`"ui": {"reference": [1920, 1080], "match": "height"}`, or `"width"` or `"fit"`; the game's own
+  window, its height matched, when it names none). `UI.scale` says how many pixels a unit takes,
+  so a HUD keeps its share of the screen at 720p, at 4K and in a small window, and texts are
+  drawn sharp from letters made near the pixels they take (a few raster sizes per face) instead of
+  being stretched. `UI.width` and `UI.height` are in units; `UI.pixel_width`, `UI.pixel_height`,
+  `UI.reference`, `UI.mouse_x` and `UI.mouse_y` are new, clicks and taps land on what is drawn at
+  any size, and `Camera.world_to_screen` and `Camera.screen_ray` are in units too. Players make
+  the interface bigger or smaller with `Settings.ui_scale` (0.5 to 2, the settings screen's
+  "Interface size"), kept with the other settings. `GameMenu` uses the same scale instead of its
+  own, so it now grows on large screens; it already takes the screen's height, so a larger
+  interface size grows a game's HUD, and the menu shrinks to fit a short or narrow screen.
 - **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
   model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
   or folder has every word, best match first (a name that is the word, then one that starts with
@@ -189,6 +226,21 @@ until 1.0, a release may change what games rely on (see
   sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
   `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
   (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+- **A typed scripting API, and type signatures for editors**: every method of
+  `docs/scripting/api.json` gives each parameter a type (with whether it is a keyword, optional,
+  its default, a rest or a block) and the type it returns, in a small closed language (`Integer`,
+  `Float`, `Numeric`, `String`, `Symbol`, `bool`, `nil`, `Color`, the API's classes, `Array[T]`,
+  `Hash[K, V]`, `Range[T]`, tuples, unions and blocks); the file is refused when it holds a type
+  not in it or a parameter out of place. `redgem api <Class>`, its search, the MCP `api` tool and
+  the [API reference](docs/scripting/api.md) show the types (`Input.axis(Symbol name, pad: Integer
+  = 0) -> Float`). `redgem api --rbs` writes them as Ruby type signatures (RBS), which new games
+  get as `sig/redgem.rbs` (kept out of builds), so editors with a Ruby language server (Steep,
+  Solargraph and the like) complete and type-check game scripts. The tests now also check that
+  each class is the class or module the engine has, and that the methods written in Ruby take the
+  parameters the reference says. `Behaviour::Timer`, what `after`, `every` and `tween` return, is
+  in the reference (`cancel`, `cancelled?`), and so are the keywords some methods took without
+  saying: `pad:` of `Input.axis`, `action?`, `action_pressed?` and the gamepad's, `alpha:` of
+  `UI.image`, the colors, `size:`, `focused:` and `confirm:` of `UI.button`, and more.
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
@@ -401,6 +453,12 @@ until 1.0, a release may change what games rely on (see
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).
+- **A slow disk no longer stops the script that saves**: reading and writing the save with `Save`
+  and its slots, and `Settings.save`, are the engine's time, not the call's, like spawning
+  (forgiven up to four budgets in one call); the block of `Save.update` still counts as the call's.
+  A save that took more than a second (another program scanning the file, a slow CI
+  machine) ended the call with a `ScriptTimeout`. The scripts' budget can be timed on a test's
+  clock (`ScriptBudget::set_clock`), and its tests no longer depend on how fast the machine is.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

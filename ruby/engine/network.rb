@@ -63,6 +63,7 @@ module Network
   SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
   DESPAWN = "$despawn".freeze    # objects that are gone: their keys
   CORRECT = "$correct".freeze    # from the host: where an object of ours is believed to be: [key, position]
+  INTERACT = "$interact".freeze  # to the host: a client's hero uses something: [actor key, target key]
   LEVEL = "$level".freeze        # the host to everyone: [change, name] load that level (network_levels.rb)
   LEVEL_PLAYED = "$played".freeze  # the host to a newcomer: [change, name] the level the game plays
   LEVEL_READY = "$ready".freeze  # to the host: change, this machine has the level of that change
@@ -71,7 +72,7 @@ module Network
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned, DESPAWN => :receive_despawn,
     LEVEL => :receive_level, LEVEL_PLAYED => :receive_level_played, LEVEL_READY => :receive_level_ready,
-    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction
+    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, INTERACT => :receive_interact
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {

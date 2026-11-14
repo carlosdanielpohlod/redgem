@@ -8,6 +8,7 @@
 #include <set>
 
 #include "core/safe_path.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 namespace {
@@ -67,6 +68,13 @@ std::string make_scene_id() {
 std::string scene_node_id(const SceneDesc& scene, int index) {
   const auto& id = scene.nodes[index].stable_id;
   return id.empty() ? std::to_string(index) : id;
+}
+
+void follow_new_identities(PropertyMap& props, const NewIdentities& identities) {
+  const auto other = get_string(props, props::kJointTo);
+  if (!other || other->empty()) return;
+  const auto renewed = identities.find(*other);
+  if (renewed != identities.end()) props[props::kJointTo] = renewed->second;
 }
 
 }  // namespace redgem

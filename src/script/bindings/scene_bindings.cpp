@@ -60,7 +60,7 @@ std::optional<Transform> spawn_placement(mrb_state* mrb, ObjectId id, mrb_value 
 
 // Making the object, its bodies and its behaviours is the engine's time, not the script's.
 ObjectId spawned(mrb_state* mrb, const SpawnRequest& request) {
-  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+  const BudgetPause pause(script_budget(mrb));
   return context(mrb).spawn(request);
 }
 
@@ -94,7 +94,7 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
 
 ObjectId spawned_prefab(mrb_state* mrb, const std::string& file, const SpawnRequest& request, std::string& failure) {
   try {
-    const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+    const BudgetPause pause(script_budget(mrb));
     return context(mrb).spawn_prefab(file, request);
   } catch (const std::exception& error) {
     failure = error.what();
