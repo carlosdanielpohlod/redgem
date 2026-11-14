@@ -45,6 +45,8 @@ std::optional<AudioVector> audio_right(const AudioListener& listener) {
   if (audio_length(right) <= kMinimumAudioAxis) return std::nullopt;
   return audio_normalized(right);
 }
+// A sound in the world that walls are let muffle.
+bool walls_muffle(const SpatialSound& sound) { return sound.positional && sound.occludable; }
 bool valid_audio_levels(const SpatialSound& sound) {
   if (!std::isfinite(sound.volume)) return false;
   if (!std::isfinite(sound.pitch)) return false;
@@ -110,7 +112,9 @@ SpatialSound flat_sound(const FlatSound& sound) {
   return flat;
 }
 
-SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound) {
+SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked) {
+  SpatialSound sound = asked;
+  sound.occlusion = blocked(sound) ? kBehindWall : kOpen;  // (heard as it is from the start)
   const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
@@ -119,7 +123,7 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   if (place == kNoSoundSource) return kNoSoundSource;
   const auto id = static_cast<SoundSourceId>(next_);
   if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
-  driver_.effects(id, groups_.effects_of(sound.group));
+  driver_.effects(id, effects_of(sound));
   if (place) stop(*place);
   sounds_.emplace(id, sound);
   ++next_;
@@ -196,11 +200,39 @@ void SoundPool::clear() {
 // A sound's mix, the volumes and gains of its groups applied.
 std::optional<SpatialMix> SoundPool::mix_of(const SpatialSound& sound) const {
   auto mix = spatial_sound_mix(listener_, sound);
-  if (mix) mix->volume *= groups_.heard_volume(sound.group);
+  if (mix) mix->volume *= groups_.heard_volume(sound.group) * occluded_volume(sound.occlusion, occlusion_);
   return mix;
 }
+VoiceEffects SoundPool::effects_of(const SpatialSound& sound) const {
+  return occluded_effects(groups_.effects_of(sound.group), sound.occlusion, occlusion_);
+}
 void SoundPool::refresh_effects() {
-  for (const auto& [id, sound] : sounds_) driver_.effects(id, groups_.effects_of(sound.group));
+  for (const auto& [id, sound] : sounds_) driver_.effects(id, effects_of(sound));
+}
+bool SoundPool::set_occlusion(const OcclusionSettings& settings) {
+  if (!valid_occlusion(settings)) return false;
+  occlusion_ = settings;
+  refresh();
+  refresh_effects();
+  return true;
+}
+void SoundPool::set_occlusion_query(OcclusionQuery query) { walls_ = std::move(query); }
+// Whether a wall stands between the listener and a sound that walls muffle, and that is near
+// enough to be heard (one farther away costs no ray).
+bool SoundPool::blocked(const SpatialSound& sound) const {
+  if (!looks_for_walls()) return false;
+  if (!walls_muffle(sound)) return false;
+  if (length(sound.position - listener_.position) >= sound.max_distance) return false;
+  return walls_(listener_.position, sound.position);
+}
+bool SoundPool::looks_for_walls() const { return walls_ && occludes(occlusion_); }
+void SoundPool::occlude(float seconds) {
+  for (auto& [id, sound] : sounds_) {
+    const float level = occlusion_step(sound.occlusion, blocked(sound), seconds, occlusion_);
+    if (level == sound.occlusion) continue;
+    sound.occlusion = level;
+    driver_.effects(id, effects_of(sound));
+  }
 }
 void SoundPool::refresh() {
   for (const auto& [id, sound] : sounds_) {
@@ -208,9 +240,10 @@ void SoundPool::refresh() {
     if (mix) driver_.mix(id, *mix);
   }
 }
-void SoundPool::update() {
+void SoundPool::update(float seconds) {
   for (const auto& [id, sound] : sounds_) driver_.update(id);
   reap();
+  occlude(seconds);
   refresh();
 }
 void SoundPool::reap() {

@@ -271,8 +271,8 @@ TEST_CASE("the music ducks by default over the attack, and a ducked volume of 1 
 TEST_CASE("Audio.ducking refuses a volume, an attack or a release out of range") {
   testing::RecordingAudio audio;
   auto engine = sandbox(audio);
-  for (const char* code : {"Audio.ducking(volume: 1.5)", "Audio.ducking(volume: -0.1)",
-                                 "Audio.ducking(attack: -1)", "Audio.ducking(release: -1)"}) {
+  for (const char* code : {"Audio.ducking(volume: 1.5)", "Audio.ducking(volume: -0.1)", "Audio.ducking(attack: -1)",
+                           "Audio.ducking(release: -1)"}) {
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_ducking.rb").ok);
   }

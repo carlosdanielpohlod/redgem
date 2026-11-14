@@ -269,7 +269,9 @@ not a promise of how it will be closed.
   (by priority, then loudness) stops for a new one, and there are no virtual voices that come
   back later. Positional sound provides
   stereo panning and distance falloff; games update source positions and the listener explicitly;
-  there is no HRTF, occlusion or Doppler.
+  there is no HRTF or Doppler. Occlusion is one ray per sound and frame through the static bodies:
+  a wall is in the way or not (no thickness, no sound going round it), and moving bodies never
+  muffle.
 - One music track at a time, two while they crossfade. A game adds at most 13 mix groups of its
   own. A group's effects are a one-pole low-pass and one fixed reverb (no room size, delay or EQ);
   they are on sounds, not on the music's tracks, and the filters are tuned for 48 kHz (a device at

@@ -16,7 +16,7 @@ namespace {
 
 constexpr float kLowCutoff = 200.0f;
 constexpr float kHalf = 0.5f;
-constexpr std::size_t kFrames = 4800;      // a tenth of a second
+constexpr std::size_t kFrames = 4800;       // a tenth of a second
 constexpr std::size_t kTailFrames = 48000;  // a second
 constexpr float kSettledShare = 0.99f;
 constexpr float kMuffledShare = 0.05f;
@@ -26,11 +26,14 @@ constexpr int kPeriods = 20;  // device periods of a tenth of a second: two seco
 constexpr std::size_t kHalves = 2;
 
 // Interleaved stereo frames, both channels the same.
-std::vector<float> frames_of(std::size_t count, float value) { return std::vector<float>(count * kEffectChannels, value); }
+std::vector<float> frames_of(std::size_t count, float value) {
+  return std::vector<float>(count * kEffectChannels, value);
+}
 // The highest frequency there is: every frame the other way.
 std::vector<float> alternating(std::size_t count) {
   std::vector<float> frames(count * kEffectChannels);
-  for (std::size_t sample = 0; sample < frames.size(); ++sample) frames[sample] = (sample / kEffectChannels) % kHalves != 0 ? -1.0f : 1.0f;
+  for (std::size_t sample = 0; sample < frames.size(); ++sample)
+    frames[sample] = (sample / kEffectChannels) % kHalves != 0 ? -1.0f : 1.0f;
   return frames;
 }
 float loudest(const std::vector<float>& frames, std::size_t from = 0) {

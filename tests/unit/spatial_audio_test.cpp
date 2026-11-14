@@ -178,7 +178,7 @@ TEST_CASE("spatial voice completion and clear release resources without reusing 
   SoundPool sounds(driver);
   const auto finished = sounds.play("impact", {});
   driver.voices.at(finished).active = false;
-  sounds.update();
+  sounds.update(0.0f);
   CHECK(driver.voices.empty());
   CHECK_FALSE(sounds.stop(finished));
   const auto next = sounds.play("impact", {});
@@ -377,9 +377,9 @@ TEST_CASE("Ruby sounds past the limit take the place of a lower priority, and a 
 TEST_CASE("Ruby refuses a priority that is not a whole number from 0 to 255") {
   testing::RecordingAudio audio;
   auto engine = spatial_engine(audio);
-  for (const char* code : {"Audio.play(:beep, priority: 256)", "Audio.play(:beep, priority: -1)",
-                           "Audio.play(:beep, priority: 1.5)", "Audio.play_at(:beep, [0, 0, 0], priority: 300)",
-                           "Audio.play_at(:beep, [0, 0, 0], priority: :high)"}) {
+  for (const char* code :
+       {"Audio.play(:beep, priority: 256)", "Audio.play(:beep, priority: -1)", "Audio.play(:beep, priority: 1.5)",
+        "Audio.play_at(:beep, [0, 0, 0], priority: 300)", "Audio.play_at(:beep, [0, 0, 0], priority: :high)"}) {
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_priority.rb").ok);
   }

@@ -46,7 +46,8 @@ bool MixGroupTree::may_define(const std::string& name, MixGroup parent) const {
 bool MixGroupTree::on_group(std::optional<MixGroup> on) const { return on.has_value() && known(*on); }
 
 std::optional<MixGroup> MixGroupTree::find(const std::string& name) const {
-  const auto found = std::find_if(groups_.begin(), groups_.end(), [&](const Group& group) { return group.name == name; });
+  const auto found =
+      std::find_if(groups_.begin(), groups_.end(), [&](const Group& group) { return group.name == name; });
   if (found == groups_.end()) return std::nullopt;
   return static_cast<MixGroup>(found - groups_.begin());
 }

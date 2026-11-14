@@ -902,6 +902,16 @@ Audio.play(:boss_roar, priority: 255)       # always heard
 Audio.play_at(:leaf, position, priority: 10) # the first to give way
 ```
 
+A positional sound behind one of the level's static bodies (a wall, a floor, a rock) is heard
+quieter and muffled, and fades back when the way is clear; moving bodies and characters do not
+muffle. `Audio.occlusion` says how much:
+
+```ruby
+Audio.occlusion(volume: 0.25, low_pass: 600, fade: 0.3)  # thicker walls
+Audio.play_at(:radio, position, occlusion: false)        # heard through walls
+Audio.occlusion(volume: 1, low_pass: nil)                # off
+```
+
 ## A sense of speed
 
 ```ruby

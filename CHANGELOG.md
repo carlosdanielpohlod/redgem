@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
+  (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
+  listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
+  fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
 - **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
   adds a group under another (13 at most, ending with the game), and sounds play in it by name.
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under

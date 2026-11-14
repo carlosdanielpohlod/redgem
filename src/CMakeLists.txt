@@ -354,6 +354,7 @@ redgem_add_library(redgem_runtime
   audio/audio_effects.cpp
   audio/effect_rack.cpp
   audio/mix_group_tree.cpp
+  audio/occlusion.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp
@@ -526,6 +527,7 @@ redgem_add_library(redgem_runtime
   app/video_recorder.cpp
   app/encoder_process.cpp
   app/engine.cpp
+  app/sound_walls.cpp
   app/engine_saves.cpp
   app/engine_object_state.cpp
   app/profile_overlay.cpp

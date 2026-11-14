@@ -83,7 +83,9 @@ MusicPlayer::Track MusicPlayer::faded_in(MusicTrackId id, const MusicRequest& re
 // (A track replaced before it was heard at all is silent already: it goes at once.)
 bool MusicPlayer::faded_out() const { return leaving_ && leaving_->level <= kSilentLevel; }
 
-float MusicPlayer::heard_volume(const Track& track) const { return track.volume * track.level * group_volume_ * ducked_; }
+float MusicPlayer::heard_volume(const Track& track) const {
+  return track.volume * track.level * group_volume_ * ducked_;
+}
 
 // The playing track starts fading out (or stops, with no fade); one already fading out stops.
 void MusicPlayer::leave(float fade_seconds) {

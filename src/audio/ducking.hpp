@@ -7,10 +7,10 @@
 
 namespace redgem {
 
-inline constexpr float kDefaultDuckedVolume = 0.4f;   // of the music's own, while a voice plays
-inline constexpr float kDefaultDuckAttack = 0.15f;    // seconds the music takes to go down
-inline constexpr float kDefaultDuckRelease = 0.6f;    // seconds it takes to come back
-inline constexpr float kNoDucking = kFullVolume;      // a ducked volume that leaves the music as it is
+inline constexpr float kDefaultDuckedVolume = 0.4f;  // of the music's own, while a voice plays
+inline constexpr float kDefaultDuckAttack = 0.15f;   // seconds the music takes to go down
+inline constexpr float kDefaultDuckRelease = 0.6f;   // seconds it takes to come back
+inline constexpr float kNoDucking = kFullVolume;     // a ducked volume that leaves the music as it is
 
 struct MusicDucking {
   float volume = kDefaultDuckedVolume;  // from 0 (silent) to 1 (no ducking)

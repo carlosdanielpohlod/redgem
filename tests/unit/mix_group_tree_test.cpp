@@ -134,10 +134,10 @@ TEST_CASE("a game's group under the voice ducks the music, and the game's groups
 TEST_CASE("Audio.group and Audio.effects refuse what they cannot do") {
   testing::RecordingAudio audio;
   auto engine = sandbox(audio);
-  for (const char* code : {"Audio.group(:music)", "Audio.group(:cave, parent: :nowhere)",
-                           "Audio.group(:cave, volume: -1)", "Audio.effects(:nowhere, reverb: 0.5)",
-                           "Audio.effects(:effects, low_pass: 5)", "Audio.effects(:effects, reverb: 2)",
-                           "Audio.play(:beep, group: :cave)"}) {
+  for (const char* code :
+       {"Audio.group(:music)", "Audio.group(:cave, parent: :nowhere)", "Audio.group(:cave, volume: -1)",
+        "Audio.effects(:nowhere, reverb: 0.5)", "Audio.effects(:effects, low_pass: 5)",
+        "Audio.effects(:effects, reverb: 2)", "Audio.play(:beep, group: :cave)"}) {
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_groups.rb").ok);
   }
