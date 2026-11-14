@@ -62,7 +62,7 @@ bool about_the_same(std::size_t a, std::size_t b, float share) {
 }
 
 MeshDesc mesh_of(PrimitiveShape shape, int material) {
-  MeshDesc mesh{"Shape", {make_primitive(shape)}, {}};
+  MeshDesc mesh{"Shape", {make_primitive(shape)}, {}, {}, {}};
   mesh.primitives[0].material = material;
   for (std::size_t i = 0; i < mesh.primitives[0].positions.size(); i += 3) {
     mesh.bounds.include(vec3_from(&mesh.primitives[0].positions[i]));

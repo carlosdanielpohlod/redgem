@@ -9,7 +9,7 @@
 namespace redgem {
 namespace {
 
-// What a channel animates; nullopt for morph target weights, which are not supported.
+// What a channel animates; nullopt for what glTF does not name.
 std::optional<AnimationPath> path_of(cgltf_animation_path_type type) {
   switch (type) {
     case cgltf_animation_path_type_translation:
@@ -18,9 +18,29 @@ std::optional<AnimationPath> path_of(cgltf_animation_path_type type) {
       return AnimationPath::Rotation;
     case cgltf_animation_path_type_scale:
       return AnimationPath::Scale;
+    case cgltf_animation_path_type_weights:
+      return AnimationPath::Weights;
     default:
       return std::nullopt;
   }
+}
+
+bool has_parts(const cgltf_node& node) { return node.mesh != nullptr && node.mesh->primitives_count > 0; }
+
+// How many shape keys the mesh of a node has (0 without a mesh).
+std::size_t shape_keys_of(const cgltf_node& node) {
+  return has_parts(node) ? node.mesh->primitives[0].targets_count : 0;
+}
+
+// Whether a weights channel gives one weight for every shape key of its node's mesh at each key.
+bool weighs_every_key(const AnimationChannel& track, const cgltf_node& node) {
+  const std::size_t keys = shape_keys_of(node);
+  return keys > 0 && track.values.size() == track.times.size() * keys;
+}
+
+// Whether a channel is whole: weights for every shape key (other paths are checked as they are played).
+bool keys_fit(const AnimationChannel& track, const cgltf_node& node) {
+  return track.path != AnimationPath::Weights || weighs_every_key(track, node);
 }
 
 // A channel that says both what it moves and with which keys.
@@ -82,7 +102,9 @@ std::optional<AnimationChannel> GltfReader::load_channel(const cgltf_animation_c
   track.times = gltf_accessors::unpack_floats(channel.sampler->input);
   track.values = gltf_accessors::unpack_floats(channel.sampler->output);
   if (track.times.empty()) return std::nullopt;
-  return track;
+  if (keys_fit(track, *channel.target_node)) return track;
+  warn("animation '" + clip_name + "': shape key weights that do not fit their mesh, skipped");
+  return std::nullopt;
 }
 
 std::optional<AnimationPath> GltfReader::playable_path(const cgltf_animation_channel& channel,

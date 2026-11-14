@@ -113,6 +113,8 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `add_component(klass, **settings)`: attaches a behaviour; settings are what its prop reads
 - `tint`: the color its colors are multiplied by
 - `tint = color`: multiplies its colors: [1.0, 0.5, 0.5]
+- `morph(name, weight = nil)`: the weight of a shape key (morph target) of its mesh and the meshes under it, or sets it: morph(:Smile, 0.7); nil when no part has the key, ArgumentError when setting one none has
+- `morph_names`: the names of the shape keys of its mesh and the meshes under it, as symbols
 
 ## Transform
 

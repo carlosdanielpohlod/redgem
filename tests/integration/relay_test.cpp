@@ -3,6 +3,8 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <future>
+#include <limits>
 #include <set>
 #include <thread>
 
@@ -12,6 +14,7 @@
 #endif
 
 #include "core/platform.hpp"
+#include "fake_clock.hpp"
 #include "integration/wire_text.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
@@ -25,14 +28,17 @@ using redgem::test::wire_frame;
 namespace {
 
 constexpr float kShortWaitSeconds = 0.05f;
-constexpr std::chrono::milliseconds kShortWait{50};
-// Windows can end a timed wait up to one tick of its system timer (about 15.6 ms) early.
-constexpr std::chrono::milliseconds kClockTick{16};
 constexpr float kLongWaitSeconds = 5.0f;  // far longer than anything here takes to arrive
-constexpr std::chrono::milliseconds kLongWait{2500};
-constexpr std::chrono::milliseconds kPromptly{500};  // well under the second an idle relay sleeps
-constexpr int kMaxRounds = 3000;                     // of polling, a millisecond apart
+// Waits whose length in milliseconds is a whole number (see wait_milliseconds).
+constexpr float kQuarterSecond = 0.25f;
+constexpr int kQuarterSecondMs = 250;
+constexpr float kSliver = 0.0001f;  // far less than a millisecond
+constexpr double kMillisecondsPerSecond = 1000.0;
+constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr std::chrono::milliseconds kCallerDelay{20};
+// What a test waits for another thread at most before it gives up (a bound, never a measure).
+constexpr std::chrono::seconds kGuard{30};
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
 constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
@@ -51,7 +57,6 @@ constexpr std::size_t kWelcomeBytes = 4096;  // plenty for a relay's first answe
 constexpr int kManyCodes = 500;
 constexpr std::string_view kCodeLetters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
-constexpr std::chrono::milliseconds kArrivalPause{50};  // for what was written to be there to read
 constexpr std::size_t kLongTextBytes = 512 * 1024;
 constexpr int kLongTexts = 10;                     // together, more than a machine may send through a relay at once
 constexpr std::size_t kSmallBudget = 1024 * 1024;  // what a small relay holds for all its machines
@@ -213,35 +218,33 @@ void answer_with_nonsense(Datagrams& listener) {
   }
 }
 
-// Whether a wait of kShortWait lasted it, give or take the tick the system's timer may cut off.
-bool slept_the_short_wait(std::chrono::steady_clock::duration slept) { return slept + kClockTick >= kShortWait; }
-
 }  // namespace
 
 TEST_CASE("an idle relay sleeps for as long as it is told when nothing arrives") {
   Meeting meeting;
-  const auto before = std::chrono::steady_clock::now();
-  CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
-  const auto slept = std::chrono::steady_clock::now() - before;
-  CHECK(slept_the_short_wait(slept));
-  CHECK(slept < kLongWait);
+  // (How long the system then sleeps is its own: what it is asked for is checked, not timed.)
+  CHECK(meeting.relay.sleep_seconds(kShortWaitSeconds) == kShortWaitSeconds);
+  CHECK(meeting.relay.sleep_seconds(kLongWaitSeconds) == kLongWaitSeconds);
+  CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));  // only the time ended it
 }
 
 TEST_CASE("a relay's wait ends as soon as someone connects") {
   Meeting meeting;
   Socket caller;
   std::thread late([&] {
-    std::this_thread::sleep_for(kArrivalPause);
+    // (Most likely while the relay sleeps; whether it calls before or during the wait, the
+    // outcome below is the same, and nothing here is timed.)
+    std::this_thread::sleep_for(kCallerDelay);
     std::string error;
     caller = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
   });
-  const auto before = std::chrono::steady_clock::now();
+  // The call is all there is to end the wait before its time (an idle relay's ends with false):
+  // ended by something, it was the call, which the relay then takes.
   const bool woken = meeting.relay.wait(kLongWaitSeconds);
-  const auto slept = std::chrono::steady_clock::now() - before;
   late.join();
+  REQUIRE(caller.valid());
   CHECK(woken);
-  CHECK(slept >= kArrivalPause);  // it slept until the call, not through it
-  CHECK(slept < kLongWait);
+  CHECK(meeting.relay.connection_count() == 0);  // not taken before the poll after the wait
   meeting.relay.poll(kRoundSeconds);
   CHECK(meeting.relay.connection_count() == 1);
 }
@@ -276,47 +279,64 @@ TEST_CASE("a relay with messages still to handle does not sleep on them") {
   const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   while (!flood.empty()) REQUIRE(flooder.socket.write(flood) != IoStatus::Closed);
-  std::this_thread::sleep_for(kArrivalPause);
+  REQUIRE(meeting.relay.wait(kLongWaitSeconds));  // the flood arrived
   meeting.relay.poll(kRoundSeconds);
-  const auto before = std::chrono::steady_clock::now();
+  // Its sockets read empty, the relay would sleep the whole wait through (and say false) but for
+  // the messages it holds.
   CHECK(meeting.relay.wait(kLongWaitSeconds));
-  CHECK(std::chrono::steady_clock::now() - before < kShortWait);
 }
 
 TEST_CASE("a wait on no socket at all is a plain sleep, and a wait of no time does not sleep") {
-  const auto before = std::chrono::steady_clock::now();
-  CHECK_FALSE(Socket::wait({}, kShortWaitSeconds));
-  CHECK(slept_the_short_wait(std::chrono::steady_clock::now() - before));
+  redgem::test::FakeClock clock;
+  CHECK_FALSE(Socket::wait({}, kQuarterSecond, clock));
+  CHECK(clock.sleeps() == 1);
+  CHECK(clock.slept() == doctest::Approx(kQuarterSecond));
   const Socket closed;
-  CHECK_FALSE(Socket::wait({{&closed, true}, {nullptr, false}}, 0.0f));
+  CHECK_FALSE(Socket::wait({{&closed, true}, {nullptr, false}}, 0.0f, clock));
+  CHECK_FALSE(Socket::wait({}, -1.0f, clock));
+  CHECK(clock.sleeps() == 1);  // neither of those slept
   Meeting meeting;
-  const auto again = std::chrono::steady_clock::now();
   CHECK_FALSE(meeting.relay.wait(0.0f));
   CHECK_FALSE(meeting.relay.wait(-1.0f));  // (never "for ever")
-  CHECK(std::chrono::steady_clock::now() - again < kShortWait);
+}
+
+TEST_CASE("a wait is asked of the system in whole milliseconds, rounded up, never negative, never endless") {
+  CHECK(wait_milliseconds(kQuarterSecond) == kQuarterSecondMs);
+  CHECK(wait_milliseconds(kSliver) == 1);  // a short wait still sleeps
+  CHECK(wait_milliseconds(0.0f) == 0);
+  CHECK(wait_milliseconds(-1.0f) == 0);  // which the system would read as "for ever"
+  CHECK(wait_milliseconds(std::numeric_limits<float>::quiet_NaN()) == 0);
+  const auto longest = static_cast<int>(kLongestWaitSeconds * kMillisecondsPerSecond);
+  CHECK(wait_milliseconds(std::numeric_limits<float>::infinity()) == longest);
 }
 
 TEST_CASE("the relay program's turns sleep until there is work, then do it") {
   Meeting meeting;
   std::atomic<bool> stopped{false};
+  std::atomic<int> woken_turns{0};
+  std::promise<bool> first_turn;
   // (Only this thread touches the relay while it runs.)
   std::thread program([&] {
-    while (!stopped) serve_relay_once(meeting.relay, kRoundSeconds);
+    first_turn.set_value(serve_relay_once(meeting.relay, kRoundSeconds));
+    while (!stopped) woken_turns += serve_relay_once(meeting.relay, kRoundSeconds) ? 1 : 0;
   });
+  // With nobody there, only the wake time ends a turn. The program is then asleep in its next
+  // turn, before anyone calls: what wakes it is what arrives.
+  std::future<bool> first = first_turn.get_future();
+  REQUIRE(first.wait_for(kGuard) == std::future_status::ready);
+  CHECK_FALSE(first.get());
   NetworkSession opener;
   std::string error;
   REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
-  const auto before = std::chrono::steady_clock::now();
   for (int round = 0; round < kMaxRounds && opener.state() != NetworkSession::State::Online; ++round) {
     opener.poll(kRoundSeconds);
     std::this_thread::sleep_for(kRoundPause);
   }
-  const auto took = std::chrono::steady_clock::now() - before;
   stopped = true;
   program.join();
   CHECK(opener.state() == NetworkSession::State::Online);
-  // Each turn may sleep a second: a room opened in a fraction of one means arrivals ended the sleeps.
-  CHECK(took < kPromptly);
+  // Turns whose sleeps only the wake time ended would count none: arrivals ended them.
+  CHECK(woken_turns > 0);
   CHECK(meeting.relay.room_count() == 1);
 }
 
@@ -342,9 +362,9 @@ TEST_CASE("a flood of tiny messages through a relay is passed on a poll's worth 
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   std::vector<std::uint8_t> unsent = flood;
   while (!unsent.empty()) REQUIRE(flooder.socket.write(unsent) != IoStatus::Closed);
-  std::this_thread::sleep_for(kArrivalPause);
+  REQUIRE(meeting.relay.wait(kLongWaitSeconds));  // the flood arrived
   meeting.relay.poll(kRoundSeconds);
-  std::this_thread::sleep_for(kArrivalPause);
+  REQUIRE(Socket::wait({{&opener.socket, false}}, kLongWaitSeconds));  // and what was passed on
   opener.listen();
   int passed_on = 0;
   while (opener.heard.next()) ++passed_on;
@@ -790,12 +810,10 @@ TEST_CASE("a relay that cannot take a newcomer rests before it asks again, inste
     const NoDescriptorsLeft nothing_to_give;
     meeting.relay.poll(kRoundSeconds);
     CHECK(meeting.relay.connection_count() == 0);
-    // The caller still waits, and would end every wait at once: the relay sleeps a moment anyway.
-    const auto before = std::chrono::steady_clock::now();
+    // The caller still waits, and would end every wait at once: the relay rests a moment instead,
+    // not watching for callers, and sleeps no longer than that rest.
+    CHECK(meeting.relay.sleep_seconds(kLongWaitSeconds) == kAcceptRestSeconds);
     CHECK_FALSE(meeting.relay.wait(kLongWaitSeconds));
-    const auto slept = std::chrono::steady_clock::now() - before;
-    CHECK(slept >= std::chrono::duration<float>(kAcceptRestSeconds / 2.0f));
-    CHECK(slept < kLongWait);
   }
   // The rest is not over yet, then it is: the caller is taken, where the system kept it waiting,
   // and so is whoever calls next.

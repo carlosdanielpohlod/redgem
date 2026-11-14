@@ -36,8 +36,9 @@ RelayCommand parse_relay_command(const std::vector<std::string>& args);
 std::string relay_usage();
 
 // One turn of a relay that has nothing else to do: sleeps until something arrives (see
-// kRelayWakeSeconds), then moves the messages. `seconds` is the time since the turn before.
-void serve_relay_once(RelayServer& relay, float seconds);
+// kRelayWakeSeconds), then moves the messages. `seconds` is the time since the turn before. True
+// when something arriving ended the sleep, false when the wake time did.
+bool serve_relay_once(RelayServer& relay, float seconds);
 
 // The whole program: reads the command line and, unless it asks for help or makes no sense, runs
 // a relay until the process is stopped. Returns the exit code.

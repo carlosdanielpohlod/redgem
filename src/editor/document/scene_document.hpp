@@ -115,8 +115,8 @@ class SceneDocument {
   int reparent(int index, int new_parent, bool record = true, const Transform* local_override = nullptr);
   // Adds every object of another .glb (meshes, materials, textures) under a new empty named after
   // the file, itself under `parent`. Returns that node, or kNoIndex with `error` set. Skeletons
-  // and animations come along. Models using several buffers are refused; morph targets and the
-  // model's lights/cameras are dropped.
+  // and animations (shape keys and their weights too) come along. Models using several buffers
+  // are refused; the model's lights/cameras are dropped.
   int import_model(const std::filesystem::path& path, std::string& error, int parent = kNoIndex);
 
   // Materials (shared by every object whose mesh uses them).

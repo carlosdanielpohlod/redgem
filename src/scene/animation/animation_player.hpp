@@ -271,6 +271,11 @@ class AnimationPlayer {
   // Makes sure a blend starts from something steady: what was laid on that part of the object
   // earlier this frame, or its pose at rest; never what the blend itself left there last frame.
   void steady_base(const Scene& scene, ObjectId object, AnimationPath path, Transform& local);
+  // The same for shape keys: a blend starts from what was laid on them earlier this frame, or from
+  // the mesh's own weights.
+  void before_weighing(GameObject& object, float weight);
+  // Lays the shape keys of the clips an animation graph blends, each by its share.
+  void weigh_graph_samples(ObjectId character, const std::vector<AnimationGraphSample>& samples, Scene& scene);
 
   const std::vector<AnimationDesc>* clips_ = nullptr;
   std::vector<ClipClock> clocks_;                    // one for each of the scene's clips

@@ -152,11 +152,11 @@ TEST_CASE("textures point at the shifted samplers and images, also through their
   CHECK(imported[kExtensions][kWebpExtension][kSource] == kLocal + kImagesInScene);
 }
 
-TEST_CASE("meshes point at the shifted accessors and materials, and lose their morph targets") {
+TEST_CASE("meshes point at the shifted accessors and materials, and keep their shape keys") {
   const json primitive = {{kAttributes, {{kPositionAttribute, kLocal}, {kNormalAttribute, kOtherLocal}}},
                           {kIndices, kLocal},
                           {kMaterial, kOtherLocal},
-                          {kTargets, {json::object()}}};
+                          {kTargets, {{{kPositionAttribute, kOtherLocal}, {kNormalAttribute, kLocal}}}}};
   const json mesh = {
       {kPrimitives, {primitive}}, {kWeights, {0, 1}}, {kExtras, {{kTargetNames, {"smile"}}, {kName, "kept"}}}};
   const json imported = imported_mesh(mesh, json_offsets());
@@ -165,18 +165,22 @@ TEST_CASE("meshes point at the shifted accessors and materials, and lose their m
   CHECK(part[kAttributes][kNormalAttribute] == kOtherLocal + kAccessorsInScene);
   CHECK(part[kIndices] == kLocal + kAccessorsInScene);
   CHECK(part[kMaterial] == kOtherLocal + kMaterialsInScene);
-  CHECK_FALSE(part.contains(kTargets));
-  CHECK_FALSE(imported.contains(kWeights));
-  CHECK_FALSE(imported[kExtras].contains(kTargetNames));
+  CHECK(part[kTargets][0][kPositionAttribute] == kOtherLocal + kAccessorsInScene);
+  CHECK(part[kTargets][0][kNormalAttribute] == kLocal + kAccessorsInScene);
+  CHECK(imported[kWeights] == json({0, 1}));
+  CHECK(imported[kExtras][kTargetNames] == json({"smile"}));
   CHECK(imported[kExtras][kName] == "kept");
 }
 
-TEST_CASE("a model's nodes keep their mesh and skin, and come without camera, light or children") {
+TEST_CASE("a model's nodes keep their mesh, skin and shape-key weights, and come without camera, light or children") {
   const json node = {{kName, "Arm"},       {kMesh, kLocal},    {kSkin, kOtherLocal},
                      {kCamera, 0},         {kWeights, {0, 1}}, {kExtensions, {{kLightsExtension, {{kLight, 0}}}}},
                      {kChildren, {kLocal}}};
   const json imported = imported_node(node, json_offsets());
-  CHECK(imported == json({{kName, "Arm"}, {kMesh, kLocal + kMeshesInScene}, {kSkin, kOtherLocal + kSkinsInFile}}));
+  CHECK(
+      imported ==
+      json(
+          {{kName, "Arm"}, {kMesh, kLocal + kMeshesInScene}, {kSkin, kOtherLocal + kSkinsInFile}, {kWeights, {0, 1}}}));
 }
 
 TEST_CASE("skins and animations point at the shifted nodes and accessors") {

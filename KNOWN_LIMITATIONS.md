@@ -91,8 +91,12 @@ the same pull request.
   the Inspector keeps a mirror it is given and the command-line tools refuse negative scales. A
   skeleton that mirrors a skinned mesh through its bones alone, and a mirrored parent of
   scattered copies, still draw those inside out.
-- Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
-  with cubic-spline interpolation are skipped with a warning (export linear or step keys).
+- Shape keys (glTF morph targets) move positions and normals; their tangents are not morphed. A
+  copy of a mesh shows its eight heaviest keys at once, and is culled by where its keys can take
+  it with weights between -1 and 1 (weights beyond that may be culled early). Their weights are
+  not sent to the other machines of a network game, and a node's own `weights` are ignored for
+  the mesh's. Animation keys with cubic-spline interpolation are skipped with a warning (export
+  linear or step keys).
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light

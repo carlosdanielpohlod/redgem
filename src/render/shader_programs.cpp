@@ -73,6 +73,9 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::noise_shift, shaders::kNoiseShift},
     {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
     {&LitUniforms::skinned, shaders::kSkinned},
+    {&LitUniforms::morph_first, shaders::kMorphFirst},
+    {&LitUniforms::morph_vertices, shaders::kMorphVertices},
+    {&LitUniforms::morph_texels, shaders::kMorphTexels},
     {&LitUniforms::wind, shaders::kWindAmount},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
     {&LitUniforms::frame_texels, shaders::kFrameTexels},
@@ -133,6 +136,9 @@ constexpr std::pair<int MotionUniforms::*, const char*> kMotionUniforms[] = {
     {&MotionUniforms::alpha_dithered, shaders::kAlphaDithered},
     {&MotionUniforms::wind, shaders::kWindAmount},
     {&MotionUniforms::skinned, shaders::kSkinned},
+    {&MotionUniforms::morph_first, shaders::kMorphFirst},
+    {&MotionUniforms::morph_vertices, shaders::kMorphVertices},
+    {&MotionUniforms::morph_texels, shaders::kMorphTexels},
     {&MotionUniforms::noise_shift, shaders::kNoiseShift},
     {&MotionUniforms::view_position, shaders::kViewPosition},
     {&MotionUniforms::time, shaders::kTime},
@@ -189,6 +195,9 @@ DepthUniforms find_depth_uniforms(const Shader& depth) {
   found.time = GetShaderLocation(depth, shaders::kTime);
   found.skinned = GetShaderLocation(depth, shaders::kSkinned);
   found.frame_texels = GetShaderLocation(depth, shaders::kFrameTexels);
+  found.morph_first = GetShaderLocation(depth, shaders::kMorphFirst);
+  found.morph_vertices = GetShaderLocation(depth, shaders::kMorphVertices);
+  found.morph_texels = GetShaderLocation(depth, shaders::kMorphTexels);
   return found;
 }
 

@@ -303,6 +303,15 @@
           "name": "tint=",
           "args": "color",
           "about": "multiplies its colors: [1.0, 0.5, 0.5]"
+        },
+        {
+          "name": "morph",
+          "args": "name, weight = nil",
+          "about": "the weight of a shape key (morph target) of its mesh and the meshes under it, or sets it: morph(:Smile, 0.7); nil when no part has the key, ArgumentError when setting one none has"
+        },
+        {
+          "name": "morph_names",
+          "about": "the names of the shape keys of its mesh and the meshes under it, as symbols"
         }
       ],
       "internal": [
