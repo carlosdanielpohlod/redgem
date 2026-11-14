@@ -26,10 +26,37 @@ float sound_pitch(mrb_state* mrb, mrb_float pitch, const char* what) {
   return static_cast<float>(from_to(mrb, pitch, kMinSpatialPitch, kMaxSpatialPitch, what));
 }
 
-// The group a sound is mixed in, named :music, :effects or :voice.
+// The group a sound is mixed in, named :music, :effects, :voice or as the game named its own.
 MixGroup mix_group(mrb_state* mrb, mrb_value name) {
   const std::string group = to_name(mrb, name);
-  return known(mrb, mix_group_from_name(group), "unknown mix group :%s (music, effects, voice)", group);
+  return known(mrb, audio(mrb).find_group(group),
+               "unknown mix group :%s (music, effects, voice, or one Audio.group made)", group);
+}
+
+// Audio.__group(name, parent, volume): a game's own group under another.
+mrb_value audio_group(mrb_state* mrb, mrb_value) {
+  mrb_value name, parent;
+  mrb_float volume = 0.0;
+  mrb_get_args(mrb, "oof", &name, &parent, &volume);
+  const std::string group = to_name(mrb, name);
+  const MixGroup over = mix_group(mrb, parent);
+  const float heard = static_cast<float>(at_least(mrb, volume, kSilent, "Audio.group's volume"));
+  known(mrb, audio(mrb).define_group(group, over, heard),
+        "Audio.group cannot make :%s: an engine group's name, a parent under it, or more than 13 groups", group);
+  return mrb_nil_value();
+}
+
+// Audio.__effects(group, low_pass, reverb): low_pass is nil for no filter.
+mrb_value audio_effects(mrb_state* mrb, mrb_value) {
+  mrb_value group, low_pass;
+  mrb_float reverb = 0.0;
+  mrb_get_args(mrb, "oof", &group, &low_pass, &reverb);
+  GroupEffects effects;
+  if (!mrb_nil_p(low_pass))
+    effects.low_pass_hz = static_cast<float>(
+        from_to(mrb, mrb_as_float(mrb, low_pass), kLowestCutoff, kHighestCutoff, "Audio.effects's low_pass"));
+  effects.reverb = static_cast<float>(from_to(mrb, reverb, kNoReverb, kFullReverb, "Audio.effects's reverb"));
+  return mrb_bool_value(audio(mrb).set_group_effects(mix_group(mrb, group), effects));
 }
 
 // A priority a sound may have, a whole number from kLowestSoundPriority to kHighestSoundPriority.
@@ -231,6 +258,8 @@ void install_audio_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "music_volume=", audio_set_music_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "__ducking", audio_ducking, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, audio_module, "__group", audio_group, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, audio_module, "__effects", audio_effects, MRB_ARGS_REQ(3));
 }
 
 }  // namespace redgem

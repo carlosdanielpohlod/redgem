@@ -881,6 +881,17 @@ Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0) # lower, slower to come b
 Audio.ducking(volume: Audio::NO_DUCKING)               # off
 ```
 
+A game adds groups of its own under the engine's, each heard at its volume times the volumes over
+it, and puts effects on a group: a low-pass that muffles its sounds and a reverb they echo in. The
+groups under it get them too (the lowest cutoff, and the reverb of the nearest group that has one):
+
+```ruby
+Audio.group(:cave, parent: :effects, volume: 0.8)
+Audio.effects(:cave, low_pass: 2_000, reverb: 0.4)   # Hz; 0 to 1 of each sound goes to the reverb
+Audio.play_at(:drip, position, group: :cave)
+Audio.effects(:cave)                                 # off again
+```
+
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
 playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then

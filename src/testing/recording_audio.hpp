@@ -16,6 +16,7 @@ struct RecordedVoice {
   SpatialSound sound;
   SpatialMix mix;
   bool playing = true;  // until RecordingAudio::finish says it came to its end
+  VoiceEffects effects;
 };
 
 // A music stream it would be playing, at the volume it would be heard at.
@@ -40,6 +41,7 @@ class RecordingSoundDriver final : public SoundDriver {
   bool playing(SoundSourceId id) const override { return voices.at(id).playing; }
   void mix(SoundSourceId id, SpatialMix mix) override { voices.at(id).mix = mix; }
   void pitch(SoundSourceId id, float pitch) override { voices.at(id).sound.pitch = pitch; }
+  void effects(SoundSourceId id, const VoiceEffects& effects) override { voices.at(id).effects = effects; }
   void stop(SoundSourceId id) override { voices.erase(id); }
 
   std::map<SoundSourceId, RecordedVoice> voices;
@@ -95,10 +97,6 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
     master_volume_ = volume;
     heard_master_volume_ = heard_volume(volume);
   }
-  void set_group_volume(MixGroup group, float volume) override {
-    group_volumes_[mix_group_index(group)] = volume;
-    MixedAudio::set_group_volume(group, volume);
-  }
   void set_sounds_dir(const std::filesystem::path& dir) override {
     stop_sounds();
     sounds_dir = dir;
@@ -120,7 +118,7 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   float music_volume() const { return music_volume_; }                // as the game last set it
   float master_volume() const { return master_volume_; }              // the game's
   float heard_master_volume() const { return heard_master_volume_; }  // the game's times the player's
-  float group_volume(MixGroup group) const { return group_volumes_[mix_group_index(group)]; }
+  float group_volume(MixGroup group) const { return groups().player_volume(group); }  // the player's
   float music_ducked() const { return MixedAudio::music_ducked(); }  // the gain over the music group
 
  private:
@@ -128,7 +126,6 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   float heard_master_volume_ = kFullVolume;
   float music_pitch_ = kAsRecorded;
   float music_volume_ = kFullVolume;
-  GroupVolumes group_volumes_ = kFullGroupVolumes;
 };
 
 }  // namespace redgem::testing

@@ -10,6 +10,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
+  adds a group under another (13 at most, ending with the game), and sounds play in it by name.
+  `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
+  it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
+  game's group of `:voice` ducks the music too.
 - **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
   that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
   quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces

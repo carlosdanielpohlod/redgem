@@ -47,6 +47,8 @@ add_executable(redgem_tests
   unit/spatial_audio_test.cpp
   unit/music_player_test.cpp
   unit/music_ducking_test.cpp
+  unit/audio_effects_test.cpp
+  unit/mix_group_tree_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp

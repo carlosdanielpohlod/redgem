@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 
+#include "audio/audio_effects.hpp"
+#include "audio/mix_group_tree.hpp"
 #include "audio/mix_groups.hpp"
 #include "core/math.hpp"
 
@@ -83,6 +85,8 @@ class SoundDriver {
   virtual bool playing(SoundSourceId id) const = 0;
   virtual void mix(SoundSourceId id, SpatialMix mix) = 0;
   virtual void pitch(SoundSourceId id, float pitch) = 0;
+  // The effects of its group (a backend with none ignores them); after start, and when they change.
+  virtual void effects(SoundSourceId, const VoiceEffects&) {}
   virtual void stop(SoundSourceId id) = 0;
 };
 
@@ -90,7 +94,10 @@ class SoundDriver {
 // ownership is independent of the audio device, so lifecycle controls are testable.
 class SoundPool {
  public:
-  explicit SoundPool(SoundDriver& driver) : driver_(driver) {}
+  // Its own groups, or the audio's, which it reads (after a change to them, refresh and
+  // refresh_effects).
+  explicit SoundPool(SoundDriver& driver) : driver_(driver), groups_(own_groups_) {}
+  SoundPool(SoundDriver& driver, MixGroupTree& groups) : driver_(driver), groups_(groups) {}
   ~SoundPool() { clear(); }
   SoundPool(const SoundPool&) = delete;
   SoundPool& operator=(const SoundPool&) = delete;
@@ -103,13 +110,17 @@ class SoundPool {
   bool move(SoundSourceId id, Vec3 position);
   // False for a sound that no longer plays, or levels a sound cannot have (it keeps its own).
   bool set_levels(SoundSourceId id, const SoundLevels& levels);
-  // The volume every sound of the group is heard at, times its own.
+  // The player's volume of one of the engine's groups: every sound of it and under it is heard at
+  // it, times its own.
   void set_group_volume(MixGroup group, float volume);
   // A gain the engine puts over a group, apart from the player's volume: the music ducked under a
   // voice.
   void set_group_gain(MixGroup group, float gain);
-  // Whether any sound of the group still plays.
+  // Whether any sound of the group, or of a group under it, still plays.
   bool group_playing(MixGroup group) const;
+  // Every sound mixed again, and given its effects again: after the groups changed.
+  void refresh();
+  void refresh_effects();
   bool playing(SoundSourceId id) const;
   bool stop(SoundSourceId id);
   void clear();
@@ -121,12 +132,11 @@ class SoundPool {
   // and kNoSoundSource when every sound playing is stronger.
   std::optional<SoundSourceId> place_for(const SpatialSound& sound) const;
   SoundSourceId weakest() const;
-  void refresh();
   void reap();  // lets go of the sounds that ended
   SoundDriver& driver_;
+  MixGroupTree own_groups_;
+  MixGroupTree& groups_;
   AudioListener listener_;
-  GroupVolumes group_volumes_ = kFullGroupVolumes;
-  GroupVolumes group_gains_ = kFullGroupVolumes;
   std::map<SoundSourceId, SpatialSound> sounds_;
   std::uint64_t next_ = 1;  // never reuse handles, including across game changes
 };
