@@ -44,6 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
@@ -216,6 +217,8 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/movement_validator.cpp
+  net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
   net/secure/tls_identity.cpp
@@ -308,6 +311,9 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/animation/animation_player_graph.cpp
+  scene/animation/animation_player_events.cpp
+  scene/animation/animation_player_root_motion.cpp
+  scene/animation/animation_markers.cpp
   scene/camera_ray.cpp
   scene/particle_emitters.cpp
   scene/particles.cpp
@@ -321,6 +327,7 @@ redgem_add_library(redgem_runtime
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/body_limit.cpp
   physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
@@ -384,6 +391,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
   script/bindings/bindings.cpp
@@ -430,6 +438,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_state_bindings.cpp
   script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
+  script/bindings/network_movement_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
@@ -523,6 +532,7 @@ redgem_add_library(redgem_runtime
   app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
+  app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
   app/scene_bodies.cpp
@@ -540,6 +550,7 @@ target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
   "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_runtime PRIVATE freetype)
+target_link_libraries(redgem_runtime PRIVATE ${CMAKE_DL_LIBS})  # render/window.cpp keeps the OpenGL libraries loaded
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
   target_link_libraries(redgem_runtime PUBLIC ws2_32)
@@ -604,6 +615,9 @@ if(NOT ANDROID)
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
     editor/editor_camera.cpp
+    editor/editor_fly_bindings.cpp
+    editor/editor_preferences.cpp
+    editor/editor_preferences_dialog.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp
@@ -779,6 +793,11 @@ if(NOT ANDROID)
   # What `redgem --version` says: the version in project() at the top of the build.
   target_compile_definitions(redgem_project PRIVATE REDGEM_VERSION="${redgem_VERSION}")
   target_link_libraries(redgem_project PUBLIC redgem_editor)
+  # (Public: what includes project/ruby_eval.hpp sees the same choice as what was built.)
+  if(REDGEM_RUBY_EVAL)
+    target_sources(redgem_project PRIVATE project/ruby_eval.cpp)
+    target_compile_definitions(redgem_project PUBLIC REDGEM_RUBY_EVAL)
+  endif()
   if(WIN32)
     target_link_libraries(redgem_project PRIVATE shell32 ole32 uuid)
   endif()
