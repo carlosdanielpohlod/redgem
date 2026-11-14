@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -18,14 +19,22 @@ struct HttpResult {
   HttpResponse response;
 };
 
+// How long a client that goes waits for the threads of its requests still on their way, once it
+// gave them up: they end at once, unless one is busy with what cannot be cut short (looking its
+// server's name up, which the system cannot be made to stop, most likely), and such a thread is
+// left behind. The thread that ends the client (a game's, an editor's, a server room's) waits
+// that long only then.
+inline constexpr std::chrono::milliseconds kHttpShutdownWait{2000};
+
 // The web requests of one game (HTTP in Ruby). Each runs on a thread of its own, so the game never
 // waits; poll() collects the answers on the game's thread, as the network's events are. When the
-// client goes (its game ended), the requests still on their way are given up: their threads stop
-// soon after, and nobody hears of them.
+// client goes (its game ended), the requests still on their way are given up, their connections
+// hung up, and their threads joined, kHttpShutdownWait at most: nobody hears of them.
 class HttpClient {
  public:
   // Secure answers are checked against `trust`; the system's authorities when null. Timeouts are
-  // kept on `clock`, the steady clock when null (shared: a request's thread may outlive the client).
+  // kept on `clock`, the steady clock when null (shared: a request's thread left behind may outlive
+  // the client).
   explicit HttpClient(std::shared_ptr<const TrustStore> trust = nullptr, std::shared_ptr<const Clock> clock = nullptr);
   ~HttpClient();
   HttpClient(const HttpClient&) = delete;

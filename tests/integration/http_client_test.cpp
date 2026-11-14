@@ -14,6 +14,8 @@
 #include "net/http/http_client.hpp"
 #include "net/http/http_message.hpp"
 #include "net/http/http_redirect.hpp"
+#include "net/http/http_stream.hpp"
+#include "net/socket/socket.hpp"
 
 using namespace redgem;
 using redgem::test::http_answer;
@@ -384,3 +386,78 @@ TEST_CASE("a compressed answer that would outgrow the limit, or is corrupt, is r
   CHECK(contains(broken.error, "gzip body is corrupt"));
   CHECK(broken.body.empty());
 }
+
+TEST_CASE("a game that ends while a request waits on a slow server ends at once, and its thread is joined") {
+  // (Its timeout is far off: only giving the request up ends it.)
+  HttpTestServer server(HttpTestServer::Kind::Plain, "");
+  server.keep_quiet();
+  const auto clock = std::make_shared<test::FakeClock>();  // (which never moves: no timeout comes)
+  auto client = std::make_unique<net::HttpClient>(nullptr, clock);
+  net::HttpRequest slow = request("GET", server.url("/slow"));
+  slow.timeout_seconds = net::kLongestHttpTimeoutSeconds;
+  start(*client, slow);
+  REQUIRE(eventually([&server] { return server.requests() == 1; }));
+  const auto ending = std::chrono::steady_clock::now();
+  client.reset();
+  CHECK(std::chrono::steady_clock::now() - ending < net::kHttpShutdownWait);
+  CHECK(eventually([&server] { return server.saw_hang_up(); }));
+}
+
+TEST_CASE("requests answered just as their game ends, collected or not, end with it safely") {
+  // (Each game ends a little later than the one before: some answers came, some are on their way.)
+  constexpr int kGames = 20;
+  constexpr std::chrono::microseconds kLaterEachGame{250};
+  HttpTestServer server(HttpTestServer::Kind::Plain, http_answer("200 OK", "{}"));
+  for (int game = 0; game < kGames; ++game) {
+    const auto ending = std::chrono::steady_clock::now();
+    {
+      net::HttpClient client;
+      start(client, request("GET", server.url("/")));
+      std::this_thread::sleep_for(kLaterEachGame * game);
+      if (game % 2 == 0) client.poll();  // an answer collected and its thread joined, or not yet
+    }
+    CHECK(std::chrono::steady_clock::now() - ending < net::kHttpShutdownWait + kLaterEachGame * game);
+  }
+}
+
+// (Windows lets a wait on a socket hung up from another thread sleep on: there, a request given
+// up is seen at its wait's next look instead.)
+#ifndef _WIN32
+namespace {
+
+// A connection to `listener`, made.
+net::Socket connected_to(const net::Socket& listener) {
+  std::string error;
+  net::Socket socket = net::Socket::connect_to(net::kThisMachine, listener.local_port(), error);
+  REQUIRE_MESSAGE(socket.valid(), error);
+  REQUIRE(eventually([&socket] { return socket.connect_status() == net::IoStatus::Ok; }));
+  return socket;
+}
+
+}  // namespace
+
+TEST_CASE("giving a request up hangs up the connection it waits on, so the wait ends at once") {
+  constexpr float kLongWaitSeconds = 10.0f;  // (far past the bound checked below)
+  constexpr std::chrono::milliseconds kWhileItWaits{100};
+  std::string error;
+  const net::Socket listener = net::Socket::listen_local(0, error);
+  REQUIRE_MESSAGE(listener.valid(), error);
+  net::Socket socket = connected_to(listener);
+  net::HttpCancel cancel;
+  const auto started = std::chrono::steady_clock::now();
+  bool woken = false;
+  std::thread waiting([&] {
+    const net::HeldConnection held(cancel, socket);
+    woken = net::Socket::wait({{&socket, false}}, kLongWaitSeconds);
+  });
+  std::this_thread::sleep_for(kWhileItWaits);
+  cancel.cancel();
+  waiting.join();
+  CHECK(woken);
+  CHECK(std::chrono::steady_clock::now() - started < net::kHttpShutdownWait);
+  // Given up before it waits, a connection is hung up as soon as it is held.
+  net::Socket later = connected_to(listener);
+  const net::HeldConnection held(cancel, later);
+  CHECK(net::Socket::wait({{&later, false}}, kLongWaitSeconds));
+}
+#endif

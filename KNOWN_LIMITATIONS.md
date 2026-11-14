@@ -117,8 +117,9 @@ the same pull request.
   `Proxy-Authorization` are dropped: other headers a game sets (an `X-Api-Key`) go along. Pass
   `redirects: false` to see the redirect and decide.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
-  for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
-  thread ends on its own).
+  for can outlast its timeout by that long. A game that ends gives its requests up, hangs up
+  their connections and joins their threads, 2 seconds at most: a request still looking its name
+  up then is left behind, its thread ending on its own once the lookup does.
 - On Windows the certificates come from the system's ROOT store, which Windows fills on demand:
   an authority no program on the machine has used yet may be missing. Not tried on a real Windows
   machine, nor on a real Android device (whose system certificates the engine reads).
@@ -397,8 +398,12 @@ not a promise of how it will be closed.
   is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
   then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
   runs while another room clears the save writes its key back afterwards.
-- The threads of web requests are detached: one still running at exit may outlive the program's
-  static objects.
+- A web request still busy 2 seconds after its game ended is left behind: one looking its
+  server's name up (the system's lookup cannot be interrupted), or, on a slow device, loading the
+  system's certificates or decompressing a large answer. If the program exits meanwhile, its
+  thread may outlive the program's static objects. Ending the game waits those 2 seconds then,
+  which on a dedicated server holds up the other rooms of its thread. Every request that is
+  waiting on the network ends at once.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
   shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
   reflections march up to 32 steps, and the shore foam's distance is computed for every water

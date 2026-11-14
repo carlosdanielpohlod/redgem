@@ -1,35 +1,62 @@
 #include "net/http/http_client.hpp"
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <optional>
 #include <system_error>
 #include <thread>
 
 #include "core/engine_thread.hpp"
+#include "core/log.hpp"
 #include "net/http/http_exchange.hpp"
+#include "net/http/http_stream.hpp"
 
 namespace redgem::net {
 
 struct HttpClient::Job {
+  using Deadline = std::chrono::steady_clock::time_point;
+
   int id = 0;
-  std::atomic<bool> cancelled{false};
-  std::atomic<bool> done{false};
-  HttpResponse response;  // written by the thread before `done`, read by poll after it
+  HttpCancel cancel;
+  HttpResponse response;  // written by the thread before it finished, read by poll after
+  std::thread thread;     // joined by the client (or, still busy past kHttpShutdownWait, left behind)
 
-  // Carries the request out on a thread of its own, which holds the job (throws std::system_error
-  // when the system has no thread left).
+  // Carries the request out on a thread of its own, which holds the job too (throws
+  // std::system_error when the system has no thread left).
   static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url, const HttpClient& client) {
-    std::thread([job, request = std::move(request), url = std::move(url), trust = client.trust_,
-                 clock = client.clock_] {
-      run_engine_thread([&] { job->carry_out(request, url, trust, *clock); });
-    }).detach();
+    job->thread = std::thread(
+        [job, request = std::move(request), url = std::move(url), trust = client.trust_, clock = client.clock_] {
+          run_engine_thread([&] { job->response = exchange(request, url, trust, job->cancel, *clock); });
+          job->finish();
+        });
   }
 
-  void carry_out(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
-                 const Clock& clock) {
-    response = exchange(request, url, trust, cancelled, clock);
-    done.store(true);
+  // The thread's last word: its work is over, and joining it takes no time.
+  void finish() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    finished_.store(true);
+    ended_.notify_all();
   }
+  bool finished() const { return finished_.load(); }
+
+  // Joins the thread once it ended, by `deadline` at most: false when it had not, and is left behind.
+  bool end_by(Deadline deadline) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    const bool ended = ended_.wait_until(lock, deadline, [this] { return finished(); });
+    lock.unlock();
+    if (ended) {
+      thread.join();
+    } else {
+      thread.detach();
+    }
+    return ended;
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable ended_;
+  std::atomic<bool> finished_{false};  // (set under mutex_, for end_by's wait; read without it by poll)
 };
 
 namespace {
@@ -43,8 +70,18 @@ HttpClient::HttpClient(std::shared_ptr<const TrustStore> trust, std::shared_ptr<
     : trust_(std::move(trust)), clock_(clock ? std::move(clock) : shared_steady_clock()) {}
 
 HttpClient::~HttpClient() {
-  // The threads hold their jobs themselves: they end on their own, with nobody to tell.
-  for (const auto& job : jobs_) job->cancelled.store(true);
+  // Every request is given up first: their threads end together, not one after the other.
+  for (const auto& job : jobs_) job->cancel.cancel();
+  const auto deadline = std::chrono::steady_clock::now() + kHttpShutdownWait;
+  std::size_t left_behind = 0;
+  for (const auto& job : jobs_) {
+    if (!job->end_by(deadline)) ++left_behind;
+  }
+  if (left_behind > 0) {
+    log::warning(std::to_string(left_behind) + " web request(s) still busy " +
+                 std::to_string(kHttpShutdownWait.count()) + " ms after the game ended (looking a name up, most " +
+                 "likely) were left behind");
+  }
 }
 
 int HttpClient::start(HttpRequest request, std::string& error) {
@@ -78,8 +115,9 @@ std::vector<HttpResult> HttpClient::poll() {
   // (Each job is looked at once: one that ends meanwhile is collected at the next poll.)
   std::vector<std::shared_ptr<Job>> still_out;
   for (auto& job : jobs_) {
-    if (job->done.load()) {
+    if (job->finished()) {
       results.push_back({job->id, std::move(job->response)});
+      job->thread.join();  // (its work is over: it is ending)
     } else {
       still_out.push_back(std::move(job));
     }

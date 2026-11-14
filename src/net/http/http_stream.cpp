@@ -10,7 +10,8 @@ namespace redgem::net {
 namespace {
 
 constexpr std::size_t kReadBytes = 64 * 1024;  // what one receive takes at most
-// How often a waiting request looks whether its game gave it up.
+// How often a waiting request looks whether its game gave it up (a connection being made is not
+// woken by hanging it up on every system).
 constexpr float kLookSeconds = 0.05f;
 
 class PlainStream : public HttpStream {
@@ -37,20 +38,41 @@ class PlainStream : public HttpStream {
 
 std::unique_ptr<HttpStream> plain_stream(Socket socket) { return std::make_unique<PlainStream>(std::move(socket)); }
 
-Patience::Patience(float seconds, const std::atomic<bool>& cancelled, const Clock& clock)
-    : clock_(clock), deadline_(clock.now() + seconds), seconds_(seconds), cancelled_(cancelled) {}
+void HttpCancel::cancel() {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  cancelled_.store(true);
+  if (held_ != nullptr) held_->hang_up();
+}
 
-bool Patience::over() const { return cancelled_.load() || clock_.now() >= deadline_; }
+HeldConnection::HeldConnection(const HttpCancel& cancel, const Socket& socket) : cancel_(cancel) {
+  const std::lock_guard<std::mutex> lock(cancel_.mutex_);
+  cancel_.held_ = &socket;
+  if (cancel_.cancelled()) socket.hang_up();
+}
+
+HeldConnection::~HeldConnection() {
+  const std::lock_guard<std::mutex> lock(cancel_.mutex_);
+  cancel_.held_ = nullptr;
+}
+
+Patience::Patience(float seconds, const HttpCancel& cancel, const Clock& clock)
+    : clock_(clock), deadline_(clock.now() + seconds), seconds_(seconds), cancel_(cancel) {}
+
+bool Patience::over() const { return cancel_.cancelled() || clock_.now() >= deadline_; }
 
 bool Patience::wait(const Socket& socket, bool sending) const {
   if (over()) return false;
   const auto left = static_cast<float>(deadline_ - clock_.now());
-  Socket::wait({{&socket, sending}}, std::min(left, kLookSeconds));
+  {
+    // (Given up meanwhile, the connection is hung up: the wait ends then, not at its next look.)
+    const HeldConnection held(cancel_, socket);
+    Socket::wait({{&socket, sending}}, std::min(left, kLookSeconds));
+  }
   return !over();
 }
 
 std::string Patience::why() const {
-  if (cancelled_.load()) return "given up: the game ended";
+  if (cancel_.cancelled()) return "given up: the game ended";
   std::ostringstream text;
   text << "no answer within " << seconds_ << " seconds";
   return text.str();
