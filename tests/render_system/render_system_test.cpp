@@ -87,7 +87,7 @@ SceneDesc skeleton_of_many_bones() {
                          AnimationPath::Translation,
                          {0.0f, kSwingSeconds},
                          {0, 0, 0, kSwing, 0, 0}};
-  desc.animations = {AnimationDesc{kSwingClip, kSwingSeconds, {swing}}};
+  desc.animations = {AnimationDesc{kSwingClip, kSwingSeconds, {swing}, {}}};
   return desc;
 }
 

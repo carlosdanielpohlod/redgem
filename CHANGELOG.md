@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the

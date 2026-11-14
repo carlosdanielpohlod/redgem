@@ -311,6 +311,9 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/animation/animation_player_graph.cpp
+  scene/animation/animation_player_events.cpp
+  scene/animation/animation_player_root_motion.cpp
+  scene/animation/animation_markers.cpp
   scene/camera_ray.cpp
   scene/particle_emitters.cpp
   scene/particles.cpp
@@ -386,6 +389,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
   script/bindings/bindings.cpp

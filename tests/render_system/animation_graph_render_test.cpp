@@ -17,7 +17,7 @@ AnimationDesc location(const std::string& name, float x) {
   channel.node = kCube;
   channel.times = {0.0f};
   channel.values = {x, 0.0f, 0.0f};
-  return {name, 1.0f, {channel}};
+  return {name, 1.0f, {channel}, {}};
 }
 
 SceneDesc graph_scene() {

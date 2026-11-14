@@ -16,7 +16,7 @@ AnimationDesc sword_clip(const char* name, int sword, float seconds, std::size_t
   channel.times = {0.0f, seconds};
   channel.values = {0, 0, 0, 0, 0, 0};
   channel.values[kEndAt + axis] = kSwordReach;
-  return AnimationDesc{name, seconds, {channel}};
+  return AnimationDesc{name, seconds, {channel}, {}};
 }
 
 }  // namespace
