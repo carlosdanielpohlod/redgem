@@ -51,6 +51,8 @@ class SaveFile final : public SaveStore {
   std::vector<std::string> keys() override;
   // (A player's machine runs one game: nothing else reads or writes in between.)
   bool update(const std::string& key, const Change& change) override { return set(key, change(get(key))); }
+  // (One write of the whole file: a crash keeps either the old values or the new ones.)
+  bool replace(const Values& values) override;
   std::string where() const override { return file_.string(); }
   std::unique_ptr<SaveStore> open_slot(const std::string& name) override;
   std::vector<std::string> slot_names() override;

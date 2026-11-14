@@ -203,6 +203,8 @@ add_executable(redgem_tests
   integration/profile_api_test.cpp
   integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
+  integration/save_migration_api_test.cpp
+  integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp

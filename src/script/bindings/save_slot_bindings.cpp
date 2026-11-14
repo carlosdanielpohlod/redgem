@@ -47,7 +47,7 @@ mrb_value names(mrb_state* mrb, mrb_value) {
 void install_save_slot_bindings(mrb_state* mrb) {
   auto* save = mrb_module_get(mrb, "Save");
   mrb_define_module_function(mrb, save, "slot", current, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, save, "slot=", select, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, save, "__select", select, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, save, "slots", names, MRB_ARGS_NONE());
 }
 }  // namespace redgem

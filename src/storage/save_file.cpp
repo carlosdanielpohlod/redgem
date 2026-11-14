@@ -215,6 +215,15 @@ bool SaveFile::clear() {
   return write();
 }
 
+bool SaveFile::replace(const Values& values) {
+  load();
+  values_.clear();
+  for (const auto& [key, value] : values) {
+    if (!value.is_null()) values_[key] = saved::kept(value).value_or(nlohmann::json());
+  }
+  return write();
+}
+
 std::vector<std::string> SaveFile::keys() {
   load();
   std::vector<std::string> names;

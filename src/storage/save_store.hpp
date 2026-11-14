@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -18,6 +19,8 @@ class SaveStore {
  public:
   // What an update makes of a key's value (nullopt: it has none); null removes it.
   using Change = std::function<nlohmann::json(const std::optional<nlohmann::json>& current)>;
+  // A whole store's values, by key.
+  using Values = std::map<std::string, nlohmann::json>;
 
   SaveStore() = default;
   virtual ~SaveStore() = default;
@@ -35,6 +38,14 @@ class SaveStore {
   // between: on a dedicated server, no other room's change to the key gets lost. What `change`
   // throws leaves the key as it was. False when it could not be written.
   virtual bool update(const std::string& key, const Change& change) = 0;
+  // Puts `values` in place of everything the store holds (null values are none), whole and at once
+  // where the backend can: a file in one write, a database in one transaction. This default clears
+  // and sets key by key, for a backend that cannot. False when it could not be written.
+  virtual bool replace(const Values& values) {
+    bool written = clear();
+    for (const auto& [key, value] : values) written = set(key, value) && written;
+    return written;
+  }
   // Where the values are kept, for what is said when they cannot be written.
   virtual std::string where() const = 0;
   // Named views borrow this store's backend and must be destroyed before it. A custom backend

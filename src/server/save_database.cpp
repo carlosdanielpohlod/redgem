@@ -28,6 +28,9 @@ constexpr const char* kRead = "SELECT value FROM saves WHERE key = ?1";
 constexpr const char* kWrite = "INSERT OR REPLACE INTO saves (key, value) VALUES (?1, ?2)";
 constexpr const char* kRemove = "DELETE FROM saves WHERE key = ?1";
 constexpr const char* kClear = "DELETE FROM saves";
+constexpr const char* kBegin = "BEGIN IMMEDIATE";
+constexpr const char* kCommit = "COMMIT";
+constexpr const char* kRollback = "ROLLBACK";
 // (Only rows that hold a value: one written by something else than the server is none.)
 constexpr const char* kKeys = "SELECT key FROM saves WHERE json_valid(value) ORDER BY key";
 // Where the statements above take their values (?1, ?2), and give them back.
@@ -157,6 +160,18 @@ bool SaveDatabase::update(const std::string& key, const Change& change) {
   // (The change runs under the lock: no other room reads or writes meanwhile.)
   const std::lock_guard<std::recursive_mutex> hold(lock_);
   return set(key, change(get(key)));
+}
+
+bool SaveDatabase::in_transaction(const std::function<bool()>& work) {
+  const std::lock_guard<std::recursive_mutex> hold(lock_);
+  if (!executed(database_, kBegin)) return false;
+  if (work()) return executed(database_, kCommit);
+  executed(database_, kRollback);
+  return false;
+}
+
+bool SaveDatabase::replace(const Values& values) {
+  return in_transaction([&] { return SaveStore::replace(values); });
 }
 
 }  // namespace redgem::server

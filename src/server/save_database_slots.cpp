@@ -72,6 +72,9 @@ class DatabaseSlot final : public SaveStore {
     const std::lock_guard<std::recursive_mutex> hold(owner_.lock_);
     return set(key, change(get(key)));
   }
+  bool replace(const Values& values) override {
+    return owner_.in_transaction([&] { return SaveStore::replace(values); });
+  }
   std::string where() const override { return owner_.where() + " (slot " + name_ + ")"; }
 
  private:

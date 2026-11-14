@@ -75,18 +75,30 @@ mrb_value save_keys(mrb_state* mrb, mrb_value) {
   return names;
 }
 
+// Save.__replace(hash): the hash's values in place of everything the slot holds, at once. Returns
+// whether they were written.
+mrb_value save_replace(mrb_state* mrb, mrb_value) {
+  const nlohmann::json values = json_from(mrb, single_arg(mrb), kSaveHolder);
+  if (!values.is_object()) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps a whole slot as a Hash");
+  SaveStore::Values replacing;
+  for (auto entry = values.begin(); entry != values.end(); ++entry) replacing[entry.key()] = entry.value();
+  const bool written = save(mrb).replace(replacing);
+  if (!written) log::warning("could not write " + save(mrb).where());
+  return mrb_bool_value(written);
+}
+
 }  // namespace
 
 void install_save_bindings(mrb_state* mrb) {
+  // (ruby/engine/save.rb builds the game's Save on these: it checks the save's version first.)
   RClass* save_module = mrb_define_module(mrb, "Save");
-  mrb_define_module_function(mrb, save_module, "get", save_get, MRB_ARGS_ARG(1, 1));
-  mrb_define_module_function(mrb, save_module, "[]", save_get, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, save_module, "set", save_set, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, save_module, "[]=", save_set, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, save_module, "update", save_update, MRB_ARGS_ARG(1, 1) | MRB_ARGS_BLOCK());
-  mrb_define_module_function(mrb, save_module, "delete", save_delete, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, save_module, "clear", save_clear, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, save_module, "keys", save_keys, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, save_module, "__get", save_get, MRB_ARGS_ARG(1, 1));
+  mrb_define_module_function(mrb, save_module, "__set", save_set, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, save_module, "__update", save_update, MRB_ARGS_ARG(1, 1) | MRB_ARGS_BLOCK());
+  mrb_define_module_function(mrb, save_module, "__delete", save_delete, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, save_module, "__clear", save_clear, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, save_module, "__keys", save_keys, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, save_module, "__replace", save_replace, MRB_ARGS_REQ(1));
   install_save_slot_bindings(mrb);
 }
 
