@@ -118,6 +118,7 @@ void EditorApp::draw_edit_menu() {
   draw_selection_items();
   ImGui::Separator();
   ui::menu(ui::icon_label(ICON_FA_MICROCHIP, "editor.menu.graphics_card"), [this] { draw_graphics_card_menu(); });
+  if (ImGui::MenuItem(tr("editor.preferences.title"))) open_preferences();
 }
 
 void EditorApp::draw_undo_items() {

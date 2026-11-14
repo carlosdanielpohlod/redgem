@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -12,6 +14,7 @@
 #include "core/math.hpp"
 #include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
+#include "net/movement_validator.hpp"
 #include "net/pose_baselines.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
@@ -45,6 +48,13 @@ inline constexpr int kMaxWaitingLinks = 32;
 // and [fade, layer weight, own clip, mixed clip] after them when it carries the object's
 // animation (a clip: [name, time, speed, loops, plays], or nil; see animation_codec.hpp).
 inline constexpr const char* kPoseMessageName = "$sync";
+// What the host tells a machine whose object it did not believe moved where it said (movement
+// validation): a Message event of this name (Network::CORRECT), whose data is [key, position],
+// from the host. The object's machine puts it there.
+inline constexpr const char* kCorrectionMessageName = "$correct";
+// The objects of one machine the host remembers the others place where it believes them (see
+// relay_pose); past that, a new one is placed where its machine says again from its next whole pose on.
+inline constexpr std::size_t kMaxDivergedObjects = kMaxCheckedObjects;
 
 struct NetworkEvent {
   enum class Kind {
@@ -120,6 +130,20 @@ class NetworkSession {
   // turned away with `reason` (cut to kMaxReasonBytes). False when there is nobody to decide on any
   // more: the newcomer left, was decided on already, or the time to decide ran out.
   bool decide(int ticket, bool accepted, const std::string& reason = {});
+  // Movement validation (see MovementValidator), on the machine hosting directly or a dedicated
+  // server's room: the poses of the machines that joined are checked against `rules` before
+  // anyone hears them. One that is not believed reaches everyone (the host's scripts too) where
+  // the host believes the object is, its machine is told so (kCorrectionMessageName), and the
+  // violation counts against it, up to the rules' kick_after. Rules that check nothing turn it
+  // off (as it starts). It lasts while hosting other games, until turned off. (In a room on a
+  // relay the relay passes the poses on: nothing is checked there.)
+  void validate_movement(const MovementRules& rules);
+  const MovementRules& movement_rules() const { return movement_.rules(); }
+  // How many violations of the movement rules machine `peer` was caught at in this game.
+  int movement_violations(int peer) const { return movement_.violations(peer); }
+  // The object that goes by `key` is new on this machine, or gone (its NetworkSync started or
+  // stopped): when its moves are checked, it starts where its machine next says.
+  void forget_movement_of_object(const std::string& key) { movement_.forget_object(key); }
   // The code of the room this game is in, on a relay or a dedicated server; empty for a game
   // hosted directly.
   const std::string& room() const { return room_; }
@@ -258,6 +282,9 @@ class NetworkSession {
   void handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void handle_as_host(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What a machine in the game said, as the host passes it on (`passed`): to whom it is for, the
+  // host included, and a pose checked first when movement is validated.
+  void take_from_game(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
   // Sends a peer's message on to whom it is for; true when that includes this machine.
   bool pass_on(int from, int to, const nlohmann::json& message);
   void handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events);
@@ -279,6 +306,29 @@ class NetworkSession {
   // (network_session_poses.cpp).
   void hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events);
+  // ... on the host, with movement validation: whether a message a machine sent is a pose to check.
+  // (Also once turned off, while the others place an object where the host believed it.)
+  bool checks_movement(const nlohmann::json& message) const {
+    return message[wire::kKind] == wire::kPose && (movement_.enabled() || !diverged_.empty());
+  }
+  // A pose from the machine at `link`, checked, passed on to everyone as the host believes it.
+  void relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
+  // Passes a checked pose on: as it came while the others place the object where its machine
+  // does, whole and where the host believes it once they no longer do (until the next whole pose
+  // its machine sends that is believed: from then on they place it alike again).
+  void relay_pose(int from, const PoseUpdate& update, const Pose& shown, const nlohmann::json& passed, bool valid);
+  // Whether a checked pose goes on as its machine sent it: believed, and the others place the
+  // object where its machine does (or will, from this whole pose on).
+  bool passes_as_sent(const std::pair<int, std::string>& source, const PoseUpdate& update, bool valid) const;
+  // Tells the machine at `link` where its object `key` is believed to be; lets it go on `kick`.
+  static void correct(Link& link, const std::string& key, Vec3 position, bool kick);
+  // Forgets what was checked of the moves of a machine that left.
+  void forget_movement_of(int peer);
+  // How many objects of `peer` the others place where the host believes them, and where they start.
+  std::size_t diverged_of(int peer) const;
+  std::set<std::pair<int, std::string>>::const_iterator first_diverged_of(int peer) const {
+    return diverged_.lower_bound({peer, std::string()});
+  }
   // The host turned this machine away: the game it was joining ends, saying why (in its own words
   // when the two speak different versions of the protocol).
   void turned_away(const nlohmann::json& refusal);
@@ -310,6 +360,8 @@ class NetworkSession {
   void queue_for_everyone_but(int peer, const nlohmann::json& message);
   Link* link_to(int peer);
   void go_offline();
+  // What this machine knew of the objects in the game it was in is forgotten.
+  void forget_objects();
 
   State state_ = State::Offline;
   int id_ = 0;
@@ -330,6 +382,10 @@ class NetworkSession {
   std::vector<RoomAsking> room_asking_;
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
   PoseBaselines poses_;
+  MovementValidator movement_;  // its rules last while hosting other games, until turned off
+  // The objects (machine, key) the others place where the host believes them, not where their
+  // machine does (see relay_pose).
+  std::set<std::pair<int, std::string>> diverged_;
 };
 
 }  // namespace redgem::net

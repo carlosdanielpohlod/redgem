@@ -2703,6 +2703,23 @@
           "about": "the peers without a dedicated server"
         },
         {
+          "name": "validate_movement",
+          "static": true,
+          "args": "max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false",
+          "about": "on the host: corrects the others' objects that move faster or further than this (no limits: off)"
+        },
+        {
+          "name": "movement_rules",
+          "static": true,
+          "about": "the movement validation settings, as a hash"
+        },
+        {
+          "name": "movement_violations",
+          "static": true,
+          "args": "peer",
+          "about": "how many moves of a machine the host did not believe in this game"
+        },
+        {
           "name": "port",
           "static": true,
           "about": "the port of the game"
