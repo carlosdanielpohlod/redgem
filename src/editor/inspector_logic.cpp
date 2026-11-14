@@ -1,6 +1,7 @@
 #include "editor/inspector_logic.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <set>
 
 #include "scene/props.hpp"
@@ -105,6 +106,12 @@ PropertyMap new_joint_props(JointKind kind) {
   PropertyMap joint{{props::kJoint, std::string(joint_kind_name(kind))}};
   if (joint_is_distance(kind)) joint[props::kJointOtherAnchor[kAxisY]] = static_cast<double>(kDefaultRopeLength);
   return joint;
+}
+
+bool kept_across_joint_kinds(const std::string& key) {
+  const bool anchor = std::find(std::begin(props::kJointAnchor), std::end(props::kJointAnchor), key) !=
+                      std::end(props::kJointAnchor);
+  return anchor || key == props::kJointTo || key == props::kJointBreakForce;
 }
 
 std::pair<float, float> default_joint_limits(JointKind kind) {

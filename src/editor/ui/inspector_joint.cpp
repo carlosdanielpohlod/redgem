@@ -25,6 +25,7 @@ using namespace inspector_logic;
 constexpr const char* kKindDescriptions[] = {
     "editor.inspector.joint.fixed_kind", "editor.inspector.joint.hinge_kind", "editor.inspector.joint.slider_kind",
     "editor.inspector.joint.point_kind", "editor.inspector.joint.distance_kind"};
+static_assert(std::size(kKindDescriptions) == std::size(props::kJointKinds), "a description for every joint kind");
 constexpr const char* kKindId = "##joint_kind";
 constexpr const char* kPartnerId = "##joint_to";
 constexpr const char* kAnchorId = "##joint_anchor";
@@ -78,7 +79,7 @@ bool draw_kind_row(EditorSession& session, int index, const JointConfig& joint) 
   int kind = joint.known_kind ? static_cast<int>(joint.kind) : kNoIndex;
   property_label(tr("editor.inspector.joint.kind"));
   if (ImGui::Combo(kKindId, &kind, props::kJointKinds, count)) {
-    set_or_remove(session, index, props::kJoint, PropertyValue(std::string(props::kJointKinds[kind])));
+    session.set_joint_kind(index, static_cast<JointKind>(kind));
     return true;
   }
   if (kind != kNoIndex) tooltip(tr(kKindDescriptions[kind]));

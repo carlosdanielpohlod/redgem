@@ -15,9 +15,15 @@ bool can_be_held_to(const SceneDocument& document, ObjectId id) {
 
 }  // namespace
 
-void EditorSession::add_joint(ObjectId id, JointKind kind) {
+void EditorSession::add_joint(ObjectId id, JointKind kind) { set_joint_kind(id, kind); }
+
+void EditorSession::set_joint_kind(ObjectId id, JointKind kind) {
   if (!editing() || !document_.has_node(id)) return;
   document_.checkpoint();
+  for (const std::string& key : joint_property_keys()) {
+    const bool stays = inspector_logic::kept_across_joint_kinds(key);
+    if (!stays && document_.node(id).props.count(key) != 0) document_.remove_prop(id, key, false);
+  }
   for (const auto& [key, value] : inspector_logic::new_joint_props(kind)) document_.set_prop(id, key, value, false);
   document_.drop_checkpoint_if_unchanged();
   refresh_preview();

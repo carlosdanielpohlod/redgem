@@ -47,18 +47,18 @@ std::optional<Vec3> other_end_of(const JointDesc& desc, const Scene& scene) {
 }
 
 // The ends of the joint as the scene has them (an other end that is not there: the world).
-JointEnds ends_in(const Scene& scene, ObjectId id, const JointConfig& config) {
-  JointEnds ends{id, scene.world_transform(id), scene.find_by_stable_id(config.other), {}};
+JointEnds ends_in(const Scene& scene, ObjectId id, const Transform& world, const JointConfig& config) {
+  JointEnds ends{id, world, scene.find_by_stable_id(config.other), {}};
   if (ends.b != kNoObject) ends.b_world = scene.world_transform(ends.b);
   return ends;
 }
 
 }  // namespace
 
-std::optional<JointGizmo> joint_gizmo(const Scene& scene, ObjectId id) {
+std::optional<JointGizmo> joint_gizmo(const Scene& scene, ObjectId id, const Transform& world) {
   const std::optional<JointConfig> config = joint_config_from_props(scene.at(id).props);
   if (!config || !config->known_kind) return std::nullopt;
-  const JointEnds ends = ends_in(scene, id, *config);
+  const JointEnds ends = ends_in(scene, id, world, *config);
   const JointDesc desc = joint_desc(*config, ends);
   JointGizmo gizmo;
   gizmo.anchor = desc.anchor;

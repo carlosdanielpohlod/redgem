@@ -62,13 +62,19 @@ TEST_CASE("what is out of range in a joint's properties is brought back, with a 
   CHECK(approx_equal(clamped->axis, Vec3::up(), kTolerance));
   CHECK(clamped->motor_torque == doctest::Approx(0.0f));
   CHECK(warned(*clamped, "axis"));
+  CHECK(warned(*clamped, "the nearest are used"));
   CHECK(warned(*clamped, props::kJointMotorTorque));
 
   props.erase(props::kJointHigh);
   CHECK(warned(*joint_config_from_props(props), "both"));
   const auto unknown = joint_config_from_props({{props::kJoint, std::string("rope")}});
   CHECK_FALSE(unknown->known_kind);
-  CHECK(warned(*unknown, "unknown joint 'rope'"));
+  CHECK(warned(*unknown, "unknown joint 'rope' (fixed, hinge, slider, point, distance)"));
+  // Not a word at all: still a joint the card shows, to be fixed or removed.
+  CHECK_FALSE(joint_config_from_props({{props::kJoint, true}})->known_kind);
+  props[props::kJointLow] = 5.0;
+  props[props::kJointHigh] = 3.0;
+  CHECK(warned(*joint_config_from_props(props), "below its high one"));
 }
 
 TEST_CASE("a joint's points and axis follow the object into the world") {
@@ -106,6 +112,16 @@ TEST_CASE("a distance joint is as long as its ends start apart unless it says") 
   const auto config = joint_config_from_props(props);
   CHECK(warned(*config, "max"));
   CHECK(joint_desc(*config, ends).max_distance == doctest::Approx(2.0f));
+
+  // Hung from the world: the other point is meters from the object along the world's axes,
+  // whatever its scale and turn (a new rope hangs it from above).
+  JointEnds alone;
+  alone.a = 1;
+  alone.a_world.position = {1, 1, 1};
+  alone.a_world.scale = {0.1f, 0.1f, 0.1f};
+  alone.a_world.rotation = quat_from_axis_angle(Vec3::right(), kPi);
+  const auto rope = joint_config_from_props(inspector_logic::new_joint_props(JointKind::Distance));
+  CHECK(approx_equal(joint_desc(*rope, alone).anchor_b, Vec3{1, 3, 1}, kTolerance));
 }
 
 TEST_CASE("the kinds of joint are named as the scene's properties name them") {
@@ -144,7 +160,7 @@ TEST_CASE("a limited hinge is drawn with its anchor, its axis and an arc from li
   door.props = hinge_props();
   desc.nodes.push_back(door);
   const Scene scene = Scene::from_desc(desc);
-  const auto gizmo = joint_gizmo(scene, 0);
+  const auto gizmo = joint_gizmo(scene, 0, scene.world_transform(0));
   REQUIRE(gizmo.has_value());
   CHECK(approx_equal(gizmo->anchor, Vec3{0.5f, 0, 0}, kTolerance));
   REQUIRE(gizmo->axis_end.has_value());
@@ -155,5 +171,6 @@ TEST_CASE("a limited hinge is drawn with its anchor, its axis and an arc from li
   CHECK(approx_equal(gizmo->limits.back(), Vec3{0.5f, 0, -kJointArcRadius}, kTolerance));
   CHECK_FALSE(gizmo->other_end.has_value());
   desc.nodes.front().props.clear();
-  CHECK_FALSE(joint_gizmo(Scene::from_desc(desc), 0).has_value());
+  const Scene plain = Scene::from_desc(desc);
+  CHECK_FALSE(joint_gizmo(plain, 0, plain.world_transform(0)).has_value());
 }

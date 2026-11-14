@@ -79,8 +79,9 @@ inline constexpr const char* kJointKinds[] = {kJointFixed, kJointHinge, kJointSl
 // The stable id of the object at its other end; none: the world.
 inline constexpr const char* kJointTo = "joint_to";
 // Points in the object's own space (its scale stretches them): where it turns or is held, and for
-// a distance joint the point it is kept from, in the other object's space (the object's own for
-// the world). The axis a hinge turns around or a slider slides along, in the object's own space.
+// a distance joint the point it is kept from, in the other object's space (for the world, meters
+// from the object along the world's axes). The axis a hinge turns around or a slider slides along,
+// in the object's own space.
 inline constexpr const char* kJointAnchor[] = {"joint_anchor_x", "joint_anchor_y", "joint_anchor_z"};
 inline constexpr const char* kJointOtherAnchor[] = {"joint_other_anchor_x", "joint_other_anchor_y",
                                                     "joint_other_anchor_z"};

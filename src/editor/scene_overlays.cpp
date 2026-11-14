@@ -77,7 +77,7 @@ void draw_object_marks(const Scene& scene, const SceneDesc& desc) {
     const Transform world = scene.world_transform(id);
     if (body_config_from_props(object.props).trigger) draw_box(world, bounds_of(object, desc), rgba(kTriggerColor));
     draw_mark(object, world);
-    if (const auto joint = joint_gizmo(scene, id)) draw_joint_mark(*joint);
+    if (const auto joint = joint_gizmo(scene, id, world)) draw_joint_mark(*joint);
   }
 }
 

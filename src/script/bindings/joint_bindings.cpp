@@ -124,7 +124,7 @@ void install_joint_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, joint, "break_force=", joint_set_break_force, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, joint, "__motor", joint_motor, MRB_ARGS_REQ(2));
   mrb_define_method(mrb, joint, "__angle", joint_angle, MRB_ARGS_NONE());
-  mrb_define_method(mrb, mrb_class_get(mrb, "GameObject"), "__scene_joint", game_object_scene_joint,
+  mrb_define_method(mrb, mrb_class_get(mrb, kGameObjectClass), "__scene_joint", game_object_scene_joint,
                     MRB_ARGS_NONE());
 }
 

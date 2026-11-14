@@ -311,7 +311,7 @@ an arc.
 | `joint_axis_x`, `_y`, `_z` | Hinges and sliders: the axis, in the object's own space (up unless said) |
 | `joint_low`, `joint_high` | Hinges: degrees from where it starts (low -180 to 0, high 0 to 180); sliders: meters. Both, or it is free |
 | `joint_motor_speed`, `joint_motor_torque` | Hinges: degrees per second, with at most that many newton meters (0: no motor) |
-| `joint_other_anchor_x`, `_y`, `_z` | Distance joints: the point it is kept from, in the other object's space (the object's own for the world) |
+| `joint_other_anchor_x`, `_y`, `_z` | Distance joints: the point it is kept from, in the other object's space; for the world, meters from the object along the world's axes (`0, 2, 0`: two meters above it) |
 | `joint_min`, `joint_max` | Distance joints: meters; `joint_max` unsaid or 0 is as far apart as the ends start |
 | `joint_spring`, `joint_damping` | Distance joints: a spring (hertz) and its damping |
 | `joint_break_force` | Newtons (or newton meters) that break it; 0 never |

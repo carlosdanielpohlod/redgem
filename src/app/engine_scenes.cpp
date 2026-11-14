@@ -87,16 +87,16 @@ void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
 
 ObjectId Engine::spawn(const SpawnRequest& request) {
   if (!scene_.is_alive(request.source)) return kNoObject;
-  const std::vector<ObjectId> created = scene_.clone(request.source);
-  shape_spawned(created.front(), request);
+  const joints::CopyPairs copies = scene_.clone_pairs(request.source);
+  shape_spawned(copies.front().second, request);
   if (request.physics) {
-    for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
+    for (const auto& [original, id] : copies) bodies::create({scene_, scene_desc_}, *physics_, id);
     // (Once every body of the copy is there: a joint may hold two of its parts.)
-    for (const ObjectId id : created) joints::create({scene_, scene_desc_}, *physics_, id, context_.scene_joints);
+    joints::create_copies({scene_, scene_desc_}, *physics_, copies, context_.scene_joints);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
-  for (const ObjectId id : created) scripts_->attach_object(id);
-  return created.front();
+  for (const auto& [original, id] : copies) scripts_->attach_object(id);
+  return copies.front().second;
 }
 
 void Engine::process_destroyed() {
@@ -109,6 +109,7 @@ void Engine::process_destroyed() {
     for (const ObjectId id : pending) scripts_->detach(id);
     // Children first, so each parent is torn down with nothing left under it.
     for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
+      context_.scene_joints.erase(scene_.handle(*id));
       physics_->remove_object(*id);
       scene_.finalize_destroy(*id);
     }

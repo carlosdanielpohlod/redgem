@@ -44,6 +44,9 @@ bool has_joint(const PropertyMap& props);
 // What Add Component > Joint gives an object: a joint of that kind to the world, at the object's
 // own origin (a distance joint hangs it from a point above it).
 PropertyMap new_joint_props(JointKind kind);
+// Whether a joint property stays when the joint's kind changes: its other end, anchor and break
+// force (what every kind takes, in the same units).
+bool kept_across_joint_kinds(const std::string& key);
 // What a joint's limits start as once turned on: a quarter turn either way for a hinge, a meter
 // either way for a slider.
 std::pair<float, float> default_joint_limits(JointKind kind);

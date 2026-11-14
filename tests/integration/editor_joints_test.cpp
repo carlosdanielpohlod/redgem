@@ -74,6 +74,15 @@ TEST_CASE("a joint added in the editor is one undo step, and undo and redo take 
   const ObjectId crate = session->scene().find("Crate");
   session->set_joint_partner(cube, crate);
   CHECK(get_string(props_of(*session, cube), props::kJointTo) == session->document().node(crate).stable_id);
+  // Another kind keeps the other end and anchor, and drops what the old kind alone took.
+  session->set_joint_kind(cube, JointKind::Hinge);
+  session->document().set_prop(cube, props::kJointLow, -10.0);
+  session->document().set_prop(cube, props::kJointHigh, 10.0);
+  session->set_joint_kind(cube, JointKind::Slider);
+  CHECK(props_of(*session, cube).count(props::kJointLow) == 0);
+  CHECK(get_string(props_of(*session, cube), props::kJointTo) == session->document().node(crate).stable_id);
+  session->undo();
+  CHECK(props_of(*session, cube).count(props::kJointLow) == 1);
   session->remove_joint(cube);
   for (const std::string& key : joint_property_keys()) CHECK(props_of(*session, cube).count(key) == 0);
   session->undo();  // the whole component comes back at once

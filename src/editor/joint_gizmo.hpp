@@ -27,8 +27,8 @@ struct JointGizmo {
   std::optional<Vec3> other_end;
 };
 
-// The gizmo of the joint an object of `scene` has (its `joint` properties), where the object is
-// now; none without a joint.
-std::optional<JointGizmo> joint_gizmo(const Scene& scene, ObjectId id);
+// The gizmo of the joint an object of `scene` has (its `joint` properties), with the object at
+// `world` (where the scene has it); none without a joint.
+std::optional<JointGizmo> joint_gizmo(const Scene& scene, ObjectId id, const Transform& world);
 
 }  // namespace redgem

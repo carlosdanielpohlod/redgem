@@ -23,7 +23,7 @@ struct JointConfig {
   std::string other;       // the stable id of the other end; empty: the world
   Vec3 anchor = Vec3::zero();
   Vec3 axis = Vec3::up();
-  Vec3 other_anchor = Vec3::zero();
+  Vec3 other_anchor = Vec3::zero();  // distance joints (see props::kJointOtherAnchor)
   // As the properties have them: degrees for hinges, meters for sliders. None: free.
   std::optional<std::pair<float, float>> limits;
   float motor_speed = 0.0f;  // degrees per second
@@ -58,6 +58,8 @@ Vec3 point_in(const Transform& world, Vec3 local);
 // The words for the kinds (scene/props.hpp kJointKinds).
 const char* joint_kind_name(JointKind kind);
 std::optional<JointKind> joint_kind_named(const std::string& name);
+// Them all, as messages list them: "fixed, hinge, ...".
+std::string joint_kind_list();
 
 // What each kind takes besides its ends and anchor.
 bool joint_has_axis(JointKind kind);    // hinges and sliders (with their limits)

@@ -37,7 +37,7 @@ void read_kind(const std::string& name, JointConfig& config) {
   if (kind) {
     config.kind = *kind;
   } else {
-    config.warnings.push_back("unknown joint '" + name + "' (fixed, hinge, slider, point, distance)");
+    config.warnings.push_back("unknown joint '" + name + "' (" + joint_kind_list() + ")");
   }
 }
 
@@ -55,19 +55,28 @@ bool one_limit_only(const std::optional<float>& low, const std::optional<float>&
   return low.has_value() != high.has_value();
 }
 
+// The limits within their range (low -farthest..0, high 0..farthest), with a warning when they
+// were out of it.
+std::pair<float, float> within_range(float low, float high, float farthest, JointConfig& config) {
+  const std::pair<float, float> kept{std::clamp(low, -farthest, 0.0f), std::clamp(high, 0.0f, farthest)};
+  if (kept != std::make_pair(low, high)) {
+    const std::string reach = std::to_string(static_cast<int>(farthest));
+    config.warnings.push_back("a joint's low limit goes from -" + reach + " to 0 and its high one from 0 to " + reach +
+                              "; the nearest are used");
+  }
+  return kept;
+}
+
 void read_limits(const PropertyMap& props, JointConfig& config) {
   const std::optional<float> low = number_of(props, props::kJointLow);
   const std::optional<float> high = number_of(props, props::kJointHigh);
   if (one_limit_only(low, high)) config.warnings.emplace_back("a joint's limits need both a low and a high one");
   if (!low || !high) return;
-  const float farthest = farthest_limit(config.kind);
-  const float lowest = std::clamp(*low, -farthest, 0.0f);
-  const float highest = std::clamp(*high, 0.0f, farthest);
-  if (lowest < highest) {
-    config.limits = std::make_pair(lowest, highest);
-  } else {
+  if (*low >= *high) {
     config.warnings.emplace_back("a joint's low limit must be below its high one; it is left free");
+    return;
   }
+  config.limits = within_range(*low, *high, farthest_limit(config.kind), config);
 }
 
 void read_motor(const PropertyMap& props, JointConfig& config) {
@@ -114,16 +123,19 @@ void describe_distance(const JointConfig& config, JointDesc& desc) {
   desc.spring_damping = config.spring_damping;
 }
 
-// Where a joint's second point is: on the other object, or on the object itself for the world.
-const Transform& second_frame(const JointEnds& ends) { return ends.b == kNoObject ? ends.a_world : ends.b_world; }
+// Where a joint's second point is: on the other object, or for the world that many meters from
+// the object (in the world's axes, so that a rope hangs from above whatever the object's turn).
+Vec3 second_point(const JointConfig& config, const JointEnds& ends) {
+  if (ends.b == kNoObject) return ends.a_world.position + config.other_anchor;
+  return point_in(ends.b_world, config.other_anchor);
+}
 
 }  // namespace
 
 std::optional<JointConfig> joint_config_from_props(const PropertyMap& props) {
-  const std::optional<std::string> kind = get_string(props, props::kJoint);
-  if (!kind) return std::nullopt;
+  if (props.count(props::kJoint) == 0) return std::nullopt;
   JointConfig config;
-  read_kind(*kind, config);
+  read_kind(get_string(props, props::kJoint).value_or(""), config);  // (one not a word names no kind)
   config.other = get_string(props, props::kJointTo).value_or("");
   config.anchor = vector_of(props, props::kJointAnchor, Vec3::zero());
   read_by_kind(props, config);
@@ -137,7 +149,7 @@ JointDesc joint_desc(const JointConfig& config, const JointEnds& ends) {
   desc.a = ends.a;
   desc.b = ends.b;
   desc.anchor = point_in(ends.a_world, config.anchor);
-  desc.anchor_b = point_in(second_frame(ends), config.other_anchor);
+  desc.anchor_b = second_point(config, ends);
   desc.axis = normalize(rotate(ends.a_world.rotation, config.axis));
   desc.limits = world_limits(config);
   desc.motor_speed = degrees_to_radians(config.motor_speed);
@@ -157,6 +169,12 @@ std::optional<JointKind> joint_kind_named(const std::string& name) {
   const auto* found = std::find(std::begin(props::kJointKinds), std::end(props::kJointKinds), name);
   if (found == std::end(props::kJointKinds)) return std::nullopt;
   return static_cast<JointKind>(std::distance(std::begin(props::kJointKinds), found));
+}
+
+std::string joint_kind_list() {
+  std::string list;
+  for (const char* kind : props::kJointKinds) list += (list.empty() ? "" : ", ") + std::string(kind);
+  return list;
 }
 
 bool joint_has_axis(JointKind kind) { return kind == JointKind::Hinge || kind == JointKind::Slider; }

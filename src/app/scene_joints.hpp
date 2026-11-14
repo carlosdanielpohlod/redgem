@@ -1,6 +1,7 @@
 #pragma once
 
-#include <string>
+#include <utility>
+#include <vector>
 
 #include "app/scene_bodies.hpp"
 #include "physics/physics_world.hpp"
@@ -10,14 +11,14 @@
 // once the bodies they hold are in the physics world, as a script's Physics.joint makes them.
 namespace redgem::joints {
 
-// The object at the other end of an object's joint (`other`, a stable id): for an object spawned
-// as part of a copy, the copy of that object in the same copy if there is one. kNoObject when no
-// object has that id.
-ObjectId partner_of(const Scene& scene, ObjectId id, const std::string& other);
+// (original, its copy), as Scene::clone_pairs gives them.
+using CopyPairs = std::vector<std::pair<ObjectId, ObjectId>>;
 
-// Makes the joint of every object that has one, into `made` (cleared first).
+// Makes the joint of every object of a loaded scene that has one, into `made` (cleared first).
+// The other end of each is the object whose stable id the joint names.
 void create_all(const bodies::Source& source, PhysicsWorld& physics, SceneJoints& made);
-// The same for one object; what is wrong with its properties is logged.
-void create(const bodies::Source& source, PhysicsWorld& physics, ObjectId id, SceneJoints& made);
+// The same for the copies a spawn just made (once their bodies are there). A copy's joint holds
+// to what its original's joint held to, or to the copy of it when that was copied too.
+void create_copies(const bodies::Source& source, PhysicsWorld& physics, const CopyPairs& copies, SceneJoints& made);
 
 }  // namespace redgem::joints

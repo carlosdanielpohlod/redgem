@@ -98,6 +98,10 @@ TEST_CASE("a scene's joint holds an object to another one, and a spawned copy to
   frames(*engine, kTwoSeconds);
   CHECK(number(*engine, "$ball.transform.position.x") == doctest::Approx(20.0f).epsilon(kTolerance));
   CHECK(number(*engine, "$ball.transform.position.y") == doctest::Approx(4.0f).epsilon(kTolerance));
+
+  // A copy of the copied ball alone hangs from what that ball hangs from: the copied hook.
+  ruby(*engine, "$again = Scene.spawn($ball, position: Vector3.new(20, 4, 1))");
+  CHECK(ruby(*engine, "$again.joint.other == $ball.joint.other") == "true");
 }
 
 TEST_CASE("a scene's joint that cannot be made is said, and the scene still plays") {
