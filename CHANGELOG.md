@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

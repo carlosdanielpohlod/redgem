@@ -12,6 +12,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb

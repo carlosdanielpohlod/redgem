@@ -285,9 +285,15 @@ not a promise of how it will be closed.
   spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
   when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
   longer needs.
-- `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
-  automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
-  work. Slot selection and storage calls are synchronous.
+- `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
+  migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
+  no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
+  timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
+  hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
+- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
+  migrate it one after another. A room writing a key of that slot at the moment another room
+  writes the migrated values can make that migration fail as busy: the slot is then refused for
+  the migrating room's run, and migrated on its next first use.
 - `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.

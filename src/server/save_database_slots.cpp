@@ -75,6 +75,9 @@ class DatabaseSlot final : public SaveStore {
     const KeyLocks::Hold updating = owner_.key_locks_.hold(name_, key);
     return set(key, change(get(key)));
   }
+  bool replace(const Values& values) override {
+    return owner_.in_transaction([&] { return SaveStore::replace(values); });
+  }
   std::string where() const override { return owner_.where() + " (slot " + name_ + ")"; }
 
  private:

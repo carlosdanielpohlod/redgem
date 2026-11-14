@@ -50,6 +50,21 @@ class Behaviour
 
   def inspect = "#<#{self.class} on #{game_object.inspect}>"
 
+  # Fields (instance variables, named without the @) that Save.checkpoint keeps for an object
+  # Scene.spawn made, and gives back to the copy Save.restore_checkpoint makes, before it starts:
+  #   class Crate < Behaviour
+  #     persist :health, :loot
+  #   end
+  def self.persist(*fields)
+    @persisted_fields = (@persisted_fields || []) + fields.map(&:to_sym)
+  end
+
+  # What persist named, in this class and in those it comes from.
+  def self.persisted_fields
+    inherited = superclass <= Behaviour ? superclass.persisted_fields : []
+    inherited + (@persisted_fields || [])
+  end
+
   def __configure(settings)
     @settings = settings
   end

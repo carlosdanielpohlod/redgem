@@ -11,6 +11,7 @@ class SaveView final : public SaveStore {
   bool clear() override { return store_.clear(); }
   std::vector<std::string> keys() override { return store_.keys(); }
   bool update(const std::string& key, const Change& change) override { return store_.update(key, change); }
+  bool replace(const Values& values) override { return store_.replace(values); }
   std::string where() const override { return store_.where(); }
 
  private:

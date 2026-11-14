@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -35,6 +36,8 @@ class SaveDatabase final : public SaveStore {
   bool clear() override;
   std::vector<std::string> keys() override;
   bool update(const std::string& key, const Change& change) override;
+  // (In one transaction: a crash keeps either the old values or the new ones.)
+  bool replace(const Values& values) override;
   std::unique_ptr<SaveStore> open_slot(const std::string& name) override;
   std::vector<std::string> slot_names() override;
   std::string where() const override { return file_.string(); }
@@ -46,6 +49,9 @@ class SaveDatabase final : public SaveStore {
   // not the server's (made by something else) cannot be read or written, and must not open as if
   // it could.
   std::string unprepared() const;
+  // Runs `work` in one transaction, under the lock: committed when it returns true, else rolled
+  // back. False when it was rolled back or could not be committed.
+  bool in_transaction(const std::function<bool()>& work);
 
   sqlite3* database_;
   std::filesystem::path file_;
