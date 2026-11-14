@@ -29,6 +29,7 @@ void NetworkSession::hold_place(const Link& link, std::vector<NetworkEvent>& eve
 }
 
 void NetworkSession::expire_held_places(float seconds, std::vector<NetworkEvent>& events) {
+  if (held_.empty()) return;  // (as on nearly every poll)
   for (Held& held : held_) held.held_for += seconds;
   const auto still_held = [](const Held& held) { return held.held_for <= held.window; };
   const auto expired = std::stable_partition(held_.begin(), held_.end(), still_held);

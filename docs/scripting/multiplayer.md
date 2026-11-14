@@ -234,7 +234,8 @@ Network.on_lost { |reason| go_to_menu(reason) } # on that machine: it could not 
 ```
 
 The machine whose connection dropped stays in the game (`Network.reconnecting?` is true,
-`Network.id` and `Network.peers` stay the same; nothing can be sent meanwhile) and calls the
+`Network.id` and `Network.peers` stay the same, the others' objects stay theirs, so
+`NetworkSync#mine?` is still false for them; nothing can be sent meanwhile) and calls the
 host again every second. Its welcome gave it a secret token, which is what gets the place back:
 a machine that does not have it is turned away, a token gets a place back once (each return
 gives a new one), and once the window is over the place is gone. The window is the one the

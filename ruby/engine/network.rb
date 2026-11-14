@@ -135,7 +135,7 @@ module Network
     end
 
     def leave
-      was_in_game = online? || reconnecting?
+      was_in_game = __in_game?
       __leave
       __event(:disconnected, 0, "", nil) if was_in_game
     end
@@ -179,6 +179,10 @@ module Network
       @synced = {}
       @spawned = {}
     end
+
+    # Whether this machine is in a game: online, or reconnecting to it (its place and id are held,
+    # and the others' objects are still theirs).
+    def __in_game? = online? || reconnecting?
 
     # Sends any message, the engine's own included (emit is the one for games).
     def __deliver(name, data, to)

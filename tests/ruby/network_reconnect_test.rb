@@ -8,6 +8,7 @@ class NetworkReconnectTest < RedGemTest::Case
   REMOVED_KEY = "ship#2.5".freeze
   OTHER_KEY = "ship#2.6".freeze
   TEMPLATE = "ship".freeze
+  OTHERS = 5 # a player's id, not this machine's
 
   def setup
     Network.reconnect_window = 0
@@ -25,6 +26,33 @@ class NetworkReconnectTest < RedGemTest::Case
 
   def test_a_machine_in_no_game_is_not_reconnecting
     refute Network.reconnecting?
+  end
+
+  def test_while_reconnecting_the_others_objects_stay_theirs
+    synced = NetworkSync.new
+    synced.__configure({ owner: OTHERS })
+    assert synced.mine? # out of a game, everything is this machine's
+    reconnecting do
+      assert Network.__in_game?
+      refute synced.mine?
+    end
+  end
+
+  # The machine as if it had dropped out of a game and were calling back.
+  def reconnecting
+    class << Network
+      alias_method :reconnecting_for_real?, :reconnecting?
+      def reconnecting? = true
+    end
+    yield
+  ensure
+    stop_reconnecting
+  end
+
+  def stop_reconnecting
+    class << Network
+      alias_method :reconnecting?, :reconnecting_for_real?
+    end
   end
 
   def test_the_handlers_hear_who_dropped_and_who_is_back

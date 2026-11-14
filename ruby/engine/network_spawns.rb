@@ -53,7 +53,7 @@ module Network
       key, template, owner, position, rotation = record
       return @spawned[key][:object] if @spawned[key]
 
-      mine = !online? || owner == id
+      mine = !__in_game? || owner == id
       object = Scene.spawn(template, position: position && Vector3[*position],
                                      rotation: rotation && Vector3[*rotation], physics: mine)
       object.add_component(NetworkSync, owner: owner, key: key)

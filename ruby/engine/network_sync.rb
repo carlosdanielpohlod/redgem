@@ -100,8 +100,9 @@ class NetworkSync < Behaviour
   # Whether its own animation goes along: known from the first pose that arrives, started or not.
   def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
-  # Offline, everything is this machine's to move.
-  def mine? = !Network.online? || owner == Network.id
+  # Out of a game, everything is this machine's to move (not while it reconnects: the others'
+  # objects stay theirs).
+  def mine? = !Network.__in_game? || owner == Network.id
 
   def start
     Network.__track(self)
