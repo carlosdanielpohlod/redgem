@@ -125,10 +125,42 @@ void Engine::update_frame(float delta) {
   // Every animation of the scene plays in a loop unless a script said otherwise (Animation);
   // scripts run after and may override poses.
   animations_.advance(delta, scene_);
+  apply_root_motion();
   particles_.update(delta);
+  // (Animation events are part of the scripts' update: they come first in it.)
+  hand_on_animation_events();
   scripts_->update(delta);
   process_destroyed();
   if (context_.renders_particles) particle_emitters_.advance(delta, scene_, particles_);
+}
+
+void Engine::apply_root_motion() {
+  for (const RootMotion& motion : animations_.take_root_motion()) {
+    const ObjectId object = scene_.resolve(motion.character);
+    if (object != kNoObject) move_by(object, motion);
+  }
+}
+
+namespace {
+
+// Bodies the physics drives on its own, which root motion leaves to it.
+bool simulated_on_its_own(BodyType type) { return type == BodyType::Dynamic || type == BodyType::Vehicle; }
+
+}  // namespace
+
+void Engine::move_by(ObjectId object, const RootMotion& motion) {
+  if (simulated_on_its_own(physics_->body_type(object))) return;
+  const Transform world = scene_.world_transform(object);
+  scene_.set_world_rotation(object, normalize(quat_from_axis_angle(Vec3::up(), motion.yaw) * world.rotation));
+  if (physics_->body_type(object) == BodyType::Character) {
+    physics_->add_character_displacement(object, motion.translation);
+  } else {
+    scene_.set_world_position(object, world.position + motion.translation);
+  }
+}
+
+void Engine::hand_on_animation_events() {
+  for (const AnimationEvent& event : animations_.take_events()) scripts_->dispatch(event);
 }
 
 bool Engine::both_alive(const ContactEvent& event) const {

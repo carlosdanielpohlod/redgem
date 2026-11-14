@@ -634,6 +634,12 @@
           "about": "copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy",
           "top": 20,
           "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
+        },
+        {
+          "name": "spawn_prefab",
+          "static": true,
+          "args": "file, position: nil, rotation: nil, physics: true, name: nil, parent: nil",
+          "about": "instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root"
         }
       ],
       "guide": "gameplay.md"
@@ -1523,8 +1529,8 @@
       "methods": [
         {
           "name": "play",
-          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false",
-          "about": "plays a clip, fading from the last one",
+          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil",
+          "about": "plays a clip, fading from the last one; root_motion: true lets the clip move the object",
           "top": 23,
           "example": "animation.play(:Run, fade: 0.2)"
         },
@@ -1571,6 +1577,31 @@
         {
           "name": "state",
           "about": "the graph's state, or nil"
+        },
+        {
+          "name": "on",
+          "args": "clip, at: nil, seconds: nil, &block",
+          "about": "calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes",
+          "example": "animation.on(:Attack, at: 0.4) { |event| hit }"
+        },
+        {
+          "name": "on_marker",
+          "args": "name, &block",
+          "about": "calls the block each time a clip passes a marker of that name authored in Blender"
+        },
+        {
+          "name": "off",
+          "args": "listener",
+          "about": "stops calling a block that on or on_marker returned"
+        },
+        {
+          "name": "root_motion=",
+          "args": "on",
+          "about": "whether all its clips move the object by their root's horizontal motion and turning"
+        },
+        {
+          "name": "root_motion?",
+          "about": "whether all its clips move the object"
         }
       ],
       "guide": "animation.md"
@@ -1607,6 +1638,29 @@
         }
       ],
       "guide": "animation.md"
+    },
+    {
+      "name": "Animation::Event",
+      "about": "What the block of an animation event is given (animation.on).",
+      "methods": [
+        {
+          "name": "game_object",
+          "about": "the object that listened"
+        },
+        {
+          "name": "clip",
+          "about": "the clip's name"
+        },
+        {
+          "name": "name",
+          "about": "the marker's name, or nil for a moment the script named"
+        },
+        {
+          "name": "at",
+          "about": "where in the clip, from 0 (its start) to 1 (its end)"
+        }
+      ],
+      "guide": "animation.md#events"
     },
     {
       "name": "Audio",
@@ -2701,6 +2755,23 @@
           "name": "players",
           "static": true,
           "about": "the peers without a dedicated server"
+        },
+        {
+          "name": "validate_movement",
+          "static": true,
+          "args": "max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false",
+          "about": "on the host: corrects the others' objects that move faster or further than this (no limits: off)"
+        },
+        {
+          "name": "movement_rules",
+          "static": true,
+          "about": "the movement validation settings, as a hash"
+        },
+        {
+          "name": "movement_violations",
+          "static": true,
+          "args": "peer",
+          "about": "how many moves of a machine the host did not believe in this game"
         },
         {
           "name": "port",

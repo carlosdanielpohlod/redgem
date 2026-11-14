@@ -23,6 +23,8 @@
 namespace redgem {
 
 inline constexpr std::size_t kMaxCollisionLayers = 16;
+// What every problem with game.json's "physics" section starts with.
+inline constexpr const char* kPhysicsSection = "game.json physics: ";
 inline constexpr const char* kDefaultLayerName = "default";
 inline constexpr std::size_t kDefaultLayer = 0;  // where kDefaultLayerName always is
 

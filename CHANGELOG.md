@@ -10,6 +10,36 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
@@ -235,6 +265,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
+  links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
   side by side instead of waiting for each other's blocks, and writes of the same key still wait,
   so no change is lost. A block that writes a second key another room is updating waits at most
