@@ -3,7 +3,8 @@
 // The few graphics calls raylib's rlgl does not offer, the same on desktop OpenGL 3.3 and on
 // OpenGL ES 3 (whose headers this part alone includes): a picture drawn with several samples per
 // pixel, depth textures of the same format as its depth, a picture's colors copied, alpha to
-// coverage, cube maps filtered across their faces' seams, and timer queries.
+// coverage, the winding of front faces, cube maps filtered across their faces' seams, and timer
+// queries.
 
 #include <cstdint>
 
@@ -39,6 +40,9 @@ void copy_buffer(unsigned int from, unsigned int to, int width, int height, Buff
 
 // While on, a fragment's alpha says how many of its pixel's samples it covers.
 void set_alpha_to_coverage(bool on);
+// Which way round a triangle's corners go when it faces the viewer: counter-clockwise as glTF
+// says, or clockwise for a mirrored copy (its placement turned its triangles the other way).
+void set_clockwise_front_faces(bool clockwise);
 // The most pixels a side of a texture or a render buffer may have on the card: of a picture drawn
 // off screen.
 int largest_target_side();

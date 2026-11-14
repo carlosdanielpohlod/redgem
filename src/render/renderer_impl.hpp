@@ -76,6 +76,7 @@ inline constexpr int kFrameTexelSlot = 11;
 inline constexpr int kSkyReflectionSlot = 12;
 inline constexpr int kSkyReflectanceSlot = 13;
 inline constexpr int kSceneDepthSlot = 14;     // what soft particles fade into
+inline constexpr int kMorphTexelSlot = 16;     // every mesh part's shape-key deltas (morph_shapes.hpp)
 inline constexpr int kPreviousTexelSlot = 15;  // the last frame's records and bones (temporal anti-aliasing)
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
@@ -91,6 +92,14 @@ struct GpuPrimitive {
   std::size_t piece = 0;
   bool skinned = false;       // has joints: a skeleton deforms it
   std::size_t primitive = 0;  // original MeshDesc primitive, shared by its GPU pieces
+  // Where its shape keys' deltas start in the morph texels (render_math::kNoMorphs: it has none).
+  float morph_first = render_math::kNoMorphs;
+};
+
+// Where a pass's shader takes what it needs of a mesh part's shape keys.
+struct MorphLocations {
+  int first = kNoLocation;     // morphFirst
+  int vertices = kNoLocation;  // morphVertices
 };
 
 // What a frame knows of an object before any pass: whether it is drawn at all (its record is in
@@ -103,6 +112,7 @@ struct ObjectSight {
   float visible_from = 0.0f;
   float visible_to = 0.0f;
   bool cast_shadow = true;
+  bool mirrored = false;  // its placement mirrors it (see `mirrors` in scene/transform.hpp)
 };
 
 // Whether what casts a shadow or not (`cast_shadow`) is drawn in a pass: the shadow map's pass
@@ -115,6 +125,7 @@ struct RecordSource {
   Transform world;
   Vec3 tint;
   float first_bone = 0.0f;
+  float first_morph = 0.0f;
   float sway = 0.0f;
   float record = 0.0f;  // its number
 };
@@ -131,10 +142,12 @@ struct ObjectPass {
   // cppcheck-suppress uninitMemberVarNoCtor ; it holds a reference: whoever makes one has to give it
   MeshPass meshes;
   int skinned_location = kNoLocation;
+  MorphLocations morph;
   render_math::AlphaPass alpha = render_math::AlphaPass::Opaque;  // Shadow: only depth is written
   render_math::View view;
   int last_material = kNoMaterialYet;
   bool last_two_sided = false;
+  bool mirrored = false;  // the winding the pass is drawing with: clockwise front faces when true
 };
 
 // What of the scattered copies a quality draws (see QualityCaps): a share of them, so far.
@@ -193,6 +206,7 @@ struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
   using ObjectSight = render_detail::ObjectSight;
+  using MorphLocations = render_detail::MorphLocations;
 
   // Shaders, and where the ones drawn with all frame long take their values.
   Shader shader{};
@@ -267,6 +281,9 @@ struct Renderer::Impl {
   std::vector<std::vector<GpuPrimitive>> meshes;  // per MeshDesc
   std::vector<Bounds> mesh_bounds;                // per MeshDesc, in the mesh's own space
   std::vector<SkinDesc> skins;                    // skeletons of the uploaded scene
+  std::vector<float> morph_deltas;                // every part's shape-key deltas, as morph_texture holds them
+  unsigned int morph_texture = 0;
+  std::size_t morph_texture_floats = 0;  // of morph_deltas when the texture was last made
   Mesh sky_mesh{};
   Material sky_material{};
   Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
@@ -389,6 +406,10 @@ struct Renderer::Impl {
   void upload_new_textures(const SceneDesc& desc);
   void upload_new_materials(const SceneDesc& desc);
   void upload_new_meshes(const SceneDesc& desc);
+  // The morph texture made again when parts with shape keys were added.
+  void remake_morph_texture();
+  // Points the passes' shaders at it (once a frame).
+  void send_morph_texels();
   // Every material's values as they are now (cheap: nothing goes to the graphics card).
   void refresh_material_values(const SceneDesc& desc);
   Material make_material(redgem::Color base_color) const;
@@ -433,9 +454,16 @@ struct Renderer::Impl {
 
   // Every object's record, sight and bones, for all the passes of the frame.
   void write_frame_texels(const Scene& scene);
-  // One object's record and sight, and its bones from texel `next_bone` on. Returns where the
-  // next skeleton's bones go.
+  // One object's record and sight, and its bones and shape keys from texel `next_bone` on.
+  // Returns where the next object's go.
   std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Where the object is seen to reach: its mesh's bounds placed by it (or by its skeleton's pose),
+  // with room for the waves and ripples that move its vertices.
+  render_math::Sight reach_of(const Scene& scene, const GameObject& object,
+                              const std::optional<render_detail::SkeletonPose>& pose) const;
+  // Writes the shape keys an object shows at texel `first` (see morph_shapes.hpp), and says where
+  // in `look`. Returns where the next object's texels go.
+  std::size_t write_morphs(const GameObject& object, std::size_t first, render_math::InstanceLook& look);
   // Writes the record of the object in `slot`, unless it was written from the same last frame.
   bool write_record(std::size_t slot, const render_math::InstanceLook& look);
   // Writes an object's bones from texel `first` on: where each of its joints is now, times the
@@ -450,6 +478,11 @@ struct Renderer::Impl {
   // Hands what changed to the graphics card, and the texture to the shaders that read it.
   void send_frame_texels();
   void remake_texel_texture();
+  // What the shader needs of a part being drawn: whether bones move it, and its shape keys.
+  static void send_part(const GpuPrimitive& primitive, const ObjectPass& pass);
+  MorphLocations motion_morph_locations() const {
+    return MorphLocations{motion_uniforms.morph_first, motion_uniforms.morph_vertices};
+  }
   void upload_changed_rows();
 
   // --- Lights, atmosphere and the sky (renderer_environment.cpp) --------------------------------
@@ -489,10 +522,18 @@ struct Renderer::Impl {
   // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
   // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
   std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
+  // The pass draw_objects draws with: the lit shader's, or the depth shader's for a shadow map.
+  ObjectPass object_pass(bool depth_pass, const render_math::View& view);
   // Gathers into `batches` what the view sees (in the shadow map's pass, what casts a shadow).
   void gather_copies(const render_math::View& view, bool depth_pass);
+  // The objects of one winding (mirrored or not) the view sees, into `batches`.
+  void gather_wound(const render_math::View& view, bool depth_pass, bool mirrored);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
+  // Turns the pass's winding for mirrored copies (or back), only when it changes.
+  static void face_by_winding(bool mirrored, ObjectPass& pass);
+  // Every pass ends with front faces counter-clockwise, as the rest of the frame draws them.
+  static void face_forward(ObjectPass& pass) { face_by_winding(false, pass); }
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 
@@ -579,7 +620,8 @@ struct Renderer::Impl {
   // The frame's texels as they were, before this frame's go to the graphics card.
   void keep_previous_texels();
   // Notes when an object's record (and bones) were not its own the frame before.
-  void note_fresh_record(const Scene& scene, const GameObject& object, float first_bone, std::size_t bones);
+  void note_fresh_record(const Scene& scene, const GameObject& object, const render_math::InstanceLook& look,
+                         std::size_t bones);
   void carry_fresh_texels();
   void give_up_temporal();
   void release_temporal_targets();

@@ -123,6 +123,19 @@ TEST_CASE("the motion pass places each vertex as the lit pass does, from this fr
   CHECK(contains(motion, std::string("uniform sampler2D ") + shaders::kPreviousTexels));
 }
 
+TEST_CASE("every pass that places vertices shapes them with the engine's shape-key numbers") {
+  const std::string limits = shaders::shape_key_limits();
+  CHECK(contains(limits, "MORPH_TEXELS = " + std::to_string(render_math::kMorphTexels) + ";"));
+  CHECK(contains(limits, "MORPH_TEXEL = " + std::to_string(render_math::kMorphTexel) + ";"));
+  CHECK(contains(limits, "TEXELS_PER_MORPH_VERTEX = " + std::to_string(render_math::kTexelsPerMorphVertex) + ";"));
+  for (const std::string& source : {shaders::lit_vertex(), shaders::motion_vertex()}) {
+    CHECK(contains(source, limits));
+    CHECK(contains(source, std::string("uniform sampler2D ") + shaders::kMorphTexels));
+    CHECK(contains(source, std::string("uniform float ") + shaders::kMorphFirst));
+    CHECK(contains(source, "gl_VertexID"));
+  }
+}
+
 TEST_CASE("the lit pass and the shadow map's leave out the same pixels of a fading copy, written once") {
   constexpr const char* kNoiseName = "NOISE_WEIGHTS =";
   for (const std::string& source : {shaders::lit_fragment(), shaders::depth_fragment()}) {

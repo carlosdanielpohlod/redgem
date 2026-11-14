@@ -27,6 +27,11 @@ std::string primitive_shape_problem(const PrimitiveDesc& primitive) {
   return {};
 }
 
+bool fits_primitive(const MorphTarget& target, const PrimitiveDesc& primitive) {
+  const bool turns_normals_alike = target.normals.empty() || target.normals.size() == primitive.positions.size();
+  return target.positions.size() == primitive.positions.size() && turns_normals_alike;
+}
+
 void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints) {
   for (std::uint16_t& joint : primitive.joints) {
     if (joint >= joints) joint = 0;
