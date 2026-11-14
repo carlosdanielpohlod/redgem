@@ -17,6 +17,13 @@ until 1.0, a release may change what games rely on (see
   see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
   bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
   every step exactly as before, and a dedicated server's rooms always use it.
+- **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
+  Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
+  public address and port its router gives it from the relay it already uses, with no third
+  party (`compose.yaml` publishes UDP 7778 too). Inside the engine, `net/stun/` reads and writes
+  those messages (with a fuzz target, `stun`), probes a STUN server without ever waiting, and
+  chooses a route to a host: its direct addresses first, each for three seconds, then the relay.
+  No game uses these yet: KNOWN_LIMITATIONS.md says what is left and where the ceiling is.
 
 - **GPU and script profiling in the statistics overlay**: with `Debug.stats_visible = true`, the
   overlay also shows how long the graphics card spent on the frame's prepare, scene and post
