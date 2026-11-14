@@ -14,6 +14,7 @@
 #include "net/http/http_client.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
+#include "script/engine_constants.hpp"
 #include "script/game_locales.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_reload.hpp"
@@ -75,6 +76,9 @@ class ScriptHost {
   // Forgets the object's behaviours and its Ruby GameObject, which from then on stands for nothing.
   void detach(ObjectId object);
 
+  // Runs code (a scene script, a console line). Code that set one of the engine's constants to
+  // something else fails, the constants put back (see EngineConstants); a game file loaded with
+  // load_file too.
   RubyResult eval(const std::string& code, const std::string& file_name);
   // Editor-only source polling; no watching or source hashing unless explicitly enabled.
   std::size_t reload_scripts(bool retry = false);
@@ -181,12 +185,17 @@ class ScriptHost {
   // Runnable and started: its callbacks are called.
   bool running(const BehaviourSlot& slot) const;
   void disable_failed(std::size_t index, const char* method, const std::string& error);
+  // The result of running a script's code, failed if the code set the engine's constants.
+  RubyResult guarded(const RubyResult& result);
+  // Puts back the engine's constants a method set while behaviours ran, reported as their error.
+  void restore_engine_constants();
 
   ScriptContext& context_;
   std::filesystem::path scripts_dir_;
   GameLocales locales_;
   std::string locale_;
   RubyVm vm_;
+  EngineConstants engine_constants_;  // remembered once the bindings and the prelude are in
   mrb_value objects_cache_ = mrb_nil_value();
   // Every instance in behaviours_, in an Array by object id: what keeps them alive while C++
   // still calls them, whatever a script does to the GameObject's own list of them.
