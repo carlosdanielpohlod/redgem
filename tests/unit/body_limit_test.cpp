@@ -89,7 +89,14 @@ TEST_CASE("the pairs, contacts and scratch memory of a step grow with the bodies
   const BodyCapacity large = body_capacity(kCustomMaxBodies);
   CHECK(large.body_pairs == kCustomMaxBodies);
   CHECK(large.scratch_bytes == config::kPhysicsTempAllocatorBytes * kCustomScale);
-  CHECK(body_capacity(kFewestMaxBodies).scratch_bytes == config::kPhysicsTempAllocatorBytes);
+  // A world smaller than the default's handles as much in a step; one between two multiples of the
+  // default gets the scratch memory of the larger.
+  const BodyCapacity small = body_capacity(kFewestMaxBodies);
+  CHECK(small.bodies == kFewestMaxBodies);
+  CHECK(small.body_pairs == kDefaultMaxBodies);
+  CHECK(small.contact_constraints == kDefaultMaxBodies);
+  CHECK(small.scratch_bytes == config::kPhysicsTempAllocatorBytes);
+  CHECK(body_capacity(kDefaultMaxBodies + 1).scratch_bytes == config::kPhysicsTempAllocatorBytes * 2);
   // What no reading lets through is kept within the bounds all the same.
   CHECK(body_capacity(0).bodies == kFewestMaxBodies);
   CHECK(body_capacity(kMostMaxBodies * 2).bodies == kMostMaxBodies);

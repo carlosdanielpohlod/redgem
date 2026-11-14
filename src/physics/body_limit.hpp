@@ -3,8 +3,8 @@
 // How many bodies a scene's physics world holds at once, as game.json's "physics" section says:
 //   "physics": {"max_bodies": 16384}
 // The world is sized for it when the scene loads: past it, an object gets no body (said once).
-// The body pairs and contacts a step can handle, and the step's scratch memory, grow with it, as
-// they are at the default.
+// The body pairs and contacts a step can handle, and the step's scratch memory, grow with it,
+// never below what they are at the default.
 
 #include <cstddef>
 #include <cstdint>

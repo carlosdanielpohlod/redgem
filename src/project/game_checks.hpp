@@ -20,7 +20,8 @@ struct CheckReport {
   std::set<std::string> broken_scripts;  // those that do not compile (their class is not looked for)
 };
 
-// What game.json says that the game cannot use: a body limit out of bounds.
+// What game.json's "physics" section says that the game cannot use: a body limit out of bounds
+// (an error), and collision layers it leaves out (warnings).
 void check_game_file(const std::filesystem::path& game_dir, CheckReport& report);
 
 // The scripts of a scripts folder (and the folders in it), as paths inside it ("enemies/slime.rb"),
