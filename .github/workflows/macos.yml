@@ -7,6 +7,7 @@ name: macOS
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -21,6 +22,8 @@ permissions:
 
 jobs:
   editor:
+    # A pull request runs this only with the full-ci label; main and nightly runs always do.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.job_minutes }}
