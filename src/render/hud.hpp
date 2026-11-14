@@ -22,6 +22,9 @@ struct HudItem {
   int height = 0;
   int size = 0;         // text height
   float radius = 0.0f;  // rounded corners of a rectangle, in pixels
+  // Pixels an image drawn at its own size (width and height 0) takes for each of its own: the
+  // interface's scale (UI.scale).
+  float scale = 1.0f;
   Color color;
 };
 

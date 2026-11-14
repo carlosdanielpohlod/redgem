@@ -66,3 +66,13 @@ module Physics
     raise ArgumentError, "a #{kind} joint takes no #{(given - taken).first.inspect} (it takes #{taken.join(", ")})"
   end
 end
+
+class GameObject
+  # The joint it came with in the scene (its Joint component, set up in the editor), or nil when it
+  # has none:
+  #   Scene.find("Door").joint.angle
+  def joint
+    id, kind, other = __scene_joint
+    id && Joint.__new(id, kind, self, other)
+  end
+end

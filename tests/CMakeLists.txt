@@ -54,6 +54,7 @@ add_executable(redgem_tests
   unit/ktx2_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
+  unit/joint_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
   unit/input_bindings_test.cpp
@@ -112,6 +113,7 @@ add_executable(redgem_tests
   unit/gpu_select_test.cpp
   unit/window_test.cpp
   unit/display_settings_test.cpp
+  unit/ui_scale_test.cpp
   unit/quality_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
@@ -206,6 +208,7 @@ add_executable(redgem_tests
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
   integration/physics_joint_api_test.cpp
+  integration/scene_joints_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp
@@ -229,6 +232,7 @@ add_executable(redgem_tests
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
+  integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
   integration/camera_switch_test.cpp
   integration/scene_parenting_test.cpp
@@ -257,6 +261,7 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_joints_test.cpp
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
   integration/game_project_test.cpp
