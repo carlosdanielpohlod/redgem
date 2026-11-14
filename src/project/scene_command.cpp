@@ -169,10 +169,12 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
-// Whether a diff compares with an earlier save: --against names one (no --revision does).
-bool compares_with_file(const ToolLine& line) {
-  const auto against = line.value(kAgainstOption);
-  return against && names_earlier_save(*against);
+// The earlier save a diff compares with: what --against names, when it is one (no --revision does).
+std::optional<std::string> earlier_save(const ToolLine& line) {
+  std::optional<std::string> against = line.value(kAgainstOption);
+  if (!against) return std::nullopt;
+  if (!names_earlier_save(*against)) return std::nullopt;
+  return against;
 }
 
 // Whether the line names what scene diff compares with: --against or --revision.
@@ -183,8 +185,9 @@ bool names_baseline(const ToolLine& line) {
 ToolResult diff_with(OpenScene& scene, std::size_t limit) {
   const SceneDesc& desc = scene.document.desc();
   const ToolLine& line = scene.line;
-  if (compares_with_file(line)) return compare_scene_file(desc, scene.name, *line.value(kAgainstOption), limit);
-  const std::string revision = line.value(kRevisionOption).value_or(line.value(kAgainstOption).value_or(""));
+  const std::optional<std::string> save = earlier_save(line);
+  if (save) return compare_scene_file(desc, scene.name, *save, limit);
+  const std::string revision = line.value(kRevisionOption).value_or(line.value(kAgainstOption).value_or(std::string()));
   return compare_scene_revision(desc, scene.name, scene.document.path(), revision, limit);
 }
 

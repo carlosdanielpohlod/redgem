@@ -61,6 +61,7 @@ int word_score(const SearchFields& fields, const std::string& word) {
 
 std::vector<std::string> lowered_all(const std::vector<std::string>& texts) {
   std::vector<std::string> low;
+  low.reserve(texts.size());
   for (const std::string& text : texts) low.push_back(lowered(text));
   return low;
 }
