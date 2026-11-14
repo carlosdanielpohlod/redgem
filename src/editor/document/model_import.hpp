@@ -58,7 +58,9 @@ nlohmann::json imported_image(nlohmann::json image, const JsonOffsets& offsets, 
                               const std::filesystem::path& scene_dir);
 nlohmann::json imported_texture(nlohmann::json texture, const JsonOffsets& offsets);
 nlohmann::json imported_material(nlohmann::json material, const JsonOffsets& offsets);
-// Morph targets are not supported: they are dropped with their weights and names.
+// A mesh's shape keys (morph targets) come along, their accessors renumbered, with their weights
+// and names.
+void shift_target_accessors(nlohmann::json& primitive, int offset);
 nlohmann::json imported_mesh(nlohmann::json mesh, const JsonOffsets& offsets);
 // The model's cameras and lights are not imported; children are rebuilt on save.
 nlohmann::json imported_node(nlohmann::json node, const JsonOffsets& offsets);

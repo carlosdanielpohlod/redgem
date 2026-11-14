@@ -36,6 +36,19 @@ class GameObject
     @light ||= Light.__new(@id, @serial)
   end
 
+  # Shape keys (Blender's, glTF morph targets) of its mesh and of the meshes under it, by name:
+  #   face.morph(:Smile, 0.7)  # sets the weight (0 off, 1 whole) on every part that has the key
+  #   face.morph(:Smile)       # the weight, or nil when no part has that key
+  #   face.morph_names         # => [:Smile, :Blink_L, ...]
+  # A clip that animates the weights sets them again as it plays.
+  def morph(name, weight = nil)
+    return __morph_weight(name.to_s) if weight.nil?
+
+    raise ArgumentError, "#{self.name} has no shape key #{name}" if __set_morph(name.to_s, Float(weight)).zero?
+
+    weight
+  end
+
   def tag?(value) = tag == value.to_s
 
   # Puts it under another object (nil: at the root of the scene), where it stays in the world: from

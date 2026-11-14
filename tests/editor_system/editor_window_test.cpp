@@ -279,6 +279,16 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   take_picture(app, screenshot("editor_script_typed"));
   CHECK(code_drawn_in(*file, ui::code_color(RubyTokenKind::Regex)));
 
+  // The Console's jump opens the same tab and places the caret at the source line.
+  REQUIRE(app.scripts().open_at(editor->path(), 1, error));
+  run(app, kFrameFrames);
+  CHECK(editor->line_request() == 0);
+  constexpr const char* kJumpMarker = "# Jumped to source";
+  ImGui::GetIO().AddInputCharactersUTF8(kJumpMarker);
+  run(app, kFrameFrames);
+  CHECK(editor->text().rfind(kJumpMarker, 0) == 0);
+  take_picture(app, screenshot("editor_script_source_jump"));
+
   app.play();  // saves the open script first
   CHECK_FALSE(editor->modified());
   CHECK(editor->syntax_error().empty());

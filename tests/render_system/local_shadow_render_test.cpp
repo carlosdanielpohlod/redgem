@@ -53,7 +53,7 @@ int middle_of(const Picture& picture) { return luma(picture.at(kMiddle, kMiddle)
 bool lit_alike(const Picture& a, const Picture& b) { return std::abs(middle_of(a) - middle_of(b)) <= kSameLight; }
 
 MeshDesc mesh_of(PrimitiveShape shape, int material) {
-  MeshDesc mesh{"Shape", {make_primitive(shape)}, {}};
+  MeshDesc mesh{"Shape", {make_primitive(shape)}, {}, {}, {}};
   mesh.primitives[0].material = material;
   for (std::size_t i = 0; i < mesh.primitives[0].positions.size(); i += 3) {
     mesh.bounds.include(vec3_from(&mesh.primitives[0].positions[i]));
