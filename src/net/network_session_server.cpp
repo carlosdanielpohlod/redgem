@@ -15,9 +15,11 @@ void NetworkSession::serve_room(const std::string& code) {
   start_hosting();
 }
 
-void NetworkSession::admit_arrival(Connection connection, const nlohmann::json& auth) {
-  // (It said hello to the lobby already: it is let in at once, or the game is asked.)
+void NetworkSession::admit_arrival(Connection connection, const nlohmann::json& auth, const std::string& token) {
+  // (It said hello to the lobby already: it is let in at once, or the game is asked; or it gets
+  // the place held for it back.)
   links_.push_back({std::move(connection), 0});
+  if (!token.empty()) return resume(links_.back(), token, pending_events_);
   consider(links_.back(), auth, pending_events_);
 }
 
@@ -33,6 +35,17 @@ std::vector<std::string> NetworkSession::addresses() const {
     if (!link.connection.closed()) found.push_back(link.connection.address());
   }
   return found;
+}
+
+bool NetworkSession::dismiss(int peer) {
+  if (!can_dismiss(peer)) return false;
+  if (through_relay_) {
+    links_.front().connection.send({{wire::kKind, wire::kDismiss}, {wire::kTo, peer}});
+    return true;
+  }
+  Link* link = link_to(peer);
+  if (link != nullptr) link->connection.close();
+  return link != nullptr;
 }
 
 void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {

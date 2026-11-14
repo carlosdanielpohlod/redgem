@@ -9,7 +9,7 @@ class InputBindingsTest < RedGemTest::Case
   end
 
   def test_the_built_in_names_are_there
-    %i[jump fire run].each { |name| assert Input.actions.include?(name), name.to_s }
+    %i[jump fire run interact].each { |name| assert Input.actions.include?(name), name.to_s }
     assert_equal %i[horizontal vertical], Input.axes.sort
     assert_equal ["key:space", "pad:a"], Input.bindings(:jump)
   end
@@ -80,5 +80,21 @@ class InputBindingsTest < RedGemTest::Case
     assert Input.capturing?
     Input.cancel_capture
     refute Input.capturing?
+  end
+
+  def test_gamepads_cannot_rumble_yet_and_rumble_says_so
+    refute Input.rumble?
+    refute Input.rumble(Input::FIRST_PAD, 0.5, 0.25)
+    refute Input.rumble(nil, 1, 0)
+  end
+
+  def test_rumble_checks_its_player_its_strength_and_its_time
+    assert_raises(ArgumentError) { Input.rumble(Input::PLAYERS, 0.5, 1) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 1.5, 1) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, -0.1, 1) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, -1) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, nil) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, Float::NAN) }
+    assert_raises(ArgumentError) { Input.rumble(Input::FIRST_PAD, 0.5, Float::INFINITY) }
   end
 end

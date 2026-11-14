@@ -57,6 +57,8 @@ class ScriptHost {
   void fixed_update(float dt);
   void update(float dt);
   void draw_loading(float unscaled_delta);
+  // A frame of the network game's level change, while the world is held for it (Network.__level_tick).
+  void wait_for_level(float unscaled_delta);
   void begin_loading_screen() { loading_screen_failed_ = false; }
   void dispatch(const ContactEvent& event);
   // Hands something that happened on the network to the scripts listening for it (Network.on...).
@@ -72,6 +74,10 @@ class ScriptHost {
   void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);
+  // Calls one of the callbacks scripts raise themselves (Interaction's on_interact...) with one
+  // argument on the object's running behaviours, as the engine calls its own: one that fails is
+  // disabled and reported, and the others still hear of it.
+  void notify(ObjectId object, const std::string& method, mrb_value argument);
   // Forgets the object's behaviours and its Ruby GameObject, which from then on stands for nothing.
   void detach(ObjectId object);
 
