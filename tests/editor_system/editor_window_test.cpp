@@ -26,6 +26,7 @@
 #include "core/config.hpp"
 #include "scene/props.hpp"
 #include "editor/editor_app.hpp"
+#include "editor/ui/dpi.hpp"
 #include "project/project_hub.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/object_clipboard.hpp"
@@ -611,6 +612,48 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   REQUIRE(flat.has_value());
   CHECK(std::fabs(flat->y) < kTolerance);
   CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}
+
+namespace {
+
+class PreferencesHome {
+ public:
+  explicit PreferencesHome(const std::filesystem::path& directory) { platform::set_user_data_dir(directory); }
+  ~PreferencesHome() { platform::set_user_data_dir({}); }
+};
+
+void check_compact_preferences(EditorApp& app) {
+  app.open_preferences();
+  run(app, kWarmupFrames);
+  CHECK(ui::scaled(1.0f) == kMaxEditorScale);
+  const auto* popup = ImGui::FindWindowByName("Preferences###editor_preferences");
+  REQUIRE(popup != nullptr);
+  REQUIRE(popup->Active);
+  CHECK(popup->Size.y <= ImGui::GetMainViewport()->WorkSize.y);
+  CHECK(popup->ScrollMax.y > 0.0f);
+  take_picture(app, screenshot("editor_preferences_200"));
+}
+
+}  // namespace
+
+TEST_CASE("Preferences can scroll on a compact window at 200 percent") {
+  constexpr int kCompactWidth = 900;
+  constexpr int kCompactHeight = 520;
+  const auto game = copy_game();
+  const PreferencesHome home(game / "user-data");
+  const EditorPreferences defaults;
+  auto manual = defaults;
+  manual.interface_scale = kMaxEditorScale;
+  std::string error;
+  REQUIRE_MESSAGE(write_editor_preferences(editor_preferences_file(), defaults, manual, error), error);
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* failure = std::get_if<std::string>(&created)) FAIL(*failure);
+  auto& app = std::get<std::unique_ptr<EditorApp>>(created);
+  SetWindowSize(kCompactWidth, kCompactHeight);
+  run(*app, kWarmupFrames);
+  check_compact_preferences(*app);
+  app.reset();
   std::filesystem::remove_all(game);
 }
 

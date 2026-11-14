@@ -44,6 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
@@ -216,6 +217,8 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/movement_validator.cpp
+  net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
   net/secure/tls_identity.cpp
@@ -241,6 +244,10 @@ redgem_add_library(redgem_net
   net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
   net/rooms/relay_texts.cpp
+  net/stun/stun_message.cpp
+  net/stun/stun_probe.cpp
+  net/stun/stun_responder.cpp
+  net/stun/route_choice.cpp
   net/http/http_url.cpp
   net/http/http_message.cpp
   net/http/http_chunks.cpp
@@ -367,6 +374,7 @@ redgem_add_library(redgem_runtime
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp
+  script/engine_constants.cpp
   script/reload_ownership.cpp
   script/script_budget.cpp
   script/script_profile.cpp
@@ -422,6 +430,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_state_bindings.cpp
   script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
+  script/bindings/network_movement_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
@@ -554,6 +563,7 @@ if(NOT ANDROID)
     server/server_command.cpp
     server/stop_signals.cpp
     server/server_program.cpp
+    server/key_locks.cpp
     server/save_database.cpp
     server/save_database_slots.cpp
     server/room_slot.cpp
@@ -594,6 +604,9 @@ if(NOT ANDROID)
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
     editor/editor_camera.cpp
+    editor/editor_fly_bindings.cpp
+    editor/editor_preferences.cpp
+    editor/editor_preferences_dialog.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp

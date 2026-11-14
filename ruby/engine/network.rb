@@ -54,10 +54,11 @@ module Network
   SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
   DESPAWN = "$despawn".freeze    # objects that are gone: their keys
   RESEND = "$resend".freeze      # to the host: send the spawned objects again (after loading a level)
+  CORRECT = "$correct".freeze    # from the host: where an object of ours is believed to be: [key, position]
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned,
-    DESPAWN => :receive_despawn, RESEND => :receive_resend
+    DESPAWN => :receive_despawn, RESEND => :receive_resend, CORRECT => :receive_correction
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
