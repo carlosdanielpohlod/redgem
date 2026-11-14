@@ -69,6 +69,7 @@ ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir
   start_roots();
   install_bindings(mrb);
   load_prelude();
+  engine_constants_.remember(mrb);
   if (live_reload_) prepare_reload_tracking();
 }
 
@@ -90,7 +91,22 @@ void ScriptHost::report_error(const std::string& where, const std::string& error
   log::error(where + ": " + error);
 }
 
-RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) { return vm_.eval(code, file_name); }
+RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) {
+  restore_engine_constants();  // (what ran before is not this code's doing)
+  return guarded(vm_.eval(code, file_name));
+}
+
+RubyResult ScriptHost::guarded(const RubyResult& result) {
+  const std::vector<std::string> restored = engine_constants_.restore(vm_.state());
+  if (restored.empty()) return result;
+  const std::string earlier = result.ok ? std::string() : "\n" + result.error;
+  return {false, mrb_nil_value(), reassigned_constants_error(restored) + earlier};
+}
+
+void ScriptHost::restore_engine_constants() {
+  const std::vector<std::string> restored = engine_constants_.restore(vm_.state());
+  if (!restored.empty()) report_error("a behaviour", reassigned_constants_error(restored));
+}
 
 RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   try {
@@ -111,7 +127,8 @@ RubyResult ScriptHost::load_source(const std::filesystem::path& path) {
     return result;
   }
   const std::string& code = *source;
-  const auto result = vm_.eval(code, path.u8string());
+  restore_engine_constants();  // (what ran before is not this file's doing)
+  const auto result = guarded(vm_.eval(code, path.u8string()));
   if (result.ok) remember_source(path, code);
   return result;
 }

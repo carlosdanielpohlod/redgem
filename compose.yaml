@@ -39,6 +39,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "7778:7778"
+      - "7778:7778/udp"  # STUN: the address the internet sees a game at
     volumes:
       - relay-data:/relay-data
     command: build/src/redgem-relay --data /relay-data
