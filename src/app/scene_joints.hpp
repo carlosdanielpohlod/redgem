@@ -21,4 +21,8 @@ void create_all(const bodies::Source& source, PhysicsWorld& physics, SceneJoints
 // to what its original's joint held to, or to the copy of it when that was copied too.
 void create_copies(const bodies::Source& source, PhysicsWorld& physics, const CopyPairs& copies, SceneJoints& made);
 
+// An object is gone: the joints it held, or that held it, go from `made` (the physics world
+// removes them itself).
+void forget(SceneJoints& made, ObjectHandle object);
+
 }  // namespace redgem::joints

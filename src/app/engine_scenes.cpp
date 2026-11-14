@@ -109,7 +109,7 @@ void Engine::process_destroyed() {
     for (const ObjectId id : pending) scripts_->detach(id);
     // Children first, so each parent is torn down with nothing left under it.
     for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
-      context_.scene_joints.erase(scene_.handle(*id));
+      joints::forget(context_.scene_joints, scene_.handle(*id));
       physics_->remove_object(*id);
       scene_.finalize_destroy(*id);
     }

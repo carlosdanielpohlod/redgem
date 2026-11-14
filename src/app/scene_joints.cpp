@@ -1,6 +1,7 @@
 #include "app/scene_joints.hpp"
 
-#include <algorithm>
+#include <iterator>
+#include <map>
 #include <optional>
 #include <string>
 #include <variant>
@@ -15,9 +16,11 @@ void warn(const GameObject& object, const std::string& warning) {
   log::warning("object '" + object.name + "': " + warning);
 }
 
+using CopyOf = std::map<ObjectId, ObjectId>;  // original -> its copy
+
 // The copy made of `end`, or `end` itself when it was not copied.
-ObjectId copy_or_same(const CopyPairs& copies, ObjectId end) {
-  const auto copied = std::find_if(copies.begin(), copies.end(), [end](const auto& pair) { return pair.first == end; });
+ObjectId copy_or_same(const CopyOf& copies, ObjectId end) {
+  const auto copied = copies.find(end);
   return copied != copies.end() ? copied->second : end;
 }
 
@@ -83,11 +86,19 @@ void create_all(const bodies::Source& source, PhysicsWorld& physics, SceneJoints
 
 void create_copies(const bodies::Source& source, PhysicsWorld& physics, const CopyPairs& copies, SceneJoints& made) {
   const Scene& scene = source.scene;
+  const CopyOf copy_of(copies.begin(), copies.end());
   for (const auto& [original, copy] : copies) {
     const std::optional<JointConfig> config = usable_config(scene, copy);
     if (!config) continue;
-    const ObjectId other_end = copy_or_same(copies, held_end(scene, made, original, config->other));
+    const ObjectId other_end = copy_or_same(copy_of, held_end(scene, made, original, config->other));
     make(scene, physics, copy, other_end, *config, made);
+  }
+}
+
+void forget(SceneJoints& made, ObjectHandle object) {
+  made.erase(object);
+  for (auto joint = made.begin(); joint != made.end();) {
+    joint = joint->second.other == object ? made.erase(joint) : std::next(joint);
   }
 }
 

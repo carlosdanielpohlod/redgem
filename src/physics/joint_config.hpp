@@ -58,6 +58,10 @@ Vec3 point_in(const Transform& world, Vec3 local);
 // The words for the kinds (scene/props.hpp kJointKinds).
 const char* joint_kind_name(JointKind kind);
 std::optional<JointKind> joint_kind_named(const std::string& name);
+// How far a kind's limits may reach either way: degrees for hinges, meters for sliders.
+float joint_limit_reach(JointKind kind);
+// The limits as the properties have them, before they are brought into range: both or none.
+std::optional<std::pair<float, float>> written_joint_limits(const PropertyMap& props);
 // Them all, as messages list them: "fixed, hinge, ...".
 std::string joint_kind_list();
 

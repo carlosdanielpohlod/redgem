@@ -86,12 +86,19 @@ bool draw_kind_row(EditorSession& session, int index, const JointConfig& joint) 
   return false;
 }
 
+// The node at the joint's other end; none for the world, or when it is not in the scene.
+const NodeDesc* partner_node(const SceneDocument& document, const std::string& other) {
+  if (other.empty()) return nullptr;
+  for (const NodeDesc& node : document.desc().nodes) {
+    if (node.stable_id == other) return &node;
+  }
+  return nullptr;
+}
+
 std::string partner_name(const SceneDocument& document, const std::string& other) {
   if (other.empty()) return tr("editor.inspector.joint.world");
-  for (const NodeDesc& node : document.desc().nodes) {
-    if (node.stable_id == other) return node.name;
-  }
-  return tr("editor.inspector.joint.missing");
+  const NodeDesc* partner = partner_node(document, other);
+  return partner != nullptr ? partner->name : tr("editor.inspector.joint.missing");
 }
 
 // Whether a node is offered as the other end of `index`'s joint: another node with an identity.
@@ -133,10 +140,11 @@ void set_limits(EditorSession& session, int index, std::optional<std::pair<float
   session.refresh_preview();
 }
 
-void draw_limit_numbers(PanelContext& context, int index, std::pair<float, float> limits) {
+// The limits as written (not as brought into range), so that a drag goes on from what it shows.
+void draw_limit_numbers(PanelContext& context, int index, std::pair<float, float> limits, float reach) {
   float ends[kLimitEnds] = {limits.first, limits.second};
   property_label(tr("editor.inspector.joint.low_high"));
-  if (!ImGui::DragFloat2(kLimitsId, ends, kDragSpeedNumber)) return;
+  if (!ImGui::DragFloat2(kLimitsId, ends, kDragSpeedNumber, -reach, reach)) return;
   streamed_edit(context);
   SceneDocument& doc = context.session.document();
   doc.set_prop(index, props::kJointLow, static_cast<double>(ends[0]), false);
@@ -145,14 +153,15 @@ void draw_limit_numbers(PanelContext& context, int index, std::pair<float, float
 }
 
 bool draw_limit_rows(PanelContext& context, int index, const JointConfig& joint) {
-  bool limited = joint.limits.has_value();
+  const auto written = written_joint_limits(context.session.document().node(index).props);
+  bool limited = written.has_value();
   property_label(tr(joint.kind == JointKind::Hinge ? "editor.inspector.joint.limits_degrees"
                                                    : "editor.inspector.joint.limits_meters"));
   if (ImGui::Checkbox(kLimitedId, &limited)) {
     set_limits(context.session, index, limited ? std::optional(default_joint_limits(joint.kind)) : std::nullopt);
     return true;
   }
-  if (joint.limits) draw_limit_numbers(context, index, *joint.limits);
+  if (written) draw_limit_numbers(context, index, *written, joint_limit_reach(joint.kind));
   return false;
 }
 
@@ -194,14 +203,17 @@ bool draw_kind_settings(PanelContext& context, int index, const JointConfig& joi
   return false;
 }
 
-void draw_joint_warnings(const PropertyMap& props, const JointConfig& joint) {
+bool lacks_body(const NodeDesc* node) {
+  return node != nullptr && !body_config_from_props(node->props).wants_physics();
+}
+
+void warn(const char* text) { ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", text); }
+
+void draw_joint_warnings(const SceneDocument& document, int index, const JointConfig& joint) {
   ImGui::PushStyleColor(ImGuiCol_Text, warning_color());
-  if (!body_config_from_props(props).wants_physics()) {
-    ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", tr("editor.inspector.joint.no_body"));
-  }
-  for (const std::string& warning : joint.warnings) {
-    ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
-  }
+  if (!body_config_from_props(document.node(index).props).wants_physics()) warn(tr("editor.inspector.joint.no_body"));
+  if (lacks_body(partner_node(document, joint.other))) warn(tr("editor.inspector.joint.partner_no_body"));
+  for (const std::string& warning : joint.warnings) warn(warning.c_str());
   ImGui::PopStyleColor();
 }
 
@@ -213,7 +225,7 @@ void draw_joint_rows(PanelContext& context, int index, const JointConfig& joint)
              {"editor.inspector.joint.break_force", kBreakForceId, props::kJointBreakForce, joint.break_force, 0.0f,
               "%.0f N"});
   tooltip(tr("editor.inspector.joint.break_force_tooltip"));
-  draw_joint_warnings(context.session.document().node(index).props, joint);
+  draw_joint_warnings(context.session.document(), index, joint);
 }
 
 }  // namespace

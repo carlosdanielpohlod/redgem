@@ -48,9 +48,6 @@ void read_axis(const PropertyMap& props, JointConfig& config) {
   config.axis = Vec3::up();
 }
 
-// How far a kind's limits may reach either way: degrees for hinges, meters for sliders.
-float farthest_limit(JointKind kind) { return kind == JointKind::Hinge ? kDegreesPerHalfTurn : kLongestSlide; }
-
 bool one_limit_only(const std::optional<float>& low, const std::optional<float>& high) {
   return low.has_value() != high.has_value();
 }
@@ -76,7 +73,7 @@ void read_limits(const PropertyMap& props, JointConfig& config) {
     config.warnings.emplace_back("a joint's low limit must be below its high one; it is left free");
     return;
   }
-  config.limits = within_range(*low, *high, farthest_limit(config.kind), config);
+  config.limits = within_range(*low, *high, joint_limit_reach(config.kind), config);
 }
 
 void read_motor(const PropertyMap& props, JointConfig& config) {
@@ -138,7 +135,7 @@ std::optional<JointConfig> joint_config_from_props(const PropertyMap& props) {
   read_kind(get_string(props, props::kJoint).value_or(""), config);  // (one not a word names no kind)
   config.other = get_string(props, props::kJointTo).value_or("");
   config.anchor = vector_of(props, props::kJointAnchor, Vec3::zero());
-  read_by_kind(props, config);
+  if (config.known_kind) read_by_kind(props, config);  // (an unknown kind takes nothing to warn of)
   config.break_force = not_negative(props, props::kJointBreakForce, config);
   return config;
 }
@@ -169,6 +166,15 @@ std::optional<JointKind> joint_kind_named(const std::string& name) {
   const auto* found = std::find(std::begin(props::kJointKinds), std::end(props::kJointKinds), name);
   if (found == std::end(props::kJointKinds)) return std::nullopt;
   return static_cast<JointKind>(std::distance(std::begin(props::kJointKinds), found));
+}
+
+float joint_limit_reach(JointKind kind) { return kind == JointKind::Hinge ? kDegreesPerHalfTurn : kLongestSlide; }
+
+std::optional<std::pair<float, float>> written_joint_limits(const PropertyMap& props) {
+  const std::optional<float> low = number_of(props, props::kJointLow);
+  const std::optional<float> high = number_of(props, props::kJointHigh);
+  if (!low || !high) return std::nullopt;
+  return std::make_pair(*low, *high);
 }
 
 std::string joint_kind_list() {

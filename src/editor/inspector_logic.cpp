@@ -108,10 +108,17 @@ PropertyMap new_joint_props(JointKind kind) {
   return joint;
 }
 
+namespace {
+
+bool one_of(const char* const (&keys)[kAxes], const std::string& key) {
+  return std::find(std::begin(keys), std::end(keys), key) != std::end(keys);
+}
+
+}  // namespace
+
 bool kept_across_joint_kinds(const std::string& key) {
-  const bool anchor =
-      std::find(std::begin(props::kJointAnchor), std::end(props::kJointAnchor), key) != std::end(props::kJointAnchor);
-  return anchor || key == props::kJointTo || key == props::kJointBreakForce;
+  const bool point_or_axis = one_of(props::kJointAnchor, key) || one_of(props::kJointAxis, key);
+  return point_or_axis || key == props::kJointTo || key == props::kJointBreakForce;
 }
 
 std::pair<float, float> default_joint_limits(JointKind kind) {

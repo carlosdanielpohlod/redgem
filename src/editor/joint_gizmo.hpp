@@ -21,14 +21,14 @@ struct JointGizmo {
   std::optional<Vec3> axis_start;
   std::optional<Vec3> axis_end;
   // Limited hinges: an arc around the axis from the low limit to the high one; limited sliders:
-  // the stretch of the axis between them. Empty when free.
+  // the stretch of the axis between them. Empty when free. Its ends are marked.
   std::vector<Vec3> limits;
   // Where its other end is: the other object, or a distance joint's other anchor.
   std::optional<Vec3> other_end;
 };
 
 // The gizmo of the joint an object of `scene` has (its `joint` properties), with the object at
-// `world` (where the scene has it); none without a joint.
+// `world` (where the scene has it); none without a joint, or when its other end is missing.
 std::optional<JointGizmo> joint_gizmo(const Scene& scene, ObjectId id, const Transform& world);
 
 }  // namespace redgem

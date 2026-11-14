@@ -146,7 +146,7 @@ class EditorSession {
   // away, one undo step each (editor_session_joints.cpp).
   void add_joint(ObjectId id, JointKind kind);
   // Changes the kind of its joint: what the old kind alone took goes (a hinge's limits in degrees
-  // are not a slider's in meters), its other end, anchor and break force stay.
+  // are not a slider's in meters), its other end, anchor, axis and break force stay.
   void set_joint_kind(ObjectId id, JointKind kind);
   void remove_joint(ObjectId id);
   // Holds the object's joint to `other` (kNoObject: the world).

@@ -56,6 +56,14 @@ void draw_mark(const GameObject& object, const Transform& world) {
   }
 }
 
+constexpr float kJointLimitMark = 0.2f;  // of an icon's size: the balls at a joint's limits
+
+// The two ends of a joint's limits (none while it is free).
+std::vector<const Vec3*> limit_ends(const std::vector<Vec3>& limits) {
+  if (limits.empty()) return {};
+  return {&limits.front(), &limits.back()};
+}
+
 void draw_line(Vec3 from, Vec3 to) { DrawLine3D(to_raylib(from), to_raylib(to), rgba(kJointColor)); }
 
 void draw_polyline(const std::vector<Vec3>& points) {
@@ -67,6 +75,9 @@ void draw_joint_mark(const JointGizmo& joint) {
   DrawSphereWires(to_raylib(joint.anchor), kIconSize * kHalf, kIconRings, kIconSlices, rgba(kJointColor));
   if (joint.axis_start && joint.axis_end) draw_line(*joint.axis_start, *joint.axis_end);
   draw_polyline(joint.limits);
+  for (const Vec3* end : limit_ends(joint.limits)) {
+    DrawSphereWires(to_raylib(*end), kIconSize * kJointLimitMark, kIconRings, kIconSlices, rgba(kJointColor));
+  }
   if (joint.other_end) draw_line(joint.anchor, *joint.other_end);
 }
 

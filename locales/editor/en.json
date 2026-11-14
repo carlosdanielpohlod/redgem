@@ -204,6 +204,7 @@
   "editor.inspector.joint.motor_tooltip": "The motor turns the hinge at its speed with at most this torque; 0 torque means no motor.",
   "editor.inspector.joint.motor_torque": "Motor torque",
   "editor.inspector.joint.no_body": "A joint holds rigid bodies: give this object a physics body (and one end a dynamic one).",
+  "editor.inspector.joint.partner_no_body": "The connected object has no physics body: the joint is not made until it gets one.",
   "editor.inspector.joint.other_anchor": "Other anchor",
   "editor.inspector.joint.point_kind": "Turns every way around the anchor (ball and socket)",
   "editor.inspector.joint.slider_kind": "Slides along an axis (drawers, lifts)",

@@ -121,3 +121,15 @@ TEST_CASE("a scene's joint that cannot be made is said, and the scene still play
   frames(*engine, kOneSecond);
   CHECK(number(*engine, "Scene.find('Lost').transform.position.y") < 2.0f);  // nothing holds it
 }
+
+TEST_CASE("a scene's joint goes with the object at its other end") {
+  const TempGame game(kPlainGame);
+  const SceneDesc scene = hook_and_ball();
+  auto engine = engine_for(game, scene);
+  CHECK(ruby(*engine, "Scene.find('Ball').joint.alive?") == "true");
+  ruby(*engine, "Scene.find('Hook').destroy");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Scene.find('Ball').joint.inspect") == "nil");
+  frames(*engine, kOneSecond);
+  CHECK(number(*engine, "Scene.find('Ball').transform.position.y") < 3.0f);  // nothing holds it up
+}

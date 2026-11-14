@@ -70,6 +70,9 @@ TEST_CASE("what is out of range in a joint's properties is brought back, with a 
   const auto unknown = joint_config_from_props({{props::kJoint, std::string("rope")}});
   CHECK_FALSE(unknown->known_kind);
   CHECK(warned(*unknown, "unknown joint 'rope' (fixed, hinge, slider, point, distance)"));
+  // (An unknown kind takes nothing to warn of besides its kind.)
+  const auto odd = joint_config_from_props({{props::kJoint, std::string("hinj")}, {props::kJointLow, -30.0}});
+  CHECK(odd->warnings.size() == 1);
   // Not a word at all: still a joint the card shows, to be fixed or removed.
   CHECK_FALSE(joint_config_from_props({{props::kJoint, true}})->known_kind);
   props[props::kJointLow] = 5.0;
@@ -170,6 +173,10 @@ TEST_CASE("a limited hinge is drawn with its anchor, its axis and an arc from li
   CHECK(approx_equal(gizmo->limits.front(), Vec3{0.5f + kJointArcRadius, 0, 0}, kTolerance));
   CHECK(approx_equal(gizmo->limits.back(), Vec3{0.5f, 0, -kJointArcRadius}, kTolerance));
   CHECK_FALSE(gizmo->other_end.has_value());
+  // A joint to an object the scene does not have is not drawn: the game would not make it.
+  desc.nodes.front().props[props::kJointTo] = std::string("gone");
+  const Scene orphan = Scene::from_desc(desc);
+  CHECK_FALSE(joint_gizmo(orphan, 0, orphan.world_transform(0)).has_value());
   desc.nodes.front().props.clear();
   const Scene plain = Scene::from_desc(desc);
   CHECK_FALSE(joint_gizmo(plain, 0, plain.world_transform(0)).has_value());
