@@ -7,6 +7,7 @@
 //   settings.json   what its player chose (Settings.save), and the card and language to use
 //   bindings.json   what its players bound (Input.bind)
 //   crashes/        the reports of a built game's crashes
+//   script_profile.tsv  what the scripts' profiler found (Debug.export_script_profile)
 //
 // A player's folder is named after the game's studio and title (game.json's "studio" and
 // "title"), where the system keeps what programs remember (see platform::programs_data_dir):
@@ -35,6 +36,7 @@ struct GameDataFiles {
   std::filesystem::path settings;
   std::filesystem::path bindings;
   std::filesystem::path crashes;  // a folder of reports
+  std::filesystem::path script_profile;
 };
 GameDataFiles game_data_files(const std::filesystem::path& folder);
 
