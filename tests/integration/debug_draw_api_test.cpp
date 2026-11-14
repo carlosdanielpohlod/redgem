@@ -9,6 +9,8 @@
 
 using namespace redgem;
 namespace {
+constexpr float kChannelMax = 255.0f;
+constexpr float kPaletteRedChannel = 230.0f / kChannelMax;  // :red in the scripts' palette is (230, 41, 55)
 class DrawPresenter final : public Presenter {
  public:
   SurfaceSize surface_size() const override { return {640, 360}; }
@@ -106,7 +108,7 @@ TEST_CASE("Debug.label keeps its text, point, color and size for the frame, and 
   REQUIRE(labels.size() == 2);
   CHECK(labels[0].text == "door");
   CHECK(labels[0].at.z == 3);
-  CHECK(labels[0].color.r == 1);
+  CHECK(labels[0].color.r == doctest::Approx(kPaletteRedChannel));
   CHECK(labels[0].size == 24);
   CHECK(labels[1].text == "42");
   CHECK(labels[1].size == 16);

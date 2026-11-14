@@ -17,20 +17,22 @@ int text_width_of(const ScriptContext& ctx, const DebugLabel& label) {
   return estimated_text_width(label.text, label.size);
 }
 
-// Whether there is a scene with a main camera that is a camera.
-bool has_main_camera(const Scene* scene) {
-  if (scene == nullptr) return false;
+// The scene's main camera object, or nothing without one.
+const GameObject* main_camera_object(const Scene* scene) {
+  if (scene == nullptr) return nullptr;
   const ObjectId id = scene->main_camera();
-  return id != kNoObject && scene->at(id).camera.has_value();
+  return id != kNoObject ? &scene->at(id) : nullptr;
 }
 
 // What the main camera shows, as the renderer draws it (its shake on it), or nothing without one.
 std::optional<LabelView> main_view(const ScriptContext& ctx) {
-  if (!has_main_camera(ctx.scene)) return std::nullopt;
-  const GameObject& camera = ctx.scene->at(ctx.scene->main_camera());
-  const Transform seen = viewed_from(ctx.scene->world_transform(ctx.scene->main_camera()), camera.camera_shake);
+  const GameObject* camera = main_camera_object(ctx.scene);
+  if (camera == nullptr) return std::nullopt;
+  const std::optional<CameraDesc>& lens = camera->camera;
+  if (!lens) return std::nullopt;
+  const Transform seen = viewed_from(ctx.scene->world_transform(ctx.scene->main_camera()), camera->camera_shake);
   const ScreenFrame frame{ctx.screen_width, ctx.screen_height, ctx.picture_width, ctx.picture_height};
-  return LabelView{seen, Lens{camera.camera->fov_y_radians, 0.0f}, frame};
+  return LabelView{seen, Lens{lens->fov_y_radians, 0.0f}, frame};
 }
 
 }  // namespace
