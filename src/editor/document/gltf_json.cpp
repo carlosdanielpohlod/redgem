@@ -14,6 +14,10 @@ bool whole_and_not_negative(const nlohmann::json& value) {
 // Whether an animation channel says which node it moves.
 bool names_node(const nlohmann::json& channel) { return channel.contains(kTarget) && channel[kTarget].contains(kNode); }
 
+bool has_channel_list(const nlohmann::json& animation) {
+  return animation.contains(kChannels) && animation[kChannels].is_array();
+}
+
 }  // namespace
 
 std::string text_at(const nlohmann::json& object, const char* key) {
@@ -134,6 +138,20 @@ std::optional<nlohmann::json> animation_with_current_nodes(nlohmann::json animat
   if (channels.empty()) return std::nullopt;
   animation[kChannels] = channels;
   return animation;
+}
+
+void add_channels_for_copies(nlohmann::json& animation, const std::map<int, int>& copies) {
+  if (!has_channel_list(animation)) return;
+  nlohmann::json& channels = animation[kChannels];
+  const std::size_t count = channels.size();
+  for (std::size_t c = 0; c < count; ++c) {
+    if (!names_node(channels[c])) continue;
+    const auto copy = copies.find(index_from(channels[c][kTarget][kNode]).value_or(kNoIndex));
+    if (copy == copies.end()) continue;
+    nlohmann::json channel = channels[c];
+    channel[kTarget][kNode] = copy->second;
+    channels.push_back(std::move(channel));
+  }
 }
 
 bool has_several_scenes(const nlohmann::json& json) { return json.contains(kScenes) && json[kScenes].size() > 1; }
