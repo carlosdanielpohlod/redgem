@@ -21,7 +21,7 @@ Texture2D load_scene_texture(const ImageData& image);
 // The same from a picture already decoded (see decode_scene_picture); `image` when it is empty.
 Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decoded);
 
-// A scene's image decoded to 8-bit RGBA on the CPU, on any thread: empty when it cannot be.
+// A scene's image decoded on the CPU, on any thread: marked unreadable when it cannot be.
 DecodedPicture decode_scene_picture(const ImageData& image);
 
 // The first file of `folder` that `name` can mean (as it is, or with a picture's extension), as

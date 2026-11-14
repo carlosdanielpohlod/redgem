@@ -44,6 +44,7 @@ class SceneActivation {
   void make_bodies(const FrameBudget& budget);
   void make_next_body();
   bool bodies_made() const { return next_body_ >= waiting_.size(); }
+  bool time_left_to_upload(const FrameBudget& budget) const;
 
   std::string name_;
   SceneDesc desc_;

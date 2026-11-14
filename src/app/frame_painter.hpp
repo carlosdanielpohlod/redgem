@@ -25,7 +25,7 @@ class FramePainter {
   void paint_flat(const FrameView& view, const RenderTexture2D* output = nullptr);
   // Readies the assets of the scene the game will show under `generation` (see
   // Presenter::prepare_scene); what it readied for another generation is dropped first.
-  bool prepare(const SceneDesc& desc, int generation, std::size_t bytes);
+  bool prepare(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget);
   void drop_prepared();
   // Says the renderer already holds the assets of this generation of the game's scene (the editor
   // plays the scene it was drawing): they are not uploaded again.

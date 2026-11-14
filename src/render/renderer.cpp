@@ -64,10 +64,18 @@ void Renderer::upload(const SceneDesc& desc) {
   sync(desc);
 }
 
-bool Renderer::stage(const SceneDesc& desc, std::size_t bytes) {
-  for (std::size_t sent = 0; sent < bytes;) {
-    if (impl_->staged_all(desc)) return true;
-    sent += impl_->stage_next(desc);
+namespace {
+// Whether a frame's share of staging is used: its bytes sent, or its time gone.
+bool share_used(std::size_t sent, std::size_t bytes, const FrameBudget& budget) {
+  return sent >= bytes || budget.spent();
+}
+}  // namespace
+
+bool Renderer::stage(const SceneDesc& desc, std::size_t bytes, const FrameBudget& budget) {
+  std::size_t sent = 0;
+  while (!impl_->staged_all(desc)) {
+    sent += impl_->stage_next(desc);  // (one at least, whatever is left of the frame)
+    if (share_used(sent, bytes, budget)) break;
   }
   return impl_->staged_all(desc);
 }

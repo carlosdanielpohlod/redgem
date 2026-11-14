@@ -83,20 +83,23 @@ Texture2D load_scene_texture(const ImageData& image) {
 }
 
 Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decoded) {
+  if (decoded.unreadable) {
+    log::warning("scene picture is unreadable; using a checkerboard");
+    return missing_picture_texture();
+  }
   if (decoded.empty()) return load_scene_texture(image);
   // (raylib only reads the pixels of an image it uploads.)
-  const Image rows{const_cast<std::uint8_t*>(decoded.rgba.data()), decoded.width, decoded.height, 1,
-                   PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  const Image rows{const_cast<std::uint8_t*>(decoded.pixels.data()), decoded.width, decoded.height, 1,
+                   decoded.format};
   return with_smaller_copies(LoadTextureFromImage(rows));
 }
 
 DecodedPicture decode_scene_picture(const ImageData& image) {
   Image decoded = decode_picture(image.encoded);
-  if (!IsImageValid(decoded)) return {};
-  ImageFormat(&decoded, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  if (!IsImageValid(decoded)) return DecodedPicture{0, 0, 0, {}, true};
   const auto* first = static_cast<const std::uint8_t*>(decoded.data);
-  const auto bytes = static_cast<std::size_t>(decoded.width) * decoded.height * kRgbaChannels;
-  DecodedPicture picture{decoded.width, decoded.height, std::vector<std::uint8_t>(first, first + bytes)};
+  const auto bytes = static_cast<std::size_t>(GetPixelDataSize(decoded.width, decoded.height, decoded.format));
+  DecodedPicture picture{decoded.width, decoded.height, decoded.format, {first, first + bytes}, false};
   UnloadImage(decoded);
   return picture;
 }

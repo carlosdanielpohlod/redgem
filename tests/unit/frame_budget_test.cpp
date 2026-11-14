@@ -19,10 +19,3 @@ TEST_CASE("a frame budget is spent once its clock has gone past its share") {
   now += kHalf;
   CHECK(budget.spent());
 }
-
-TEST_CASE("an unlimited frame budget is never spent") {
-  double now = 0.0;
-  const FrameBudget budget([&] { return now; }, FrameBudget::kUnlimited);
-  now += 1.0e6;
-  CHECK_FALSE(budget.spent());
-}

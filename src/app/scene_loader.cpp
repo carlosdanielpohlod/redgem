@@ -81,18 +81,18 @@ std::shared_ptr<SceneLoad> SceneLoader::submit(const std::filesystem::path& game
   if (outstanding_.size() >= kOutstandingLimit) return {};
   auto result = std::make_shared<SceneLoad>();
   outstanding_.push_back(result);
-  queue_request({game, name, result, decode_pictures}, result);
+  queue_request({game, name, result, decode_pictures});
   changed_.notify_one();
   return result;
 }
 
-void SceneLoader::queue_request(Request request, const std::shared_ptr<SceneLoad>& result) {
+void SceneLoader::queue_request(Request request) {
   try {
     if (request.game.empty()) request.game = std::filesystem::current_path();
     request.game = std::filesystem::absolute(request.game);
     queue_.push_back(std::move(request));
   } catch (const std::exception& error) {
-    result->finish({false, error.what(), {}, {}});
+    if (auto slot = request.result.lock()) slot->finish({false, error.what(), {}, {}});
   }
 }
 

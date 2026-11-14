@@ -58,7 +58,7 @@ class SceneLoader {
   std::optional<Request> next();
   void run();
   void discard_abandoned();
-  void queue_request(Request request, const std::shared_ptr<SceneLoad>& result);
+  void queue_request(Request request);
   SceneLoad::Result read(const Request& request);
   Reader reader_;
   std::mutex mutex_;
@@ -72,7 +72,7 @@ class SceneLoader {
 // One background parser shared by players and dedicated-server rooms in this process.
 SceneLoader& shared_scene_loader();
 LoadResult read_scene_data(const std::filesystem::path& game, const std::string& name);
-// Decodes every picture of a scene to RGBA on the CPU, on any thread (SceneDesc::decoded_images).
+// Decodes every picture of a scene on the CPU, on any thread (SceneDesc::decoded_images).
 void decode_scene_pictures(SceneDesc& scene);
 
 }  // namespace redgem

@@ -12,6 +12,7 @@
 #include "core/config.hpp"
 #include "core/image_header.hpp"
 #include "core/safe_path.hpp"
+#include "render/texture_loading.hpp"
 #include "scene/props.hpp"
 #include "test_support.hpp"
 
@@ -166,6 +167,13 @@ TEST_CASE("a scene read for a game that draws it has its pictures decoded in the
   const auto decoded = drawn->take()->loaded.scene.decoded_images;
   REQUIRE(decoded.size() == 1);
   CHECK(decoded[0].width > 0);
-  CHECK(decoded[0].rgba.size() == static_cast<std::size_t>(decoded[0].width) * decoded[0].height * 4);
+  CHECK_FALSE(decoded[0].empty());
+  CHECK_FALSE(decoded[0].unreadable);
   CHECK(undrawn->take()->loaded.scene.decoded_images.empty());
+}
+
+TEST_CASE("a picture that cannot be decoded in the background is marked so, and not tried again") {
+  const DecodedPicture broken = render_detail::decode_scene_picture(ImageData{{1, 2, 3}, ".png"});
+  CHECK(broken.unreadable);
+  CHECK(broken.empty());
 }

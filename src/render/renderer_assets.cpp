@@ -111,10 +111,13 @@ std::size_t mesh_bytes(const MeshDesc& mesh) {
   return bytes;
 }
 
+bool has_decoded(const SceneDesc& desc, std::size_t image) {
+  return image < desc.decoded_images.size() && !desc.decoded_images[image].empty();
+}
+
 // Roughly what a picture sends: its pixels, or its file's bytes when it was not decoded yet.
 std::size_t picture_bytes(const SceneDesc& desc, std::size_t image) {
-  if (image < desc.decoded_images.size() && !desc.decoded_images[image].empty())
-    return desc.decoded_images[image].rgba.size();
+  if (has_decoded(desc, image)) return desc.decoded_images[image].pixels.size();
   return desc.images[image].encoded.size();
 }
 

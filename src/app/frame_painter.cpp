@@ -2,10 +2,10 @@
 
 namespace redgem {
 
-bool FramePainter::prepare(const SceneDesc& desc, int generation, std::size_t bytes) {
+bool FramePainter::prepare(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget) {
   if (generation != prepared_generation_) drop_prepared();
   prepared_generation_ = generation;
-  return renderer_.stage(desc, bytes);
+  return renderer_.stage(desc, bytes, budget);
 }
 
 void FramePainter::drop_prepared() {
