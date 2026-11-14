@@ -248,6 +248,8 @@ until 1.0, a release may change what games rely on (see
 - In a network game, a machine that is not the host can no longer load a level on its own
   (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
   objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
+- **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
+  links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
   side by side instead of waiting for each other's blocks, and writes of the same key still wait,
   so no change is lost. A block that writes a second key another room is updating waits at most
