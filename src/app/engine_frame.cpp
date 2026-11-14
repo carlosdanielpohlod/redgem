@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "app/scene_bodies.hpp"
+#include "app/debug_labels.hpp"
 #include "app/profile_overlay.hpp"
 #include "app/scene_water.hpp"
 #include "app/touch_circles.hpp"
@@ -37,6 +38,7 @@ void Engine::prepare_frame() {
   hand_on_capture();
   context_.hud.clear();
   debug_draw_.clear();
+  scripts_->vm().set_sampling(profiler_.enabled());
   if (!is_loading_scene()) scripts_->start_pending();
 }
 
@@ -189,7 +191,8 @@ void Engine::finish_fixed_step(float dt) {
 
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
-  append_profile_overlay(context_);
+  append_debug_labels(context_, debug_draw_);
+  append_profile_overlay(context_, {presenter_->gpu_timings(), &scripts_->vm().sampler().profile()});
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,

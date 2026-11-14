@@ -233,6 +233,12 @@ void Engine::connect_effects() {
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
 
+// The frame's statistics, and where the scripts' profile is exported to.
+void Engine::connect_profiling() {
+  context_.profiler = &profiler_;
+  context_.script_profile_file = kept_files(options_).script_profile;
+}
+
 void Engine::connect_world() {
   context_.scene = &scene_;
   context_.physics = physics_.get();
@@ -251,7 +257,7 @@ void Engine::fill_context(const GameSettings& settings) {
   connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
-  context_.profiler = &profiler_;
+  connect_profiling();
   context_.scene_name = options_.scene_name;
   connect_context();
 }
