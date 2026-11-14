@@ -407,6 +407,8 @@ TEST_CASE("requests answered just as their game ends, collected or not, end with
   // (Each game ends a little later than the one before: some answers came, some are on their way.)
   constexpr int kGames = 20;
   constexpr std::chrono::microseconds kLaterEachGame{250};
+  // Far less than kHttpShutdownWait: a game whose requests are answered or on the network ends at once.
+  constexpr std::chrono::milliseconds kAtOnce{500};
   HttpTestServer server(HttpTestServer::Kind::Plain, http_answer("200 OK", "{}"));
   for (int game = 0; game < kGames; ++game) {
     const auto ending = std::chrono::steady_clock::now();
@@ -416,7 +418,7 @@ TEST_CASE("requests answered just as their game ends, collected or not, end with
       std::this_thread::sleep_for(kLaterEachGame * game);
       if (game % 2 == 0) client.poll();  // an answer collected and its thread joined, or not yet
     }
-    CHECK(std::chrono::steady_clock::now() - ending < net::kHttpShutdownWait + kLaterEachGame * game);
+    CHECK(std::chrono::steady_clock::now() - ending < kAtOnce + kLaterEachGame * game);
   }
 }
 

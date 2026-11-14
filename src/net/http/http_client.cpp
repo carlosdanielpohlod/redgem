@@ -1,6 +1,5 @@
 #include "net/http/http_client.hpp"
 
-#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <optional>
@@ -32,18 +31,21 @@ struct HttpClient::Job {
         });
   }
 
-  // The thread's last word: its work is over, and joining it takes no time.
+  // The thread's last word: its work is over, and joining it takes a moment (what it holds is let go).
   void finish() {
     const std::lock_guard<std::mutex> lock(mutex_);
-    finished_.store(true);
+    finished_ = true;
     ended_.notify_all();
   }
-  bool finished() const { return finished_.load(); }
+  bool finished() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return finished_;
+  }
 
   // Joins the thread once it ended, by `deadline` at most: false when it had not, and is left behind.
   bool end_by(Deadline deadline) {
     std::unique_lock<std::mutex> lock(mutex_);
-    const bool ended = ended_.wait_until(lock, deadline, [this] { return finished(); });
+    const bool ended = ended_.wait_until(lock, deadline, [this] { return finished_; });
     lock.unlock();
     if (ended) {
       thread.join();
@@ -56,7 +58,7 @@ struct HttpClient::Job {
  private:
   std::mutex mutex_;
   std::condition_variable ended_;
-  std::atomic<bool> finished_{false};  // (set under mutex_, for end_by's wait; read without it by poll)
+  bool finished_ = false;  // (under mutex_)
 };
 
 namespace {
@@ -117,7 +119,7 @@ std::vector<HttpResult> HttpClient::poll() {
   for (auto& job : jobs_) {
     if (job->finished()) {
       results.push_back({job->id, std::move(job->response)});
-      job->thread.join();  // (its work is over: it is ending)
+      job->thread.join();  // (its work is over: it is ending, in a moment)
     } else {
       still_out.push_back(std::move(job));
     }
