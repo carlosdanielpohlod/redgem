@@ -4,7 +4,8 @@
 
 namespace redgem::shaders {
 
-// HDR scene + bloom -> exposure, filmic tone mapping (ACES fit), vignette, gamma.
+// HDR scene + bloom -> exposure (the environment's, times the adapted one when auto exposure is on:
+// see exposure.hpp, whose adaptedScale with_adapted_scale puts in), filmic tone mapping (ACES fit), vignette, gamma.
 // Alpha carries the luma, which the anti-aliasing pass reads.
 inline constexpr const char* kCompositeFragment = R"GLSL(
 #version 330
@@ -67,7 +68,7 @@ void main() {
     scene /= float(BLUR_TAPS);
   }
   scene *= mix(1.0, texture(occlusionTexture, fragTexCoord).r, occlusionAmount);
-  vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure;
+  vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure * adaptedScale();
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
   float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);

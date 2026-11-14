@@ -92,7 +92,8 @@ void Renderer::draw_plain(const Scene& scene, const Camera3D& camera, const Rend
   const int height = output != nullptr ? output->texture.height : GetRenderHeight();
   if (!has_area(width, height)) return;
   impl_->prepare_water_ripples(scene, water_ripples);
-  const Environment env = within_quality(scene_environment(scene), impl_->quality, impl_->gpu);
+  Environment env = within_quality(scene_environment(scene), impl_->quality, impl_->gpu);
+  env.auto_exposure = with_overrides(env.auto_exposure, impl_->exposure_overrides);
   impl_->ensure_targets(width, height, env.msaa);
   impl_->temporal.viewer = viewer_of(scene);
   const float aspect = static_cast<float>(width) / static_cast<float>(height);
@@ -108,6 +109,8 @@ GpuTimings Renderer::gpu_timings() const { return impl_->gpu_timers.timings(); }
 void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
+
+void Renderer::set_auto_exposure(const AutoExposureOverrides& overrides) { impl_->exposure_overrides = overrides; }
 
 void Renderer::set_quality(const QualityCaps& caps) { impl_->quality = caps; }
 

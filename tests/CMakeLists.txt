@@ -103,6 +103,7 @@ add_executable(redgem_tests
   unit/project_files_test.cpp
   unit/game_scenes_test.cpp
   unit/environment_test.cpp
+  unit/auto_exposure_test.cpp
   unit/scene_lights_test.cpp
   unit/local_shadows_test.cpp
   unit/gpu_select_test.cpp
@@ -597,6 +598,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/display_render_test.cpp
                render_system/camera_marker_render_test.cpp
                render_system/local_shadow_render_test.cpp
+               render_system/exposure_foliage_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

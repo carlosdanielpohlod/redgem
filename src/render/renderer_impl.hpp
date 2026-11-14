@@ -167,6 +167,9 @@ struct SkyTextures {
 };
 
 inline constexpr std::size_t kHistories = 2;  // the mixed frames: this one's, and the last one's
+// Auto exposure's adapted brightness: this frame's and the last one's, a texel each.
+inline constexpr std::size_t kExposures = 2;
+inline constexpr int kExposureSide = 1;
 
 // Temporal anti-aliasing's state from frame to frame (see temporal.hpp).
 struct TemporalState {
@@ -241,6 +244,8 @@ struct Renderer::Impl {
   Shader temporal_shader{};
   render_detail::TemporalUniforms temporal_uniforms;
   Shader sharpen_shader{};
+  Shader luminance_shader{};  // auto exposure: the picture's brightness measured, then adapted to
+  Shader adapt_shader{};
   // Targets whose size does not follow the window.
   RenderTexture2D shadow{};  // depth of the scene seen from the sun (no color)
   // Depth seen from the point and spot lights that cast shadows, in tiles (see local_shadows.hpp):
@@ -248,6 +253,12 @@ struct Renderer::Impl {
   RenderTexture2D local_shadow{};
   RenderTexture2D reflection_face{};  // one 90-degree view of the surroundings
   RenderTexture2D panorama{};         // all of them, as longitude x latitude, with mips
+  // Auto exposure: the lit picture's mean log2 luminance, cell by cell, and the brightness the
+  // exposure is adapted to (a single texel), this frame's and the last one's in turn.
+  RenderTexture2D luminance{};
+  std::array<RenderTexture2D, render_detail::kExposures> exposures{};
+  std::size_t latest_exposure = 0;  // which of them holds the newest
+  render_math::ExposureHistory exposure_history;
   // Post-processing targets, sized like the output.
   RenderTexture2D debug_output{};  // opt-in native-window overlay target; follows its own size
   std::pair<int, int> refused_debug_size{};
@@ -296,9 +307,10 @@ struct Renderer::Impl {
   std::unordered_map<std::string, Texture2D> ui_images;  // by name; missing files keep a cached checkerboard
   // What the game asked for.
   bool show_prefabs = false;
-  std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
-  float motion_blur = 0.0f;         // 0..1 (Camera.motion_blur)
-  std::optional<double> clock;      // seconds (Renderer::set_clock); nothing: the real time
+  std::uint64_t scene_uploads = 0;           // scenes uploaded so far: what a frame was drawn of
+  float motion_blur = 0.0f;                  // 0..1 (Camera.motion_blur)
+  AutoExposureOverrides exposure_overrides;  // what the game's camera changes of auto exposure
+  std::optional<double> clock;               // seconds (Renderer::set_clock); nothing: the real time
   float now() const { return static_cast<float>(clock ? *clock : GetTime()); }
   // The frame being drawn.
   std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
@@ -327,6 +339,7 @@ struct Renderer::Impl {
   std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
   float glow_limit = 0.0f;            // of the environment (0: glowing particles are not gathered apart)
+  float foliage_translucency = 0.0f;  // of the environment
   bool glow_gathered = false;         // this frame's glowing particles wait in `glow`
   Vector3 sun_travel{};               // direction the sun's light travels
   std::array<Matrix, render_math::kMaxShadowCascades> light_matrices{};  // into each cascade's view
@@ -358,6 +371,7 @@ struct Renderer::Impl {
   // Shaders, their uniforms, the shadow map, the reflection targets and the sky.
   void load_pipeline();
   void compile_shaders();
+  void compile_post_shaders();
   // The lit shader with these features (compiled again only when they change: the sky picture or
   // soft shadows switched on or off).
   void compile_lit(const shaders::LitFeatures& features);
@@ -673,9 +687,18 @@ struct Renderer::Impl {
   // screen when null).
   void post_process(const Environment& env, const RenderTexture2D* output);
   void draw_occlusion();
-  void draw_bloom();
+  void draw_bloom(const AutoExposure& exposure);
   // Blurs `picture` across, then down. `scratch` (the same size) holds the half-way result.
   void blur(const RenderTexture2D& picture, const RenderTexture2D& scratch);
+  // Auto exposure, before bloom (whose threshold is of the exposed picture): measures the lit
+  // picture's brightness and adapts the exposure to it (when the settings have it on; off, the
+  // next time it is on starts anew).
+  void adapt_exposure(const AutoExposure& settings);
+  void measure_luminance();
+  void send_adaptation(const AutoExposure& settings);
+  // What a pass that exposes the picture (the bloom threshold, tone mapping) takes of auto exposure,
+  // while it is being drawn with.
+  void send_exposure(const Shader& pass, const AutoExposure& settings);
   void tone_map(const Environment& env);
   void send_grade(const Environment& env);
   void antialias(const RenderTexture2D* output);

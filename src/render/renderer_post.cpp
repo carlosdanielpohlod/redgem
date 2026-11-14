@@ -1,5 +1,6 @@
 // From the lit picture to the one on screen: the frames before mixed in (temporal anti-aliasing),
-// ambient occlusion, bloom, tone mapping and anti-aliasing (or sharpening), each a full-screen pass.
+// ambient occlusion, bloom, auto exposure, tone mapping and anti-aliasing (or sharpening), each a
+// full-screen pass.
 
 #include "render/renderer_impl.hpp"
 
@@ -12,6 +13,8 @@ namespace redgem {
 namespace {
 
 using namespace render_detail;
+using render_math::kOff;
+using render_math::kOn;
 
 // Bloom: what is brighter than the threshold (in linear light) glows.
 constexpr float kBloomThreshold = 1.0f;
@@ -45,7 +48,8 @@ void Renderer::Impl::post_process(const Environment& env, const RenderTexture2D*
   rlDisableColorBlend();  // these passes replace pixels (alpha carries data, not transparency)
   if (temporal.on) resolve_temporal();
   if (env.ambient_occlusion > 0.0f) draw_occlusion();
-  draw_bloom();
+  adapt_exposure(env.auto_exposure);
+  draw_bloom(env.auto_exposure);
   tone_map(env);
   antialias(output);
   rlEnableColorBlend();
@@ -64,10 +68,16 @@ void Renderer::Impl::draw_occlusion() {
   blur(occlusion_a, occlusion_b);
 }
 
-// The bright parts of the picture, at a fraction of its size, blurred until they glow.
-void Renderer::Impl::draw_bloom() {
+// The bright parts of the picture as it will be exposed, at a fraction of its size, blurred until
+// they glow.
+void Renderer::Impl::draw_bloom(const AutoExposure& exposure) {
+  BeginTextureMode(bloom_a);
+  BeginShaderMode(bright_shader);
   send(bright_shader, shaders::kThreshold, kBloomThreshold);
-  apply_effect(bloom_a, bright_shader, lit_picture());
+  send_exposure(bright_shader, exposure);
+  draw_full(lit_picture(), bloom_a.texture.width, bloom_a.texture.height);
+  EndShaderMode();
+  EndTextureMode();
   for (int i = 0; i < kBloomBlurPasses; ++i) blur(bloom_a, bloom_b);
 }
 
@@ -79,11 +89,54 @@ void Renderer::Impl::blur(const RenderTexture2D& picture, const RenderTexture2D&
   apply_effect(picture, blur_shader, scratch);
 }
 
+void Renderer::Impl::adapt_exposure(const AutoExposure& settings) {
+  if (!settings.enabled) {
+    exposure_history.adapted = false;
+    return;
+  }
+  measure_luminance();
+  const std::size_t next = (latest_exposure + 1) % kExposures;
+  BeginTextureMode(exposures[next]);
+  BeginShaderMode(adapt_shader);
+  send_adaptation(settings);
+  draw_full(exposures[latest_exposure], kExposureSide, kExposureSide);
+  EndShaderMode();
+  EndTextureMode();
+  latest_exposure = next;
+  exposure_history = {true, temporal.viewer, scene_uploads, now()};
+}
+
+// The mean log2 luminance of each cell of the lit picture, into `luminance`.
+void Renderer::Impl::measure_luminance() {
+  const float cell = texel_of(render_math::kLuminanceSide);
+  send(luminance_shader, shaders::kCellSize, Vector2{cell, cell});
+  apply_effect(luminance, luminance_shader, lit_picture());
+}
+
+void Renderer::Impl::send_adaptation(const AutoExposure& settings) {
+  SetShaderValueTexture(adapt_shader, GetShaderLocation(adapt_shader, shaders::kLuminanceTexture), luminance.texture);
+  send(adapt_shader, shaders::kLuminanceSide, render_math::kLuminanceSide);
+  const bool anew = render_math::starts_anew(exposure_history, temporal.viewer, scene_uploads);
+  const float seconds = render_math::adapt_seconds(exposure_history, now());
+  const std::pair<const char*, float> values[] = {
+      {shaders::kMinEv, settings.min_ev},     {shaders::kMaxEv, settings.max_ev},
+      {shaders::kSpeedUp, settings.speed_up}, {shaders::kSpeedDown, settings.speed_down},
+      {shaders::kAdaptSeconds, seconds},      {shaders::kStartAnew, anew ? kOn : kOff}};
+  for (const auto& [name, value] : values) send(adapt_shader, name, value);
+}
+
+void Renderer::Impl::send_exposure(const Shader& pass, const AutoExposure& settings) {
+  SetShaderValueTexture(pass, GetShaderLocation(pass, shaders::kExposureTexture), exposures[latest_exposure].texture);
+  send(pass, shaders::kAutoExposure, settings.enabled ? kOn : kOff);
+  send(pass, shaders::kExposureCompensation, settings.compensation);
+}
+
 // Linear HDR + bloom + ambient occlusion -> the graded picture, with its luma in alpha.
 void Renderer::Impl::tone_map(const Environment& env) {
   BeginTextureMode(ldr);
   BeginShaderMode(composite_shader);
   send_grade(env);
+  send_exposure(composite_shader, env.auto_exposure);
   SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kBloomTexture), bloom_a.texture);
   send(composite_shader, shaders::kOcclusionAmount, env.ambient_occlusion);
   SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kOcclusionTexture),

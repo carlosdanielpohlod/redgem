@@ -8,12 +8,14 @@
 #include <string>
 #include <vector>
 
+#include "render/auto_exposure.hpp"
 #include "render/gpu_profile.hpp"
 #include "render/local_shadows.hpp"
 #include "render/shader_source.hpp"
 #include "render/shaders/ambient_occlusion.hpp"
 #include "render/shaders/antialias.hpp"
 #include "render/shaders/bloom.hpp"
+#include "render/shaders/exposure.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shaders/lit_vertex.hpp"
 #include "render/shaders/motion.hpp"
@@ -42,14 +44,24 @@ constexpr const char* kNoVersion = "void main() {}";
 constexpr const char* kVersionWord = "#version";
 constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
-const std::string kEngineShaders[] = {shaders::lit_vertex(),       shaders::lit_fragment(),
-                                      shaders::depth_fragment(),   shaders::kSkyVertex,
-                                      shaders::kSkyFragment,       shaders::particle_fragment(),
-                                      shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
-                                      shaders::kBrightFragment,    shaders::kBlurFragment,
-                                      shaders::kCompositeFragment, shaders::kAntialiasFragment,
-                                      shaders::motion_vertex(),    shaders::motion_fragment(),
-                                      shaders::kTemporalFragment,  shaders::kSharpenFragment};
+const std::string kEngineShaders[] = {shaders::lit_vertex(),
+                                      shaders::lit_fragment(),
+                                      shaders::depth_fragment(),
+                                      shaders::kSkyVertex,
+                                      shaders::kSkyFragment,
+                                      shaders::particle_fragment(),
+                                      shaders::kPanoramaFragment,
+                                      shaders::kAmbientOcclusionFragment,
+                                      shaders::with_adapted_scale(shaders::kBrightFragment),
+                                      shaders::kBlurFragment,
+                                      shaders::with_adapted_scale(shaders::kCompositeFragment),
+                                      shaders::kAntialiasFragment,
+                                      shaders::motion_vertex(),
+                                      shaders::motion_fragment(),
+                                      shaders::kTemporalFragment,
+                                      shaders::kSharpenFragment,
+                                      shaders::kLuminanceFragment,
+                                      shaders::kAdaptFragment};
 
 std::string desktop_source() { return std::string(kNote) + shaders::kDesktopVersionLine + kBody; }
 
@@ -234,4 +246,23 @@ TEST_CASE("the lit shader's shadows of point and spot lights use the renderer's 
   CHECK(render_math::kStraightUpOrDown == doctest::Approx(0.99f));
   CHECK(contains(lit, std::string("uniform vec4 ") + shaders::kPointLightSpots));
   CHECK(contains(shaders::kParticleVertex, std::string("uniform vec4 ") + shaders::kPointLightSpots));
+}
+
+TEST_CASE("the tone mapping pass takes auto exposure's adapted brightness, and the lit pass light through leaves") {
+  for (const char* pass : {shaders::kCompositeFragment, shaders::kBrightFragment}) {
+    const std::string exposed = shaders::with_adapted_scale(pass);
+    CHECK(starts_with(exposed.substr(exposed.find(kVersionWord)), shaders::kDesktopVersionLine));
+    CHECK(contains(exposed, std::string("uniform sampler2D ") + shaders::kExposureTexture));
+    CHECK(contains(exposed, std::string("uniform float ") + shaders::kAutoExposure));
+    CHECK(contains(exposed, std::string("uniform float ") + shaders::kExposureCompensation));
+    CHECK(exposed.find(kVersionWord) < exposed.find(shaders::kExposureTexture));  // after its version line
+  }
+  CHECK(contains(shaders::kAdaptFragment, std::string("uniform sampler2D ") + shaders::kLuminanceTexture));
+  CHECK(contains(shaders::kLuminanceFragment, std::string("uniform vec2 ") + shaders::kCellSize));
+  CHECK(contains(shaders::lit_fragment(), std::string("uniform float ") + shaders::kFoliageTranslucency));
+}
+
+TEST_CASE("the adaptation shader exposes for middle grey as the engine's math does") {
+  const std::string grey = std::to_string(render_math::kMiddleGreyLog2).substr(0, 6);  // "-2.473"
+  CHECK(contains(shaders::kAdaptFragment, "MIDDLE_GREY_LOG2 = " + grey));
 }

@@ -87,8 +87,22 @@ the same pull request.
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
-  probes or baked lighting, so interiors and deep shade are lit by the sky. Exposure is a fixed
-  environment property; there is no eye adaptation.
+  probes or baked lighting, so interiors and deep shade are lit by the sky. Baked lightmaps are a
+  planned follow-up.
+- Auto exposure (`auto_exposure = true`) measures the whole picture, every pixel alike: there is
+  no metering that favors the middle of the picture, no histogram that leaves out the darkest and
+  brightest pixels, and no exposure for a part of the screen (a minimap). It samples a 256 x 256
+  grid of the picture rather than every pixel, so at high resolutions a small, very bright spot
+  (a glint, a distant lamp) can fall between samples as the camera moves; the slow adaptation
+  hides most of it. Its state is one per
+  renderer: a game drawn through two cameras in the same frame (a split screen) shares one
+  exposure, which starts anew whenever the camera drawn changes. It has been seen on desktop
+  OpenGL only.
+- Leaves lit from behind (`foliage_translucency`) take the sun's light only, through every
+  textured cut-out or blended material alike, as if each were a thin leaf: point and spot lights
+  do not shine through, there is no per-material thickness or translucency map, and a fence
+  drawn as a cut-out glows in the sun the same way. Far-away foliage is still each copy's own
+  mesh: impostors and a separate far-grass layer are planned follow-ups.
 - A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can

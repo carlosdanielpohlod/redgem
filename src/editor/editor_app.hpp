@@ -222,6 +222,7 @@ class EditorApp {
   // The Scene view's picture.
   void render_viewport_texture();
   void draw_edited_scene();
+  void set_editor_view_options();
   void aim_viewport_camera();
   void sync_renderer_assets();
   void upload_preview_assets();
