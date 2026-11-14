@@ -140,8 +140,7 @@ void Engine::fixed_step(float dt) {
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
-  prepare_water();
-  bodies::push_poses(scene_, *physics_);
+  push_poses_and_float();
   physics_->step(dt);
   bodies::pull_poses(scene_, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
@@ -152,10 +151,13 @@ void Engine::fixed_step(float dt) {
   context_.time.elapsed += dt;
 }
 
-void Engine::prepare_water() {
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
+void Engine::push_poses_and_float() {
+  find_water();  // primes newly spawned or teleported bodies
+  bodies::push_poses(scene_, *physics_);
   apply_scene_buoyancy(water_, scene_, scene_desc_, *physics_);
 }
+
+void Engine::find_water() { update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f); }
 
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);

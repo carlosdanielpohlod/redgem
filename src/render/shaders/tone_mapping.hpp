@@ -99,8 +99,9 @@ void main() {
     scene /= float(BLUR_TAPS);
   }
   scene *= mix(1.0, texture(occlusionTexture, at).r, occlusionAmount);
-  scene = underwaterFog(scene, at);
-  vec3 color = (scene + texture(bloomTexture, at).rgb * bloomStrength) * exposure;
+  // Under water, the glow of bright things (the sun through the surface) fades into the water too.
+  scene = underwaterFog(scene + texture(bloomTexture, at).rgb * bloomStrength, at);
+  vec3 color = scene * exposure;
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
   float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);

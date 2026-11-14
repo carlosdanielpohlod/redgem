@@ -115,6 +115,7 @@ void Engine::build_world(const GameSettings& settings) {
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
+  find_water();
 }
 
 void Engine::open_presenter(const GameSettings& settings) {

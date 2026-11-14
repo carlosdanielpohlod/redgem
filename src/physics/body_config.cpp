@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <optional>
+#include <sstream>
 
 #include "physics/physics_config.hpp"
 #include "scene/props.hpp"
@@ -135,7 +136,9 @@ void read_density(const PropertyMap& props, BodyConfig& config) {
   if (!density) return;
   config.density = static_cast<float>(*density);
   if (usable_density(config.density)) return;
-  config.warnings.push_back("density must be positive, using " + std::to_string(kDefaultBodyDensity));
+  std::ostringstream warning;  // (the default as it is written: 500, not 500.000000)
+  warning << "density must be positive, using " << kDefaultBodyDensity;
+  config.warnings.push_back(warning.str());
   config.density = kDefaultBodyDensity;
 }
 

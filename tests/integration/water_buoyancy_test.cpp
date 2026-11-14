@@ -105,3 +105,10 @@ TEST_CASE("scripts ask where the water is: its height, how deep a point is, and 
   CHECK(ruby(*engine, "Water.depth_at(Vector3.new(0, -1.5, 0))") == "1.5");
   CHECK(ruby(*engine, "Water.depth_at([30, 0, 0]).inspect") == "nil");
 }
+
+TEST_CASE("a world just made has its water before its first step, for its scripts' first calls") {
+  auto engine = engine_for(pond_with("kinematic", std::nullopt));
+  // No frame yet: a script's start, or a game that starts paused, asks now.
+  CHECK(ruby(*engine, "Water.height_at(1, -2)") == "0.0");
+  CHECK(ruby(*engine, "Water.under?(Vector3.new(0, -1, 0))") == "true");
+}

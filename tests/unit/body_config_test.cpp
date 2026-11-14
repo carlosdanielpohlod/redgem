@@ -160,5 +160,6 @@ TEST_CASE("a body's density says how it floats, half as dense as water unless sa
   CHECK(stone.warnings.empty());
   const BodyConfig wrong = body_config_from_props({{"body", std::string("dynamic")}, {"density", -3.0}});
   CHECK(wrong.density == doctest::Approx(kDefaultBodyDensity));
-  CHECK(wrong.warnings.size() == 1);
+  REQUIRE(wrong.warnings.size() == 1);
+  CHECK(wrong.warnings.front() == "density must be positive, using 500");
 }

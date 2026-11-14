@@ -66,6 +66,7 @@ void Engine::replace_world(SceneDesc desc) {
   scene_ = Scene::from_desc(scene_desc_);
   water_.reset(scene_desc_);
   make_bodies();
+  find_water();
   context_.physics = physics_.get();
 }
 
