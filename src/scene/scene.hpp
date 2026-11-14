@@ -143,6 +143,7 @@ class Scene {
   std::vector<ObjectId> clone(ObjectId source);
   // The same, as (original, its copy) pairs in that order.
   std::vector<std::pair<ObjectId, ObjectId>> clone_pairs(ObjectId source);
+  std::vector<ObjectId> instantiate_rigid(const std::vector<NodeDesc>& nodes, int mesh_offset, const SceneDesc& assets);
   // The alive copies of an object of the loaded scene (see GameObject::copy_of).
   std::vector<ObjectId> copies_of(ObjectId original) const;
 

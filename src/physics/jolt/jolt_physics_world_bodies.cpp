@@ -59,7 +59,7 @@ void World::create_body(const BodyDesc& desc, const ShapeInfo& info, Record& rec
 void World::tell_bodies_full() {
   if (told_bodies_full_) return;
   told_bodies_full_ = true;
-  log::error("the physics world holds " + std::to_string(config::kMaxBodies) +
+  log::error("the physics world holds " + std::to_string(capacity_.bodies) +
              " bodies, all it can: objects added from now on get no body (no collisions, raycasts miss them) "
              "until others are destroyed");
 }

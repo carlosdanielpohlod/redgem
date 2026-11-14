@@ -27,6 +27,8 @@ void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<
     hear_while_joining(message, events);
   } else if (state_ == State::Online) {
     hear_of_the_game(message, events);
+  } else if (state_ == State::Reconnecting) {
+    hear_while_reconnecting(message, events);
   }
 }
 
@@ -35,7 +37,13 @@ void NetworkSession::hear_of_the_game(const nlohmann::json& message, std::vector
   if (kind == kArrived) peer_arrived(message.value(kFrom, 0), events);
   if (kind == kGone) peer_gone(message.value(kFrom, 0), events);
   if (kind == kAsking) hear_asking(message, events);
+  hear_of_reconnects(kind, message);
   if (is_game_message(message)) hear_from_game(message, events);
+}
+
+void NetworkSession::hear_of_reconnects(const std::string& kind, const nlohmann::json& message) {
+  if (kind == kBack) hear_back(message.value(kFrom, 0));
+  if (kind == kBye) links_.front().connection.close();  // the game is over: nothing to call back
 }
 
 void NetworkSession::hear_while_joining(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -67,6 +75,7 @@ void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<N
   }
   id_ = given;
   peers_ = others;
+  keep_resume(message);
   enter_game(message, events);
 }
 
@@ -94,6 +103,8 @@ bool NetworkSession::host_gone() const { return !links_.empty() && links_.front(
 
 void NetworkSession::end_game_if_host_gone(std::vector<NetworkEvent>& events) {
   if (!host_gone()) return;
+  if (state_ == State::Reconnecting) return call_failed(events);
+  if (can_reconnect()) return start_reconnecting(events);
   // The host is gone, and the game with it.
   const bool was_in = state_ == State::Online;
   NetworkEvent ended = NetworkEvent::of(was_in ? NetworkEvent::Kind::Disconnected : NetworkEvent::Kind::Failed);

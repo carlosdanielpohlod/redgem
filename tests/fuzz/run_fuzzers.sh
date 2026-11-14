@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${1:?usage: run_fuzzers.sh <build_dir> <seconds_each> <work_dir>}"
 SECONDS_EACH="${2:?usage: run_fuzzers.sh <build_dir> <seconds_each> <work_dir>}"
 WORK_DIR="${3:?usage: run_fuzzers.sh <build_dir> <seconds_each> <work_dir>}"
-TARGETS=(gltf image_header wire http_response json_scanner game_archive stun)
+TARGETS=(gltf image_header wire http_response json_scanner game_archive stun ktx2)
 # One input taking longer than this (seconds), or more memory than this (MB), is a finding.
 INPUT_TIMEOUT=10
 MEMORY_LIMIT_MB=2048

@@ -2,6 +2,7 @@ add_executable(redgem_tests
   test_main.cpp
   unit/math_test.cpp
   unit/collision_layers_test.cpp
+  unit/body_limit_test.cpp
   unit/nav_settings_test.cpp
   unit/nav_path_test.cpp
   unit/fixed_clock_test.cpp
@@ -39,6 +40,7 @@ add_executable(redgem_tests
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
+  unit/asset_search_test.cpp
   unit/mcp_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
@@ -49,6 +51,7 @@ add_executable(redgem_tests
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/webp_image_test.cpp
+  unit/ktx2_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/joint_config_test.cpp
@@ -94,6 +97,7 @@ add_executable(redgem_tests
   unit/inspector_typing_test.cpp
   unit/ui_widgets_test.cpp
   unit/editor_camera_test.cpp
+  unit/editor_preferences_test.cpp
   unit/gated_input_source_test.cpp
   unit/gizmo_test.cpp
   unit/scene_overlays_test.cpp
@@ -122,6 +126,8 @@ add_executable(redgem_tests
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
   unit/water_interactions_test.cpp
+  unit/water_volume_test.cpp
+  unit/buoyancy_test.cpp
   unit/sky_light_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
@@ -157,7 +163,10 @@ add_executable(redgem_tests
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
+  unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
+  unit/movement_validator_test.cpp
+  unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp
   unit/stun_probe_test.cpp
@@ -177,6 +186,9 @@ add_executable(redgem_tests
   unit/graph_animation_codec_test.cpp
   unit/animation_sync_test.cpp
   unit/clip_clock_test.cpp
+  unit/animation_markers_test.cpp
+  unit/animation_events_test.cpp
+  unit/root_motion_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
   unit/build_id_test.cpp
@@ -204,10 +216,13 @@ add_executable(redgem_tests
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
+  integration/water_buoyancy_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
   integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
+  integration/save_migration_api_test.cpp
+  integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
@@ -219,6 +234,7 @@ add_executable(redgem_tests
   integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
+  integration/animation_events_api_test.cpp
   integration/scatter_test.cpp
   integration/native_arguments_test.cpp
   integration/game_translations_test.cpp
@@ -229,6 +245,8 @@ add_executable(redgem_tests
   integration/http_client_test.cpp
   integration/http_game_test.cpp
   integration/network_session_test.cpp
+  integration/network_reconnect_test.cpp
+  integration/movement_validation_test.cpp
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp
@@ -245,12 +263,17 @@ add_executable(redgem_tests
   integration/game_project_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
+  integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
   integration/error_hints_test.cpp
   integration/agent_connection_test.cpp)
 # (zlib: the tests compress the answers their web servers send.)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest redgem_zlib)
+# (The editor's Ruby evaluation is in development builds only, and so are its tests.)
+if(REDGEM_RUBY_EVAL)
+  target_sources(redgem_tests PRIVATE integration/ruby_eval_test.cpp)
+endif()
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)
@@ -328,6 +351,20 @@ add_test(NAME app.check_catches_test_code
 # (Matched on its message: a script that did not run must not count as "it failed as expected".)
 set_tests_properties(app.check_catches_test_code PROPERTIES
   PASS_REGULAR_EXPRESSION "test code in .*redgem-test: \"SystemTest\"")
+
+# The player and the game server never have the editor's Ruby evaluation; nor has redgem in a
+# release build (REDGEM_RUBY_EVAL off: the release workflow runs the same script on it).
+add_test(NAME app.ships_no_ruby_eval
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_ruby_eval.sh
+                 $<TARGET_FILE:redgem_player> $<TARGET_FILE:redgem_server>)
+if(REDGEM_RUBY_EVAL)
+  # Guards the check itself: redgem, built with the evaluation here, must fail it.
+  add_test(NAME app.check_catches_ruby_eval
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_ruby_eval.sh $<TARGET_FILE:redgem>)
+  # (Matched on its message: a script that did not run must not count as "it failed as expected".)
+  set_tests_properties(app.check_catches_ruby_eval PROPERTIES
+    PASS_REGULAR_EXPRESSION "ruby eval in [^\n]*redgem: \"game_eval\".*ruby eval in [^\n]*redgem: \"--ruby-eval\".*ruby eval in [^\n]*redgem: \"ruby eval token\"")
+endif()
 
 # The program games ship as has none of the tools games are made with in it (no editor, no project
 # hub, no templates, no packer of phone apps, no relay), and the relay has nothing that draws.
@@ -591,6 +628,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/mirrored_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
+               render_system/ktx2_render_test.cpp
                render_system/material_pictures_render_test.cpp
                render_system/morph_render_test.cpp
                render_system/game_font_render_test.cpp
@@ -609,6 +647,15 @@ target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_
   REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
+
+# Window after window in one process, as the render system tests open them (render/window.cpp):
+# Linux only, where glibc's limit on libraries loaded again is.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(redgem_window_reopen_tests render_system/render_test_main.cpp render_system/window_reopen_test.cpp)
+  target_link_libraries(redgem_window_reopen_tests PRIVATE redgem_runtime doctest::doctest)
+  add_test(NAME system.render.windows_reopen COMMAND redgem_window_reopen_tests)
+  set_tests_properties(system.render.windows_reopen PROPERTIES LABELS system RUN_SERIAL TRUE)
+endif()
 
 # Games whose scene is generated from downloaded assets (not committed) are tested when it is
 # there, and reported as skipped when it is not: a test that did not run never counts as passed.

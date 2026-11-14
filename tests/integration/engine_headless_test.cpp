@@ -2,6 +2,7 @@
 
 #include <mruby.h>
 #include <mruby/string.h>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@
 #include "app/window_presenter.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
+#include "script/script_config.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
@@ -847,7 +849,11 @@ struct NamedSandbox {
   NamedSandbox() {
     std::filesystem::remove_all(dir);
     std::filesystem::copy(fixture("games/sandbox"), dir, std::filesystem::copy_options::recursive);
-    std::ofstream(dir / kGameSettingsFile) << R"({"studio": "RedGem Tests", "title": "Data Folder Sandbox"})";
+    // (Its scripts save: they are given the time for a slow disk.)
+    const nlohmann::json settings = {{"studio", "RedGem Tests"},
+                                     {"title", "Data Folder Sandbox"},
+                                     {config::kScriptBudgetKey, test::kSlowDiskScriptBudgetMs}};
+    std::ofstream(dir / kGameSettingsFile) << settings.dump();
     std::filesystem::remove_all(developer_data_folder(dir));
   }
   ~NamedSandbox() {

@@ -128,12 +128,15 @@ inline constexpr const char* kClearcoatFactor = "clearcoatFactor";
 inline constexpr const char* kClearcoatRoughnessFactor = "clearcoatRoughnessFactor";
 inline constexpr const char* kEmissiveStrengthExtension = "KHR_materials_emissive_strength";
 inline constexpr const char* kWebpTextureExtension = "EXT_texture_webp";  // a texture showing a WebP picture
+// (Read, not written: a texture showing a KTX2 picture of Basis Universal data.)
+inline constexpr const char* kBasisuTextureExtension = "KHR_texture_basisu";
 
 // What an image says its picture is ("mimeType"), and the kinds of picture the editor writes.
 inline constexpr const char* kMimeType = "mimeType";
 inline constexpr const char* kPngMime = "image/png";
 inline constexpr const char* kJpegMime = "image/jpeg";
 inline constexpr const char* kWebpMime = "image/webp";
+inline constexpr const char* kKtx2Mime = "image/ktx2";  // (carried in when linked, never added)
 
 // What a document made here says about itself.
 inline constexpr const char* kGltfVersion = "2.0";

@@ -1,7 +1,7 @@
 {
   "description": "Every class and method of the scripting API, a line each (also: redgem api).",
   "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
-  "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
+  "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "internal_classes": [
     "Behaviour::Timer",
     "Behaviour::Tween",
@@ -18,6 +18,7 @@
     "Network::Said",
     "NetworkSync::Snapshots",
     "NetworkSync::Snapshots::Pose",
+    "Save::Spawns",
     "UI::TextBlock",
     "UI::Wrapping"
   ],
@@ -69,6 +70,17 @@
         {
           "name": "on_destroy",
           "about": "the object is being destroyed"
+        },
+        {
+          "name": "persist",
+          "static": true,
+          "args": "*fields",
+          "about": "fields Save.checkpoint keeps for a spawned copy, given back before it starts"
+        },
+        {
+          "name": "persisted_fields",
+          "static": true,
+          "about": "what persist named, in this class and those above it"
         },
         {
           "name": "game_object",
@@ -639,6 +651,12 @@
           "about": "copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy",
           "top": 20,
           "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
+        },
+        {
+          "name": "spawn_prefab",
+          "static": true,
+          "args": "file, position: nil, rotation: nil, physics: true, name: nil, parent: nil",
+          "about": "instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root"
         }
       ],
       "guide": "gameplay.md"
@@ -889,6 +907,17 @@
           "about": "whether a gamepad button went up this frame"
         },
         {
+          "name": "rumble?",
+          "static": true,
+          "about": "whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)"
+        },
+        {
+          "name": "rumble",
+          "static": true,
+          "args": "pad, strength, seconds",
+          "about": "rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)"
+        },
+        {
           "name": "text",
           "static": true,
           "about": "what was typed this frame"
@@ -1127,6 +1156,33 @@
       ],
       "guide": "gameplay.md#chase-the-player-navigation",
       "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+    },
+    {
+      "name": "Water",
+      "about": "Where the scene's water is: the height of its surface, and how deep a point is under it.",
+      "methods": [
+        {
+          "name": "height_at",
+          "static": true,
+          "args": "x, z",
+          "about": "the height of the water surface over that point of the ground, or nil where there is no water",
+          "example": "level = Water.height_at(transform.position.x, transform.position.z)"
+        },
+        {
+          "name": "depth_at",
+          "static": true,
+          "args": "point",
+          "about": "how far below the water surface a point is in meters (negative above it), or nil where there is no water"
+        },
+        {
+          "name": "under?",
+          "static": true,
+          "args": "point",
+          "about": "whether a point is below the water surface"
+        }
+      ],
+      "guide": "gameplay.md#float-in-water",
+      "notes": "Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game."
     },
     {
       "name": "CharacterController",
@@ -1528,8 +1584,8 @@
       "methods": [
         {
           "name": "play",
-          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false",
-          "about": "plays a clip, fading from the last one",
+          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil",
+          "about": "plays a clip, fading from the last one; root_motion: true lets the clip move the object",
           "top": 23,
           "example": "animation.play(:Run, fade: 0.2)"
         },
@@ -1576,6 +1632,31 @@
         {
           "name": "state",
           "about": "the graph's state, or nil"
+        },
+        {
+          "name": "on",
+          "args": "clip, at: nil, seconds: nil, &block",
+          "about": "calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes",
+          "example": "animation.on(:Attack, at: 0.4) { |event| hit }"
+        },
+        {
+          "name": "on_marker",
+          "args": "name, &block",
+          "about": "calls the block each time a clip passes a marker of that name authored in Blender"
+        },
+        {
+          "name": "off",
+          "args": "listener",
+          "about": "stops calling a block that on or on_marker returned"
+        },
+        {
+          "name": "root_motion=",
+          "args": "on",
+          "about": "whether all its clips move the object by their root's horizontal motion and turning"
+        },
+        {
+          "name": "root_motion?",
+          "about": "whether all its clips move the object"
         }
       ],
       "guide": "animation.md"
@@ -1612,6 +1693,29 @@
         }
       ],
       "guide": "animation.md"
+    },
+    {
+      "name": "Animation::Event",
+      "about": "What the block of an animation event is given (animation.on).",
+      "methods": [
+        {
+          "name": "game_object",
+          "about": "the object that listened"
+        },
+        {
+          "name": "clip",
+          "about": "the clip's name"
+        },
+        {
+          "name": "name",
+          "about": "the marker's name, or nil for a moment the script named"
+        },
+        {
+          "name": "at",
+          "about": "where in the clip, from 0 (its start) to 1 (its end)"
+        }
+      ],
+      "guide": "animation.md#events"
     },
     {
       "name": "Audio",
@@ -2529,10 +2633,39 @@
           "name": "slots",
           "static": true,
           "about": "sorted names of persisted slots and slots opened in this run, including default"
+        },
+        {
+          "name": "version",
+          "static": true,
+          "about": "the version of the saved data this game writes, or nil"
+        },
+        {
+          "name": "version=",
+          "static": true,
+          "args": "number",
+          "about": "declares that version (1 or more): older slots are migrated, newer ones refused"
+        },
+        {
+          "name": "migrate",
+          "static": true,
+          "args": "from:, &block",
+          "about": "the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one"
+        },
+        {
+          "name": "checkpoint",
+          "static": true,
+          "args": "key = :checkpoint",
+          "about": "keeps this scene's spawned objects whose behaviours persist fields; returns how many"
+        },
+        {
+          "name": "restore_checkpoint",
+          "static": true,
+          "args": "key = :checkpoint",
+          "about": "spawns them again in place of the current ones; returns the new copies"
         }
       ],
       "guide": "online-services.md#saving-on-a-server",
-      "notes": "Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata."
+      "notes": "Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Each slot records the Save.version that wrote it: the first use of a slot (or Save.slot =) runs the migration hooks it needs, in order, and writes the result back at once; a slot from a newer game, or one a hook raised on, is left untouched and every use of it raises a RuntimeError saying why (Save.slot = then keeps the previous slot). A slot written before the game declared a version counts as version 1."
     },
     {
       "name": "HTTP",
@@ -2683,6 +2816,22 @@
           "about": "whether a join is on its way"
         },
         {
+          "name": "reconnecting?",
+          "static": true,
+          "about": "whether this machine's connection dropped and it is getting back in"
+        },
+        {
+          "name": "reconnect_window",
+          "static": true,
+          "about": "seconds the game hosted here holds a dropped player's place (0: none)"
+        },
+        {
+          "name": "reconnect_window=",
+          "static": true,
+          "args": "seconds",
+          "about": "holds a dropped player's place and id that long, up to 300 (0 turns it off)"
+        },
+        {
           "name": "host?",
           "static": true,
           "about": "whether this machine hosts"
@@ -2706,6 +2855,23 @@
           "name": "players",
           "static": true,
           "about": "the peers without a dedicated server"
+        },
+        {
+          "name": "validate_movement",
+          "static": true,
+          "args": "max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false",
+          "about": "on the host: corrects the others' objects that move faster or further than this (no limits: off)"
+        },
+        {
+          "name": "movement_rules",
+          "static": true,
+          "about": "the movement validation settings, as a hash"
+        },
+        {
+          "name": "movement_violations",
+          "static": true,
+          "args": "peer",
+          "about": "how many moves of a machine the host did not believe in this game"
         },
         {
           "name": "port",
@@ -2800,6 +2966,24 @@
           "static": true,
           "args": "&block",
           "about": "a join did not work out: |reason|"
+        },
+        {
+          "name": "on_reconnecting",
+          "static": true,
+          "args": "&block",
+          "about": "a connection dropped and its place is held: |peer|"
+        },
+        {
+          "name": "on_reconnected",
+          "static": true,
+          "args": "&block",
+          "about": "a dropped machine is back in its place: |peer|"
+        },
+        {
+          "name": "on_lost",
+          "static": true,
+          "args": "&block",
+          "about": "this machine could not get back in time: |reason|"
         },
         {
           "name": "authenticate",
