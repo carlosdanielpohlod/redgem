@@ -273,6 +273,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries now stay loaded once a window has
+  opened. A system test opens, draws in and closes 300 windows in one process.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

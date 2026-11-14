@@ -3,8 +3,11 @@
 #include <raylib.h>
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "core/log.hpp"
 #include "render/gl_extras.hpp"
@@ -12,6 +15,9 @@
 
 // On desktop Linux raylib opens windows through the GLFW it is built with (see windowing_started).
 #if defined(__linux__) && !defined(__ANDROID__)
+#include <dlfcn.h>
+#include <link.h>
+
 extern "C" int glfwInit(void);
 #endif
 
@@ -32,6 +38,35 @@ bool windowing_started() {
   return true;
 #endif
 }
+
+#if defined(__linux__) && !defined(__ANDROID__)
+constexpr int kKeepIterating = 0;  // what a dl_iterate_phdr callback returns to see the next library
+
+// Whether a loaded object is a library with a name (the program itself has none).
+bool named_library(const char* name) { return name != nullptr && name[0] != '\0'; }
+
+int add_library_name(dl_phdr_info* info, std::size_t /*size*/, void* names) {
+  if (named_library(info->dlpi_name)) static_cast<std::vector<std::string>*>(names)->emplace_back(info->dlpi_name);
+  return kKeepIterating;
+}
+
+// Keeps every library loaded so far in the process until it ends. Closing a window, GLFW unloads
+// the OpenGL library and Mesa its driver, and opening the next loads them again; glibc does not
+// take back the thread-local storage a library loaded at run time is given, so after about a
+// hundred windows in one process the driver no longer loads ("GLX: No GLXFBConfigs returned").
+// Kept loaded, the next window finds them there. (Names are gathered first: dlopen is not called
+// while dl_iterate_phdr walks the list.)
+void keep_libraries_loaded() {
+  std::vector<std::string> names;
+  dl_iterate_phdr(add_library_name, &names);
+  for (const std::string& name : names) {
+    void* library = dlopen(name.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
+    if (library != nullptr) dlclose(library);  // the flag stays; only this reference is given back
+  }
+}
+#else
+void keep_libraries_loaded() {}  // the limit above is glibc's
+#endif
 
 constexpr int kTraceLineLength = 512;  // characters of a raylib log line that are kept
 
@@ -58,6 +93,7 @@ void open_window(const WindowSettings& settings) {
   SetTraceLogCallback(nullptr);
   SetTraceLogLevel(LOG_WARNING);
   if (!IsWindowReady()) throw std::runtime_error("cannot open a window");
+  keep_libraries_loaded();
 }
 
 }  // namespace
