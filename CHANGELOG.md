@@ -20,6 +20,28 @@ until 1.0, a release may change what games rely on (see
   the host shows it the spawned objects as they are now. A player who leaves, and a host that
   leaves, now say goodbye, so no place is held for them. Not in rooms on a relay, and there is
   no host migration (see KNOWN_LIMITATIONS.md).
+- **A second key or button per action on the controls page**: each row of the menu's controls
+  page has two cells of keys and two of gamepad buttons, so a player binds W and Up both to
+  "Move up". A key caught for the second cell is added beside the first, one caught for the first
+  keeps the second in its place, Delete, Backspace or a gamepad's Y clears the focused cell, and a
+  key the row already has changes nothing. Both are kept for the next runs.
+- **`Input.rumble(pad, strength, seconds)` and `Input.rumble?`**: a hook for gamepad vibration
+  that does nothing yet (raylib 5.5 has none on desktops or Android) and says so: `rumble?` is
+  false and `rumble` returns false, checking its arguments all the same.
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
+- **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
+  (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
+  format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
+  ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
+  file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
+  encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
 
 - **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
   body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
@@ -341,6 +363,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
 - **A program on Linux opens as many windows, one after another, as it likes**: closing a window
   unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
   storage of a library loaded again, so after about a hundred windows in one process the driver
