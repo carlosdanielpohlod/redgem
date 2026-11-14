@@ -251,10 +251,10 @@ class InteractionTest < RedGemTest::Case
   def test_the_prompt_names_the_key
     target = interactable("Door", ahead(NEAR), prompt: "door.open")
     interactor = new_interactor
-    assert_equal "[E] door.open", interactor.prompt_label(target), "a key with no text shows as itself"
+    assert_equal "[E] door.open", interactor.prompt_label(target)
     assert_equal "[E] Interact", interactor.prompt_label(interactable("Thing", ahead(NEAR)))
     Input.unbind(Interaction::ACTION, key: :e)
     Input.bind(Interaction::ACTION, key: :f)
-    assert_equal "[F] door.open", interactor.prompt_label(target), "as the player bound it"
+    assert_equal "[F] door.open", interactor.prompt_label(target)
   end
 end

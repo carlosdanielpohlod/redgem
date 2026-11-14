@@ -37,7 +37,7 @@ module Interaction
     # client's hero (see NETWORK_SLACK).
     def best_for(actor, candidates = Interactable.all, lenient: false)
       in_reach = candidates.select { |target| reachable?(actor, target, lenient: lenient) }
-      in_reach.min_by { |target| [-target.priority, distance(actor, target)] }
+      in_reach.min { |one, other| before(actor, one, other) }
     end
 
     # Whether an actor can use a target now.
@@ -99,6 +99,11 @@ module Interaction
       return true if target.angle.nil?
 
       angle_to(actor, target) <= target.angle + (lenient ? NETWORK_ANGLE_SLACK : 0.0)
+    end
+
+    # How two targets an actor reaches compare: the higher priority first, then the nearer.
+    def before(actor, one, other)
+      (other.priority <=> one.priority).nonzero? || distance(actor, one) <=> distance(actor, other)
     end
 
     # Degrees between two directions that are not zero.
