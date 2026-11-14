@@ -173,3 +173,17 @@ TEST_CASE("selecting the same font from disk retains the built-in text scale") {
   const auto custom = MeasureTextEx(fonts.get("custom", "Sample"), "Sample", kTextPixels, 0).x;
   CHECK(custom == doctest::Approx(builtin).epsilon(kRoundingTolerance));
 }
+
+TEST_CASE("a text is drawn from an atlas made at least as tall as it is, never stretched up to the largest") {
+  constexpr int kSmallText = 20;
+  constexpr int kLargeText = 100;
+  constexpr int kHugeText = 300;
+  RenderStage stage;
+  GameFonts fonts;
+  CHECK(GameFonts::raster_pixels(GameFonts::kDefaultPixels) == GameFonts::kDefaultPixels);
+  CHECK(fonts.get("", "Sharp", kSmallText).baseSize == GameFonts::raster_pixels(kSmallText));
+  CHECK(GameFonts::raster_pixels(kSmallText) >= kSmallText);
+  CHECK(fonts.get("", "Sharp", kLargeText).baseSize >= kLargeText);
+  CHECK(fonts.get("", "Sharp", kHugeText).baseSize == GameFonts::raster_pixels(kHugeText));  // the largest
+  CHECK(fonts.get("", "Sharp", kSmallText).texture.id != fonts.get("", "Sharp", kLargeText).texture.id);
+}
