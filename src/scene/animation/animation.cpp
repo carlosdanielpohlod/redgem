@@ -70,6 +70,25 @@ ChannelValue sample_channel(const AnimationChannel& channel, float time) {
   return blended(a, b, 1.0f, around.blend, width);
 }
 
+std::vector<float> sample_weights(const AnimationChannel& channel, float time) {
+  const std::size_t keys = channel.times.size();
+  if (keys == 0) return {};
+  const std::size_t width = channel.values.size() / keys;
+  const KeyPair around = keys_around(channel.times, keys, time);
+  std::vector<float> weights(width);
+  for (std::size_t i = 0; i < width; ++i) {
+    const float a = channel.values[around.previous * width + i];
+    weights[i] = a + (channel.values[around.next * width + i] - a) * around.blend;
+  }
+  return weights;
+}
+
+void lay_weights_over(std::vector<float>& weights, const std::vector<float>& to, float share) {
+  const std::size_t count = std::min(weights.size(), to.size());
+  const float kept = std::min(share, 1.0f);
+  for (std::size_t i = 0; i < count; ++i) weights[i] += (to[i] - weights[i]) * kept;
+}
+
 namespace {
 
 using redgem::mix;  // (points; rotations below)
@@ -107,22 +126,30 @@ struct Playback {
 void pose(const AnimationChannel& channel, const Playback& playback, float time, Transform& local) {
   const float weight = playback.options.weight;
   const ChannelValue value = sample_channel(channel, clip_time(playback.clip, time, playback.options.loop));
-  switch (channel.path) {
-    case AnimationPath::Translation:
-      local.position = laid_over(local.position, vec3_from(value.data()), weight);
-      break;
-    case AnimationPath::Rotation:
-      local.rotation = laid_over(local.rotation, quat_from(value.data()), weight);
-      break;
-    case AnimationPath::Scale:
-      local.scale = laid_over(local.scale, vec3_from(value.data()), weight);
-      break;
-  }
+  // (A weights channel is not a placement: see weigh_shape_keys.)
+  if (channel.path == AnimationPath::Translation)
+    local.position = laid_over(local.position, vec3_from(value.data()), weight);
+  if (channel.path == AnimationPath::Rotation)
+    local.rotation = laid_over(local.rotation, quat_from(value.data()), weight);
+  if (channel.path == AnimationPath::Scale) local.scale = laid_over(local.scale, vec3_from(value.data()), weight);
+}
+
+// A weights channel moves the object's shape keys, not its placement.
+void weigh_shape_keys(const AnimationChannel& channel, const Playback& playback, float time, GameObject& object) {
+  const float at = clip_time(playback.clip, time, playback.options.loop);
+  if (playback.options.before_weighing) playback.options.before_weighing(object);
+  lay_weights_over(object.morph_weights, sample_weights(channel, at), playback.options.weight);
 }
 
 void pose_object(const AnimationChannel& channel, const Playback& playback, float time, GameObject& object) {
+  if (channel.path == AnimationPath::Weights) return weigh_shape_keys(channel, playback, time, object);
   if (playback.options.before) playback.options.before(object.id, channel.path, object.local);
   pose(channel, playback, time, object.local);
+}
+
+// Whether a channel is left alone: a placement, when only shape keys are wanted.
+bool left_alone(const AnimationChannel& channel, const PoseOptions& options) {
+  return options.only_shape_keys && channel.path != AnimationPath::Weights;
 }
 
 void pose_original(const AnimationChannel& channel, const Playback& playback, Scene& scene) {
@@ -157,6 +184,7 @@ void apply_animation(const AnimationDesc& clip, float time, Scene& scene, const 
   if (options.weight <= 0.0f) return;
   const Playback playback{clip, time, options};
   for (const AnimationChannel& channel : clip.channels) {
+    if (left_alone(channel, options)) continue;
     pose_original(channel, playback, scene);
     pose_copies(channel, playback, scene);
   }
