@@ -88,7 +88,7 @@ std::size_t SceneDocument::bytes_of(const Snapshot& step) {
   for (const NodeDesc& node : step.nodes) bytes += node_bytes(node);
   for (const MaterialDesc& material : step.materials) bytes += sizeof(MaterialDesc) + material.name.capacity();
   for (const auto& [mesh, shape] : step.shapes) {
-    bytes += (shape.positions.capacity() + shape.normals.capacity()) * sizeof(float);
+    bytes += (shape.positions.capacity() + shape.normals.capacity()) * sizeof(float) + shape.colors.capacity();
   }
   return bytes;
 }

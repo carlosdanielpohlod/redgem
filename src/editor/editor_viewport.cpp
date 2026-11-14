@@ -91,7 +91,7 @@ void EditorApp::drop_script(const char* script_file, float x, float y) {
 // What the mouse does in the Scene view while editing: the terrain brush, or the gizmo and picking.
 void EditorApp::use_viewport_tools() {
   // Sculpting takes the left button over from the gizmo and from picking.
-  if (sculpting()) {
+  if (using_terrain_brush()) {
     box_start_.reset();  // a rectangle begun before the brush came on is not finished by it
     use_brush();
     return;
@@ -101,7 +101,10 @@ void EditorApp::use_viewport_tools() {
   use_selection_clicks();
 }
 
-bool EditorApp::sculpting() const { return terrain_tool_.sculpting && session_->is_terrain(session_->selection()); }
+bool EditorApp::using_terrain_brush() const {
+  const bool active = terrain_tool_.painting || terrain_tool_.sculpting;
+  return active && session_->is_terrain(session_->selection());
+}
 
 void EditorApp::use_brush() {
   const SceneViewport& view = *viewport_;

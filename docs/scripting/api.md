@@ -189,6 +189,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
 - `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+- `Scene.spawn_prefab(file, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
 
 ## SceneScript
 
@@ -745,6 +746,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.id`: this machine's peer id
 - `Network.peers`: the peers of the game
 - `Network.players`: the peers without a dedicated server
+- `Network.validate_movement(max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false)`: on the host: corrects the others' objects that move faster or further than this (no limits: off)
+- `Network.movement_rules`: the movement validation settings, as a hash
+- `Network.movement_violations(peer)`: how many moves of a machine the host did not believe in this game
 - `Network.port`: the port of the game
 - `Network.room`: the room code, on a relay
 - `Network.relay`: the relay's address

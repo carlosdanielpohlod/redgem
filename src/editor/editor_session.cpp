@@ -191,6 +191,14 @@ bool EditorSession::sculpt_terrain(ObjectId terrain, Vec3 world_point, float rad
   return true;
 }
 
+bool EditorSession::paint_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, Color tint) {
+  if (!can_sculpt(terrain)) return false;
+  auto brush =
+      editor_logic::local_brush(preview_.world_transform(terrain), world_point, radius, amount, SculptMode::Smooth);
+  brush.amount = amount;
+  return document_.paint_terrain(terrain, brush, tint);
+}
+
 void EditorSession::reparent(ObjectId child, ObjectId parent) {
   if (!can_edit(child) || !valid_parent(parent)) return;
   const auto selected = selected_names();

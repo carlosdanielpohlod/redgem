@@ -50,7 +50,14 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
   if (!is_game_message(message)) return;
   link.idle_for = 0.0f;
   // Who it is from is what the host knows, not what the message claims.
-  const nlohmann::json passed = passed_on(message, link.peer);
+  take_from_game(link, passed_on(message, link.peer), events);
+}
+
+void NetworkSession::take_from_game(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events) {
+  if (checks_movement(passed)) {
+    relay_checked_pose(link, passed, events);
+    return;
+  }
   if (pass_on(link.peer, passed.value(kTo, kEveryone), passed)) hear_from_game(passed, events);
 }
 

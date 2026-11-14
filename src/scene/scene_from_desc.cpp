@@ -76,6 +76,39 @@ Scene Scene::from_desc(const SceneDesc& desc) {
   return scene;
 }
 
+namespace {
+
+GameObject rigid_object(const NodeDesc& node, ObjectId id, ObjectId parent, int mesh_offset, const SceneDesc& assets) {
+  GameObject object = placed_object(node, id);
+  copy_parts(node, object);
+  apply_props(node.props, object);
+  object.serial = new_object_serial();
+  object.stable_id.clear();
+  if (object.mesh != kNoIndex) object.mesh += mesh_offset;
+  give_shape_keys(assets, object);
+  object.parent = parent;
+  object.children.clear();
+  object.prefab = false;
+  return object;
+}
+
+}  // namespace
+
+std::vector<ObjectId> Scene::instantiate_rigid(const std::vector<NodeDesc>& nodes, int mesh_offset,
+                                               const SceneDesc& assets) {
+  std::vector<ObjectId> ids;
+  ids.reserve(nodes.size());
+  for (const auto& node : nodes) {
+    const ObjectId id = free_slot();
+    const bool parent_created = is_index_of(node.parent, ids.size());
+    const ObjectId parent = parent_created ? ids[static_cast<std::size_t>(node.parent)] : kNoObject;
+    objects_[id] = rigid_object(node, id, parent, mesh_offset, assets);
+    if (parent != kNoObject) objects_[parent].children.push_back(id);
+    ids.push_back(id);
+  }
+  return ids;
+}
+
 std::vector<ObjectHandle> Scene::joints_of(const NodeDesc& node, const SceneDesc& desc) const {
   std::vector<ObjectHandle> bones;
   if (!is_index_of(node.skin, desc.skins.size())) return bones;

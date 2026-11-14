@@ -114,6 +114,9 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   CollisionLayersReading reading = collision_layers_from_json(json[kPhysicsKey]);
   manifest.settings.collision_layers = std::move(reading.layers);
   manifest.physics_warnings = std::move(reading.warnings);
+  const BodyLimitReading limit = body_limit_from_json(json[kPhysicsKey]);
+  manifest.settings.max_bodies = limit.max_bodies;
+  manifest.max_bodies_error = limit.error;
 }
 
 void read_servers(const nlohmann::json& json, GameManifest& manifest) {
@@ -126,6 +129,21 @@ void read_navigation(const nlohmann::json& json, GameManifest& manifest) {
   NavSettingsReading reading = nav_settings_from_json(json[nav::kSectionKey]);
   manifest.settings.navigation = reading.settings;
   manifest.navigation_warnings = std::move(reading.warnings);
+}
+
+void read_movement(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(net::kMovementSectionKey)) return;
+  net::MovementRulesReading reading = net::movement_rules_from_json(json[net::kMovementSectionKey]);
+  manifest.settings.movement = reading.rules;
+  manifest.movement_warnings = std::move(reading.warnings);
+}
+
+// game.json's sections, each with the warnings of what it says that cannot be used.
+void read_sections(const nlohmann::json& json, GameManifest& manifest) {
+  read_physics(json, manifest);
+  read_servers(json, manifest);
+  read_navigation(json, manifest);
+  read_movement(json, manifest);
 }
 
 // What a game that says nothing is: named after its folder, with the engine's window.
@@ -151,10 +169,14 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
-  read_physics(json, manifest);
-  read_servers(json, manifest);
-  read_navigation(json, manifest);
+  read_sections(json, manifest);
   return manifest;
+}
+
+std::vector<std::string> physics_problems(const GameManifest& manifest) {
+  std::vector<std::string> problems = manifest.physics_warnings;
+  if (!manifest.max_bodies_error.empty()) problems.push_back(manifest.max_bodies_error);
+  return problems;
 }
 
 bool valid_game_id(const std::string& id) {
