@@ -105,10 +105,16 @@ module Network
       end
     end
 
-    def announce_scene_reset
-      mine = keys_spawned_by(id)
-      __deliver(DESPAWN, mine, :all) unless mine.empty?
-      __deliver(RESEND, nil, :host) unless host?
+    # A newcomer is told the level the game plays, then (once it has it) what is spawned there.
+    def greet(peer) = Level.welcome(peer)
+
+    def send_spawned_to(peer)
+      __deliver(SPAWNED, spawned_records, peer) if host?
+    end
+
+    # What a newcomer needs to see the objects spawned before it arrived, where they are now.
+    def spawned_records
+      @spawned.to_a.select { |_key, entry| entry[:object].alive? }.map { |key, entry| record_of(key, entry) }
     end
   end
 end

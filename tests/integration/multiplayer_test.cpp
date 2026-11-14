@@ -32,9 +32,13 @@ constexpr int kSettleRounds = 90;   // frames for a watched object to close in
 constexpr float kBallStart = 3.0f;  // where the ball's template sits, along x
 constexpr float kNear = 0.05f;      // meters: "the same place" across machines
 constexpr std::size_t kManyTexts = 64;
-constexpr float kFarAlong = 40.0f;            // where a hero is moved to, along x
-constexpr int kAsksTooMany = 2;               // for what is spawned, beyond the answers a machine has saved up
-constexpr int kRoundsForOneMoreAnswer = 150;  // frames: past the two seconds of game time that earn one
+constexpr float kFarAlong = 40.0f;  // where a hero is moved to, along x
+// A change of level: how long the host waits for the slowest machine (Network.level_timeout), and
+// what a machine late within it or past it stays out of the game's frames.
+constexpr const char* kLevelTimeout = "1.0";
+constexpr int kTimeoutFrames = 60;  // (a second of fixed steps)
+constexpr int kWithinTimeoutFrames = kTimeoutFrames / 2;
+constexpr int kPastTimeoutFrames = kTimeoutFrames * 3;
 constexpr float kWhereTheGuestLeftIt = 2.9f;  // meters along x, give or take
 constexpr int kQuarterSecondRounds = 15;      // frames
 constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
@@ -119,6 +123,17 @@ struct Lan {
 
   void rounds(int count) {
     for (int i = 0; i < count; ++i) round();
+  }
+
+  // Rounds in which `stalled` plays no frame: its network is not read, as if it were busy loading.
+  void rounds_without(const Engine& stalled, int count) {
+    for (int i = 0; i < count; ++i) {
+      if (relay) relay->poll(config::kFixedDeltaSeconds);
+      for (auto& machine : machines) {
+        if (machine.get() != &stalled) machine->frame(config::kFixedDeltaSeconds);
+      }
+      std::this_thread::sleep_for(kRoundPause);
+    }
   }
 
   bool until(const std::function<bool()>& done) {
@@ -243,14 +258,15 @@ TEST_CASE("a machine that floods a game a player hosts with tiny messages is let
   Engine* host = nullptr;
   Engine* guest = nullptr;
   std::tie(host, guest) = lan.host_and_guest();
+  lan.rounds(kSettleRounds);  // (the guest says it has the game's level)
   // Few bytes, far more messages at once than poses of dozens of objects make.
   ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   ruby(*guest, "20_000.times { Network.emit(:t) }");
   REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
   CHECK(ruby(*host, "Network.peers.inspect") == "[]");
-  // Every message within the burst was heard (its hello took one); the one past it, which let the
-  // guest go, was not.
-  constexpr int kJoinMessages = 1;
+  // Every message within the burst was heard (its hello took one, and its word that it has the
+  // game's level another); the one past it, which let the guest go, was not.
+  constexpr int kJoinMessages = 2;
   CHECK(ruby(*host, "$got") == std::to_string(static_cast<int>(net::kServedBurstMessages) - kJoinMessages));
 }
 
@@ -551,7 +567,7 @@ TEST_CASE("handlers end with the level; the connection does not") {
   Engine* guest = nullptr;
   std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$got = 0; Network.on(:ping) { $got += 1 }; Game.load_scene('level2')");
-  lan.round();
+  REQUIRE(lan.until([&] { return ruby(*host, "Network.changing_level?") == "false"; }));
   ruby(*guest, "Network.emit(:ping)");
   lan.rounds(kSettleRounds);
   CHECK(ruby(*host, "[$got, Network.online?, Network.peers].inspect") == "[0, true, [2]]");
@@ -731,31 +747,6 @@ TEST_CASE("an object that goes by a spawned object's key does not take it along 
   REQUIRE(lan.until([&guest] { return balls_spawned_on(guest) == "1"; }));
 }
 
-TEST_CASE("a machine that keeps asking what is spawned is answered a few times, then only now and then") {
-  Lan lan;
-  Engine* host = nullptr;
-  Engine* guest = nullptr;
-  std::tie(host, guest) = lan.host_and_guest();
-  ruby(*host, "Network.spawn('Ball')");
-  REQUIRE(lan.until([&] { return balls_spawned_on(*guest) == "1"; }));
-  // The guest loses its copy and asks the host again: an answer brings the copy back.
-  const auto answered = [&] {
-    ruby(*guest, "Scene.objects.select { |o| o.name == 'Ball' }.drop(1).each(&:destroy)");
-    lan.round();  // (the copy is gone with the frame)
-    ruby(*guest, "Network.__deliver(Network::RESEND, nil, :host)");
-    heard_out(lan, *guest, *host);
-    heard_out(lan, *host, *guest);
-    return balls_spawned_on(*guest) == "1";
-  };
-  const int saved_up = std::stoi(ruby(*host, "Network::Resends::SAVED_UP"));
-  int answers = 0;
-  for (int ask = 0; ask < saved_up + kAsksTooMany; ++ask) answers += answered() ? 1 : 0;
-  CHECK(answers == saved_up);  // asking costs a few bytes and answering a whole list: not as often as asked
-  lan.rounds(kRoundsForOneMoreAnswer);
-  CHECK(answered());
-  CHECK(host->scripts().error_count() == 0);
-}
-
 TEST_CASE("a host spawns only for machines in the game, and what it says in the wrong shape is ignored") {
   Lan lan;
   Engine* host = nullptr;
@@ -817,23 +808,149 @@ TEST_CASE("hosting or joining again leaves the game this machine was in, and the
   CHECK(ruby(*guest, "$log.last.inspect") == ":disconnected");
 }
 
-TEST_CASE("after a level is loaded, the objects of the others are back and one's own are gone elsewhere") {
+namespace {
+
+std::string crates(Engine& machine) { return ruby(machine, "Scene.objects.count { |o| o.name == 'Crate' }"); }
+
+// Whether a machine plays the level `name`, its change with the others over.
+bool plays(Engine& machine, const std::string& name) {
+  return ruby(machine, "[Game.scene_name, Network.changing_level?].inspect") == "[\"" + name + "\", false]";
+}
+
+// Every one of `machines` notes what it hears of a change of level, and spawns a crate of its own
+// as each level that has one starts (the player's object, as a game respawns it).
+void watch_level_changes(std::initializer_list<Engine*> machines) {
+  for (Engine* machine : machines) {
+    ruby(*machine, std::string("Network.level_timeout = ") + kLevelTimeout + R"(
+      $changes = []
+      Network.on_level_loading { |name| $changes << [:loading, name, Game.scene_name] }
+      Network.on_level_ready do |name|
+        $changes << [:ready, name, Game.scene_name]
+        Network.spawn('Crate', position: Vector3.new(4 + Network.id, 9, 0)) if Scene.find('Crate')
+      end
+    )");
+  }
+}
+
+}  // namespace
+
+TEST_CASE("the host changes the level, and every machine plays the new one once all have it") {
   Lan lan;
   lan.level_from_files = true;
   Engine* host = nullptr;
   Engine* guest = nullptr;
   std::tie(host, guest) = lan.host_and_guest();
-  const auto crates = [](Engine& machine) { return ruby(machine, "Scene.objects.count { |o| o.name == 'Crate' }"); };
   REQUIRE(crates(*host) == "1");  // the level's own
-  ruby(*host, "Network.spawn('Crate', position: Vector3.new(4, 9, 0))");
-  ruby(*guest, "Network.spawn('Crate', position: Vector3.new(9, 9, 0))");
+  ruby(*host, "Network.spawn('Crate', position: Vector3.new(4, 9, 0)); $score = { 1 => 7 }");
+  ruby(*guest, "Network.spawn('Crate', position: Vector3.new(9, 9, 0)); $score = { 1 => 7 }");
   REQUIRE(lan.until([&] { return crates(*host) == "3" && crates(*guest) == "3"; }));
+  watch_level_changes({host, guest});
 
-  // The guest restarts the level: its own crate went with the old level, everywhere; the host's
-  // is shown to it again.
-  ruby(*guest, "Game.load_scene('main')");
-  REQUIRE(lan.until([&] { return crates(*host) == "2" && crates(*guest) == "2"; }));
-  CHECK(ruby(*guest, "Network.online?") == "true");
+  // The host starts the level over; a crate the guest spawns as it does belongs to the old level.
+  CHECK(ruby(*host, "Game.load_scene('main')") == "true");
+  ruby(*guest, "Network.spawn('Crate', position: Vector3.new(12, 9, 0))");
+  REQUIRE(lan.until([&] { return plays(*host, "main") && plays(*guest, "main"); }));
+  lan.rounds(kSettleRounds);
+  // Each has the level's crate and the one each machine spawned in the new level: nothing of the old.
+  CHECK(crates(*host) == "3");
+  CHECK(crates(*guest) == "3");
+  for (Engine* machine : {host, guest}) {
+    CHECK(ruby(*machine, "$changes.inspect") == "[[:loading, \"main\", \"main\"], [:ready, \"main\", \"main\"]]");
+    CHECK(ruby(*machine, "[Network.online?, $score].inspect") == "[true, {1 => 7}]");  // what the game keeps, kept
+  }
+  CHECK(ruby(*host, "Network.peers.inspect") == "[2]");
+
+  // To another level, together: the old level's objects are gone with it, here and there.
+  CHECK(ruby(*host, "Game.load_scene_async('level2')") == "true");
+  REQUIRE(lan.until([&] { return plays(*host, "level2") && plays(*guest, "level2"); }));
+  CHECK(ruby(*guest, "[$level2_setup_in, $changes.size].inspect") == "[\"level2\", 4]");
+}
+
+TEST_CASE("the host waits for a machine slow to load the level, and lets go one past the timeout") {
+  Lan lan;
+  Engine* host = nullptr;
+  Engine* quick = nullptr;
+  std::tie(host, quick) = lan.host_and_guest();
+  Engine& slow = lan.add_machine();
+  lan.join(slow, *host);
+  watch_level_changes({host, quick, &slow});
+
+  // Late within the timeout: nobody plays the level until the slow machine has it too.
+  ruby(*host, "Game.load_scene('level2')");
+  lan.rounds_without(slow, kWithinTimeoutFrames);  // (the others have the level by then)
+  CHECK(ruby(*host, "Network.changing_level?") == "true");
+  CHECK(ruby(*quick, "[Game.scene_name, Network.changing_level?].inspect") == "[\"level2\", true]");
+  REQUIRE(lan.until([&] { return plays(*host, "level2") && plays(*quick, "level2") && plays(slow, "level2"); }));
+  CHECK(ruby(*host, "Network.peers.sort.inspect") == "[2, 3]");
+
+  // Late past it: the others play on without it, and it is let go.
+  ruby(*host, "Game.load_scene('main')");
+  lan.rounds_without(slow, kPastTimeoutFrames);
+  CHECK(plays(*host, "main"));
+  CHECK(plays(*quick, "main"));
+  // (The handlers of $log ended with the first level: what is left of the game says who is there.)
+  CHECK(ruby(*host, "Network.peers.inspect") == "[2]");
+  REQUIRE(lan.until([&] { return ruby(*quick, "Network.peers.inspect") == "[1]"; }));
+  REQUIRE(lan.until([&] { return ruby(slow, "Network.online?") == "false"; }));
+  CHECK(ruby(slow, "Network.changing_level?") == "false");
+}
+
+TEST_CASE("a machine that is not the host cannot change the level of a network game") {
+  Lan lan;
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
+  Engine& other = lan.add_machine();
+  lan.join(other, *host);
+  watch_level_changes({host, guest, &other});
+  CHECK(ruby(*guest, "Game.load_scene('level2')") == "false");
+  CHECK(ruby(*guest, "Game.load_scene_async('level2')") == "false");
+  // Nor by saying what the host would: only the host's word changes the level, and starts it.
+  ruby(*guest, "Network.__deliver(Network::LEVEL, [1, 'level2'], :all)");
+  ruby(*guest, "Network.__deliver(Network::LEVEL_GO, 1, :all)");
+  heard_out(lan, *guest, *host);
+  heard_out(lan, *guest, other);
+  lan.rounds(kSettleRounds);
+  for (Engine* machine : {host, guest, &other}) {
+    CHECK(ruby(*machine, "[Game.scene_name, Network.changing_level?, $changes].inspect") == "[\"main\", false, []]");
+  }
+  // Nor have the host send it all that is spawned again, by saying again that it has the level.
+  ruby(*host, "Network.spawn('Ball')");
+  REQUIRE(lan.until([&] { return balls_spawned_on(*guest) == "1"; }));
+  ruby(*guest, "Scene.objects.select { |o| o.name == 'Ball' }.drop(1).each(&:destroy)");
+  lan.round();
+  ruby(*guest, "Network.__deliver(Network::LEVEL_READY, 0, :host)");
+  heard_out(lan, *guest, *host);
+  heard_out(lan, *host, *guest);
+  CHECK(balls_spawned_on(*guest) == "0");
+}
+
+TEST_CASE("in a room on a relay, the opener's game lets go a machine past the level's timeout") {
+  Lan lan;
+  lan.relay = std::make_unique<net::RelayServer>();
+  std::string error;
+  const auto identity = net::TlsIdentity::generate(error);
+  REQUIRE_MESSAGE(lan.relay->start(0, error, identity), error);
+  Engine& opener = lan.add_machine();
+  Engine& quick = lan.add_machine();
+  Engine& slow = lan.add_machine();
+  for (Engine* machine : {&opener, &quick, &slow}) {
+    ruby(*machine, "Network.relay = '127.0.0.1:" + std::to_string(lan.relay->port()) + "'");
+  }
+  REQUIRE(ruby(opener, "Network.host(room: true)") == "true");
+  REQUIRE(lan.until([&] { return ruby(opener, "Network.online?") == "true"; }));
+  for (Engine* guest : {&quick, &slow}) {
+    REQUIRE(ruby(*guest, "Network.join(room: '" + ruby(opener, "Network.room") + "')") == "true");
+    REQUIRE(lan.until([guest] { return ruby(*guest, "Network.online?") == "true"; }));
+  }
+  lan.round();
+  watch_level_changes({&opener, &quick, &slow});
+  ruby(opener, "Game.load_scene('level2')");
+  lan.rounds_without(slow, kPastTimeoutFrames);
+  CHECK(plays(opener, "level2"));
+  CHECK(plays(quick, "level2"));
+  CHECK(ruby(opener, "Network.peers.inspect") == "[2]");
+  REQUIRE(lan.until([&] { return ruby(slow, "Network.online?") == "false"; }));
 }
 
 TEST_CASE("machines that cannot reach each other meet in a room on a relay, by its code") {

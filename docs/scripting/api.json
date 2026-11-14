@@ -14,7 +14,7 @@
     "GameMenu::ControlsPage::Row",
     "GameMenu::ControlsScreen",
     "GameMenu::SettingsScreen",
-    "Network::Resends",
+    "Network::Level",
     "Network::Said",
     "NetworkSync::Snapshots",
     "NetworkSync::Snapshots::Pose",
@@ -2031,13 +2031,13 @@
           "name": "load_scene",
           "static": true,
           "args": "name",
-          "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive"
+          "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive. In a network game only the host may, and every machine changes level with it (false elsewhere)"
         },
         {
           "name": "load_scene_async",
           "static": true,
           "args": "name",
-          "about": "queues a background scene read; the old world survives failed reads and cancellation"
+          "about": "queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)"
         },
         {
           "name": "loading?",
@@ -2057,7 +2057,7 @@
         {
           "name": "cancel_scene_load",
           "static": true,
-          "about": "cancels a pending asynchronous request; returns whether one was pending"
+          "about": "cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)"
         },
         {
           "name": "on_loading",
@@ -2813,6 +2813,34 @@
           "static": true,
           "args": "peer",
           "about": "a peer's name"
+        },
+        {
+          "name": "on_level_loading",
+          "static": true,
+          "args": "&block",
+          "about": "the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call"
+        },
+        {
+          "name": "on_level_ready",
+          "static": true,
+          "args": "&block",
+          "about": "every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call"
+        },
+        {
+          "name": "changing_level?",
+          "static": true,
+          "about": "the machines are between two levels: loading, or waiting for each other"
+        },
+        {
+          "name": "level_timeout",
+          "static": true,
+          "about": "seconds the host waits for every machine to have a new level (30); later ones are let go"
+        },
+        {
+          "name": "level_timeout=",
+          "static": true,
+          "args": "seconds",
+          "about": "sets it"
         },
         {
           "name": "spawn",

@@ -16,10 +16,11 @@ bool Engine::deterministic_scene_load() const {
 
 void Engine::advance_or_loading(float frame_seconds) {
   const FrameProfileScope phase(profiler_, ProfilePhase::Update);
-  if (!is_loading_scene()) return advance_game(frame_seconds);
+  if (!frozen()) return advance_game(frame_seconds);
   context_.time.delta = 0.0f;
   const float delta =
       options_.fixed_step ? config::kFixedDeltaSeconds : std::clamp(frame_seconds, 0.0f, config::kMaxFrameSeconds);
+  if (context_.level_held) scripts_->wait_for_level(delta);
   scripts_->draw_loading(delta);
 }
 

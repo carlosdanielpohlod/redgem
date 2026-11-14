@@ -42,7 +42,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_levels.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb

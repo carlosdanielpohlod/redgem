@@ -104,6 +104,8 @@ inline constexpr const char* kRefused = "x";      // to a newcomer: you are not 
 inline constexpr const char* kGuarded = "g";  // opener to relay: whether its game decides who comes in (kData)
 inline constexpr const char* kAsking = "q";   // relay to opener: newcomer kFrom asks to come in, with kAuth
 inline constexpr const char* kVerdict = "v";  // opener to relay: newcomer kTo is let in (kData), or not and why
+// The opener's game lets machine kTo go (one late to load a level, see NetworkSession::dismiss).
+inline constexpr const char* kDismiss = "u";
 
 // The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
 // handed out again once free, so they never outgrow what a message may carry.

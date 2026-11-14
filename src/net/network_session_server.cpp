@@ -35,6 +35,17 @@ std::vector<std::string> NetworkSession::addresses() const {
   return found;
 }
 
+bool NetworkSession::dismiss(int peer) {
+  if (!can_dismiss(peer)) return false;
+  if (through_relay_) {
+    links_.front().connection.send({{wire::kKind, wire::kDismiss}, {wire::kTo, peer}});
+    return true;
+  }
+  Link* link = link_to(peer);
+  if (link != nullptr) link->connection.close();
+  return link != nullptr;
+}
+
 void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
   if (!relaying()) return;
   link.allowance.refill(seconds);

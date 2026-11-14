@@ -38,7 +38,11 @@ void Engine::prepare_frame() {
   context_.hud.clear();
   debug_draw_.clear();
   scripts_->vm().set_sampling(profiler_.enabled());
-  if (!is_loading_scene()) scripts_->start_pending();
+  start_scripts();
+}
+
+void Engine::start_scripts() {
+  if (!frozen()) scripts_->start_pending();
 }
 
 void Engine::read_input() {
@@ -83,7 +87,7 @@ void Engine::answer_requests() {
 
 bool Engine::found_by_neighbours() const { return network_.hosting() && network_.room().empty(); }
 
-bool Engine::captures_cursor() const { return context_.mouse_locked && !is_loading_scene(); }
+bool Engine::captures_cursor() const { return context_.mouse_locked && !frozen(); }
 
 void Engine::read_surface_sizes() {
   const SurfaceSize size = presenter_->surface_size();

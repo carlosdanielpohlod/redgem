@@ -534,12 +534,12 @@ Profiling is off by default. The overlay uses the shared game HUD, including edi
 
 The game itself. See [gameplay.md#a-loading-screen](gameplay.md#a-loading-screen).
 
-- `Game.load_scene(name)`: switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive
-- `Game.load_scene_async(name)`: queues a background scene read; the old world survives failed reads and cancellation
+- `Game.load_scene(name)`: switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive. In a network game only the host may, and every machine changes level with it (false elsewhere)
+- `Game.load_scene_async(name)`: queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)
 - `Game.loading?`: a scene request is queued or being read
 - `Game.loading_scene`: the requested scene name, or nil
 - `Game.loading_error`: the last asynchronous read error, or nil; cleared by the next load request
-- `Game.cancel_scene_load`: cancels a pending asynchronous request; returns whether one was pending
+- `Game.cancel_scene_load`: cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)
 - `Game.on_loading(&block)`: draws the loading screen each frame with unscaled delta; no block restores the default
 - `Game.scene_name`: the scene running
 - `Game.title`: the game's title
@@ -750,6 +750,11 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.authenticate(&block)`: decides who gets in: |peer, auth, decide|
 - `Network.identity(peer)`: who a peer was accepted as
 - `Network.player_name(peer)`: a peer's name
+- `Network.on_level_loading(&block)`: the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call
+- `Network.on_level_ready(&block)`: every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call
+- `Network.changing_level?`: the machines are between two levels: loading, or waiting for each other
+- `Network.level_timeout`: seconds the host waits for every machine to have a new level (30); later ones are let go
+- `Network.level_timeout = seconds`: sets it
 - `Network.spawn(template, owner: Network.id, position:, rotation:)`: spawns a copy on every machine
 - `Network.allow_spawn(*templates)`: lets guests spawn those templates
 

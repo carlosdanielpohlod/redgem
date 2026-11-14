@@ -448,6 +448,11 @@ not a promise of how it will be closed.
   a broadcast or multicast address, little to bounce traffic with. Behind something that proxies
   UDP (Docker's userland proxy, rootless Docker), the relay sees the proxy's address and names
   that instead of the player's.
+- A change of level is the host's alone, one at a time, and waits for every machine
+  (`Network.level_timeout`) before anyone plays: there is no streaming of levels or seamless
+  travel, and the players load the whole level. A game's own messages (`Network.emit`) are not
+  held across a change: one sent as it starts reaches handlers of whichever level the receiver has
+  by then.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,

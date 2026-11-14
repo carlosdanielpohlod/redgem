@@ -16,6 +16,7 @@ constexpr const char* kNetworkModule = "Network";
 constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP", "Input", "Game"};  // (Input: a capture waiting)
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
+constexpr const char* kLevelTickEntry = "__level_tick";
 
 // What Ruby calls each kind of network event.
 struct EventName {
@@ -54,6 +55,14 @@ void ScriptHost::scene_was_reset() {
     const RubyResult result = vm_.call(module_named(name), kSceneResetEntry);
     if (!result.ok) report_error(std::string("resetting the handlers of ") + name, result.error);
   }
+}
+
+void ScriptHost::wait_for_level(float unscaled_delta) {
+  const int arena = mrb_gc_arena_save(vm_.state());
+  const RubyResult result =
+      vm_.call(module_named(kNetworkModule), kLevelTickEntry, {mrb_float_value(vm_.state(), unscaled_delta)});
+  mrb_gc_arena_restore(vm_.state(), arena);
+  if (!result.ok) report_error("the network's level change", result.error);
 }
 
 void ScriptHost::dispatch(const net::NetworkEvent& event) {

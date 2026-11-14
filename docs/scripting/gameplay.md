@@ -877,7 +877,8 @@ Game.load_scene("level2")   # scenes/level2.glb; "main" is scene.glb
 ```
 
 The switch happens at the end of the frame. Ruby global variables survive it, which is the simple
-way to carry a score or lives from one level to the next.
+way to carry a score or lives from one level to the next. In a game played together, the host
+changes the level for every machine (see [Changing level together](multiplayer.md#changing-level-together)).
 
 ## Do something later, or over a while
 
