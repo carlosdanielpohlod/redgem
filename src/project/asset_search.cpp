@@ -161,9 +161,9 @@ int asset_score(const AssetEntry& asset, const AssetQuery& query, const Prepared
 
 template <typename Found>
 struct Scored {
-  int score;
+  int score = kNoMatch;
   std::string key;  // what ties are ordered by
-  const Found* found;
+  const Found* found = nullptr;
 };
 
 template <typename Found>
