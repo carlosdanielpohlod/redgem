@@ -227,6 +227,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
+  links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
+
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
   this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
