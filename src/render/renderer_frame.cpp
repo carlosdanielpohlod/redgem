@@ -91,6 +91,19 @@ void Renderer::Impl::use_environment(const Environment& env, const Camera3D& cam
   begin_temporal(env, camera);
 }
 
+// (A renderer that draws more than one view a frame times the last one drawn.)
+void Renderer::Impl::draw_timed_passes(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
+                                       const ParticleSystem* particles, const RenderTexture2D* output) {
+  gpu_timers.start_frame();
+  gpu_timers.begin(GpuPass::Prepare);
+  prepare_frame(scene, camera, env, aspect, particles);
+  gpu_timers.begin(GpuPass::Scene);
+  draw_lit_scene(camera, particles);
+  gpu_timers.begin(GpuPass::Post);
+  post_process(env, output);
+  gpu_timers.end();
+}
+
 void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles) {
   glow_gathered = false;  // until this frame's particles gather some (a frame may have none)
   const bool sampled = scene_samples.framebuffer != 0;
