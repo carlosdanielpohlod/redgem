@@ -30,8 +30,8 @@ void NetworkSession::hold_place(const Link& link, std::vector<NetworkEvent>& eve
 
 void NetworkSession::expire_held_places(float seconds, std::vector<NetworkEvent>& events) {
   for (Held& held : held_) held.held_for += seconds;
-  const auto expired = std::stable_partition(held_.begin(), held_.end(),
-                                             [](const Held& held) { return held.held_for <= held.window; });
+  const auto still_held = [](const Held& held) { return held.held_for <= held.window; };
+  const auto expired = std::stable_partition(held_.begin(), held_.end(), still_held);
   const std::vector<Held> gone(expired, held_.end());
   held_.erase(expired, held_.end());
   for (const Held& held : gone) farewell(held.peer, events);
