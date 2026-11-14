@@ -71,6 +71,7 @@ struct LitUniforms {
   int morph_first = kNoLocation;
   int morph_vertices = kNoLocation;
   int wind = kNoLocation;
+  int foliage_translucency = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
   int frame_texels = kNoLocation;
   int morph_texels = kNoLocation;

@@ -539,6 +539,22 @@ module Camera
   def self.motion_blur: () -> Float
   # sets it
   def self.motion_blur=: (Numeric amount) -> Numeric
+  # whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides
+  def self.auto_exposure: () -> (bool | nil)
+  # turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene
+  def self.auto_exposure=: (bool | nil on) -> (bool | nil)
+  # EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides
+  def self.exposure_compensation: () -> (Float | nil)
+  # sets it, -16 to 16; nil gives it back to the scene
+  def self.exposure_compensation=: (Numeric | nil ev) -> (Numeric | nil)
+  # [darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides
+  def self.exposure_range: () -> ([Float, Float] | nil)
+  # sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene
+  def self.exposure_range=: ([Numeric, Numeric] | nil range) -> ([Numeric, Numeric] | nil)
+  # [up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides
+  def self.exposure_speed: () -> ([Float, Float] | nil)
+  # sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene
+  def self.exposure_speed=: ([Numeric, Numeric] | nil speeds) -> ([Numeric, Numeric] | nil)
   # follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
   def self.follow: (GameObject target, ?offset: Vector3 | Array[Numeric], ?relative: bool, ?smoothing: Numeric, ?look_at: bool, ?look_height: Numeric, ?avoid_walls: bool, ?dead_zone: Numeric, ?snap: bool) -> void
   # orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
@@ -713,10 +729,10 @@ module UI
   def self.choice: (String label, Array[String] choices, Integer index, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Integer
   # a row with a slider; returns the value
   def self.slider: (String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?min: Numeric, ?max: Numeric, ?step: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Float
-  # the face texts are drawn with: a file name of fonts/, or nil for the built-in one
-  def self.font: () -> (String | nil)
-  # draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
-  def self.font=: (String | nil name) -> (String | nil)
+  # the face texts are drawn with: a file name of fonts/, a list of them (a fallback chain; a list of one is its name), or nil for the built-in one
+  def self.font: () -> (String | Array[String] | nil)
+  # draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
+  def self.font=: (String | Array[String] | nil name) -> (String | Array[String] | nil)
 end
 
 # Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
