@@ -265,7 +265,9 @@ not a promise of how it will be closed.
 
 ### Audio
 
-- At most 64 sounds with ids play at once, flat and positional together. Positional sound provides
+- At most 128 sounds with ids play at once, flat and positional together; past that, the weakest
+  (by priority, then loudness) stops for a new one, and there are no virtual voices that come
+  back later. Positional sound provides
   stereo panning and distance falloff; games update source positions and the listener explicitly;
   there is no HRTF, occlusion or Doppler.
 - One music track at a time, two while they crossfade. The mix groups are fixed (master, music,

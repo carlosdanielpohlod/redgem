@@ -32,22 +32,30 @@ MixGroup mix_group(mrb_state* mrb, mrb_value name) {
   return known(mrb, mix_group_from_name(group), "unknown mix group :%s (music, effects, voice)", group);
 }
 
+// A priority a sound may have, a whole number from kLowestSoundPriority to kHighestSoundPriority.
+int sound_priority(mrb_state* mrb, mrb_value value, const char* what) {
+  if (mrb_type(value) != MRB_TT_INTEGER) mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s must be a whole number", what);
+  return static_cast<int>(from_to(mrb, static_cast<mrb_float>(mrb_integer(value)), kLowestSoundPriority,
+                                  kHighestSoundPriority, what));
+}
+
 // A sound's handle, or nil when it does not play.
 mrb_value source_value(mrb_state* mrb, SoundSourceId id) {
   return id == kNoSoundSource ? mrb_nil_value() : mrb_int_value(mrb, static_cast<mrb_int>(id));
 }
 
-// Audio.__play(name, volume, pitch, loop, group): the handle of a flat sound, or nil.
+// Audio.__play(name, volume, pitch, loop, group, priority): the handle of a flat sound, or nil.
 mrb_value audio_play(mrb_state* mrb, mrb_value) {
-  mrb_value name, group;
+  mrb_value name, group, priority;
   mrb_float volume = 0.0, pitch = 0.0;
   mrb_bool loop = false;
-  mrb_get_args(mrb, "offbo", &name, &volume, &pitch, &loop, &group);
+  mrb_get_args(mrb, "offboo", &name, &volume, &pitch, &loop, &group, &priority);
   FlatSound sound;
   sound.volume = static_cast<float>(at_least(mrb, volume, kSilent, "Audio.play's volume"));
   sound.pitch = sound_pitch(mrb, pitch, "Audio.play's pitch");
   sound.loop = loop;
   sound.group = mix_group(mrb, group);
+  sound.priority = sound_priority(mrb, priority, "Audio.play's priority");
   return source_value(mrb, audio(mrb).play_sound(to_name(mrb, name), sound));
 }
 
@@ -88,7 +96,7 @@ mrb_value audio_set_volume(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, volume);
 }
 
-enum SpatialOption { Volume, Pitch, ReferenceDistance, MaxDistance, Loop, Group, SpatialOptionCount };
+enum SpatialOption { Volume, Pitch, ReferenceDistance, MaxDistance, Loop, Group, Priority, SpatialOptionCount };
 constexpr mrb_int kMaximumSourceId = std::numeric_limits<std::int32_t>::max();
 struct SpatialArguments {
   mrb_value name{};
@@ -97,7 +105,8 @@ struct SpatialArguments {
 };
 std::array<mrb_sym, SpatialOptionCount> spatial_option_names(mrb_state* mrb) {
   return {mrb_intern_lit(mrb, "volume"),       mrb_intern_lit(mrb, "pitch"), mrb_intern_lit(mrb, "reference_distance"),
-          mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),  mrb_intern_lit(mrb, "group")};
+          mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),  mrb_intern_lit(mrb, "group"),
+          mrb_intern_lit(mrb, "priority")};
 }
 SpatialArguments spatial_arguments(mrb_state* mrb) {
   SpatialArguments arguments;
@@ -120,6 +129,9 @@ bool spatial_loop(mrb_state* mrb, mrb_value value) {
 MixGroup spatial_group(mrb_state* mrb, mrb_value value) {
   return mrb_undef_p(value) ? MixGroup::Effects : mix_group(mrb, value);
 }
+int spatial_priority(mrb_state* mrb, mrb_value value) {
+  return mrb_undef_p(value) ? kDefaultSoundPriority : sound_priority(mrb, value, "Audio.play_at's priority");
+}
 SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   SpatialSound sound;
   sound.position = to_vec3(mrb, arguments.position);
@@ -129,6 +141,7 @@ SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   sound.reference_distance = spatial_number(mrb, arguments.options[ReferenceDistance], sound.reference_distance);
   sound.max_distance = spatial_number(mrb, arguments.options[MaxDistance], sound.max_distance);
   sound.loop = spatial_loop(mrb, arguments.options[Loop]);
+  sound.priority = spatial_priority(mrb, arguments.options[Priority]);
   if (!valid_spatial_sound(sound))
     mrb_raise(mrb, E_ARGUMENT_ERROR,
               "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
@@ -200,7 +213,7 @@ void install_spatial_audio_bindings(mrb_state* mrb, RClass* module) {
 void install_audio_bindings(mrb_state* mrb) {
   RClass* audio_module = mrb_define_module(mrb, "Audio");
   install_spatial_audio_bindings(mrb, audio_module);
-  mrb_define_module_function(mrb, audio_module, "__play", audio_play, MRB_ARGS_REQ(5));
+  mrb_define_module_function(mrb, audio_module, "__play", audio_play, MRB_ARGS_REQ(6));
   mrb_define_module_function(mrb, audio_module, "__music", audio_music, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, audio_module, "__stop_music", audio_stop_music, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "music_pitch=", audio_set_music_pitch, MRB_ARGS_REQ(1));

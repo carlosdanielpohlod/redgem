@@ -13,11 +13,15 @@ module Audio
   # What a sound is mixed in, unless it says (group: :music, :effects or :voice): each group has
   # the player's volume of its own (Settings.music_volume...).
   DEFAULT_GROUP = :effects
+  # With 128 sounds playing, a new one takes the place of the weakest (the lowest priority, then the
+  # quietest, then the oldest) when its priority (0 to 255) is at least that one's.
+  DEFAULT_PRIORITY = 128
 
   # A sound with no place in the world. Returns its handle (for stop, playing? and set), or nil
-  # when the sound file does not exist or 64 sounds already play.
-  def self.play(name, volume: FULL_VOLUME, pitch: NORMAL_PITCH, loop: false, group: DEFAULT_GROUP)
-    __play(name, volume.to_f, pitch.to_f, loop ? true : false, group)
+  # when the sound file does not exist or 128 sounds of a higher priority already play.
+  def self.play(name, volume: FULL_VOLUME, pitch: NORMAL_PITCH, loop: false, group: DEFAULT_GROUP,
+                priority: DEFAULT_PRIORITY)
+    __play(name, volume.to_f, pitch.to_f, loop ? true : false, group, priority)
   end
 
   # Changes the volume or the pitch of a sound that plays (play's or play_at's); false once it

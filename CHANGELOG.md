@@ -10,6 +10,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
+  that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
+  quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
+  stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
+  default).
 - **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
   editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
   Ruby snippet in the game the editor plays, given that token, and answers with the result's
