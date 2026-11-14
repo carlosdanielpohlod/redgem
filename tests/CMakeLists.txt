@@ -160,6 +160,9 @@ add_executable(redgem_tests
   unit/movement_validator_test.cpp
   unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
+  unit/stun_message_test.cpp
+  unit/stun_probe_test.cpp
+  unit/route_choice_test.cpp
   unit/room_choice_test.cpp
   unit/tick_pacer_test.cpp
   unit/server_command_test.cpp
@@ -233,6 +236,7 @@ add_executable(redgem_tests
   integration/encrypted_connection_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
+  integration/route_choice_socket_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp

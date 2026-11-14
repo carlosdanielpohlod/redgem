@@ -319,8 +319,9 @@ not a promise of how it will be closed.
   the app's files and to `adb logcat`, and the next run only says so in its log. The report's
   backtrace on Android is what the unwinder could walk from the signal handler, after the address
   the crash happened at.
-- The scripts' time budget stops Ruby code only: one call of the engine's own that takes long
-  (a huge `Array#sort`, a request to the engine for millions of things) is not cut off, and the
+- The scripts' time budget counts the time spent in the engine's functions, but it stops Ruby
+  code only: one call of the engine's own that takes long (a huge `Array#sort`, a request to the
+  engine for millions of things) runs to its end, and the script is stopped right after it. The
   budget is wall time: a call paused in a debugger for longer than it is stopped when it resumes.
 
 ### Security
@@ -331,8 +332,11 @@ not a promise of how it will be closed.
   networks (only the clouds' known metadata addresses are refused).
 - On Windows a server's save database takes its folder's permissions: it is kept to its owner
   only on Linux and macOS.
-- A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
-  engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
+- A script that sets one of the engine's top-level constants to something else (`Vector3 = 5`)
+  or removes it gets an error and the constant is put back, but only once its code has run: the
+  file's top-level code, the console line, or (for a method that does it) the frame's updates.
+  Until then, the engine's calls that use the name fail with Ruby errors. Constants inside the
+  engine's classes and modules (`Input::PLAYERS`) are not watched.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
   the relay and server integration tests), the socket layer or the web requests' TLS stream on
   its own (only through requests; game connections' TLS is tested over loopback sockets only);
@@ -386,10 +390,13 @@ not a promise of how it will be closed.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
-- A connection's buffers never give memory back once grown, and copy what is left on every
-  partial send (`frame_buffer.cpp`, `socket_io.cpp`).
-- `Save.update`'s block runs under one lock for the whole database, which every room of a
-  dedicated server shares: a slow block holds up the saves of all rooms.
+- A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
+  receive buffer gives memory back after a large message, down to 64 KiB.
+- On a dedicated server, `Save.update`'s block holds its key's lock: a slow block holds up the
+  other rooms' writes of that key (not of others). A block that writes a second key another room
+  is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
+  then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
+  runs while another room clears the save writes its key back afterwards.
 - The threads of web requests are detached: one still running at exit may outlive the program's
   static objects.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
@@ -434,7 +441,23 @@ not a promise of how it will be closed.
   correction twice. A correction moves the owner's
   transform; a physics body or character controller on it follows only if it follows the transform.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
-  connection through home routers (no STUN or hole punching).
+  connection through home routers yet. The engine has the pieces, not the path through them: the
+  relay answers STUN on its UDP port (a game can learn the public address its router gives it),
+  and a joining machine can try direct routes before the relay (`RouteChooser`), but no game asks
+  either yet: the relay does not pass a host's public address to who joins its room, and
+  `Network` does not use them. The ceiling, even once wired: game connections are TCP, and STUN
+  maps a UDP port (routers map TCP apart), so what STUN finds is the host's public address, not
+  a TCP port anyone can reach. A direct route only connects where the host's router lets
+  connections in (a forwarded port, UPnP done by hand). TCP hole punching (simultaneous open) is
+  not done: routers handle it unevenly, and both ends would have to agree on which is the TLS
+  client. Everyone else plays through the relay, as now.
+- The relay's STUN answers are IPv4 only, unauthenticated (no MESSAGE-INTEGRITY or FINGERPRINT)
+  and only as fast as the relay wakes: about once a second while no TCP traffic arrives, 64
+  requests a wake at most (a game asks again every half second for five seconds). Its UDP port is
+  not limited per address; an answer is 32 bytes for a request of at least 20, and none goes to
+  a broadcast or multicast address, little to bounce traffic with. Behind something that proxies
+  UDP (Docker's userland proxy, rootless Docker), the relay sees the proxy's address and names
+  that instead of the player's.
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,
