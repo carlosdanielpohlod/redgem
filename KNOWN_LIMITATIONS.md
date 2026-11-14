@@ -333,6 +333,16 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
+- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
+  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
+  between the actor's and the target's positions (a target whose position is inside the ground or
+  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
+  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
+  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
+  the on-screen controls being turned on). Over the network the host runs every use, checking
+  sight from the hero's late pose: a client hears of what it did only through the game's own
+  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
+  them to an action of its own rebinds one.
 - A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
   one whose other end is in another scene, or was deleted, is not made (the log says so). The
   editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
