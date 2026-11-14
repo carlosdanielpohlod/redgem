@@ -50,6 +50,9 @@ int largest_target_side();
 // Cube maps filtered across the seams between their faces (always so on OpenGL ES 3).
 void filter_cube_maps_across_seams();
 
+// Lets go of the errors earlier calls left, so that the next check is of a call's own.
+void forget_errors();
+
 // Queries of how long the graphics card took over what was sent between a begin and an end
 // (GL_TIME_ELAPSED, core in desktop OpenGL 3.3). OpenGL ES 3 has them only as an extension, which
 // is not looked for: there, and wherever the driver lacks them, has_timer_queries is false and the

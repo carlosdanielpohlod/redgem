@@ -73,6 +73,9 @@ mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// Game.__scene?(name): whether the game has a scene of that name.
+mrb_value game_has_scene(mrb_state* mrb, mrb_value) { return mrb_bool_value(has_scene(context(mrb), name_arg(mrb))); }
+
 mrb_value game_scene_name(mrb_state* mrb, mrb_value) { return mrb_str_new_cstr(mrb, context(mrb).scene_name.c_str()); }
 
 mrb_value game_title(mrb_state* mrb, mrb_value) { return text_value(mrb, context(mrb).game_title); }
@@ -100,7 +103,9 @@ void install_game_bindings(mrb_state* mrb) {
   RClass* game_module = mrb_define_module(mrb, "Game");
   mrb_define_module_function(mrb, game_module, "quit", game_quit, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "stop_recording", game_stop_recording, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, game_module, "load_scene", game_load_scene, MRB_ARGS_REQ(1));
+  // (Game.load_scene is Ruby's: on a network game, every machine changes level together.)
+  mrb_define_module_function(mrb, game_module, "__load_scene", game_load_scene, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, game_module, "__scene?", game_has_scene, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "scene_name", game_scene_name, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "title", game_title, MRB_ARGS_NONE());
 }

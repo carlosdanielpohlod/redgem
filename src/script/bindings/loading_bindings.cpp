@@ -2,6 +2,7 @@
 
 #include "script/bindings/binding_helpers.hpp"
 #include "core/safe_path.hpp"
+#include "net/network_session.hpp"
 #include "script/bindings/bindings.hpp"
 
 namespace redgem {
@@ -46,14 +47,32 @@ mrb_value cancel_loading(mrb_state* mrb, mrb_value) {
   if (queued) ctx.requested_scene.reset();
   return mrb_bool_value(active || queued);
 }
+// Game.__hold(held): the world stays frozen as while loading, until a network game's machines all
+// have the next level.
+mrb_value hold(mrb_state* mrb, mrb_value) {
+  context(mrb).level_held = bool_arg(mrb);
+  return mrb_nil_value();
+}
+// Game.__held?: whether the world is held for a network game's change of level.
+mrb_value held(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).level_held); }
+
+// Game.__online?: whether this machine is in a network game, whose level the host changes for all.
+// (Asked of the session itself: a script may have replaced the Network module.)
+mrb_value online(mrb_state* mrb, mrb_value) {
+  const net::NetworkSession* network = context(mrb).network;
+  return mrb_bool_value(network != nullptr && network->state() == net::NetworkSession::State::Online);
+}
 }  // namespace
 
 void install_loading_bindings(mrb_state* mrb) {
   auto* game = mrb_module_get(mrb, "Game");
-  mrb_define_module_function(mrb, game, "load_scene_async", load_async, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, game, "__load_scene_async", load_async, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, game, "__hold", hold, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, game, "__held?", held, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, game, "__online?", online, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game, "loading?", loading, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game, "loading_scene", loading_scene, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game, "loading_error", loading_error, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, game, "cancel_scene_load", cancel_loading, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, game, "__cancel_scene_load", cancel_loading, MRB_ARGS_NONE());
 }
 }  // namespace redgem

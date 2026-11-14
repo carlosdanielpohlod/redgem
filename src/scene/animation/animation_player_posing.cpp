@@ -27,11 +27,17 @@ void copy_part(const Transform& from, AnimationPath path, Transform& to) {
 void AnimationPlayer::advance(float dt, Scene& scene) {
   if (clips_ == nullptr) return;
   posed_.clear();
+  forget_departed(scene);
   for (std::size_t i = 0; i < clocks_.size(); ++i) redgem::advance(clocks_[i], duration_of(i), dt);
   pose_followers(scene);
+  advance_characters(dt, scene);
+}
+
+void AnimationPlayer::advance_characters(float dt, Scene& scene) {
   for (auto entry = owned_.begin(); entry != owned_.end();) {
     const ObjectId character = scene.resolve(entry->first);
     const bool done = character == kNoObject || advance_own(character, entry->second, dt, scene);
+    if (!done) follow_up(character, entry->second, scene);
     entry = done ? owned_.erase(entry) : std::next(entry);
   }
 }
@@ -54,7 +60,7 @@ void AnimationPlayer::apply_scene_clips(Scene& scene, PoseOptions options) const
 }
 
 void AnimationPlayer::advance_track(std::optional<Track>& track, float dt) const {
-  if (track) redgem::advance(track->clock, duration_of(track->clip), dt);
+  if (track) track->span = advance_spanning(track->clock, duration_of(track->clip), dt);
 }
 
 bool AnimationPlayer::advance_own(ObjectId character, Own& own, float dt, Scene& scene) {
@@ -68,7 +74,7 @@ bool AnimationPlayer::advance_own(ObjectId character, Own& own, float dt, Scene&
 bool AnimationPlayer::advance_manual_own(ObjectId character, Own& own, float dt, Scene& scene) {
   for (std::optional<Track>* track : {&own.from, &own.to, &own.layer}) advance_track(*track, dt);
   own.faded += dt;
-  const bool arrived = own.fade <= 0.0f || own.faded >= own.fade;
+  const bool arrived = fade_arrived(own);
   if (!arrived) pose_character(character, own.from, kWhole, scene);
   pose_character(character, own.to, arrived ? kWhole : own.faded / own.fade, scene);
   if (own.layer) pose_character(character, own.layer, own.layer_weight, scene);

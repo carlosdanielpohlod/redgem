@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <utility>
 #include <vector>
 
 #include "audio/audio.hpp"
@@ -34,6 +35,7 @@
 #include "app/game_settings.hpp"
 #include "app/game_identity.hpp"
 #include "app/presenter.hpp"
+#include "app/scene_activation.hpp"
 #include "storage/save_store.hpp"
 #include "storage/save_slots.hpp"
 #include "script/script_context.hpp"
@@ -97,6 +99,10 @@ struct EngineOptions {
   Stopwatch::Reading network_time;
   // A borrowed reader (must outlive the engine); otherwise one process-wide worker is shared.
   SceneLoader* scene_loader = nullptr;
+  // Where the time a scene read in the background takes to be made ready is counted, each loading
+  // frame taking about kActivationSecondsPerFrame of it: the steady clock when empty. Tests give a
+  // counter, never the real time.
+  Stopwatch::Reading activation_time;
 };
 
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
@@ -121,7 +127,8 @@ class Engine {
   ObjectId spawn(const SpawnRequest& request);
   ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
   const prefabs::Source& load_runtime_prefab(const std::string& file);
-  ObjectId finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request);
+  // The rest of a spawn, for its (original, copy) pairs (kNoObject originals: made from a prefab file).
+  ObjectId finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   void frame(float frame_seconds);
@@ -147,6 +154,9 @@ class Engine {
   Presenter& presenter() { return *presenter_; }
   AnimationPlayer& animations() { return animations_; }
   net::NetworkSession& network() { return network_; }
+  // Starts the behaviours that did not start yet, unless the world is frozen (a level loading, or
+  // the machines of a network game waiting for each other to have the next one).
+  void start_scripts();
 
  private:
   explicit Engine(const EngineOptions& options);
@@ -202,13 +212,21 @@ class Engine {
   void seed_scripts();
 
   static Vec3 gravity();
+  // An empty physics world with the game's layers.
+  std::unique_ptr<PhysicsWorld> new_physics_world() const;
   // A physics world of its own for the scene in place, with a body for every object that asks for one.
   void make_bodies();
+  // What follows from the scene's bodies being in place: its water, its navigation grid.
+  void settle_world();
+  // The number the next scene is shown under: no two scenes, loaded or abandoned, share one.
+  int reserve_generation() { return ++last_generation_; }
 
-  // Makes a scene that was loaded the one that runs, under `name`.
+  // Makes a scene that was loaded the one that runs, under `name`, all at once.
   void switch_to(const std::string& name, SceneDesc desc);
-  // Puts a newly loaded scene, with its bodies, in place of the running one.
-  void replace_world(SceneDesc desc);
+  // Makes a scene that was made ready the one that runs: its scripts start, in this frame.
+  void switch_to(SceneActivation& incoming);
+  // Puts a scene made ready, with its bodies, in place of the running one.
+  void install_world(SceneActivation& incoming);
   void place_spawned(ObjectId id, const std::optional<Transform>& world);
   // Names, places and parents a new copy as its request says, before its bodies and scripts.
   void shape_spawned(ObjectId id, const SpawnRequest& request);
@@ -233,8 +251,17 @@ class Engine {
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
   int fixed_steps_due(float frame_seconds, float scale);
   void update_frame(float delta);
+  // Moves each character by how far its clips moved their root (Animator root motion): a
+  // character controller goes there through the physics, sliding along walls; anything else is
+  // moved there.
+  void apply_root_motion();
+  void move_by(ObjectId object, const RootMotion& motion);
+  // Hands the moments the characters' clips went past to the scripts listening (animation.on).
+  void hand_on_animation_events();
   void switch_scene_if_asked();
   bool is_loading_scene() const;
+  // Whether the world is frozen: a level loading, or held until every machine has it (Network).
+  bool frozen() const { return is_loading_scene() || context_.level_held; }
   bool deterministic_scene_load() const;
   void advance_or_loading(float frame_seconds);
   void request_scene(const std::string& name);
@@ -242,8 +269,22 @@ class Engine {
   void cancel_scene_load();
   void poll_scene_load();
   void finish_scene_load(LoadResult loaded);
+  void fail_scene_load(const std::string& name, std::string error);
+  // This frame's share of making the scene read ready (see SceneActivation).
+  void advance_activation();
+  void complete_activation();
+  void drop_activation();
+  // Pictures decoded in the background are dropped once the presenter had them.
+  void forget_decoded_pictures();
 
   void fixed_step(float dt);
+  // Before a physics step: the water notes bodies that appeared or jumped, the bodies take the poses
+  // scripts gave them, and the water holds up what floats (its forces turn the bodies about where
+  // they are now, not where they were before a script moved them).
+  void push_poses_and_float();
+  // The water of a world just made, and the bodies in it: found at once, so its scripts' first calls
+  // and a game that starts paused (no fixed step yet) see it.
+  void find_water();
   // Whether a contact is between two objects that are both still there to hear of it.
   bool both_alive(const ContactEvent& event) const;
   void process_destroyed();
@@ -253,6 +294,7 @@ class Engine {
   std::unique_ptr<Presenter> own_presenter_;  // the nobody that shows a game given no presenter
   Presenter* presenter_ = nullptr;
   std::shared_ptr<SceneLoad> scene_load_;
+  std::unique_ptr<SceneActivation> activation_;  // the scene read, while it is made ready
   SceneDesc scene_desc_;
   std::map<std::string, prefabs::Source> runtime_prefabs_;
   std::uint64_t runtime_prefab_bytes_ = 0;
@@ -274,6 +316,7 @@ class Engine {
   SaveSlots save_slots_;
   float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a fixed-step run
   int scene_generation_ = kFirstSceneGeneration;
+  int last_generation_ = kFirstSceneGeneration;  // the last one reserved
   AnimationPlayer animations_;
   ParticleSystem particles_;
   ParticleEmitters particle_emitters_;

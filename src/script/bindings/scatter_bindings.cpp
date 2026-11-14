@@ -174,7 +174,7 @@ ScatterSet set_of(mrb_state* mrb, const GameObject& object, const PlaceArgs& arg
 // -> [the set's id, how many copies were placed].
 mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   // (Placing thousands of copies is the engine's time, not the script's.)
-  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+  const BudgetPause pause(script_budget(mrb));
   const PlaceArgs args = place_args(mrb);
   const GameObject& object = template_arg(mrb, args.source);
   const auto lods = lods_arg(mrb, args, object);

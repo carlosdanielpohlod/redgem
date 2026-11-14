@@ -38,12 +38,14 @@ void warn_of_unusable(const GameManifest& manifest) {
   warn_of_all(manifest.servers_warnings);
   warn_of_all(manifest.navigation_warnings);
   warn_of_all(manifest.movement_warnings);
+  warn_of_all(manifest.ui_warnings);
 }
 
 // What the game's scripts are told of what game.json says.
 void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
+  context.ui_reference = settings.ui;
 }
 
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
@@ -127,6 +129,7 @@ void Engine::build_world(const GameSettings& settings) {
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
+  find_water();
 }
 
 void Engine::open_presenter(const GameSettings& settings) {
@@ -249,6 +252,7 @@ void Engine::connect_world() {
   context_.scene = &scene_;
   context_.physics = physics_.get();
   context_.navigation = &navigation_;
+  context_.water = &water_.surfaces();
   context_.bake_navigation = [this] { bake_navigation(); };
 }
 

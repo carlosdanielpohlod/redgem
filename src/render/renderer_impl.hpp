@@ -42,6 +42,7 @@
 #include "render/gl_extras.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/instance_batches.hpp"
+#include "render/underwater.hpp"
 #include "render/water_ripple_packet.hpp"
 #include "render/instance_records.hpp"
 #include "render/local_shadows.hpp"
@@ -284,6 +285,15 @@ struct Renderer::Impl {
   std::vector<float> morph_deltas;                // every part's shape-key deltas, as morph_texture holds them
   unsigned int morph_texture = 0;
   std::size_t morph_texture_floats = 0;  // of morph_deltas when the texture was last made
+  // What Renderer::stage readied of the scene to be shown next, the first ones of its images and
+  // meshes, while this one's are still drawn; the next upload takes them.
+  struct StagedAssets {
+    std::vector<Texture2D> textures;
+    std::vector<std::vector<GpuPrimitive>> meshes;
+    std::vector<float> morph_deltas;       // of the staged meshes' parts
+    int scene = Renderer::kNoStagedScene;  // what Renderer::stage was told the scene is
+  };
+  StagedAssets staged;
   Mesh sky_mesh{};
   Material sky_material{};
   Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
@@ -298,6 +308,7 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
   float motion_blur = 0.0f;         // 0..1 (Camera.motion_blur)
+  UnderwaterView underwater;        // where the camera is against the water (Renderer::set_underwater)
   std::optional<double> clock;      // seconds (Renderer::set_clock); nothing: the real time
   float now() const { return static_cast<float>(clock ? *clock : GetTime()); }
   // The frame being drawn.
@@ -417,6 +428,15 @@ struct Renderer::Impl {
   void bind_textures(Material& material, const MaterialDesc& source) const;
   void release_assets();
   void release_meshes();
+  // A scene image as a texture: from its decoded pixels when it has them.
+  static Texture2D scene_picture(const SceneDesc& desc, std::size_t image);
+  // Stages the next image or mesh of `desc` (see staged); returns roughly how many bytes it sent.
+  std::size_t stage_next(const SceneDesc& desc);
+  bool staged_all(const SceneDesc& desc) const;
+  bool staged_fits(const SceneDesc& desc) const;  // none of them is past what `desc` has
+  // Makes the staged assets this scene's own (after release_assets).
+  void adopt_staged(const SceneDesc& desc);
+  void release_staged();
 
   // --- Texts and pictures (renderer_pictures.cpp) -----------------------------------------------
 
@@ -678,6 +698,7 @@ struct Renderer::Impl {
   void blur(const RenderTexture2D& picture, const RenderTexture2D& scratch);
   void tone_map(const Environment& env);
   void send_grade(const Environment& env);
+  void send_underwater();
   void antialias(const RenderTexture2D* output);
   // The last pass's shader, its values set: smoothing, or after the frames are mixed, sharpening.
   const Shader& begin_finish(int width, int height);

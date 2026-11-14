@@ -153,4 +153,17 @@ TEST_CASE("a program run to its end reports its output, its exit code and a cras
   CHECK_FALSE(run_to_end({"/no/such/program"}, output).started);
   std::filesystem::remove(output);
 }
+
+TEST_CASE("a program run to its end can keep its errors apart from its output") {
+  const auto output = std::filesystem::temp_directory_path() / "redgem-run-to-end-output.txt";
+  const auto errors = std::filesystem::temp_directory_path() / "redgem-run-to-end-errors.txt";
+  const ProcessEnd ended = run_to_end({"/bin/sh", "-c", "echo said; echo warned >&2; exit 3"}, output, errors);
+  CHECK(ended.exited);
+  CHECK(ended.code == 3);
+  std::string error;
+  CHECK(read_text_file(output, error) == std::optional<std::string>("said\n"));
+  CHECK(read_text_file(errors, error) == std::optional<std::string>("warned\n"));
+  std::filesystem::remove(output);
+  std::filesystem::remove(errors);
+}
 #endif
