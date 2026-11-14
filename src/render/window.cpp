@@ -40,6 +40,8 @@ bool windowing_started() {
 #endif
 }
 
+using LibraryNames = std::vector<std::string>;  // loaded libraries, by file name
+
 #if defined(__linux__) && !defined(__ANDROID__)
 constexpr int kKeepIterating = 0;  // what a dl_iterate_phdr callback returns to see the next library
 
@@ -47,11 +49,9 @@ constexpr int kKeepIterating = 0;  // what a dl_iterate_phdr callback returns to
 bool named_library(const char* name) { return name != nullptr && name[0] != '\0'; }
 
 int add_library_name(dl_phdr_info* info, std::size_t /*size*/, void* names) {
-  if (named_library(info->dlpi_name)) static_cast<std::vector<std::string>*>(names)->emplace_back(info->dlpi_name);
+  if (named_library(info->dlpi_name)) static_cast<LibraryNames*>(names)->emplace_back(info->dlpi_name);
   return kKeepIterating;
 }
-
-using LibraryNames = std::vector<std::string>;
 
 // The libraries loaded in the process now, by file name.
 LibraryNames loaded_libraries() {
@@ -79,7 +79,6 @@ void keep_window_libraries_loaded(const LibraryNames& before) {
   }
 }
 #else
-using LibraryNames = std::vector<std::string>;
 LibraryNames loaded_libraries() { return {}; }
 void keep_window_libraries_loaded(const LibraryNames& /*before*/) {}  // the limit above is glibc's
 #endif

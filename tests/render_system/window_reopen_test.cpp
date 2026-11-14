@@ -6,8 +6,6 @@
 
 #include <raylib.h>
 
-#include <stdexcept>
-
 #include "render/window.hpp"
 
 using namespace redgem;
@@ -30,21 +28,18 @@ void draw_a_frame(Window& window) {
   window.end_frame();
 }
 
-// Opens a window, draws one frame in it and closes it; whether it opened.
-bool open_draw_and_close() {
-  try {
-    Window window(small_window());
-    draw_a_frame(window);
-    return IsWindowReady();
-  } catch (const std::runtime_error&) {
-    return false;  // reported with the window's number
-  }
+// Opens a window, draws one frame in it and closes it (a window that does not open throws).
+void open_draw_and_close() {
+  Window window(small_window());
+  draw_a_frame(window);
 }
 
 }  // namespace
 
 TEST_CASE("a process opens, draws in and closes 300 windows one after another") {
-  for (int window = 0; window < kWindows; ++window)
-    REQUIRE_MESSAGE(open_draw_and_close(), "window " << window + 1 << " of " << kWindows << " did not open");
+  for (int window = 0; window < kWindows; ++window) {
+    INFO("window " << window + 1 << " of " << kWindows);  // reported on a throw or a crash too
+    REQUIRE_NOTHROW(open_draw_and_close());
+  }
   CHECK_FALSE(IsWindowReady());  // the last one closed too
 }
