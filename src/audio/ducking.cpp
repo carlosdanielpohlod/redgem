@@ -12,7 +12,9 @@ constexpr float kSilentGain = 0.0f;
 constexpr float kShortestDuckFade = 0.001f;
 
 bool valid_duck_seconds(float seconds) { return std::isfinite(seconds) && seconds >= 0.0f; }
-bool valid_ducked_volume(float volume) { return std::isfinite(volume) && volume >= kSilentGain && volume <= kNoDucking; }
+bool valid_ducked_volume(float volume) {
+  return std::isfinite(volume) && volume >= kSilentGain && volume <= kNoDucking;
+}
 // No fade to make: one too short to take time, or no distance between full and ducked.
 bool ducks_at_once(float duration, float span) { return duration < kShortestDuckFade || span <= kSilentGain; }
 

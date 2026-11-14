@@ -62,8 +62,8 @@ mrb_value audio_effects(mrb_state* mrb, mrb_value) {
 // A priority a sound may have, a whole number from kLowestSoundPriority to kHighestSoundPriority.
 int sound_priority(mrb_state* mrb, mrb_value value, const char* what) {
   if (mrb_type(value) != MRB_TT_INTEGER) mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s must be a whole number", what);
-  return static_cast<int>(from_to(mrb, static_cast<mrb_float>(mrb_integer(value)), kLowestSoundPriority,
-                                  kHighestSoundPriority, what));
+  return static_cast<int>(
+      from_to(mrb, static_cast<mrb_float>(mrb_integer(value)), kLowestSoundPriority, kHighestSoundPriority, what));
 }
 
 // A sound's handle, or nil when it does not play.
