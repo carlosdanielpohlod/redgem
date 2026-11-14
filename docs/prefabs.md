@@ -61,3 +61,14 @@ a complete file; it never exposes an incomplete source. Export checks a conserva
 estimate of the edited scene's data before copying and caps the source GLB at 256 MiB.
 Overriding inherited children remains future work.
 Built games include regular files in `prefabs/` along with the other game assets.
+
+## Spawning from Ruby
+
+`Scene.spawn_prefab("crate.glb", position: Vector3.new(2, 0, 4))` creates a rigid hierarchy
+from the game's `prefabs/` folder. Positions default to the world origin and rotations to
+identity. The root keeps its authored scale. The same `name:`, `parent:` and `physics:` options
+as `Scene.spawn` are available. Missing, unsafe or animated/skinned files raise `ArgumentError`.
+
+Imports are synchronous on first use. The runtime shares each file's meshes, materials and
+images across its instances, with a cache of up to 32 files and 64 MiB of estimated data per
+scene. Reload the scene to pick up changes to a cached file.

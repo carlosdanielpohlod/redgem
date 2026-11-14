@@ -11,7 +11,8 @@
 namespace redgem {
 
 // The hooks for one editor; `bridge` (the editor's, when --editor-bridge already enabled it) must
-// outlive the editor's run, and is enabled into when still empty.
-AgentHooks agent_hooks(std::unique_ptr<tools::EditorBridge>& bridge);
+// outlive the editor's run, and is enabled into when still empty (answering game_eval with
+// `ruby_eval`, see enable_editor_bridge).
+AgentHooks agent_hooks(std::unique_ptr<tools::EditorBridge>& bridge, bool ruby_eval = false);
 
 }  // namespace redgem

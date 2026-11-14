@@ -17,6 +17,7 @@
 #include "script/script_config.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/water_geometry.hpp"
 
 namespace redgem {
 
@@ -120,6 +121,9 @@ struct ScriptContext {
   // grid now. Null outside a running engine.
   Navigation* navigation = nullptr;
   std::function<void()> bake_navigation;
+  // The running scene's water surfaces, as the simulation last found them (Water). Null outside a
+  // running engine.
+  const std::vector<WaterSurface>* water = nullptr;
   bool renders_particles = false;  // emitters are local presentation, never simulated by a headless room
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;
@@ -139,6 +143,7 @@ struct ScriptContext {
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
   std::function<ObjectId(const SpawnRequest&)> spawn;
+  std::function<ObjectId(const std::string&, const SpawnRequest&)> spawn_prefab;
   AudioSystem* audio = nullptr;
   // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;

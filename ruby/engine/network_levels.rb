@@ -54,12 +54,14 @@ module Network
         announce(name) if started?(change, name)
       end
 
-      # The host tells a newcomer the level the game plays; during a change, the newcomer joins it.
+      # The host tells a newcomer (or one reconnected) the level the game plays, which it loads unless
+      # it has it; during a change, it takes part in the change.
       def welcome(peer)
         return unless Network.host?
         return Network.__deliver(LEVEL, [@change, @name], peer) if changing?
 
         Network.__deliver(LEVEL_PLAYED, [@count, Game.scene_name], peer)
+        @shown.delete(peer)  # (one back after its connection dropped is shown the objects again)
       end
 
       # Whether a newcomer that has the level the game plays is to be shown what is spawned there

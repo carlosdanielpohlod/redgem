@@ -3,8 +3,12 @@
 class << UI
   # What the test presses this frame: [keys, gamepad buttons] pairs, as UI's constants name them.
   attr_accessor :pressed_now
+  # The gamepad the test presses its buttons on (the first one when it says none).
+  attr_accessor :pressed_pad
 
-  def pressed_any?(controls) = (pressed_now || []).include?(controls)
+  def pressed_any?(controls, pad: Input::FIRST_PAD)
+    (pressed_now || []).include?(controls) && pad == (pressed_pad || Input::FIRST_PAD)
+  end
 end
 
 class UiWidgetsTest < RedGemTest::Case

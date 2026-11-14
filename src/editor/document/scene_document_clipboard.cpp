@@ -122,7 +122,7 @@ std::optional<std::vector<std::uint8_t>> SceneDocument::clipboard_glb(const std:
   if (!glb_.bin.empty()) clip.glb_.json[kBuffers] = nlohmann::json::array({{{kByteLength, glb_.bin.size()}}});
   // (Only what the clip's nodes reach is taken from the scene's binary chunk, repeats once.)
   GlbFile lean = compacted(clip.glb_.json, glb_.bin).value_or(GlbFile{clip.glb_.json, glb_.bin});
-  material_textures::forget_unused_webp(lean.json);
+  material_textures::forget_unused_texture_extensions(lean.json);
   glb_images::embed_linked_images(lean, path_.parent_path());
   return encode_glb(lean, error);
 }

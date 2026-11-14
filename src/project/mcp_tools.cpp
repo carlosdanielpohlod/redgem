@@ -6,13 +6,17 @@
 #include <stdexcept>
 #include <vector>
 
+#include "core/command_line.hpp"
 #include "core/event_journal.hpp"
 #include "core/message_lines.hpp"
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
 #include "project/mcp_game_tools.hpp"
+#include "project/scene_revision.hpp"
+#include "project/search_command.hpp"
 #include "project/tool_commands.hpp"
 #include "project/editor_bridge.hpp"
+#include "project/ruby_eval.hpp"
 
 namespace redgem::tools::mcp {
 namespace {
@@ -73,6 +77,20 @@ Words api_words(const Json& args) {
   return words;
 }
 
+// What scene diff compares with: an earlier save inside the game, or the scene at a Git revision.
+Words baseline_words(const Options& options, const Json& args) {
+  check_diff_baseline(args);
+  if (args.contains("against")) return {"--against", inside(options, args, "against")};
+  return {"--revision", args["revision"].get<std::string>()};
+}
+
+// The words of a search, as one word of a command line: never one it would read as an option.
+std::string query_word(const Json& args) {
+  const std::string query = args["query"];
+  if (command_line::is_option(query)) throw std::invalid_argument("query cannot start with -");
+  return query;
+}
+
 const char* scene_action(const std::string& name) {
   if (name == "scene_list") return "list";
   if (name == "scene_get") return "get";
@@ -84,19 +102,39 @@ Words scene_command(const Options& options, const std::string& name, const Json&
   if (name == "scene_list" && !asked.contains("limit")) asked["limit"] = kDefaultListLimit;
   Words words = scene_words(options, asked, scene_action(name));
   for (const char* key : {"depth", "limit"}) option(words, asked, key);
-  if (name == "scene_diff") {
-    words.push_back("--against");
-    words.push_back(inside(options, args, "against"));
-  }
+  if (name != "scene_diff") return words;
+  const Words baseline = baseline_words(options, args);
+  words.insert(words.end(), baseline.begin(), baseline.end());
   return words;
+}
+
+Words assets_words(const Options& options, const Json& args) {
+  Words words{kAssetsCommand, options.game.string()};
+  if (args.contains("query")) words.push_back(query_word(args));
+  for (const char* key : {"kind", "tag", "limit"}) option(words, args, key);
+  return words;
+}
+
+Words templates_words(const Json& args) {
+  Words words{kTemplatesCommand};
+  if (args.contains("query")) words.push_back(query_word(args));
+  option(words, args, "limit");
+  return words;
+}
+
+// The command lines of the tools that only read: the API, the searches and the scene's.
+Words reading_command(const Options& options, const std::string& name, const Json& args) {
+  if (name == "api") return api_words(args);
+  if (name == "asset_search") return assets_words(options, args);
+  if (name == "template_search") return templates_words(args);
+  return scene_command(options, name, args);
 }
 
 Words command(const Options& options, const std::string& name, const Json& args) {
   if (name == "scene_edit") return edit_words(options, args);
   if (name == "game_run") return run_words(options, args);
   if (name == "game_check") return {"check", options.game.string()};
-  if (name == "api") return api_words(args);
-  return scene_command(options, name, args);
+  return reading_command(options, name, args);
 }
 
 log::Level level(const std::string& name) {
@@ -159,7 +197,8 @@ Json native_result(const Options& options, const std::string& name, const Json& 
 }
 // The tools a connected editor answers, about its unsaved document and its own process.
 bool answered_live(const std::string& name) {
-  return name == "editor" || name == "events" || name == "game_query" || name.rfind("scene_", 0) == 0;
+  return name == "editor" || name == "events" || name == "game_query" || name.rfind("scene_", 0) == 0 ||
+         is_ruby_eval_tool(name);
 }
 
 constexpr const char* kNoEditor =
@@ -210,10 +249,33 @@ Json discovered(const Options& options, const std::string& name, const Json& arg
     if (attempt.reply) return *attempt.reply;
     remember(file, attempt.miss);
   }
+#if defined(REDGEM_RUBY_EVAL)
+  if (is_ruby_eval_tool(name)) return no_editor_for_ruby_eval();
+#endif
   if (name == "editor") return tool_result(kNoEditor, true);
   return from_files(native_result(options, name, args));
 }
 }  // namespace
+
+namespace {
+// Whether scene_diff's arguments name a revision Git could not take as one.
+bool names_bad_revision(const Json& args) {
+  return args.contains("revision") && !valid_revision(args["revision"].get<std::string>());
+}
+
+// Whether scene_diff's arguments name an earlier save that is no scene file (.glb).
+bool names_bad_save(const Json& args) {
+  return args.contains("against") && !names_scene_file(args["against"].get<std::string>());
+}
+}  // namespace
+
+void check_diff_baseline(const Json& args) {
+  if (args.contains("against") == args.contains("revision"))
+    throw std::invalid_argument("give one of against (an earlier .glb) or revision (a Git revision)");
+  if (names_bad_revision(args))
+    throw std::invalid_argument("revision is not a Git revision: " + args["revision"].get<std::string>());
+  if (names_bad_save(args)) throw std::invalid_argument("against must name a .glb file");
+}
 
 Json invoke(const Options& options, const std::string& name, const Json& args) {
   const Json tools = catalog(options);

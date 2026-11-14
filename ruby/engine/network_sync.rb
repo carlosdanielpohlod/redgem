@@ -11,10 +11,14 @@ module Network
       refuse_taken(key, sync)
       __untrack(sync)
       @synced[key] = sync
+      __forget_movement(key)   # a new object: the host checks its moves from where it next is
     end
 
     def __untrack(sync)
-      @synced.delete(sync.key) if @synced[sync.key].equal?(sync)
+      return unless @synced[sync.key].equal?(sync)
+
+      @synced.delete(sync.key)
+      __forget_movement(sync.key)
     end
 
     # Any destroyed object: if it was spawned on the network, it is no longer, whether or not its
@@ -68,6 +72,7 @@ module Network
     def forget_spawned(key, entry)
       @spawned.delete(key)
       __deliver(DESPAWN, [key], :all) if shared_by_me?(entry[:owner])
+      note_despawned_away(key, entry[:owner])
     end
   end
 end
@@ -99,8 +104,9 @@ class NetworkSync < Behaviour
   # Whether its own animation goes along: known from the first pose that arrives, started or not.
   def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
-  # Offline, everything is this machine's to move.
-  def mine? = !Network.online? || owner == Network.id
+  # Out of a game, everything is this machine's to move (not while it reconnects: the others'
+  # objects stay theirs).
+  def mine? = !Network.__in_game? || owner == Network.id
 
   def start
     Network.__track(self)
@@ -156,6 +162,12 @@ class NetworkSync < Behaviour
     return take_animation(animation) unless @snapshots
 
     @snapshots.add(@position, @rotation, animation)
+  end
+
+  # The host did not believe a move of the object (Network.validate_movement): it is put back
+  # where the host believes it is. Only the owner's own object moves.
+  def __corrected(position)
+    transform.position = Vector3[*position] if mine?
   end
 
   private
