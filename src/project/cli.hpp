@@ -26,6 +26,8 @@ struct CliOptions {
   // and --record-seconds); no file: nothing is recorded.
   RecordOptions record;
   bool editor_bridge = false;  // --editor-bridge: opt-in authenticated local tooling
+  // --ruby-eval (development builds only): the bridge, answering game_eval too (project/ruby_eval.hpp)
+  bool ruby_eval = false;
 };
 
 struct CliResult {

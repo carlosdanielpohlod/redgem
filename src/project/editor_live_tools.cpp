@@ -174,9 +174,8 @@ const SceneDesc& runtime_scene(EditorSession& session, Engine& runtime) {
 }
 
 Json query(EditorSession& session, const Json& args) {
-  Engine* runtime = session.runtime();
-  if (session.editing() || runtime == nullptr)
-    throw std::invalid_argument("the editor is not playing; start the game with editor action=play first");
+  Engine* runtime = playing_runtime(session);
+  if (runtime == nullptr) throw std::invalid_argument(kEditorNotPlaying);
   if (args.contains("frames"))
     throw std::invalid_argument("frames is for headless queries; pause and use editor action=step to advance");
   return tool_result(answer_query(*runtime, runtime_scene(session, *runtime), args));
@@ -230,6 +229,8 @@ Json handle(EditorSession& session, const std::string& name, const Json& args, b
   return read(session, name, args);
 }
 }  // namespace
+
+Engine* playing_runtime(EditorSession& session) { return session.editing() ? nullptr : session.runtime(); }
 
 Json invoke_editor(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   try {

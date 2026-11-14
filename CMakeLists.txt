@@ -14,6 +14,13 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(REDGEM_BUILD_TESTS "Build the test suites" ON)
+# Ruby evaluated in the game a running editor plays, for developers and their assistants
+# (project/ruby_eval.hpp): in development builds only. Release builds turn the tests off, and this
+# with them, so that no program that goes to other people has it (tests/ships_no_ruby_eval.sh).
+# (Dependent: turning the tests off in a build folder made with them turns this off as well.)
+include(CMakeDependentOption)
+cmake_dependent_option(REDGEM_RUBY_EVAL "Build the opt-in Ruby evaluation of the editor's bridge" ON
+                       "REDGEM_BUILD_TESTS" OFF)
 # The continuous integration turns this on: a warning in the engine's own code (src, tests) fails
 # the build. The libraries it is built from keep theirs as warnings.
 option(REDGEM_WARNINGS_AS_ERRORS "Treat compiler warnings in the engine's own code as errors" OFF)

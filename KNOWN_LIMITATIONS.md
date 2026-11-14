@@ -511,9 +511,16 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   Slash commands and session modes are not offered, and answers are not selectable as text (code
   blocks have a Copy button). Past conversations are reopened through the agent (`session/load`): an
   agent that cannot do that starts anew, and a conversation the agent no longer keeps is gone.
-- An opt-in Ruby eval in a running game (localhost and a token, a timeout, compiled out of
-  release builds). `game_run` expressions cover headless runs; `game_query` covers inspection
-  and physics queries.
+- The opt-in Ruby eval (`game_eval`, [docs/mcp.md](docs/mcp.md#ruby-eval-in-the-playing-game))
+  runs in the game an editor plays, only: not in a game played with `--play`, a built game or a
+  dedicated server. It needs an editor started with `--ruby-eval` and its token, which the editor
+  prints to its terminal (the Agent panel's agent is not handed it). It is in development builds
+  only; the downloads are release builds, so they do not have it. The game waits while a snippet
+  runs: a snippet has 0.4 seconds of Ruby (less when the game's script budget is shorter), and the
+  engine's own work inside it, such as spawning, is not counted up to four times that. An answer is
+  cut at 8 KiB, as any tool's text.
+  Classes a snippet defines or reopens are tracked by hot reload as coming from `(game_eval)`, so
+  hot reloading their script files may not go cleanly afterwards: stop and play again.
 - MCP adds one object per `scene_edit` call; a row of copies takes one call each.
 - Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
   and pass back than the numeric ids of older objects.

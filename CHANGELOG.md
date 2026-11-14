@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
 - **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
   block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
   passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`

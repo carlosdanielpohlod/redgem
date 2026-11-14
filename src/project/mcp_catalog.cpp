@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "project/ruby_eval.hpp"
+
 namespace redgem::tools::mcp {
 namespace {
 // A small fixed vocabulary; schemas are also validated before the native command is called.
@@ -125,9 +127,17 @@ void check_array(const Json& schema, const Json& args) {
 }  // namespace
 
 namespace {
+// The tools only a running editor answers.
+void add_editor_tools(Json& tools) {
+  tools.push_back(Json::parse(kEditorSchema));
+#if defined(REDGEM_RUBY_EVAL)
+  tools.push_back(ruby_eval_schema());
+#endif
+}
+
 Json available_tools(const Options& options) {
   Json tools = Json::parse(kSchemas);
-  if (!options.editor_connection.empty()) tools.push_back(Json::parse(kEditorSchema));
+  if (!options.editor_connection.empty()) add_editor_tools(tools);
   return tools;
 }
 
@@ -139,6 +149,12 @@ void live_schema(Json& tool, const Options& options) {
   if (tool["name"] == "editor" && options.read_only)
     tool["inputSchema"]["properties"]["action"]["enum"] = {"status", "capture"};
   if (tool["name"] == "scene_edit" && always_live(options)) tool["inputSchema"]["properties"].erase("from");
+}
+
+// Whether a call of the tool may change or destroy what the game holds.
+bool destructive(const Options& options, const std::string& name) {
+  if (name == "editor") return !options.read_only;
+  return name == "scene_edit" || is_ruby_eval_tool(name);
 }
 
 // scene_edit says how to color an object, in either mode.
@@ -156,7 +172,7 @@ Json catalog(const Options& options) {
     describe_assignments(tool);
     tool["annotations"] = {{"readOnlyHint", name == "editor" ? options.read_only : read_only_tool(name)},
                            {"openWorldHint", !read_only_tool(name)},
-                           {"destructiveHint", name == "scene_edit" || (name == "editor" && !options.read_only)}};
+                           {"destructiveHint", destructive(options, name)}};
     tools.push_back(std::move(tool));
   }
   return tools;
