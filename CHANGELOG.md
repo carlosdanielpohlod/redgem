@@ -24,6 +24,14 @@ until 1.0, a release may change what games rely on (see
   and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
   how much.
 
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
@@ -251,6 +259,8 @@ until 1.0, a release may change what games rely on (see
 
 - **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
   when not given. A scene that wants its leaves as they were sets it to 0.
+- **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
+  links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
   side by side instead of waiting for each other's blocks, and writes of the same key still wait,
   so no change is lost. A block that writes a second key another room is updating waits at most
