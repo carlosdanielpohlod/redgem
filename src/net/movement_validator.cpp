@@ -108,7 +108,7 @@ void MovementValidator::spend(Track& track, float moved) {
 MovementVerdict MovementValidator::accept(Track& track, Vec3 position, float moved) {
   spend(track, moved);
   track.accepted = position;
-  return {true, position, false};
+  return {true, position, false, false};
 }
 
 MovementVerdict MovementValidator::refuse(int peer, Track& track, Vec3 position, float moved) {
@@ -116,7 +116,7 @@ MovementVerdict MovementValidator::refuse(int peer, Track& track, Vec3 position,
   spend(track, length(instead - track.accepted));
   track.accepted = instead;
   const bool counted = count_violation(peer, track);
-  return {false, instead, counted && kicks(peer)};
+  return {false, instead, counted && kicks(peer), false};
 }
 
 Vec3 MovementValidator::corrected(const Track& track, Vec3 position, float moved) const {
