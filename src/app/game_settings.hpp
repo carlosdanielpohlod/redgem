@@ -9,6 +9,7 @@
 #include "net/secure/server_pins.hpp"
 #include "navigation/nav_settings.hpp"
 #include "physics/collision_layers.hpp"
+#include "physics/physics_config.hpp"
 #include "render/display_settings.hpp"
 #include "script/script_config.hpp"
 
@@ -40,6 +41,9 @@ struct GameSettings {
   int script_budget_ms = config::kDefaultScriptBudgetMs;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
+  // How many threads solve the game's physics: the "threads" key of the "physics" section (see
+  // physics/physics_threads.hpp). 1 solves it as RedGem always did.
+  int physics_threads = config::kDefaultPhysicsThreads;
   // The relays and dedicated servers the game knows by their fingerprints: the "servers" section
   // (see net/secure/server_pins.hpp). Joining one of them checks that it is the one.
   std::vector<net::ServerPin> servers;
@@ -80,8 +84,9 @@ inline constexpr std::size_t kMaxGameIdLength = 100;
 bool valid_game_id(const std::string& id);
 // The settings alone, for whoever has no use for what is wrong with the file.
 GameSettings read_game_settings(const std::filesystem::path& game_dir);
-// Writes the title, the window's size, and the studio and the id (when the settings have them). What else the file
-// holds (its "android" section, an id the settings have none for...) stays as it is.
+// Writes the title, the window's size, the studio and the id (when the settings have them), and the
+// physics' threads (taken out of the file for the default). What else the file holds (its "android"
+// section, an id the settings have none for...) stays as it is.
 bool write_game_settings(const std::filesystem::path& game_dir, const GameSettings& settings, std::string& error);
 
 }  // namespace redgem

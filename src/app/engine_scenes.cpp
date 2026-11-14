@@ -3,7 +3,9 @@
 
 #include "app/engine.hpp"
 
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
@@ -15,8 +17,21 @@ namespace redgem {
 
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
+std::unique_ptr<PhysicsWorld> Engine::make_physics_world() {
+  // (A step still under way was the old world's: it ends with it, and is never finished.)
+  step_prepared_ = false;
+  step_in_flight_ = false;
+  overlapped_ = nullptr;
+  std::unique_ptr<PhysicsWorld> world = create_jolt_physics_world(gravity(), collision_layers_, physics_threads_);
+  if (!config::solves_in_parallel(physics_threads_)) return world;
+  auto overlapped = std::make_unique<OverlappedPhysicsWorld>(std::move(world));
+  overlapped_ = overlapped.get();
+  return overlapped;
+}
+
 void Engine::make_bodies() {
-  physics_ = create_jolt_physics_world(gravity(), collision_layers_);
+  physics_.reset();  // (its threads end before the new world's start)
+  physics_ = make_physics_world();
   bodies::create_all({scene_, scene_desc_}, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   navigation_.forget();  // the grid was the old scene's

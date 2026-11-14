@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
+  physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
+  of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
+  scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

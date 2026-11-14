@@ -377,7 +377,19 @@ not a promise of how it will be closed.
 
 ### Engineering
 
-- Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
+- Rendering and scripts run on one thread. Physics does too unless game.json's `physics.threads`
+  asks for more: then Jolt's thread pool solves each step, and each frame's last fixed step runs on
+  a thread of its own while the frame is drawn (scripts never run during it). There is no separate
+  render thread yet: drawing a frame while the next one's scripts run is a later step, as is a
+  thread count chosen from the player's machine (the setting is the game's, fixed, not "auto").
+- With `physics.threads` above 1, the frame drawn is one physics step behind the world, and
+  contact callbacks and `Time.elapsed` reach scripts at the start of the next frame. Anything that
+  asks the world something between frames (the editor's physics view, a tool) waits for the step
+  under way. The equality of results with one thread and with several is tested on the CI's Linux
+  runners; it rests on Jolt's determinism, not on a promise of the engine's across platforms.
+- The profiler's Physics phase counts only the time a frame waits for its overlapped step, not the
+  step itself on the physics thread. Every scene gets a new thread pool, made when it loads.
+  A dedicated server's rooms ignore `physics.threads`.
 - Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
   most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests

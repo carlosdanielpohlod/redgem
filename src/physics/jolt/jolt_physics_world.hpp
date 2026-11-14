@@ -13,7 +13,7 @@
 
 #include <Jolt/Jolt.h>
 
-#include <Jolt/Core/JobSystemSingleThreaded.h>
+#include <Jolt/Core/JobSystem.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/CastResult.h>
@@ -24,6 +24,7 @@
 #include <Jolt/Physics/Vehicle/VehicleConstraint.h>
 
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -78,7 +79,7 @@ inline bool is_movable_body(const Record* record) { return has_body(record) && r
 
 class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterContactListener {
  public:
-  World(Vec3 gravity, const CollisionLayers& layers);
+  World(Vec3 gravity, const CollisionLayers& layers, int threads = config::kDefaultPhysicsThreads);
   ~World() override;
 
   std::optional<std::string> add_object(const BodyDesc& desc) override;
@@ -238,7 +239,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   ObjectVsBroadPhase object_vs_broad_phase_;
   ObjectPairs object_pairs_{layers_};
   JPH::TempAllocatorImpl temp_allocator_;
-  JPH::JobSystemSingleThreaded job_system_;
+  std::unique_ptr<JPH::JobSystem> job_system_;  // one thread, or Jolt's pool of them
   JPH::PhysicsSystem system_;
   std::map<ObjectId, Record> records_;  // ordered: deterministic iteration
   std::set<ObjectId> triggers_;         // of the records, those that are triggers
