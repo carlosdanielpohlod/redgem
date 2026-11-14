@@ -286,6 +286,9 @@ void Engine::connect_context() {
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
   context_.spawn = [this](const SpawnRequest& request) { return spawn(request); };
+  context_.spawn_prefab = [this](const std::string& file, const SpawnRequest& request) {
+    return spawn_prefab(file, request);
+  };
   context_.scene_exists = [this](const std::string& name) { return has_scene_file(options_.game_dir, name); };
 }
 

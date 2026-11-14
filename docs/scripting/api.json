@@ -634,6 +634,12 @@
           "about": "copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy",
           "top": 20,
           "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
+        },
+        {
+          "name": "spawn_prefab",
+          "static": true,
+          "args": "file, position: nil, rotation: nil, physics: true, name: nil, parent: nil",
+          "about": "instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root"
         }
       ],
       "guide": "gameplay.md"

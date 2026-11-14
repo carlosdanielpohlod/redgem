@@ -60,6 +60,26 @@ TEST_CASE("world transforms follow the hierarchy") {
   CHECK(approx_equal(scene.world_transform(1).position, Vec3{0, 5, 0}, kTolerance));
 }
 
+TEST_CASE("runtime prefab copies keep the rest weights of their shared mesh") {
+  constexpr int kMeshOffset = 1;
+  constexpr float kRestWeight = 0.25f;
+  SceneDesc assets;
+  assets.meshes.resize(kMeshOffset + 1);
+  assets.meshes.back().target_names = {"Smile"};
+  assets.meshes.back().target_weights = {kRestWeight};
+  NodeDesc face;
+  face.mesh = 0;
+  Scene scene;
+  const auto first = scene.instantiate_rigid({face}, kMeshOffset, assets).front();
+  const auto second = scene.instantiate_rigid({face}, kMeshOffset, assets).front();
+  CHECK(scene.at(first).mesh == kMeshOffset);
+  CHECK(scene.at(first).morph_names == std::vector<std::string>{"Smile"});
+  REQUIRE(scene.at(first).morph_weights == std::vector<float>{kRestWeight});
+  scene.at(first).morph_weights.front() = 1.0f;
+  CHECK(scene.at(first).morph_rest == std::vector<float>{kRestWeight});
+  CHECK(scene.at(second).morph_weights == std::vector<float>{kRestWeight});
+}
+
 TEST_CASE("destroying a parent destroys its children in two phases") {
   Scene scene = Scene::from_desc(family());
   scene.request_destroy(0);

@@ -207,7 +207,7 @@ not a promise of how it will be closed.
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
-  script cannot spawn a prefab file by its path (only a placement in the scene), and a running
+  scripted prefab imports are synchronous and support rigid hierarchies only, and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
   descendant-only animation; it does not replace the original selection with a reference or
   overwrite an existing source file. (Loading, nesting, root overrides, previews, placement from

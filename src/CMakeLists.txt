@@ -523,6 +523,7 @@ redgem_add_library(redgem_runtime
   app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
+  app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
   app/scene_bodies.cpp

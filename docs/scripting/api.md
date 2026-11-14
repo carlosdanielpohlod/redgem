@@ -188,6 +188,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
 - `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+- `Scene.spawn_prefab(file, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
 
 ## SceneScript
 

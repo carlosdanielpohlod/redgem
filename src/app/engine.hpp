@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <variant>
@@ -28,6 +29,7 @@
 #include "scene/water_interactions.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/prefab_import.hpp"
 #include "app/game_display.hpp"
 #include "app/game_settings.hpp"
 #include "app/game_identity.hpp"
@@ -117,6 +119,9 @@ class Engine {
   // Copies a prefab (or any object) into the running game with physics and scripts, as the request
   // says (see SpawnRequest). Returns the new root object.
   ObjectId spawn(const SpawnRequest& request);
+  ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
+  const prefabs::Source& load_runtime_prefab(const std::string& file);
+  ObjectId finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   void frame(float frame_seconds);
@@ -249,6 +254,8 @@ class Engine {
   Presenter* presenter_ = nullptr;
   std::shared_ptr<SceneLoad> scene_load_;
   SceneDesc scene_desc_;
+  std::map<std::string, prefabs::Source> runtime_prefabs_;
+  std::uint64_t runtime_prefab_bytes_ = 0;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
