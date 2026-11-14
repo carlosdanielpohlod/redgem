@@ -26,6 +26,15 @@ mrb_value network_decide(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(network(mrb).decide(static_cast<int>(ticket), accepted, binding::to_name(mrb, reason)));
 }
 
+bool is_peer_id(mrb_int peer) { return peer >= net::kHostId && peer <= net::kMaxPeers; }
+
+// Network.__dismiss(peer): lets a machine go from the game hosted here; false when it cannot.
+mrb_value network_dismiss(mrb_state* mrb, mrb_value) {
+  mrb_int peer = 0;
+  mrb_get_args(mrb, "i", &peer);
+  return mrb_bool_value(is_peer_id(peer) && network(mrb).dismiss(static_cast<int>(peer)));
+}
+
 }  // namespace
 
 nlohmann::json auth_arg(mrb_state* mrb, mrb_value auth) {
@@ -41,6 +50,7 @@ nlohmann::json auth_arg(mrb_state* mrb, mrb_value auth) {
 void install_network_approval_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__approval", network_approval, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, network_module, "__decide", network_decide, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, network_module, "__dismiss", network_dismiss, MRB_ARGS_REQ(1));
 }
 
 }  // namespace redgem

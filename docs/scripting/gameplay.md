@@ -17,7 +17,8 @@ Input.down?(:e)                # any key: held
 Input.pressed?(:e)             # any key: went down this frame
 ```
 
-Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift). A game
+Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift), `:interact` (E,
+what an [Interactor](interaction.md) uses things with). A game
 declares its own and lets players change them: see [Controls](#controls).
 
 Keys go by these names:
@@ -40,8 +41,8 @@ and a game never sees it go down there.
 ## Read a gamepad
 
 A game written with axes and actions already works with a gamepad: the left stick moves
-`:horizontal` and `:vertical` (by as much as it is pushed), and A, X and B are `:jump`, `:fire`
-and `:run`. For the rest, ask the gamepad itself:
+`:horizontal` and `:vertical` (by as much as it is pushed), and A, X, B and Y are `:jump`, `:fire`,
+`:run` and `:interact`. For the rest, ask the gamepad itself:
 
 ```ruby
 Input.gamepad?                        # is one plugged in?
@@ -71,14 +72,21 @@ Input.gamepad_down?(:start, pad: 1)
 The keyboard and the mouse belong to the first player (pad 0). The other players start with the
 gamepad's bindings only, unless a player binds keys of their own (two players sharing one keyboard).
 
-Gamepads cannot rumble: the window library the engine uses on desktops has no vibration, and
-neither does Android's.
+Gamepads cannot rumble: the window library the engine uses (raylib 5.5) has no vibration on
+desktops nor on Android. `Input.rumble?` says so (false), and `Input.rumble(pad, strength,
+seconds)` is a hook that does nothing yet and returns false; it still checks its player, a
+strength from 0 to 1 and a time that is not negative, so a game can call it now and offer a
+vibration option only where `Input.rumble?` is true.
+
+```ruby
+Input.rumble(0, 0.8, 0.2) if Input.rumble?   # the first player's gamepad, hard, a fifth of a second
+```
 
 ## Controls
 
 A game names what its players do (actions, which are on or off, and axes, from -1 to 1) and says
 what triggers them. Scripts then read the names, never the keys, so players can change the keys.
-The built-in `:jump`, `:fire`, `:run`, `:horizontal` and `:vertical` are always there; a game adds
+The built-in `:jump`, `:fire`, `:run`, `:interact`, `:horizontal` and `:vertical` are always there; a game adds
 its own, or binds one of those anew, in the `input` section of its `game.json`:
 
 ```json
@@ -113,7 +121,7 @@ Input.define_action(:shoot, :f, mouse: [:left], buttons: [:right_bumper])
 Input.define_action(:next_weapon, "mouse:wheel_up", "pad:y")
 Input.define_axis(:steer, negative: [:a, "pad:dpad_left"], positive: {keys: [:d], buttons: [:dpad_right]},
                   pad_axis: :left_x)
-Input.actions                   # [:dash, :fire, :jump, :run]
+Input.actions                   # [:dash, :fire, :interact, :jump, :run]
 Input.action_released?(:dash)   # true on the frame the last of its keys and buttons lets go
 ```
 
@@ -186,14 +194,19 @@ which stick moves an axis (`:left_x`, or `nil`): it is the game's, the same for 
 `GameMenu`'s settings screen has a Controls button that opens a ready-made controls page (the
 `:controls` screen). At its top, a choice of the player whose bindings it shows (1 to 4: the first
 also has the keyboard). Under it, a row for each action and one for each side of each axis, every
-one the game declared, in two cells: the player's keys and mouse buttons, and their gamepad buttons (an axis' stick
-shows among them, though no player rebinds it). Up and down move between the rows, left and
-right between a row's two cells.
+one the game declared, in four cells: two for the player's keys and mouse buttons, and two for
+their gamepad buttons. The first cell of each shows the first binding and the second the next (W
+and Up both move up), the second also listing any more a game bound; an axis' stick shows in its
+first buttons' cell, though no player rebinds it. Up and down move between the rows, left and
+right between a row's cells.
 
 Enter, a gamepad's A or a click on a cell (which also moves the focus there) waits for the next
-key, mouse button or wheel turn (the keys' cell) or gamepad button (the buttons' cell): that one
-takes the place of everything the cell
-had, and the row's other cell keeps its own. A button pressed for the keys' cell (or a key for the
+key, mouse button or wheel turn (a keys' cell) or gamepad button (a buttons' cell): that one takes
+the place of what the cell had, and the row's other cells keep theirs, in their places; caught for
+an empty second cell, it is added beside the first. One the row already has changes nothing.
+Delete, Backspace or a gamepad's Y clears the focused cell (the note under the rows says so). Keys
+are listed before mouse buttons, so a mouse button caught for the first cell of a row that has a
+key shows after it. A button pressed for a keys' cell (or a key for a
 buttons'), or a button of another player's gamepad, is not for it, and it waits on; any keyboard
 key or mouse button is taken for any player. The click on a cell that starts a wait is not taken for
 its binding; the next click is, and it clicks nothing else on the page. While a buttons' cell waits,
@@ -237,7 +250,7 @@ To click on things in the world, cast a ray from the camera through the pointer:
 
 ```ruby
 if Input.mouse_pressed?(:left)
-  origin, direction = Camera.screen_ray(Input.mouse_x, Input.mouse_y)
+  origin, direction = Camera.screen_ray(UI.mouse_x, UI.mouse_y)
   hit = Physics.raycast(origin, direction, 100.0)
   hit[:object].destroy if hit
 end
@@ -320,6 +333,16 @@ end
 ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons, or twisted
 harder than 500 newton meters (`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
 
+A joint can also come with the scene: set up in the editor's Joint card (or with `joint`
+properties in Blender, see [Levels](../levels.md)), it is made as the scene loads, and
+`game_object.joint` returns it:
+
+```ruby
+class Gate < Behaviour
+  def open = game_object.joint.motor(90, 200)                 # the hinge set up in the editor
+end
+```
+
 ## Collision layers
 
 Bullets that fly through pickups, ghosts that walk through walls: give each body a **layer** and
@@ -372,6 +395,29 @@ end
 ```
 
 `vehicle.speed` is in meters per second, negative in reverse.
+
+## Float in water
+
+Dynamic bodies and vehicles float in any water surface (a material with `water = true`, see
+[Water surfaces](../levels.md#water-surfaces)) with no script: water pushes each one up by the
+weight of what it displaces and slows it as it moves through. How deep one sits is its `density`
+custom property, in kilograms per cubic meter: water is 1000, so a crate of `density = 500` (what a
+body that does not say gets) floats half under, one of 250 a quarter under, and a stone of 2500
+sinks. Its mass only says how hard it is to push.
+
+When the camera goes under the surface the picture fades into the water's color with distance and
+wobbles a little; it fades in as the camera goes under the waves, so crossing the surface never
+flickers.
+
+Scripts ask where the water is:
+
+```ruby
+def fixed_update(_dt)
+  @swimming = Water.under?(transform.position + Vector3.new(0, 1.2, 0)) # the head is under
+  depth = Water.depth_at(transform.position) # meters under the surface, nil out of the water
+  level = Water.height_at(transform.position.x, transform.position.z) # nil where it is dry
+end
+```
 
 ## Pickups and zones
 
@@ -602,7 +648,7 @@ picture.
 
 ## Mark things on the screen
 
-`Camera.world_to_screen` says where a point of the world is on the screen, in the pixels `UI`
+`Camera.world_to_screen` says where a point of the world is on the screen, in the units `UI`
 draws in, at any window size and render scale: a health bar over an enemy, an arrow over a coin.
 It is nil when the point is behind the camera; a point beside the view comes back off the screen.
 
@@ -657,6 +703,34 @@ The anchors are `:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`,
 and the settings widgets all take one. `UI.anchored(:center, x: 0, y: 0, width: 300, height: 200)`
 gives the top-left `[x, y]` of a box placed that way, for laying out several things together. An
 image is placed by the width and height you give it.
+
+### At any screen size: the reference screen
+
+Anchors keep things at their corners; the reference screen keeps them the right size. Every
+size, position, margin and font size `UI` takes is in units of the screen the game lays its
+interface out for, which `game.json` names:
+
+```json
+"ui": {"reference": [1920, 1080], "match": "height"}
+```
+
+Without it, the reference is the game's own window (`window_width` by `window_height`), its
+height matched. On another screen a unit is `UI.scale` pixels: with `"match": "height"`, the
+screen's height over the reference's, so a HUD takes the same share of the screen at 1280x720,
+at 4K and in a small window; `"width"` follows the width instead, and `"fit"` takes the smaller
+of the two, so all of the reference always shows. Texts are drawn at the pixels they take, from
+letters made at about that size: they stay sharp at 4K rather than being stretched.
+
+`UI.width` and `UI.height` are the screen in units (with the height matched, `UI.height` is the
+reference's, and `UI.width` follows the screen's shape), so anchors and `UI.width / 2` work as
+before. `UI.pixel_width` and `UI.pixel_height` are its pixels, `UI.reference` the reference's
+size, and `UI.mouse_x` and `UI.mouse_y` the pointer in units: clicks and taps land on what is
+drawn at any size. `Camera.world_to_screen` and `Camera.screen_ray` are in units too.
+
+The player makes everything bigger or smaller with `Settings.ui_scale` (0.5 to 2; the settings
+screen's "Interface size"), which `UI.scale` is multiplied by and which is kept with the other
+settings. The game's menus already take the screen's height: they shrink with a smaller one, and
+stay as they are with a larger one, where only the HUD grows.
 
 ### Long texts: word wrap
 
@@ -803,7 +877,9 @@ Game.load_scene_async("level2")
 Normal simulation pauses while the file is read; the loading screen, audio and network continue.
 Failure or cancellation preserves the current scene. Check `Game.loading_error` after the load
 ends to report a failure or retry. Successful activation removes the old loading callback.
-Physics, texture decoding and GPU upload can still cause an activation hitch; see
+The new scene is made ready over several frames while the loading screen keeps drawing (its
+bodies a few milliseconds a frame, its textures and meshes a few megabytes a frame); its scripts
+all start in the frame it takes the old one's place, so they see the whole level. See
 [the API's loading limits](api.md#game). Use `Game.load_scene` for the existing synchronous switch.
 
 ## A settings screen
@@ -918,7 +994,8 @@ Game.load_scene("level2")   # scenes/level2.glb; "main" is scene.glb
 ```
 
 The switch happens at the end of the frame. Ruby global variables survive it, which is the simple
-way to carry a score or lives from one level to the next.
+way to carry a score or lives from one level to the next. In a game played together, the host
+changes the level for every machine (see [Changing level together](multiplayer.md#changing-level-together)).
 
 ## Do something later, or over a while
 
@@ -1263,7 +1340,74 @@ persisted after a write; the database remembers named slots when they are opened
 custom `SaveStore` keeps its original behavior and must implement the optional slot factory to
 support named selection. Game tests isolate slot files too: fresh runs clear live data/backups,
 restart runs copy them, and damaged evidence is retained rather than copied into another test.
-This API stores values; it does not automatically serialize scene objects or migrate game data.
+Slots store values; [save versions](#migrate-saves-when-the-game-changes) bring an older slot up
+to date, and [checkpoints](#keep-spawned-objects) keep the objects a game spawned.
+
+### Migrate saves when the game changes
+
+A shipped game gets patched, and its players' saves must still load. Declare which version of the
+saved data the game writes, and how a slot of each older version becomes the next one:
+
+```ruby
+Save.version = 3
+Save.migrate(from: 1) { |data| data.merge("coins" => data.delete("gold")) }
+Save.migrate(from: 2) { |data| data.merge("lives" => 3) }
+```
+
+Declare them where scripts run before the game first reads its save (the top of the first
+scene's script, say). A hook gets the slot's values as a Hash with String keys and returns the
+new ones; a version that changed nothing needs no hook. The first use of a slot after that (any
+`get`, `set`, `keys`... or `Save.slot =`) checks it:
+
+- a slot of an older version goes through the hooks it needs, in order, and is written back whole
+  and at once (one file write, or one database transaction), stamped with the new version, so
+  each hook runs once per slot;
+- a slot written by a newer version of the game is refused: it is not loaded, nothing writes over
+  it, and every use of it raises a `RuntimeError` saying which versions they are;
+- a hook that raises (or returns something that is not a Hash) leaves the slot as it was: the log
+  says why, and the slot is refused the same way.
+
+`Save.slot =` that meets a refused slot raises and keeps the slot that was selected;
+`Save.clear` empties a refused slot, which then starts again at the current version. Declare the
+hooks before the version is first used: a step with no hook counts as one that changed nothing,
+and a hook declared after the slot was checked is too late for it (the log says so). A slot
+written before the game declared a version counts as version 1, and a new slot is stamped with
+the current version on its first write. The version is kept in the slot under the key
+`__save_version`, which `Save.keys` does not list. A game that declares no version gets its
+values as they are.
+
+### Keep spawned objects
+
+What `Scene.spawn` made at run time (a dropped item, a placed building) is not in the scene file.
+A behaviour that names fields with `persist` asks for its object to be kept:
+
+```ruby
+class Crate < Behaviour
+  persist :health, :loot
+
+  def initialize = @health = 100   # what a new crate starts with
+end
+
+Save.checkpoint                 # whenever the game saves; returns how many objects it kept
+Save.restore_checkpoint         # after the scene loads (its SceneScript#setup, say)
+```
+
+`Save.checkpoint(key = :checkpoint)` keeps, under that key of `Save`, every spawned object of the
+scene that carries such a behaviour: its template, its name, its pose and look (its
+[checkpoint](#object-checkpoints)) and the persisted fields of each of those behaviours. Their
+values are what `Save` can keep (a Symbol comes back as a String; a `GameObject` cannot be kept). Objects destroyed by then are not kept, nor are objects of the
+scene file, spawned objects with no persisting behaviour, or parts of a bigger spawned copy.
+
+`Save.restore_checkpoint(key = :checkpoint)` spawns each one again from its template, poses it,
+and gives its behaviours their fields before they start (a behaviour its template did not give
+it is added). It returns the new copies, and replaces the spawned objects that persist something
+now rather than adding to them, so restoring twice leaves one set. A checkpoint of another scene,
+or one naming a template or behaviour class the game no longer has, raises an `ArgumentError`
+before anything is spawned or destroyed. Fields a class no longer persists are left as it starts
+them. A copy spawned with `physics: false` comes back without one. A spawned copy put under
+another spawned copy is not kept; one under an object of the scene file is spawned under it
+again. Only the behaviours of the spawned object itself are looked at, not those of its parts.
+Objects of `Network.spawn` are the network's: a checkpoint is for what one machine spawns.
 
 ### Keeping references to scene objects
 
@@ -1291,7 +1435,8 @@ Runtime copies have `nil` identities, including their descendants and copies of 
 never resolves as its source, even after an object is destroyed or a runtime slot is reused.
 An old object reference remains stale after a scene switch; look up the saved identity again.
 An object whose in-memory source supplies no identity also returns `nil`. This lookup does not
-serialize transforms, behaviours or spawned instances; object checkpoints are a separate API.
+serialize transforms, behaviours or spawned instances; object checkpoints and
+[spawned-object checkpoints](#keep-spawned-objects) are separate APIs.
 
 ### Object checkpoints
 
@@ -1322,7 +1467,7 @@ magnitude, and at most 4096 objects can move in one restoration.
 
 A checkpoint also works on an explicitly chosen runtime copy of the same source and parent;
 it cannot silently select a copy or overwrite its original. The game creates any needed copies
-first. This API neither spawns nor resurrects objects, changes parents, nor restores descendants'
+first (`Save.restore_checkpoint` does that for [spawned objects](#keep-spawned-objects)). This API neither spawns nor resurrects objects, changes parents, nor restores descendants'
 individual local poses or appearance. Save each object's checkpoint if those values matter.
 Animations, behaviours, joints, forces and game time remain active. Health, inventory and other
 script-owned values must be saved explicitly beside the checkpoint; this is not a whole-game

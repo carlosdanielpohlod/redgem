@@ -9,6 +9,9 @@
 #     def on_collision_enter(other); end
 #     def on_collision_exit(other); end
 #     def on_destroy; end
+#     def on_interact(actor); end    # with an Interactable (see interaction.rb)
+#     def on_focus(actor); end
+#     def on_blur(actor); end
 #   end
 class Behaviour
   attr_reader :game_object
@@ -21,6 +24,9 @@ class Behaviour
   def on_collision_enter(_other); end
   def on_collision_exit(_other); end
   def on_destroy; end
+  def on_interact(_actor); end
+  def on_focus(_actor); end
+  def on_blur(_actor); end
 
   def transform = game_object.transform
   def character = game_object.character
@@ -49,6 +55,22 @@ class Behaviour
   def animation = game_object.animation
 
   def inspect = "#<#{self.class} on #{game_object.inspect}>"
+
+  # Fields (instance variables, named without the @) that Save.checkpoint keeps for an object
+  # Scene.spawn made, and gives back to the copy Save.restore_checkpoint makes, before it starts:
+  #   class Crate < Behaviour
+  #     persist :health, :loot
+  #   end
+  # A class says them in one persist line: another replaces it (a reloaded script's does).
+  def self.persist(*fields)
+    @persisted_fields = fields.map(&:to_sym).uniq
+  end
+
+  # What persist named, in this class and in those it comes from.
+  def self.persisted_fields
+    inherited = superclass <= Behaviour ? superclass.persisted_fields : []
+    inherited + (@persisted_fields || [])
+  end
 
   def __configure(settings)
     @settings = settings

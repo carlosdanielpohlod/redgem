@@ -38,7 +38,11 @@ void Engine::prepare_frame() {
   context_.hud.clear();
   debug_draw_.clear();
   scripts_->vm().set_sampling(profiler_.enabled());
-  if (!is_loading_scene()) scripts_->start_pending();
+  start_scripts();
+}
+
+void Engine::start_scripts() {
+  if (!frozen()) scripts_->start_pending();
 }
 
 void Engine::read_input() {
@@ -70,6 +74,8 @@ void Engine::poll_network() {
   const float seconds = std::min(lap, config::kMaxFrameSeconds);
   network_.forgive_stall(lap - seconds);  // (what the others sent while this one stood still)
   for (const net::NetworkEvent& event : network_.poll(seconds)) scripts_->dispatch(event);
+  // Out of the game, nobody is waited for: the world is never left held (whatever the scripts did).
+  if (network_.state() == net::NetworkSession::State::Offline) context_.level_held = false;
   // A game hosted on this machine's own port answers the neighbours looking for one.
   if (!found_by_neighbours()) discovery_.stop_announcing();
   discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
@@ -83,7 +89,7 @@ void Engine::answer_requests() {
 
 bool Engine::found_by_neighbours() const { return network_.hosting() && network_.room().empty(); }
 
-bool Engine::captures_cursor() const { return context_.mouse_locked && !is_loading_scene(); }
+bool Engine::captures_cursor() const { return context_.mouse_locked && !frozen(); }
 
 void Engine::read_surface_sizes() {
   const SurfaceSize size = presenter_->surface_size();
@@ -172,8 +178,7 @@ void Engine::fixed_step(float dt) {
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
-  bodies::push_poses(scene_, *physics_);
+  push_poses_and_float();
   physics_->step(dt);
   bodies::pull_poses(scene_, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
@@ -184,6 +189,14 @@ void Engine::fixed_step(float dt) {
   context_.time.elapsed += dt;
 }
 
+void Engine::push_poses_and_float() {
+  find_water();  // primes newly spawned or teleported bodies
+  bodies::push_poses(scene_, *physics_);
+  apply_scene_buoyancy(water_, scene_, scene_desc_, *physics_);
+}
+
+void Engine::find_water() { update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f); }
+
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
   append_debug_labels(context_, debug_draw_);
@@ -192,7 +205,8 @@ void Engine::present() {
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
-                       shows_profile_stats(context_), &debug_draw_});
+                       shows_profile_stats(context_), &debug_draw_, &water_.surfaces()});
+  forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
 }
 
 int Engine::run() {

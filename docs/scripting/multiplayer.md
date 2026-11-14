@@ -218,6 +218,38 @@ An array or a hash holds at most 4096 things (in a message: `Save` keeps any num
 until the next level is loaded, so register them in a behaviour's `start` or a scene script's
 `setup`. Names starting with `$` are the engine's own.
 
+## Reconnecting after a drop
+
+A phone switching from Wi-Fi to mobile data, or a router restarting, drops a player's connection
+for a moment. The game hosting (directly, or on a dedicated server) can hold that player's place
+and id for a while, so that it gets back in as if nothing happened:
+
+```ruby
+# on the host (on a dedicated server: in a manager's start)
+Network.reconnect_window = 20   # seconds; 0 (the default) turns it off, 300 at most
+
+Network.on_reconnecting { |peer| show_banner("#{peer} lost the connection...") }  # on the host and on that machine
+Network.on_reconnected { |peer| hide_banner }   # back, with the same id
+Network.on_lost { |reason| go_to_menu(reason) } # on that machine: it could not get back in time
+```
+
+The machine whose connection dropped stays in the game (`Network.reconnecting?` is true,
+`Network.id` and `Network.peers` stay the same, the others' objects stay theirs, so
+`NetworkSync#mine?` is still false for them; nothing can be sent meanwhile) and calls the
+host again every second. Its welcome gave it a secret token, which is what gets the place back:
+a machine that does not have it is turned away, a token gets a place back once (each return
+gives a new one), and once the window is over the place is gone. The window is the one the
+player's welcome told: setting another one later counts for those let in afterwards. The others hear the player left
+(`on_leave`) only when the window is over; if it gets back first they hear nothing. A player
+who leaves (`Network.leave`) says so and holds no place; a host that leaves ends the game at once
+for everyone, as before.
+
+What was said while it was away is not replayed. When it is back, the host tells it the spawned
+objects as they are now (`Network.spawn`), it starts what it knows of the others' objects over,
+and the peers that came and went meanwhile arrive and leave (`on_join`, `on_leave`) on its
+machine. Messages of the game (`Network.emit`) sent meanwhile to it are lost, so keep what
+matters in state the host can send again (in an `on_reconnected` handler on the host).
+
 ## Objects in the same place everywhere
 
 A `NetworkSync` keeps an object where its **owner** has it: the owner's machine moves it as usual
@@ -288,8 +320,75 @@ A machine only creates for others what the game itself spawns: templates it has 
 machine can only spawn objects of its own: 64 at a time, 512 in the whole game. Past that
 `Network.spawn` makes nothing and returns `nil`.
 
-Loading a level happens on one machine: its spawned objects go away everywhere, and it is shown
-the others' again. To change level together, send a message and load it on every machine.
+## Changing level together
+
+In a game played together the level is the host's to change: on the host (a player hosting, or
+the game on a dedicated server), `Game.load_scene("level2")` changes the level of every machine.
+The connection stays up; nobody leaves the game.
+
+```ruby
+Game.load_scene("level2")                # on the host: true, and every machine loads level2
+Network.on_level_loading { |name| ... }  # on every machine, as the change starts (the old level is still there)
+Network.on_level_ready { |name| ... }    # on every machine, once all of them have the level: it starts now
+Network.level_timeout = 20               # seconds the host, once it has the level, waits for the rest (30 unless said)
+```
+
+What happens, step by step:
+
+1. The host tells every machine the level, and every machine loads it in the background (in a
+   network game `Game.load_scene` reads like `Game.load_scene_async`), showing the loading
+   screen (`Game.on_loading`).
+2. A machine that has the level waits, its new level frozen as while loading: its behaviours do
+   not start, nothing moves, nothing it spawns is sent yet. It tells the host it is ready.
+3. When every machine is ready, or `Network.level_timeout` seconds passed since the host itself
+   had the level, the host lets go of the ones still loading (they hear `on_disconnect`, the
+   others `on_leave`) and everyone starts the level at once: `on_level_ready` runs, then the
+   level's behaviours start.
+
+The objects of the old level are gone with it on every machine, the ones spawned with
+`Network.spawn` included: anything said about them on the way (a place, a spawn) is dropped, so
+none of them turns up in the new level. Each machine spawns its player's objects again in the new
+level, in the scene script's `setup` or in `on_level_ready`:
+
+```ruby
+Network.on_level_ready do |_name|
+  Network.spawn("Hero", position: Scene.find!("Start").transform.position) unless Network.server?
+end
+```
+
+Only the host changes the level: elsewhere `Game.load_scene` changes nothing, warns, and returns
+`false`, and a level change that any other machine claims to order is ignored. One change goes on
+at a time (another asked meanwhile returns `false`), a name the game has no scene for raises at
+once, and `Game.cancel_scene_load` cancels nothing during a change. A machine that joins is told
+the level the game plays and loads it (unless it has it already) before it sees what is spawned
+there; one that joins during a change takes part in it. A machine that cannot load the level (its
+file is broken) leaves the game; when that is the host, the game ends.
+
+`Network.on_level_loading` and `Network.on_level_ready` last across levels, like
+`Network.authenticate`: each call replaces the handler before it (unlike `Network.on`, whose
+handlers end with the level). `Network.changing_level?` is true from the start of a change until
+the level starts.
+
+### What lasts from one level to the next
+
+The Ruby of every machine survives a level: its global variables, its classes and modules and
+what they hold. What the game wants to keep (a score, the players' lives, the round) it keeps in
+Ruby objects of its own, outside the level's behaviours, which end with the level:
+
+```ruby
+# scripts/match.rb: one per machine, for the whole game
+module Match
+  @scores = Hash.new(0)
+  class << self
+    attr_reader :scores
+  end
+end
+
+Network.on(:scored) { |points, from| Match.scores[from] += points }   # (in a level's setup)
+```
+
+Every machine keeps its own copy: the host decides (it can send the whole of it with
+`Network.emit(:scores, Match.scores)` in `on_level_ready`, for a machine that joined late).
 
 ## Movement validation
 
@@ -351,6 +450,11 @@ Network.on(:coin) { |coin_name, _from| Scene.find(coin_name)&.get_component(Coin
 The platformer demo plays together this way: Esc > Multiplayer hosts or joins a game, and
 `games/platformer/scripts/co_op.rb` is the whole of its networking.
 
+What a player uses (a door, a lever, someone to talk to, through an `Interactor`) is the one
+exception: the host decides it. A client's use is asked of the host, which checks the hero's
+range and line of sight again before `on_interact` runs there (see
+[Interaction](interaction.md#over-the-network)).
+
 ## Testing it
 
 The engine's own multiplayer test runs two copies of the game at once, each with its own test
@@ -368,4 +472,6 @@ target (lag compensation), so the shooter's machine should decide its own hits, 
 things once": fine for co-op and casual games, not for competitive shooters. Connections are
 encrypted, but who answers is checked only when the game gives its fingerprint (see "Encrypted
 connections"). Players are not authenticated unless the game hosting asks for it
-([Online services](online-services.md)), in a room on a relay too.
+([Online services](online-services.md)), in a room on a relay too. A room on a relay holds no
+place for a player whose connection dropped (see "Reconnecting after a drop"), and when the
+player hosting a game drops, the game ends: nobody else takes over as host.
