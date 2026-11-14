@@ -561,13 +561,17 @@ reported through `Game.loading_error` and the event log. At most eight backgroun
 outstanding across the process, using one shared reader; a full queue fails without changing the
 world. Cancelling an active read discards its result; it does not interrupt the file parser.
 
-Only file reading and glTF parsing happen on the worker. Physics creation, script setup, texture
-decoding and GPU upload still happen on the owning thread and may hitch during activation. The
-old and incoming scene coexist in memory during reading. Fixed-step offline runs (including
-recordings and scripted replays) wait for the reader before advancing, then show exactly one
-loading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the
-background reader even in fixed-step mode; activation still runs on the server loop and can stall
-other rooms sharing that loop. Closing the process waits for an active parser to return.
+File reading, glTF parsing and, for a game shown in a window, picture decoding happen on the
+worker. The scene read is then made ready over the next loading frames while the old one is still
+shown: its physics bodies are made in batches of about 4 ms a frame, its textures and meshes go to
+the graphics card about 8 MiB a frame, and the swap happens once all of it is ready. Every script
+of the new scene starts in that one frame, so a behaviour's first update sees the complete level.
+Creating the scene's objects, its water and its navigation bake still take one frame each. The old
+and incoming scene coexist in memory until the swap. Fixed-step offline runs (including
+recordings and scripted replays) wait for the reader before advancing, then make the scene ready
+all at once after exactly one loading frame, so completion depends neither on thread scheduling
+nor on the real clock. Networked runs and dedicated-server rooms keep the background reader and
+the spread activation even in fixed-step mode; a dedicated server's rooms share their loop. Closing the process waits for an active parser to return.
 
 ## Settings
 

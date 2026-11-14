@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -9,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "core/frame_budget.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
@@ -38,6 +40,13 @@ class Renderer {
   // Uploads assets added to `desc` since the last upload/sync and refreshes every material's values
   // (cheap enough to call every frame in the editor).
   void sync(const SceneDesc& desc);
+  // Readies the textures and meshes of the scene to be shown next on the graphics card, a share at
+  // a time, while the scene uploaded before is still drawn: about `bytes` a call, within
+  // `budget`, at least one asset. True once all of them are; the next upload takes them instead
+  // of sending them again.
+  bool stage(const SceneDesc& desc, std::size_t bytes, const FrameBudget& budget);
+  // Releases what stage readied (a scene that will not be shown after all).
+  void drop_staged();
   // Borrows an uploaded image for this frame, or returns an empty texture. Never unload it.
   Texture2D scene_texture(int image) const;
   std::uint64_t scene_upload_count() const;

@@ -52,6 +52,7 @@ Renderer::Renderer(const Window&) : impl_(std::make_unique<Impl>()) {
 
 Renderer::~Renderer() {
   end_scene_texture_use();
+  impl_->release_staged();  // (assets readied for a scene never shown)
   impl_->release();
 }
 
@@ -60,8 +61,27 @@ void Renderer::upload(const SceneDesc& desc) {
   impl_->reset_water_ripples();
   impl_->faces_captured = 0;  // do not reflect the previous scene while the new one is captured
   ++impl_->scene_uploads;     // nor mix its frames into the new one's
+  impl_->adopt_staged(desc);
   sync(desc);
 }
+
+namespace {
+// Whether a frame's share of staging is used: its bytes sent, or its time gone.
+bool share_used(std::size_t sent, std::size_t bytes, const FrameBudget& budget) {
+  return sent >= bytes || budget.spent();
+}
+}  // namespace
+
+bool Renderer::stage(const SceneDesc& desc, std::size_t bytes, const FrameBudget& budget) {
+  std::size_t sent = 0;
+  while (!impl_->staged_all(desc)) {
+    sent += impl_->stage_next(desc);  // (one at least, whatever is left of the frame)
+    if (share_used(sent, bytes, budget)) break;
+  }
+  return impl_->staged_all(desc);
+}
+
+void Renderer::drop_staged() { impl_->release_staged(); }
 
 void Renderer::sync(const SceneDesc& desc) {
   impl_->upload_new_textures(desc);

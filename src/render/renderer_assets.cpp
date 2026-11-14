@@ -96,6 +96,31 @@ Texture2D blank_map(int slot) {
   return Texture2D{rlGetTextureIdDefault(), 1, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
 }
 
+template <typename Element>
+std::size_t bytes_of(const std::vector<Element>& elements) {
+  return elements.size() * sizeof(Element);
+}
+
+// Roughly what a mesh sends to the graphics card: its vertices and indices.
+std::size_t mesh_bytes(const MeshDesc& mesh) {
+  std::size_t bytes = 0;
+  for (const PrimitiveDesc& piece : mesh.primitives) {
+    bytes += bytes_of(piece.positions) + bytes_of(piece.normals) + bytes_of(piece.texcoords) + bytes_of(piece.colors) +
+             bytes_of(piece.indices) + bytes_of(piece.joints) + bytes_of(piece.weights);
+  }
+  return bytes;
+}
+
+bool has_decoded(const SceneDesc& desc, std::size_t image) {
+  return image < desc.decoded_images.size() && !desc.decoded_images[image].empty();
+}
+
+// Roughly what a picture sends: its pixels, or its file's bytes when it was not decoded yet.
+std::size_t picture_bytes(const SceneDesc& desc, std::size_t image) {
+  if (has_decoded(desc, image)) return desc.decoded_images[image].pixels.size();
+  return desc.images[image].encoded.size();
+}
+
 }  // namespace
 
 Texture2D Renderer::scene_texture(int image) const {
@@ -115,9 +140,49 @@ void Renderer::end_scene_texture_use() {
 }
 
 void Renderer::Impl::upload_new_textures(const SceneDesc& desc) {
-  for (std::size_t i = textures.size(); i < desc.images.size(); ++i) {
-    textures.push_back(load_scene_texture(desc.images[i]));
+  for (std::size_t i = textures.size(); i < desc.images.size(); ++i) textures.push_back(scene_picture(desc, i));
+}
+
+Texture2D Renderer::Impl::scene_picture(const SceneDesc& desc, std::size_t image) {
+  static const DecodedPicture kNotDecoded;
+  const bool decoded = image < desc.decoded_images.size();
+  return load_scene_texture(desc.images[image], decoded ? desc.decoded_images[image] : kNotDecoded);
+}
+
+bool Renderer::Impl::staged_all(const SceneDesc& desc) const {
+  return staged.textures.size() >= desc.images.size() && staged.meshes.size() >= desc.meshes.size();
+}
+
+std::size_t Renderer::Impl::stage_next(const SceneDesc& desc) {
+  const std::size_t image = staged.textures.size();
+  if (image < desc.images.size()) {
+    staged.textures.push_back(scene_picture(desc, image));
+    return picture_bytes(desc, image);
   }
+  const MeshDesc& mesh = desc.meshes[staged.meshes.size()];
+  staged.meshes.push_back(upload_mesh(mesh, staged.morph_deltas));
+  return mesh_bytes(mesh);
+}
+
+bool Renderer::Impl::staged_fits(const SceneDesc& desc) const {
+  return staged.textures.size() <= desc.images.size() && staged.meshes.size() <= desc.meshes.size();
+}
+
+void Renderer::Impl::adopt_staged(const SceneDesc& desc) {
+  if (!staged_fits(desc)) return release_staged();
+  textures = std::move(staged.textures);
+  meshes = std::move(staged.meshes);
+  morph_deltas = std::move(staged.morph_deltas);
+  for (std::size_t m = 0; m < meshes.size(); ++m) mesh_bounds.push_back(render_math::drawn_bounds(desc.meshes[m]));
+  staged = {};
+}
+
+void Renderer::Impl::release_staged() {
+  for (const Texture2D& texture : staged.textures) UnloadTexture(texture);
+  for (auto& primitives : staged.meshes) {
+    for (GpuPrimitive& primitive : primitives) UnloadMesh(primitive.mesh);
+  }
+  staged = {};
 }
 
 Material Renderer::Impl::make_material(redgem::Color base_color) const {

@@ -18,6 +18,11 @@ Image decode_picture(const std::vector<std::uint8_t>& encoded);
 // A scene's image as a texture surfaces are drawn with, smaller copies of itself included. Its
 // missing or undecodable data becomes an opaque checkerboard, with a warning.
 Texture2D load_scene_texture(const ImageData& image);
+// The same from a picture already decoded (see decode_scene_picture); `image` when it is empty.
+Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decoded);
+
+// A scene's image decoded on the CPU, on any thread: marked unreadable when it cannot be.
+DecodedPicture decode_scene_picture(const ImageData& image);
 
 // The first file of `folder` that `name` can mean (as it is, or with a picture's extension), as
 // a texture. Missing, refused and undecodable files become an opaque checkerboard, with a warning.

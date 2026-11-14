@@ -788,7 +788,9 @@ Game.load_scene_async("level2")
 Normal simulation pauses while the file is read; the loading screen, audio and network continue.
 Failure or cancellation preserves the current scene. Check `Game.loading_error` after the load
 ends to report a failure or retry. Successful activation removes the old loading callback.
-Physics, texture decoding and GPU upload can still cause an activation hitch; see
+The new scene is made ready over several frames while the loading screen keeps drawing (its
+bodies a few milliseconds a frame, its textures and meshes a few megabytes a frame); its scripts
+all start in the frame it takes the old one's place, so they see the whole level. See
 [the API's loading limits](api.md#game). Use `Game.load_scene` for the existing synchronous switch.
 
 ## A settings screen

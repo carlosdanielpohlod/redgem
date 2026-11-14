@@ -8,6 +8,7 @@
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
+#include "render/texture_loading.hpp"
 
 namespace redgem {
 namespace {
@@ -25,10 +26,19 @@ void capture_message(SceneLoad::Messages& messages, log::Level level, const std:
   messages.emplace_back(level, std::move(bounded));
 }
 
-LoadResult invoke_reader(const SceneLoader::Reader& reader, const std::filesystem::path& game,
-                         const std::string& name) {
+// Reads the scene, then decodes its pictures when asked to and there is a scene.
+LoadResult read_and_decode(const SceneLoader::Reader& reader, const std::filesystem::path& game,
+                           const std::string& name, bool decode_pictures) {
+  LoadResult loaded = reader(game, name);
+  if (!loaded.ok) return loaded;
+  if (decode_pictures) decode_scene_pictures(loaded.scene);
+  return loaded;
+}
+
+LoadResult invoke_reader(const SceneLoader::Reader& reader, const std::filesystem::path& game, const std::string& name,
+                         bool decode_pictures) {
   try {
-    return reader(game, name);
+    return read_and_decode(reader, game, name, decode_pictures);
   } catch (const std::exception& error) {
     return {false, error.what(), {}, {}};
   } catch (...) {
@@ -64,24 +74,25 @@ SceneLoader::~SceneLoader() {
   worker_.join();
 }
 
-std::shared_ptr<SceneLoad> SceneLoader::submit(const std::filesystem::path& game, const std::string& name) {
+std::shared_ptr<SceneLoad> SceneLoader::submit(const std::filesystem::path& game, const std::string& name,
+                                               bool decode_pictures) {
   const std::lock_guard<std::mutex> hold(mutex_);
   discard_abandoned();
   if (outstanding_.size() >= kOutstandingLimit) return {};
   auto result = std::make_shared<SceneLoad>();
   outstanding_.push_back(result);
-  queue_request(game, name, result);
+  queue_request({game, name, result, decode_pictures});
   changed_.notify_one();
   return result;
 }
 
-void SceneLoader::queue_request(const std::filesystem::path& game, const std::string& name,
-                                const std::shared_ptr<SceneLoad>& result) {
+void SceneLoader::queue_request(Request request) {
   try {
-    const auto root = game.empty() ? std::filesystem::current_path() : std::filesystem::absolute(game);
-    queue_.push_back({root, name, result});
+    if (request.game.empty()) request.game = std::filesystem::current_path();
+    request.game = std::filesystem::absolute(request.game);
+    queue_.push_back(std::move(request));
   } catch (const std::exception& error) {
-    result->finish({false, error.what(), {}, {}});
+    if (auto slot = request.result.lock()) slot->finish({false, error.what(), {}, {}});
   }
 }
 
@@ -105,7 +116,7 @@ SceneLoad::Result SceneLoader::read(const Request& request) {
   SceneLoad::Result result;
   const log::Capture quiet(
       [&](log::Level level, const std::string& text) { capture_message(result.messages, level, text); });
-  result.loaded = invoke_reader(reader_, request.game, request.name);
+  result.loaded = invoke_reader(reader_, request.game, request.name, request.decode_pictures);
   return result;
 }
 
@@ -129,6 +140,13 @@ LoadResult read_scene_data(const std::filesystem::path& game, const std::string&
     return result;
   }
   return load_gltf_scene(file.string());
+}
+
+void decode_scene_pictures(SceneDesc& scene) {
+  scene.decoded_images.clear();
+  scene.decoded_images.reserve(scene.images.size());
+  for (const ImageData& image : scene.images)
+    scene.decoded_images.push_back(render_detail::decode_scene_picture(image));
 }
 
 SceneLoader& shared_scene_loader() {

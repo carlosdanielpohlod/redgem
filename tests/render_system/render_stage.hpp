@@ -17,6 +17,9 @@
 
 namespace redgem::test {
 
+// Time a test gives staging: it is cut short by the bytes it is given, never by the clock.
+inline constexpr double kStageSeconds = 3600.0;
+
 // A picture the renderer drew.
 struct Picture {
   int width = 0;
@@ -46,6 +49,11 @@ class RenderStage {
   // Brings the uploaded scene up to date with what changed in `desc` since, as the editor does
   // every frame (new pictures and materials, and their values).
   void sync(const SceneDesc& desc) { renderer_->sync(desc); }
+  // Readies the next scene's assets ahead of its upload, about `bytes` a call (Renderer::stage).
+  bool stage(const SceneDesc& desc, std::size_t bytes) {
+    return renderer_->stage(desc, bytes, FrameBudget({}, kStageSeconds));
+  }
+  void drop_staged() { renderer_->drop_staged(); }
   void begin_scene_texture_use() { renderer_->begin_scene_texture_use(); }
   void end_scene_texture_use() { renderer_->end_scene_texture_use(); }
   Texture2D scene_texture(int image) const { return renderer_->scene_texture(image); }

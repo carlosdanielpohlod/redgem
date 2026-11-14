@@ -288,10 +288,13 @@ not a promise of how it will be closed.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
-- `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
-  worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
-  upload still block the owning thread at activation. Old and new scenes coexist in memory.
-  Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
+- `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
+  a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
+  creating the scene's objects, its water and its navigation bake still take one frame each, and
+  the editor's Play view uploads the new scene's textures and meshes in the frame it first shows
+  it. Old and new scenes coexist in memory until the swap, and the new one's decoded pictures are
+  all held at once until they are on the graphics card. Offline fixed-step runs intentionally
+  wait for the reader and activate all at once, for reproducible activation frames.
 - `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
   world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
   GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES

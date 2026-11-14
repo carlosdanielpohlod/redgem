@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Loading a level without a freeze**: after `Game.load_scene_async` reads a level, the engine
+  makes it ready over the next frames while the loading screen keeps drawing: pictures are
+  decoded on the background reader, physics bodies are made in batches of about 4 ms a frame,
+  and textures and meshes go to the graphics card about 8 MiB a frame. The swap happens once all
+  of it is ready, and every script of the new level starts in that frame, so each sees the whole
+  level on its first update. Offline fixed-step runs (`--record`, `redgem run`) still make the
+  level ready all at once, in the same frame as before.
+
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third

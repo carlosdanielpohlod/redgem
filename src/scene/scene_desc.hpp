@@ -34,6 +34,18 @@ struct ImageData {
   std::string file_extension;         // file-type hint for the image decoder
 };
 
+// A scene's picture decoded on the CPU, its rows top first, in the decoder's own pixel format
+// (`format` is the renderer's code for it, nothing the scene reads).
+struct DecodedPicture {
+  int width = 0;
+  int height = 0;
+  int format = 0;
+  std::vector<std::uint8_t> pixels{};
+  bool unreadable = false;  // decoding was tried and failed: it is not tried again
+
+  bool empty() const { return pixels.empty(); }
+};
+
 enum class AlphaMode { Opaque, Mask, Blend };
 
 // A transparent dielectric coating above the base material (KHR_materials_clearcoat).
@@ -234,6 +246,10 @@ struct SceneDesc {
   std::vector<MeshDesc> meshes;
   std::vector<MaterialDesc> materials;
   std::vector<ImageData> images;
+  // Per image, when the scene was read in the background for a game that draws it: decoding there
+  // spares the frames of the loading screen. Empty otherwise, and once the pictures are on the
+  // graphics card.
+  std::vector<DecodedPicture> decoded_images;
   std::vector<SkinDesc> skins;
   std::vector<AnimationDesc> animations;
 

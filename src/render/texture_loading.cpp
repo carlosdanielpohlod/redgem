@@ -46,6 +46,15 @@ Image decode_webp_picture(const EncodedImage& encoded) {
   return {};
 }
 
+// Smaller copies of a scene's texture, filtered so that floors stay sharp at grazing angles.
+Texture2D with_smaller_copies(Texture2D texture) {
+  if (texture.id == 0) return texture;
+  GenTextureMipmaps(&texture);
+  SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
+  SetTextureFilter(texture, TEXTURE_FILTER_ANISOTROPIC_8X);
+  return texture;
+}
+
 Image decode_picture_file(const std::filesystem::path& folder, const std::string& name) {
   const auto file = find_asset_file(folder, name, kPictureExtensions);
   if (!file) return {};
@@ -68,13 +77,30 @@ Image decode_picture(const std::vector<std::uint8_t>& encoded) {
 Texture2D load_scene_texture(const ImageData& image) {
   Image decoded = decode_picture(image.encoded);
   if (!IsImageValid(decoded)) log::warning("scene picture is unreadable; using a checkerboard");
-  Texture2D texture = texture_or_placeholder(decoded);
+  const Texture2D texture = texture_or_placeholder(decoded);
   UnloadImage(decoded);
-  if (texture.id == 0) return texture;
-  GenTextureMipmaps(&texture);
-  SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
-  SetTextureFilter(texture, TEXTURE_FILTER_ANISOTROPIC_8X);  // floors stay sharp at grazing angles
-  return texture;
+  return with_smaller_copies(texture);
+}
+
+Texture2D load_scene_texture(const ImageData& image, const DecodedPicture& decoded) {
+  if (decoded.unreadable) {
+    log::warning("scene picture is unreadable; using a checkerboard");
+    return missing_picture_texture();
+  }
+  if (decoded.empty()) return load_scene_texture(image);
+  // (raylib only reads the pixels of an image it uploads.)
+  const Image rows{const_cast<std::uint8_t*>(decoded.pixels.data()), decoded.width, decoded.height, 1, decoded.format};
+  return with_smaller_copies(LoadTextureFromImage(rows));
+}
+
+DecodedPicture decode_scene_picture(const ImageData& image) {
+  Image decoded = decode_picture(image.encoded);
+  if (!IsImageValid(decoded)) return DecodedPicture{0, 0, 0, {}, true};
+  const auto* first = static_cast<const std::uint8_t*>(decoded.data);
+  const auto bytes = static_cast<std::size_t>(GetPixelDataSize(decoded.width, decoded.height, decoded.format));
+  DecodedPicture picture{decoded.width, decoded.height, decoded.format, {first, first + bytes}, false};
+  UnloadImage(decoded);
+  return picture;
 }
 
 Texture2D load_picture_file(const std::filesystem::path& folder, const std::string& name) {
