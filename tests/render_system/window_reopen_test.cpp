@@ -1,10 +1,12 @@
 // System test: one process opens and closes window after window, as the render system tests do,
 // and every window opens and draws. Each window used to load the OpenGL library and Mesa's
 // driver again, and after about a hundred of them the driver no longer loaded (see
-// keep_libraries_loaded in render/window.cpp).
+// keep_window_libraries_loaded in render/window.cpp). Linux only: the limit is glibc's.
 #include <doctest/doctest.h>
 
 #include <raylib.h>
+
+#include <stdexcept>
 
 #include "render/window.hpp"
 
@@ -22,23 +24,27 @@ WindowSettings small_window() {
   return settings;
 }
 
-// Opens a window, draws one frame in it and closes it; whether it opened.
-bool open_draw_and_close() {
-  Window window(small_window());
+void draw_a_frame(Window& window) {
   window.begin_frame();
   ClearBackground(BLACK);
   window.end_frame();
-  return IsWindowReady();
+}
+
+// Opens a window, draws one frame in it and closes it; whether it opened.
+bool open_draw_and_close() {
+  try {
+    Window window(small_window());
+    draw_a_frame(window);
+    return IsWindowReady();
+  } catch (const std::runtime_error&) {
+    return false;  // reported with the window's number
+  }
 }
 
 }  // namespace
 
 TEST_CASE("a process opens, draws in and closes 300 windows one after another") {
-  int opened = 0;
-  for (int window = 0; window < kWindows; ++window) {
-    REQUIRE_MESSAGE(open_draw_and_close(), "window " << window + 1 << " of " << kWindows);
-    ++opened;
-  }
-  CHECK(opened == kWindows);
+  for (int window = 0; window < kWindows; ++window)
+    REQUIRE_MESSAGE(open_draw_and_close(), "window " << window + 1 << " of " << kWindows << " did not open");
   CHECK_FALSE(IsWindowReady());  // the last one closed too
 }
