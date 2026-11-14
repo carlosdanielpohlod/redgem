@@ -25,11 +25,11 @@ struct HttpClient::Job {
   // Carries the request out on a thread of its own, which holds the job too (throws
   // std::system_error when the system has no thread left).
   static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url, const HttpClient& client) {
-    job->thread = std::thread([job, request = std::move(request), url = std::move(url), trust = client.trust_,
-                               clock = client.clock_] {
-      run_engine_thread([&] { job->response = exchange(request, url, trust, job->cancel, *clock); });
-      job->finish();
-    });
+    job->thread = std::thread(
+        [job, request = std::move(request), url = std::move(url), trust = client.trust_, clock = client.clock_] {
+          run_engine_thread([&] { job->response = exchange(request, url, trust, job->cancel, *clock); });
+          job->finish();
+        });
   }
 
   // The thread's last word: its work is over, and joining it takes no time.
