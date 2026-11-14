@@ -179,6 +179,9 @@ class Engine {
   void keep_bindings();
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
+  // The network's movement checks (game.json's, which a script may change later), and the
+  // dedicated server's room, before any script asks for either.
+  void open_network(const GameSettings& settings);
   void connect_effects();
   // The scene, its bodies and its navigation, for the scripts.
   void connect_world();

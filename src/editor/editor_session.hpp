@@ -122,6 +122,7 @@ class EditorSession {
   // meters (Raise, Lower) or as a 0..1 share (Smooth, Flatten). Call document().checkpoint() once
   // when a stroke begins. False when nothing changed or while playing.
   bool sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode);
+  bool paint_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, Color tint);
   // An object whose properties set the scene's sky, fog and effects (see render/environment.hpp),
   // filled with a sunset to start from. Selects the existing one if the scene already has it.
   ObjectId create_environment();

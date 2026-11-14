@@ -57,6 +57,9 @@ float terrain_height(const PrimitiveDesc& mesh, const TerrainGrid& grid, float x
 // are brought up to date. Returns false when the brush touches no vertex.
 bool sculpt_terrain(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush);
 
+// Paints a linear RGB tint with the same radial falloff as sculpting. Keeps vertex alpha.
+bool paint_terrain(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush, Color tint);
+
 // Recomputes every normal from the heights.
 void update_terrain_normals(PrimitiveDesc& mesh, const TerrainGrid& grid);
 

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app/android/android_settings.hpp"
+#include "net/movement_rules.hpp"
 #include "net/secure/server_pins.hpp"
 #include "navigation/nav_settings.hpp"
 #include "physics/collision_layers.hpp"
@@ -46,6 +47,9 @@ struct GameSettings {
   // How big the characters that walk the level are, and how finely it is baked: the "navigation"
   // section (see navigation/nav_settings.hpp).
   NavSettings navigation;
+  // What the host holds the others' moves to, an anti-cheat: the "movement_validation" section
+  // (see net/movement_rules.hpp). A game without it checks nothing.
+  net::MovementRules movement;
 };
 
 // Everything game.json says, read once.
@@ -71,6 +75,8 @@ struct GameManifest {
   std::vector<std::string> servers_warnings;
   // What is wrong with the "navigation" section; each such setting keeps its default.
   std::vector<std::string> navigation_warnings;
+  // What is wrong with the "movement_validation" section; each such setting keeps its default.
+  std::vector<std::string> movement_warnings;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 

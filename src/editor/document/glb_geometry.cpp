@@ -1,5 +1,7 @@
 #include "editor/document/glb_geometry.hpp"
 
+#include <cstring>
+
 #include "scene/scene_config.hpp"
 #include "editor/document/gltf_json.hpp"
 
@@ -11,7 +13,11 @@ using namespace gltf_json;
 constexpr std::size_t kFloatsPerVec3 = 3;
 constexpr int kArrayBufferTarget = 34962;         // glTF bufferView.target for vertex data
 constexpr int kElementArrayBufferTarget = 34963;  // ... and for indices
-constexpr int kUnsignedIntComponent = 5125;       // glTF componentType UNSIGNED_INT
+constexpr int kUnsignedByteComponent = 5121;
+constexpr const char* kColorAttribute = "COLOR_0";
+constexpr const char* kVec4Type = "VEC4";
+constexpr const char* kNormalized = "normalized";
+constexpr int kUnsignedIntComponent = 5125;  // glTF componentType UNSIGNED_INT
 
 // object[key] as a size: `missing` when the object has no such key, nullopt when what it has is
 // not a whole number of zero or more (a negative offset must never become a huge one).
@@ -141,8 +147,49 @@ std::size_t append_binary(GlbFile& glb, const std::uint8_t* data, std::size_t by
   return offset;
 }
 
+namespace {
+
+bool packed_colors(const nlohmann::json& accessor, std::size_t vertices) {
+  return accessor.value(kComponentType, nlohmann::json()) == kUnsignedByteComponent &&
+         accessor.value(kType, nlohmann::json()) == kVec4Type &&
+         accessor.value(kNormalized, nlohmann::json()) == true && size_at(accessor, kCount, std::nullopt) == vertices &&
+         !accessor.contains("sparse");
+}
+
+std::optional<std::size_t> color_offset(const GlbFile& glb, const nlohmann::json& index, std::size_t bytes) {
+  const auto* accessor = entry_at(glb.json, kAccessors, index);
+  if (accessor == nullptr) return std::nullopt;
+  if (!packed_colors(*accessor, bytes / config::kChannelsPerColor)) return std::nullopt;
+  const auto* view = entry_at(glb.json, kBufferViews, accessor->value(kBufferView, nlohmann::json()));
+  if (view == nullptr) return std::nullopt;
+  constexpr std::size_t stride = config::kChannelsPerColor;
+  const bool packed = size_at(*view, kByteStride, stride) == stride;
+  const bool embedded = size_at(*view, kBuffer, std::nullopt) == static_cast<std::size_t>(kOnlyBuffer);
+  if (!packed || !embedded) return std::nullopt;
+  return place_in_chunk(*view, *accessor, bytes, glb.bin.size());
+}
+
+}  // namespace
+
+void store_vertex_colors(GlbFile& glb, nlohmann::json& attributes, const std::vector<std::uint8_t>& colors) {
+  if (colors.empty()) {
+    attributes.erase(kColorAttribute);
+    return;
+  }
+  const auto offset = color_offset(glb, attributes.value(kColorAttribute, nlohmann::json()), colors.size());
+  const bool same = offset && std::memcmp(glb.bin.data() + *offset, colors.data(), colors.size()) == 0;
+  if (same) return;
+  // An imported accessor may be shared with another mesh. Only write to new storage.
+  const int view = append_buffer_view(glb, colors.data(), colors.size(), kArrayBufferTarget);
+  const auto vertices = colors.size() / config::kChannelsPerColor;
+  const int accessor = append_accessor(glb.json, view, kUnsignedByteComponent, vertices, kVec4Type);
+  glb.json[kAccessors][accessor][kNormalized] = true;
+  attributes[kColorAttribute] = accessor;
+}
+
 int append_mesh(GlbFile& glb, const std::string& name, const PrimitiveDesc& primitive, const Bounds& bounds) {
-  const nlohmann::json attributes = append_attributes(glb, primitive, bounds);
+  auto attributes = append_attributes(glb, primitive, bounds);
+  store_vertex_colors(glb, attributes, primitive.colors);
   const int indices = append_indices(glb, primitive.indices);
   nlohmann::json json_primitive = {{kAttributes, attributes}, {kIndices, indices}};
   if (primitive.material != kNoIndex) json_primitive[kMaterial] = primitive.material;

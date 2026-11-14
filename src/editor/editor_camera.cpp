@@ -10,7 +10,6 @@ namespace {
 
 constexpr float kLookDegreesPerPixel = 0.25f;
 constexpr float kMaxPitchDegrees = 89.0f;
-constexpr float kFlySpeed = 8.0f;  // m/s
 constexpr float kFastMultiplier = 4.0f;
 constexpr float kZoomStep = 1.5f;  // meters per wheel notch
 constexpr float kFovYDegrees = 50.0f;
@@ -44,7 +43,7 @@ void EditorCamera::update(const FlyInput& input) {
   yaw_degrees_ -= input.look_x * kLookDegreesPerPixel;
   pitch_degrees_ =
       std::clamp(pitch_degrees_ - input.look_y * kLookDegreesPerPixel, -kMaxPitchDegrees, kMaxPitchDegrees);
-  const float speed = kFlySpeed * (input.fast ? kFastMultiplier : 1.0f);
+  const float speed = fly_speed_ * (input.fast ? kFastMultiplier : 1.0f);
   const Vec3 move = forward() * input.forward + right() * input.right + Vec3::up() * input.up;
   position_ = position_ + move * (speed * input.dt) + forward() * (input.zoom * kZoomStep);
 }

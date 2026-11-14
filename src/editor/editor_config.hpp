@@ -43,6 +43,8 @@ inline constexpr float kStatusBarHeight = 26.0f;
 inline constexpr float kToolbarGroupGap = 18.0f;
 inline constexpr float kIconButtonWidth = 1.3f;  // icon buttons are this many frame heights wide
 
+inline constexpr float kDefaultFlySpeed = 8.0f;  // meters per second
+
 // Gizmo snapping (hold Ctrl, or toggle it in the toolbar).
 inline constexpr float kTranslateSnap = 0.5f;
 inline constexpr float kRotateSnapDegrees = 15.0f;
