@@ -13,6 +13,7 @@
 #include "render/debug_draw.hpp"
 #include "render/render_config.hpp"
 #include "render/renderer_impl.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {
@@ -24,6 +25,14 @@ constexpr float kFullMotionBlur = 1.0f;
 // raylib's vertex buffer slots for a mesh's positions and normals.
 constexpr int kPositionBuffer = 0;
 constexpr int kNormalBuffer = 2;
+constexpr int kColorBuffer = 3;
+
+void update_vertex_colors(const Mesh& mesh, const PrimitiveDesc& primitive) {
+  const auto count = vertex_count_of(primitive) * config::kChannelsPerColor;
+  const std::vector<std::uint8_t> white(primitive.colors.empty() ? count : 0, config::kMaxColorByte);
+  const auto& colors = primitive.colors.empty() ? white : primitive.colors;
+  UpdateMeshBuffer(mesh, kColorBuffer, colors.data(), static_cast<int>(colors.size()), 0);
+}
 
 // Same vertices in the same order, only moved: write over the buffers already on the card.
 void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
@@ -31,6 +40,7 @@ void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
   const int bytes = static_cast<int>(primitive.positions.size() * sizeof(float));
   UpdateMeshBuffer(mesh, kPositionBuffer, primitive.positions.data(), bytes, 0);
   UpdateMeshBuffer(mesh, kNormalBuffer, primitive.normals.data(), bytes, 0);
+  update_vertex_colors(mesh, primitive);
 }
 
 // A minimized window has no size: there is nothing to draw into.
@@ -108,6 +118,8 @@ GpuTimings Renderer::gpu_timings() const { return impl_->gpu_timers.timings(); }
 void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
+
+void Renderer::set_underwater(const UnderwaterView& view) { impl_->underwater = view; }
 
 void Renderer::set_quality(const QualityCaps& caps) { impl_->quality = caps; }
 

@@ -19,6 +19,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
@@ -28,6 +29,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
 | [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
 | [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
+| [`Animation::Event`](#animationevent) | What the block of an animation event is given (animation.on). |
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
@@ -188,6 +190,7 @@ The objects of the running scene. See [gameplay.md](gameplay.md).
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object
 - `Scene.spawn(template, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+- `Scene.spawn_prefab(file, position: nil, rotation: nil, physics: true, name: nil, parent: nil)`: instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
 
 ## SceneScript
 
@@ -306,6 +309,16 @@ Where the characters a game moves can walk, and the way from one place to anothe
 
 The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
 
+## Water
+
+Where the scene's water is: the height of its surface, and how deep a point is under it. See [gameplay.md#float-in-water](gameplay.md#float-in-water).
+
+- `Water.height_at(x, z)`: the height of the water surface over that point of the ground, or nil where there is no water
+- `Water.depth_at(point)`: how far below the water surface a point is in meters (negative above it), or nil where there is no water
+- `Water.under?(point)`: whether a point is below the water surface
+
+Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
+
 ## CharacterController
 
 The body of an object with body = "character": walks, jumps, climbs steps. See [gameplay.md](gameplay.md).
@@ -416,7 +429,7 @@ The scene's own animations (exported from Blender), by name. See [animation.md](
 
 game_object.animation (animation in a behaviour): an object's own clips. See [animation.md](animation.md).
 
-- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`: plays a clip, fading from the last one
+- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false, root_motion: nil)`: plays a clip, fading from the last one; root_motion: true lets the clip move the object
 - `mix(name, weight: 1.0, loop: true, speed: 1.0)`: plays a clip over the one playing
 - `unmix`: stops the clip mixed over
 - `pause`: pauses its clips
@@ -427,6 +440,11 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `use(graph)`: installs an Animation::Graph
 - `set(parameter, value)`: sets a parameter of the graph
 - `state`: the graph's state, or nil
+- `on(clip, at: nil, seconds: nil, &block)`: calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+- `on_marker(name, &block)`: calls the block each time a clip passes a marker of that name authored in Blender
+- `off(listener)`: stops calling a block that on or on_marker returned
+- `root_motion = on`: whether all its clips move the object by their root's horizontal motion and turning
+- `root_motion?`: whether all its clips move the object
 
 ## Animation::Graph
 
@@ -437,6 +455,15 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 - `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
 - `blend_2d(name, parameters:, clips:, loop: true, speed: 1.0)`: a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
 - `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
+
+## Animation::Event
+
+What the block of an animation event is given (animation.on). See [animation.md#events](animation.md#events).
+
+- `game_object`: the object that listened
+- `clip`: the clip's name
+- `name`: the marker's name, or nil for a moment the script named
+- `at`: where in the clip, from 0 (its start) to 1 (its end)
 
 ## Audio
 
@@ -730,6 +757,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.id`: this machine's peer id
 - `Network.peers`: the peers of the game
 - `Network.players`: the peers without a dedicated server
+- `Network.validate_movement(max_speed: 0.0, teleport_distance: 0.0, tolerance: 0.25, kick_after: 0, undo: false)`: on the host: corrects the others' objects that move faster or further than this (no limits: off)
+- `Network.movement_rules`: the movement validation settings, as a hash
+- `Network.movement_violations(peer)`: how many moves of a machine the host did not believe in this game
 - `Network.port`: the port of the game
 - `Network.room`: the room code, on a relay
 - `Network.relay`: the relay's address

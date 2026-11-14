@@ -84,7 +84,7 @@ SceneDocument::Snapshot SceneDocument::snapshot() const {
   for (int i = 0; i < node_count(); ++i) {
     if (!terrain_grid(i)) continue;
     const PrimitiveDesc& ground = desc_.meshes[static_cast<std::size_t>(desc_.nodes[i].mesh)].primitives.front();
-    state.shapes[desc_.nodes[i].mesh] = {ground.positions, ground.normals};
+    state.shapes[desc_.nodes[i].mesh] = {ground.positions, ground.normals, ground.colors};
   }
   return state;
 }

@@ -5,6 +5,7 @@
 #include <raylib.h>
 
 #include "editor/editor_camera.hpp"
+#include "editor/editor_fly_bindings.hpp"
 
 namespace redgem::keyboard {
 
@@ -13,14 +14,14 @@ inline bool shift_down() { return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIG
 inline bool alt_down() { return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT); }
 
 // The fly camera's keys, as the keyboard has them now.
-inline FlyKeys fly_keys() {
+inline FlyKeys fly_keys(const FlyBindings& bindings) {
   FlyKeys keys;
-  keys.forward = IsKeyDown(KEY_W);
-  keys.back = IsKeyDown(KEY_S);
-  keys.left = IsKeyDown(KEY_A);
-  keys.right = IsKeyDown(KEY_D);
-  keys.up = IsKeyDown(KEY_E);
-  keys.down = IsKeyDown(KEY_Q);
+  keys.forward = IsKeyDown(static_cast<int>(bindings.forward));
+  keys.back = IsKeyDown(static_cast<int>(bindings.back));
+  keys.left = IsKeyDown(static_cast<int>(bindings.left));
+  keys.right = IsKeyDown(static_cast<int>(bindings.right));
+  keys.up = IsKeyDown(static_cast<int>(bindings.up));
+  keys.down = IsKeyDown(static_cast<int>(bindings.down));
   keys.left_shift = IsKeyDown(KEY_LEFT_SHIFT);
   keys.right_shift = IsKeyDown(KEY_RIGHT_SHIFT);
   return keys;
