@@ -38,6 +38,8 @@ bool would_block() {
 
 void close_native(NativeSocket socket) { closesocket(socket); }
 
+void shut_both(NativeSocket socket) { shutdown(socket, SD_BOTH); }
+
 bool make_non_blocking(NativeSocket socket) {
   u_long enabled = kEnabled;
   return ioctlsocket(socket, FIONBIO, &enabled) == 0;
@@ -68,6 +70,8 @@ void start_sockets() {}
 bool would_block() { return errno == EWOULDBLOCK || errno == EAGAIN || errno == EINPROGRESS || errno == EINTR; }
 
 void close_native(NativeSocket socket) { ::close(socket); }
+
+void shut_both(NativeSocket socket) { ::shutdown(socket, SHUT_RDWR); }
 
 bool make_non_blocking(NativeSocket socket) {
   const int flags = fcntl(socket, F_GETFL, 0);

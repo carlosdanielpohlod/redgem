@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -49,11 +50,38 @@ std::unique_ptr<HttpStream> plain_stream(Socket socket);
 std::unique_ptr<HttpStream> secure_stream(Socket socket, const std::string& host,
                                           std::shared_ptr<const TrustStore> trust, std::string& error);
 
+// How a request is given up from another thread (its game ended): it is told so, and the
+// connection it is waiting on, if it is, is hung up, so that the wait ends at once.
+class HttpCancel {
+ public:
+  void cancel();
+  bool cancelled() const { return cancelled_.load(); }
+
+ private:
+  friend class HeldConnection;
+  mutable std::mutex mutex_;  // over held_, and over hanging it up: it is never hung up once let go
+  std::atomic<bool> cancelled_{false};
+  mutable const Socket* held_ = nullptr;
+};
+
+// The connection a request waits on while this lives: hung up at once when the request is given
+// up, or already was. The socket must outlive it and stay where it is (not moved, not closed).
+class HeldConnection {
+ public:
+  HeldConnection(const HttpCancel& cancel, const Socket& socket);
+  ~HeldConnection();
+  HeldConnection(const HeldConnection&) = delete;
+  HeldConnection& operator=(const HeldConnection&) = delete;
+
+ private:
+  const HttpCancel& cancel_;
+};
+
 // How long a request may still wait, on the thread it runs on: until its timeout, on `clock`, or
 // until it is given up (its game ended).
 class Patience {
  public:
-  Patience(float seconds, const std::atomic<bool>& cancelled, const Clock& clock);
+  Patience(float seconds, const HttpCancel& cancel, const Clock& clock);
   // Sleeps until `socket` can go on (has something to read, or room to send when `sending`) or a
   // moment passed. False once there is no waiting left: why() says why.
   bool wait(const Socket& socket, bool sending) const;
@@ -64,7 +92,7 @@ class Patience {
   const Clock& clock_;
   double deadline_;
   float seconds_;
-  const std::atomic<bool>& cancelled_;
+  const HttpCancel& cancel_;
 };
 
 }  // namespace redgem::net

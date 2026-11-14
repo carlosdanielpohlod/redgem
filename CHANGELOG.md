@@ -273,6 +273,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still looking its server's name
+  up past that is left behind, with a warning.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

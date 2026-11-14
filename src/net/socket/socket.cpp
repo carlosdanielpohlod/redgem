@@ -107,6 +107,10 @@ void Socket::close_reading_at_most(std::size_t most_unread) {
   handle_ = kNoHandle;
 }
 
+void Socket::hang_up() const {
+  if (handle_ != kNoHandle) shut_both(native(handle_));
+}
+
 void Socket::reset() {
   if (handle_ == kNoHandle) return;
   reset_on_close(native(handle_));
