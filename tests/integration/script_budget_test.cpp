@@ -336,17 +336,15 @@ TEST_CASE("an interpreter's call that never returns is stopped, even one stuck s
 namespace {
 
 // An engine function that takes longer than the budget on its own, as a request for millions of
-// things would: the interpreter cannot stop it halfway, but its time is the call's.
-constexpr std::chrono::milliseconds kSlowEngineCall = 2 * kTestBudget;
-constexpr int kQuickEngineCallMs = 5;  // many of these together pass the budget
+// things would: the interpreter cannot stop it halfway, but its time is the call's. On the test's
+// clock it lasts two budgets, and goes on until the watchdog has seen that.
+constexpr double kSlowEngineCallSeconds = 2 * kTestBudgetMs / kMillisecondsPerSecond;
+RubyVm* slow_vm = nullptr;
+test::FakeClock* slow_clock = nullptr;
 
 mrb_value slow_engine_call(mrb_state*, mrb_value) {
-  std::this_thread::sleep_for(kSlowEngineCall);
-  return mrb_nil_value();
-}
-
-mrb_value quick_engine_call(mrb_state*, mrb_value) {
-  std::this_thread::sleep_for(std::chrono::milliseconds(kQuickEngineCallMs));
+  slow_clock->advance(kSlowEngineCallSeconds);
+  while (!slow_vm->budget_keeper().stop_requested()) std::this_thread::yield();
   return mrb_nil_value();
 }
 
@@ -354,20 +352,19 @@ mrb_value quick_engine_call(mrb_state*, mrb_value) {
 
 TEST_CASE("time spent inside engine functions counts against the budget") {
   const TestDeadline deadline("engine calls");
+  test::FakeClock clock;
   RubyVm vm;
-  mrb_state* mrb = vm.state();
-  mrb_define_method(mrb, mrb->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
-  mrb_define_method(mrb, mrb->kernel_module, "quick_engine_call", quick_engine_call, MRB_ARGS_NONE());
+  slow_vm = &vm;
+  slow_clock = &clock;
+  const test::ScriptTicks ticks(vm, clock, kTickSeconds);  // (`tick`: a quick engine function)
+  mrb_define_method(vm.state(), vm.state()->kernel_module, "slow_engine_call", slow_engine_call, MRB_ARGS_NONE());
   vm.set_budget(kTestBudget);
   // One call past the budget: stopped at the first instruction of Ruby after it returns.
   const RubyResult slow = vm.eval("slow_engine_call; $after_slow = true", "slow.rb");
-  CHECK_FALSE(slow.ok);
   CHECK(slow.error.find("ScriptTimeout") != std::string::npos);
   CHECK(mrb_true_p(vm.eval("$after_slow.nil?", "check.rb").value));
   // Many short ones, with next to no Ruby between them: stopped all the same.
-  const RubyResult many = vm.eval("loop { quick_engine_call }", "many.rb");
-  CHECK_FALSE(many.ok);
-  CHECK(many.error.find("ScriptTimeout") != std::string::npos);
+  CHECK(vm.eval("loop { tick }", "many.rb").error.find("ScriptTimeout") != std::string::npos);
 }
 
 #if !defined(_WIN32)
