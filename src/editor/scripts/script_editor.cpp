@@ -20,6 +20,17 @@ bool ScriptEditor::open(const std::string& file_name, std::string& error) {
   return true;
 }
 
+void ScriptEditor::show_line(std::size_t line) {
+  constexpr int kJumpFrames = 3;
+  line_request_ = line;
+  line_frames_left_ = kJumpFrames;
+}
+
+void ScriptEditor::age_line_request() {
+  if (line_request_ == 0) return;
+  if (--line_frames_left_ == 0) finish_line_request();
+}
+
 bool ScriptEditor::save(std::string& error) {
   if (!is_open()) return true;
   if (!write_text_file(path(), text_, error)) return false;
