@@ -3,6 +3,7 @@
 #include <mruby/string.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -152,7 +153,7 @@ TEST_CASE("cancelling a level while it is made ready keeps the running scene") {
 }
 
 TEST_CASE("a scene read for a game that draws it has its pictures decoded in the background") {
-  const auto bytes = read_file_up_to(test::fixture("images") / "sniff.png", kMaxEncodedImageBytes);
+  const auto bytes = read_file_up_to(std::filesystem::path(test::fixture("images")) / "sniff.png", kMaxEncodedImageBytes);
   REQUIRE(bytes.has_value());
   SceneLoader loader([&](const auto&, const auto&) {
     LoadResult result;

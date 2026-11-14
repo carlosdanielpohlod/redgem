@@ -19,7 +19,7 @@ constexpr std::size_t kEverything = static_cast<std::size_t>(-1);
 constexpr int kStagedMeshes = 2;
 
 ImageData picture(const char* name, const char* extension) {
-  const auto bytes = read_file_up_to(test::fixture("images") / name, kMaxEncodedImageBytes);
+  const auto bytes = read_file_up_to(std::filesystem::path(test::fixture("images")) / name, kMaxEncodedImageBytes);
   REQUIRE(bytes.has_value());
   return ImageData{*bytes, extension};
 }
