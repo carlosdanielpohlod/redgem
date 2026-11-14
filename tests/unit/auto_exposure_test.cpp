@@ -103,6 +103,12 @@ TEST_CASE("a cut to another camera or a new scene starts the exposure anew") {
   CHECK(adapt_seconds(history, 0.0f) == doctest::Approx(0.0f));  // a clock set back
 }
 
+TEST_CASE("the exposure adapts by each frame's time even after the game has run for days") {
+  constexpr double kThreeDays = 3.0 * 24.0 * 60.0 * 60.0;  // seconds: a float of them is too coarse
+  const ExposureHistory history{true, kCamera, kScene, kThreeDays};
+  CHECK(adapt_seconds(history, kThreeDays + kFrame) == doctest::Approx(kFrame));
+}
+
 TEST_CASE("what a game's camera sets wins over the scene, and what it leaves follows the scene") {
   AutoExposure scene;
   scene.compensation = 0.5f;

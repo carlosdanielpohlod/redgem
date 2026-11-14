@@ -103,7 +103,7 @@ void Renderer::Impl::adapt_exposure(const AutoExposure& settings) {
   EndShaderMode();
   EndTextureMode();
   latest_exposure = next;
-  exposure_history = {true, temporal.viewer, scene_uploads, now()};
+  exposure_history = {true, temporal.viewer, scene_uploads, seconds()};
 }
 
 // The mean log2 luminance of each cell of the lit picture, into `luminance`.
@@ -117,7 +117,7 @@ void Renderer::Impl::send_adaptation(const AutoExposure& settings) {
   SetShaderValueTexture(adapt_shader, GetShaderLocation(adapt_shader, shaders::kLuminanceTexture), luminance.texture);
   send(adapt_shader, shaders::kLuminanceSide, render_math::kLuminanceSide);
   const bool anew = render_math::starts_anew(exposure_history, temporal.viewer, scene_uploads);
-  const float seconds = render_math::adapt_seconds(exposure_history, now());
+  const float seconds = render_math::adapt_seconds(exposure_history, seconds());
   const std::pair<const char*, float> values[] = {
       {shaders::kMinEv, settings.min_ev},     {shaders::kMaxEv, settings.max_ev},
       {shaders::kSpeedUp, settings.speed_up}, {shaders::kSpeedDown, settings.speed_down},

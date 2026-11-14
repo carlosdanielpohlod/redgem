@@ -47,8 +47,8 @@ bool starts_anew(const ExposureHistory& history, std::uint64_t viewer, std::uint
   return !history.adapted || history.viewer != viewer || history.scene != scene;
 }
 
-float adapt_seconds(const ExposureHistory& history, float now) {
-  return std::clamp(now - history.time, 0.0f, kLongestAdaptStep);
+float adapt_seconds(const ExposureHistory& history, double now) {
+  return std::clamp(static_cast<float>(now - history.time), 0.0f, kLongestAdaptStep);
 }
 
 }  // namespace render_math

@@ -311,7 +311,8 @@ struct Renderer::Impl {
   float motion_blur = 0.0f;                  // 0..1 (Camera.motion_blur)
   AutoExposureOverrides exposure_overrides;  // what the game's camera changes of auto exposure
   std::optional<double> clock;               // seconds (Renderer::set_clock); nothing: the real time
-  float now() const { return static_cast<float>(clock ? *clock : GetTime()); }
+  double seconds() const { return clock ? *clock : GetTime(); }
+  float now() const { return static_cast<float>(seconds()); }
   // The frame being drawn.
   std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
   std::vector<ObjectSight> sights;                          // by object, for every pass of the frame

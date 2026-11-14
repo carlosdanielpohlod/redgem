@@ -76,14 +76,14 @@ struct ExposureHistory {
   bool adapted = false;
   std::uint64_t viewer = 0;
   std::uint64_t scene = 0;
-  float time = 0.0f;
+  double time = 0.0;  // in double: a float of seconds is too coarse for a frame after a day or so
 };
 // Whether this frame's exposure is set straight to the scene's brightness instead of adapting to
 // it: nothing was adapted yet, or the picture is of another camera or another scene (a cut).
 bool starts_anew(const ExposureHistory& history, std::uint64_t viewer, std::uint64_t scene);
 // The seconds the exposure adapts by this frame: since the last one, never below none (a clock set
 // back) nor above kLongestAdaptStep.
-float adapt_seconds(const ExposureHistory& history, float now);
+float adapt_seconds(const ExposureHistory& history, double now);
 
 }  // namespace render_math
 }  // namespace redgem
