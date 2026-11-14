@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <utility>
 #include <vector>
 
 #include "audio/audio.hpp"
@@ -121,7 +122,8 @@ class Engine {
   ObjectId spawn(const SpawnRequest& request);
   ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
   const prefabs::Source& load_runtime_prefab(const std::string& file);
-  ObjectId finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request);
+  // The rest of a spawn, for its (original, copy) pairs (kNoObject originals: made from a prefab file).
+  ObjectId finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request);
   // Simulates one frame and hands it to the presenter. With fixed_step it always advances
   // exactly one fixed step.
   void frame(float frame_seconds);

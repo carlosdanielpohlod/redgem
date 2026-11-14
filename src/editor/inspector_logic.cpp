@@ -1,6 +1,7 @@
 #include "editor/inspector_logic.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <set>
 
 #include "scene/props.hpp"
@@ -18,8 +19,17 @@ const std::set<std::string>& reserved_props() {
                                              props::kMass,   props::kTag,     props::kWheel,       props::kVisible,
                                              props::kPrefab, props::kTerrain, props::kTerrainSize, props::kTerrainCells,
                                              props::kLayer};
-  return keys;
+  static const std::set<std::string> with_joints = [] {
+    std::set<std::string> all = keys;
+    for (const std::string& key : joint_property_keys()) all.insert(key);
+    return all;
+  }();
+  return with_joints;
 }
+
+constexpr float kDefaultRopeLength = 2.0f;   // meters above the object a new distance joint hangs it from
+constexpr float kDefaultHingeLimit = 90.0f;  // degrees
+constexpr float kDefaultSlideLimit = 1.0f;   // meters
 
 }  // namespace
 
@@ -88,6 +98,32 @@ bool can_add_property(const PropertyMap& props, const std::string& key) {
 
 bool wheel_card_shown(const std::optional<std::string>& parent_body, bool is_wheel) {
   return is_wheel || parent_body == std::optional<std::string>(props::kBodyVehicle);
+}
+
+bool has_joint(const PropertyMap& props) { return props.count(props::kJoint) != 0; }
+
+PropertyMap new_joint_props(JointKind kind) {
+  PropertyMap joint{{props::kJoint, std::string(joint_kind_name(kind))}};
+  if (joint_is_distance(kind)) joint[props::kJointOtherAnchor[kAxisY]] = static_cast<double>(kDefaultRopeLength);
+  return joint;
+}
+
+namespace {
+
+bool one_of(const char* const (&keys)[kAxes], const std::string& key) {
+  return std::find(std::begin(keys), std::end(keys), key) != std::end(keys);
+}
+
+}  // namespace
+
+bool kept_across_joint_kinds(const std::string& key) {
+  const bool point_or_axis = one_of(props::kJointAnchor, key) || one_of(props::kJointAxis, key);
+  return point_or_axis || key == props::kJointTo || key == props::kJointBreakForce;
+}
+
+std::pair<float, float> default_joint_limits(JointKind kind) {
+  const float reach = kind == JointKind::Hinge ? kDefaultHingeLimit : kDefaultSlideLimit;
+  return {-reach, reach};
 }
 
 }  // namespace redgem::inspector_logic
