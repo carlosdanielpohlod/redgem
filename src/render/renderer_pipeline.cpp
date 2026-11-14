@@ -111,6 +111,7 @@ void Renderer::Impl::load_sky() {
 }
 
 void Renderer::Impl::release() {
+  gpu_timers.release();
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
   texel_texture = 0;
   release_slots(slots);
