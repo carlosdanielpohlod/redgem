@@ -2195,6 +2195,74 @@
           "about": "sets it"
         },
         {
+          "name": "auto_exposure",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool | nil"},
+          "about": "whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides"
+        },
+        {
+          "name": "auto_exposure=",
+          "static": true,
+          "params": [
+            {"name": "on", "type": "bool | nil"}
+          ],
+          "returns": {"type": "bool | nil"},
+          "about": "turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene",
+          "example": "Camera.auto_exposure = true"
+        },
+        {
+          "name": "exposure_compensation",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float | nil"},
+          "about": "EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides"
+        },
+        {
+          "name": "exposure_compensation=",
+          "static": true,
+          "params": [
+            {"name": "ev", "type": "Numeric | nil"}
+          ],
+          "returns": {"type": "Numeric | nil"},
+          "about": "sets it, -16 to 16; nil gives it back to the scene",
+          "example": "Camera.exposure_compensation = -0.5"
+        },
+        {
+          "name": "exposure_range",
+          "static": true,
+          "params": [],
+          "returns": {"type": "[Float, Float] | nil"},
+          "about": "[darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides"
+        },
+        {
+          "name": "exposure_range=",
+          "static": true,
+          "params": [
+            {"name": "range", "type": "[Numeric, Numeric] | nil"}
+          ],
+          "returns": {"type": "[Numeric, Numeric] | nil"},
+          "about": "sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene",
+          "example": "Camera.exposure_range = [-6, 2]"
+        },
+        {
+          "name": "exposure_speed",
+          "static": true,
+          "params": [],
+          "returns": {"type": "[Float, Float] | nil"},
+          "about": "[up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides"
+        },
+        {
+          "name": "exposure_speed=",
+          "static": true,
+          "params": [
+            {"name": "speeds", "type": "[Numeric, Numeric] | nil"}
+          ],
+          "returns": {"type": "[Numeric, Numeric] | nil"},
+          "about": "sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene",
+          "example": "Camera.exposure_speed = [3, 1]"
+        },
+        {
           "name": "follow",
           "static": true,
           "params": [

@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
 - **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
   letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
   text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
@@ -389,6 +402,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
 - In a network game, a machine that is not the host can no longer load a level on its own
   (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
   objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
