@@ -729,10 +729,10 @@ module UI
   def self.choice: (String label, Array[String] choices, Integer index, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Integer
   # a row with a slider; returns the value
   def self.slider: (String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?min: Numeric, ?max: Numeric, ?step: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Float
-  # the face texts are drawn with: a file name of fonts/, or nil for the built-in one
-  def self.font: () -> (String | nil)
-  # draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
-  def self.font=: (String | nil name) -> (String | nil)
+  # the face texts are drawn with: a file name of fonts/, a list of them (a fallback chain; a list of one is its name), or nil for the built-in one
+  def self.font: () -> (String | Array[String] | nil)
+  # draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
+  def self.font=: (String | Array[String] | nil name) -> (String | Array[String] | nil)
 end
 
 # Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
