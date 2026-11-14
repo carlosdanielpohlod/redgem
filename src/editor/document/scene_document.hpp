@@ -68,7 +68,8 @@ class SceneDocument {
   void set_camera(int index, const CameraDesc& camera, bool record = true);
   void remove_prop(int index, const std::string& key, bool record = true);
   // Copies the node and its children next to it. Returns the index of the copy. A skinned
-  // character copied together with its bones gets its own skeleton, in the pose it had.
+  // character copied together with its bones gets its own skeleton, and the clips that move the
+  // original move the copy too.
   int duplicate(int index);
   // The same for several nodes at once, one undo step for all. Returns the copies, in the order
   // of `roots` (none of which may be under another one: see top_level_of in editor/selection.hpp).
@@ -114,8 +115,8 @@ class SceneDocument {
   int reparent(int index, int new_parent, bool record = true, const Transform* local_override = nullptr);
   // Adds every object of another .glb (meshes, materials, textures) under a new empty named after
   // the file, itself under `parent`. Returns that node, or kNoIndex with `error` set. Skeletons
-  // and animations come along. Models using several buffers are refused; morph targets and the
-  // model's lights/cameras are dropped.
+  // and animations (shape keys and their weights too) come along. Models using several buffers
+  // are refused; the model's lights/cameras are dropped.
   int import_model(const std::filesystem::path& path, std::string& error, int parent = kNoIndex);
 
   // Materials (shared by every object whose mesh uses them).
@@ -155,6 +156,14 @@ class SceneDocument {
 
   bool save(std::string& error);
   bool save_as(const std::filesystem::path& path, std::string& error);
+  // What the last successful save wrote of the scene's data (its binary chunk: vertices, pictures,
+  // animation keys), and what it left out of what the document holds: data repeated elsewhere in
+  // the scene, and data no object uses any more. Both in bytes; zero before the first save.
+  struct SaveReport {
+    std::size_t written_bytes = 0;
+    std::size_t left_out_bytes = 0;
+  };
+  const SaveReport& last_save() const { return last_save_; }
 
   // A name not used by any node: "Crate" -> "Crate.001" (Blender style).
   std::string unique_name(const std::string& base) const;
@@ -230,6 +239,10 @@ class SceneDocument {
   void restore_shapes(const std::map<int, MeshShape>& shapes);
   // A mesh whose vertices changed: new bounds, and the renderer and the next save get to know.
   void mark_reshaped(int mesh);
+  // Gives a reshaped mesh positions and normals of its own where it shares them with other data
+  // (two copies of a model merged by a save, a file exported that way), so that writing its shape
+  // over them changes it alone.
+  void own_vertices(int mesh);
   // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
   // file does not grow).
   bool store_mesh_vertices(int mesh, std::string& error);
@@ -272,6 +285,9 @@ class SceneDocument {
   static std::variant<SceneDocument, std::string> open_file(const std::filesystem::path& path);
   int import_model_file(const std::filesystem::path& path, std::string& error, int parent);
   bool save_file(const std::filesystem::path& path, std::string& error);
+  // Remembers what a save wrote (see last_save) and logs a line when it left out something the
+  // previous save did not.
+  void report_save(const std::filesystem::path& path, std::size_t written_bytes);
   // Takes out of the file what an import that failed half way had already added to it.
   void forget_model(const model_import::JsonOffsets& offsets, std::size_t bin_size, std::size_t animations);
   bool sync_glb(std::string& error);
@@ -315,6 +331,13 @@ class SceneDocument {
   std::optional<int> copy_skin(int original, const std::vector<int>& copy_of);
   // Points a copied skin and its glTF JSON at the copies of its bones. Returns their source nodes.
   std::vector<int> point_at_copies(SkinDesc& skin, nlohmann::json& json, const std::vector<int>& copy_of) const;
+  // Every clip that moves a copied node moves its copy the same way (a channel of its own per
+  // copied channel), so a duplicated character plays the clips of the original instead of
+  // standing in the pose it was copied in. `source`: the copied nodes, `copy_of` as above but
+  // without the copied roots (a copy's root stays where it is put).
+  void give_copies_own_channels(const std::vector<int>& source, const std::vector<int>& copy_of);
+  // The described channels of clip `animation` copied onto the copied nodes.
+  void copy_described_channels(std::size_t animation, const std::vector<int>& copy_of);
   // False for invalid indices, a move into the node's own subtree and a move to where it already is.
   bool can_reparent(int index, int new_parent) const;
   // The top level, or one of the nodes.
@@ -370,7 +393,8 @@ class SceneDocument {
   std::set<int> changed_meshes_;   // reshaped since the renderer last asked
   std::set<int> unsaved_meshes_;   // reshaped since the last save
   std::set<int> released_meshes_;  // let go of: nothing can use them again
-  std::set<int> unshown_images_;   // added for a texture slot, no material shows them yet: held until one does
+  SaveReport last_save_;
+  std::set<int> unshown_images_;  // added for a texture slot, no material shows them yet: held until one does
 };
 
 }  // namespace redgem

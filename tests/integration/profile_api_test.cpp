@@ -1,4 +1,5 @@
 #include <doctest/doctest.h>
+#include <algorithm>
 #include <mruby.h>
 #include <mruby/string.h>
 
@@ -8,6 +9,10 @@
 
 using namespace redgem;
 namespace {
+constexpr const char* kScenePhasePrefix = "scene:";
+bool has_line_starting_with(const std::vector<HudItem>& hud, const std::string& prefix) {
+  return std::any_of(hud.begin(), hud.end(), [&](const HudItem& item) { return item.text.rfind(prefix, 0) == 0; });
+}
 struct ProfileGame {
   double seconds = 0.0;
   int reads = 0;
@@ -71,7 +76,7 @@ TEST_CASE("statistics overlay is opt in and remains bounded across frames and sc
   const auto items = game.engine->script_context().hud.size();
   game.frame();
   CHECK(game.engine->script_context().hud.size() == items);
-  CHECK(game.engine->script_context().hud.back().text.find("scene:") == 0);
+  CHECK(has_line_starting_with(game.engine->script_context().hud, kScenePhasePrefix));
   game.ruby("Game.load_scene('level2')");
   game.frame();
   game.frame();

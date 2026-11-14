@@ -44,7 +44,8 @@ icons):
   a picture to see it in your system's viewer.
   *New script* creates a `Behaviour` from a template, *New scene* a scene; *Open folder* shows the
   files.
-* **Console**: engine and Ruby output (filter by level), including script errors with backtraces.
+* **Console**: engine and Ruby output (filter by level). Click a Ruby backtrace row to open the
+  project's script and scroll to the reported line.
 * **Scripts**: each open Ruby file gets its own tab next to the Scene. Drag tabs to split the view
   anywhere (or press *Split right*), like a code editor's editor groups. The code is colored as
   you type: keywords, strings, symbols, comments, numbers, constants and `@variables` each have a
@@ -104,7 +105,12 @@ window: the copy goes on the system's clipboard as text. A copy bigger than 64 M
 editor's own clipboard and pastes only in the window it was copied in.
 
 A pasted object has its own copy of its meshes and pictures, even in the scene it was copied from
-(Duplicate shares them instead).
+(Duplicate shares them instead); the saved file keeps repeated data once (see below).
+
+A duplicated object moves with the clips that move the original: a duplicated character plays
+the same clips (each copy of a bone gets the keys of its original), so it does not stand still in
+the pose it was copied in. The copied object itself stays where it is put: keys that move the
+original's top node are not copied onto it.
 
 Undo goes back up to 200 steps, and keeps at most 256 MB for them (its copies of the objects and
 terrains, and what deleted objects and undone imports were made of: vertices, pictures and their
@@ -112,9 +118,29 @@ bytes in the scene's file; an estimate, counted as each step begins): past eithe
 go, and what no step can bring back any more is let go of, so a long session with many imports does
 not keep growing. The latest step always stays, however big.
 
-Saving rewrites the open scene's file in place (only the glTF JSON; meshes and textures are
-untouched), so the file still opens in Blender. When the file changes on disk (e.g. you re-export
-from Blender) the editor reloads it automatically, unless you have unsaved edits.
+Saving rewrites the open scene's file in place, still a `.glb` that opens in Blender. When the file
+changes on disk (e.g. you re-export from Blender) the editor reloads it automatically, unless you
+have unsaved edits.
+
+The saved file holds only what the scene uses, and each piece of data once, so a level edited for
+months does not keep growing:
+
+* **Repeated data is written once.** A model imported twice, or an object pasted twice, stores its
+  vertex data, pictures, samplers and textures once: the second copy points at the first one's
+  (found by comparing their bytes). Each import keeps its own materials and meshes, so the
+  Inspector still edits one without the other. A terrain's vertices are never shared, since
+  sculpting writes over them (a terrain sculpted while it shares them gets a copy of its own
+  first). Copy uses the same rule, so a copy of two imports of one model carries its data once.
+* **Unused data is left out.** What no object uses any more (a deleted object's meshes, materials
+  and pictures, an import that was undone, a picture no material shows) is not written. Template
+  objects (`prefab`), prefab placements and pictures set in the Inspector count as used.
+* **Undo is unaffected.** Both happen only in the written file: the open scene keeps everything,
+  numbered as it was, so undo after a save brings a deleted object back with all its data, and the
+  next save writes it again.
+
+When a save leaves out more than the save before it, the Console logs a line with how many bytes. `redgem scene
+compact <game> [--scene name]` does the same from the command line: it rewrites a scene without its
+repeats and unused data and says how much it left out (see [the command line](command-line.md)).
 
 ## Scenes
 

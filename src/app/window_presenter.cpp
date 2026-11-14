@@ -145,6 +145,7 @@ void WindowPresenter::capture_cursor(bool wanted) {
 }
 
 void WindowPresenter::present(const FrameView& view) {
+  renderer_.set_gpu_timing(view.statistics_overlay);  // (one view a frame: the game's)
   if (view.stop_recording && recording()) stop_recording();
   if (recording()) {
     present_recorded(view);

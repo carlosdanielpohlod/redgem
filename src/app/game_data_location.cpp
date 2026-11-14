@@ -15,6 +15,7 @@ constexpr const char* kSaveFile = "save.json";
 constexpr const char* kSettingsFile = "settings.json";
 constexpr const char* kBindingsFile = "bindings.json";
 constexpr const char* kCrashesFolder = "crashes";
+constexpr const char* kScriptProfileFile = "script_profile.tsv";
 // In the user's RedGem folder: the games its user makes keep what they keep while they are played
 // there (the editor's Play), apart from what the same games keep for their players.
 constexpr const char* kDeveloperFolder = "game-data";
@@ -43,7 +44,8 @@ std::filesystem::path folder_named(const std::string& name, const char* unnamed)
 }  // namespace
 
 GameDataFiles game_data_files(const std::filesystem::path& folder) {
-  return {folder / kSaveFile, folder / kSettingsFile, folder / kBindingsFile, folder / kCrashesFolder};
+  return {folder / kSaveFile, folder / kSettingsFile, folder / kBindingsFile, folder / kCrashesFolder,
+          folder / kScriptProfileFile};
 }
 
 std::filesystem::path game_data_subfolder(const GameSettings& settings) {

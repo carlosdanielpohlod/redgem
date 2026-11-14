@@ -117,7 +117,7 @@ NodeDesc camera_at(Vec3 position) {
 }
 
 MeshDesc cube_mesh(int material) {
-  MeshDesc mesh{"Cube", {make_primitive(PrimitiveShape::Cube)}, {}};
+  MeshDesc mesh{"Cube", {make_primitive(PrimitiveShape::Cube)}, {}, {}, {}};
   mesh.primitives[0].material = material;
   for (std::size_t i = 0; i < mesh.primitives[0].positions.size(); i += 3) {
     mesh.bounds.include(vec3_from(&mesh.primitives[0].positions[i]));

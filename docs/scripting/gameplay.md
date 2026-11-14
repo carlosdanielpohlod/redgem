@@ -1036,6 +1036,23 @@ animation.unmix
 `animation.follow_scene(fade: 0.3)` hands the character back to what the level plays, and
 `animation.clip` is the name of its own clip (nil while it follows the level).
 
+### Shape keys
+
+A mesh's shape keys (Blender's, exported as glTF morph targets) come with the model: faces,
+blinks, a door that bends. Keys keyed in an action (Blender exports them as a `weights`
+channel) play with the clip like any other channel. A script sets them by name on an object and
+on the meshes under it:
+
+```ruby
+face = find("Head")
+face.morph_names           # => [:Smile, :Blink_L, :Blink_R]
+face.morph(:Smile, 0.7)    # 0 leaves the mesh as modeled, 1 is the whole key
+face.morph(:Smile)         # => 0.7 (nil when no part has that key)
+```
+
+Each copy of a mesh shows its own weights, the eight heaviest at most at once. A clip that moves a
+key sets it again every frame it plays, as it does a bone.
+
 ## Save progress
 
 `Save` keeps numbers, texts and true/false values between runs, in one file per game:
@@ -1117,8 +1134,22 @@ Debug.reset_frame_stats              # clears the window and any unfinished meas
 The panel works in the player, editor Play and recordings. Collection is off by default and
 keeps at most 120 completed frames. Timings use the steady clock, so pausing or slowing the game
 does not change what is measured. Physics is included in update, and presentation includes any
-upload, frame cap or synchronization wait: these are inclusive foreground wall times, not GPU
-timers or a per-function sampling profiler. Leave the panel off for reproducible pictures.
+upload, frame cap or synchronization wait: these are inclusive foreground wall times. Where the
+graphics card can time its work (desktop OpenGL), the panel adds its time over the prepare, scene
+and post passes. Leave the panel off for reproducible pictures.
+
+## Find the slow scripts
+
+```ruby
+Debug.profiling = true               # also starts the scripts' sampling profiler
+Debug.script_profile(3)              # [{name: "Enemy#update", self: 120, total: 180, ...}, ...]
+Debug.export_script_profile          # writes script_profile.tsv to the game's data folder
+```
+
+While profiling, the engine reads the scripts' call stack about every millisecond of Ruby
+running. `self` counts the samples that caught a method running its own code, `total` the ones
+that caught it anywhere on the stack; the panel lists the five methods with the most `self`.
+Turning profiling on again starts a fresh profile, and `Debug.reset_frame_stats` clears it.
 
 
 ## Draw world diagnostics
@@ -1135,7 +1166,15 @@ Lines and axis-aligned wire boxes use world coordinates and are submitted every 
 is its full nonnegative width, height and depth. They create no objects and are local to the
 presenter; a dedicated server validates arguments and returns `false` without collecting commands.
 Calls return `true` when accepted and `false` after the shared limit of 4096 commands per frame.
-The next frame starts with an empty buffer. Invalid vectors, box bounds or color channels are rejected before reaching the renderer. Use `UI.text` for a screen-space label.
+The next frame starts with an empty buffer. Invalid vectors, box bounds or color channels are rejected before reaching the renderer. Use `Debug.label` for a text at a world position:
+
+```ruby
+Debug.label("HP #{health}", at: transform.position + Vector3.up * 2, color: :yellow)
+```
+
+It is centered where the main camera shows the point once the frame's scripts are done, drawn
+over the game's interface and never hidden behind objects; nothing is drawn for a point behind
+the camera.
 
 `depth_test: true` hides shapes behind opaque geometry; `false` draws through it. Transparent
 surfaces use the renderer's normal depth, so this is an opaque-scene diagnostic. Frames with shapes

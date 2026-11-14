@@ -187,7 +187,8 @@ redgem_add_library(redgem_core
   core/math.cpp
   core/fixed_clock.cpp
   core/frame_profiler.cpp
-  core/stopwatch.cpp)
+  core/stopwatch.cpp
+  core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
 # (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)
@@ -368,6 +369,8 @@ redgem_add_library(redgem_runtime
   script/ruby_classes.cpp
   script/reload_ownership.cpp
   script/script_budget.cpp
+  script/script_profile.cpp
+  script/script_sampler.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp
   script/script_host_reload.cpp
@@ -380,6 +383,7 @@ redgem_add_library(redgem_runtime
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
   script/bindings/object_state_bindings.cpp
+  script/bindings/shape_key_bindings.cpp
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
@@ -433,6 +437,7 @@ redgem_add_library(redgem_runtime
   render/shadow_cascades.cpp
   render/temporal.cpp
   render/gl_extras.cpp
+  render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
@@ -469,6 +474,7 @@ redgem_add_library(redgem_runtime
   render/texel_rows.cpp
   render/instance_records.cpp
   render/instance_batches.cpp
+  render/morph_shapes.cpp
   render/scatter_chunks.cpp
   render/capture_views.cpp
   render/shader_source.cpp
@@ -505,6 +511,7 @@ redgem_add_library(redgem_runtime
   app/engine_saves.cpp
   app/engine_object_state.cpp
   app/profile_overlay.cpp
+  app/debug_labels.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/engine_loading.cpp
@@ -561,6 +568,7 @@ if(NOT ANDROID)
     editor/document/material_textures.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
+    editor/document/glb_dedup.cpp
     editor/document/gltf_json.cpp
     editor/document/gltf_json_entries.cpp
     editor/document/glb_geometry.cpp

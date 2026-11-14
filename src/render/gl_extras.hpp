@@ -3,7 +3,10 @@
 // The few graphics calls raylib's rlgl does not offer, the same on desktop OpenGL 3.3 and on
 // OpenGL ES 3 (whose headers this part alone includes): a picture drawn with several samples per
 // pixel, depth textures of the same format as its depth, a picture's colors copied, alpha to
-// coverage, and cube maps filtered across their faces' seams.
+// coverage, the winding of front faces, cube maps filtered across their faces' seams, and timer
+// queries.
+
+#include <cstdint>
 
 namespace redgem::render_detail {
 
@@ -37,11 +40,28 @@ void copy_buffer(unsigned int from, unsigned int to, int width, int height, Buff
 
 // While on, a fragment's alpha says how many of its pixel's samples it covers.
 void set_alpha_to_coverage(bool on);
+// Which way round a triangle's corners go when it faces the viewer: counter-clockwise as glTF
+// says, or clockwise for a mirrored copy (its placement turned its triangles the other way).
+void set_clockwise_front_faces(bool clockwise);
 // The most pixels a side of a texture or a render buffer may have on the card: of a picture drawn
 // off screen.
 int largest_target_side();
 
 // Cube maps filtered across the seams between their faces (always so on OpenGL ES 3).
 void filter_cube_maps_across_seams();
+
+// Queries of how long the graphics card took over what was sent between a begin and an end
+// (GL_TIME_ELAPSED, core in desktop OpenGL 3.3). OpenGL ES 3 has them only as an extension, which
+// is not looked for: there, and wherever the driver lacks them, has_timer_queries is false and the
+// rest do nothing. One query runs at a time.
+bool has_timer_queries();
+unsigned int make_timer_query();
+void release_timer_query(unsigned int query);
+void begin_timer(unsigned int query);
+void end_timer();
+// Whether the card has the answer yet: asked without waiting for it.
+bool timer_ready(unsigned int query);
+// The answer, in nanoseconds: only once timer_ready says so (else it would wait for the card).
+std::uint64_t timer_nanoseconds(unsigned int query);
 
 }  // namespace redgem::render_detail

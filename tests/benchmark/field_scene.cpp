@@ -57,7 +57,7 @@ PrimitiveDesc trunk() {
 }
 
 MeshDesc mesh_of(const char* name, std::vector<PrimitiveDesc> primitives) {
-  MeshDesc mesh{name, std::move(primitives), {}};
+  MeshDesc mesh{name, std::move(primitives), {}, {}, {}};
   for (const PrimitiveDesc& primitive : mesh.primitives) {
     for (std::size_t i = 0; i < primitive.positions.size(); i += 3)
       mesh.bounds.include(vec3_from(&primitive.positions[i]));
