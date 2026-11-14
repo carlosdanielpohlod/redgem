@@ -23,7 +23,9 @@ constexpr float kBrightScene = 3.0f;    // EV
 constexpr std::uint64_t kCamera = 7;    // a camera object's serial
 constexpr std::uint64_t kOtherCamera = 8;
 constexpr std::uint64_t kScene = 2;  // scenes uploaded so far
-constexpr float kAboveBrightest = kBrightestExposureEv + 2.0f;  // EV: past the default range
+
+// EV: past the default range of scene brightness
+constexpr float kAboveBrightest = kBrightestExposureEv + 2.0f;
 
 // The mean log2 luminance of a scene `ev` doublings brighter than middle grey.
 float mean_log2_of(float ev) { return kMiddleGreyLog2 + ev; }
