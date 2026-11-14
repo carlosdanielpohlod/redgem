@@ -526,6 +526,22 @@ TEST_CASE("scripts open in tabs that split side by side, and the side panels hid
   std::filesystem::remove_all(game);
 }
 
+namespace {
+
+void paint_terrain_in_view(EditorApp& app, ObjectId terrain, float x, float y, float seconds) {
+  app.terrain_tool().painting = true;
+  REQUIRE(app.sculpt_at(x, y, seconds).has_value());
+  const SceneDocument& document = app.session().document();
+  const auto mesh = static_cast<std::size_t>(document.node(terrain).mesh);
+  const auto& colors = document.desc().meshes.at(mesh).primitives.front().colors;
+  REQUIRE_FALSE(colors.empty());
+  CHECK(*std::min_element(colors.begin(), colors.end()) < config::kMaxColorByte);
+  take_picture(app, screenshot("editor_terrain_tint"));
+  app.terrain_tool().painting = false;
+}
+
+}  // namespace
+
 TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and things land on its hills") {
   constexpr float kBrushSeconds = 1.0f;
   constexpr float kMinHill = 2.0f;  // meters raised by a second of the default brush
@@ -578,6 +594,7 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   CHECK(top->y - shoulder->y < kRestTolerance);  // level around the middle
   run(app, kFrameFrames);                        // the renderer picks the new shape up
   take_picture(app, screenshot("editor_terrain"));
+  paint_terrain_in_view(app, terrain, center_x, center_y, kBrushSeconds);
 
   // A crate dropped over the hill comes to rest on its top, not on the flat ground the terrain
   // started as: the collider follows the sculpted shape.

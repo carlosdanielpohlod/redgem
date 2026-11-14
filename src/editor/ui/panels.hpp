@@ -22,10 +22,12 @@ namespace redgem::ui {
 
 // The terrain brush: set up in the Inspector, used in the Scene view.
 struct TerrainTool {
+  static constexpr Color kDefaultTint{0.68f, 0.36f, 0.22f, 1.0f};
+
   bool sculpting = false;  // while on, dragging the left button over the selected terrain reshapes it
   SculptMode mode = SculptMode::Raise;
   bool painting = false;
-  Color tint{};
+  Color tint = kDefaultTint;
   float radius = editor_config::kDefaultBrushRadius;  // meters
   // Meters per second for Raise and Lower; how fast Smooth and Flatten act.
   float strength = editor_config::kDefaultBrushStrength;
