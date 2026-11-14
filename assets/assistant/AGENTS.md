@@ -2,7 +2,7 @@
 
 This is a game made with RedGem, a 3D engine whose games are written in Ruby. These notes are for
 whoever works on it, coding assistants included. The engine's manual is at
-https://carlosdanielpohlod.github.io/redgem-site/manual/ (`llms.txt` there indexes it).
+https://www.redgem-engine.org/manual/ (`llms.txt` there indexes it).
 
 ## Layout
 

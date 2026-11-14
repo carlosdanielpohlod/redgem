@@ -22,7 +22,7 @@ Also here:
   bin/runtimes/       the players for Windows and Android games
 
 Android builds also need the Android SDK and a JDK. The manual says how:
-https://carlosdanielpohlod.github.io/redgem-site/manual/
+https://www.redgem-engine.org/manual/
 
 RedGem is MIT licensed (LICENSE). It is built on open source projects, listed with their
 licenses in THIRD_PARTY_LICENSES.md.

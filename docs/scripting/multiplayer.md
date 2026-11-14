@@ -102,6 +102,13 @@ One address may hold 24 machines and 8 open rooms on a relay. When many players 
 address (a campus, some mobile networks), raise them: `--per-address <number>` (up to 1024) and
 `--rooms-per-address <number>` (up to 256).
 
+The relay also answers STUN Binding requests on the same port number over UDP (open UDP 7778 as
+well as TCP to let them through): a machine that asks learns the public address and port its
+router gives it. Games do not use this yet (see KNOWN_LIMITATIONS.md); when the UDP port cannot be
+had, the relay says so and runs without it. Behind a proxy of UDP (Docker's userland proxy,
+rootless Docker) the relay sees the proxy's address and its answers name that one: publish the
+port without a proxy (rootful Docker with `"userland-proxy": false`, or host networking).
+
 While nobody talks to it the relay sleeps: it wakes when a machine connects or says something,
 and about once a second to let go of machines that went silent.
 
@@ -283,6 +290,45 @@ machine can only spawn objects of its own: 64 at a time, 512 in the whole game. 
 
 Loading a level happens on one machine: its spawned objects go away everywhere, and it is shown
 the others' again. To change level together, send a message and load it on every machine.
+
+## Movement validation
+
+The machine that owns an object says where it is, so a changed copy of the game could say its
+hero runs ten times as fast or stands on the other side of the level. The host (a player's
+machine that hosts, or a dedicated server's room) can refuse to believe it: it checks every pose
+of the others' objects against how fast and how far one may move, and everyone, the host's own
+scripts included, sees an object that went past that where the host believes it is. Its owner is
+told and puts it back there (`Network::CORRECT`), and the violation is counted against its
+machine, which is let go after `kick_after` of them. It is off unless the game turns it on, in
+game.json:
+
+```json
+"movement_validation": {
+  "max_speed": 9.0,
+  "teleport_distance": 4.0,
+  "tolerance": 0.25,
+  "kick_after": 10,
+  "undo": false
+}
+```
+
+or from a script on the host, at any time (every key may be left out; no limits turns it off):
+
+```ruby
+Network.validate_movement(max_speed: 9.0, teleport_distance: 4.0, kick_after: 10) if Network.host?
+Network.movement_violations(peer)   # how many moves of that machine the host did not believe
+```
+
+`max_speed` is in meters a second; a move too fast goes as far as was allowed (`undo: true` puts
+it back where it was). `teleport_distance` is the most one pose (twenty a second) may move an
+object: a longer one is never believed. `tolerance` is the share of the limits a move may go past
+and still be believed, and half a second of movement at the top speed may arrive at once, so the
+network's jitter is never a violation. The poses that were already on their way when a correction
+went out count once. Set the limits above anything the game does on purpose (a dash, a launch pad):
+to move an object further, spawn it again (an object whose NetworkSync starts on the host starts
+where its owner next says), or let the host move it (the host's own objects are never checked).
+A machine's objects past 4096 that it has not moved for ten seconds are forgotten; while none are,
+the poses of its new ones are not used. In a room on a relay the relay passes poses on and checks nothing.
 
 ## Deciding things once
 

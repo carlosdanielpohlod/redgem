@@ -158,7 +158,12 @@ add_executable(redgem_tests
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
   unit/byte_allowance_test.cpp
+  unit/movement_validator_test.cpp
+  unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
+  unit/stun_message_test.cpp
+  unit/stun_probe_test.cpp
+  unit/route_choice_test.cpp
   unit/room_choice_test.cpp
   unit/tick_pacer_test.cpp
   unit/server_command_test.cpp
@@ -225,12 +230,14 @@ add_executable(redgem_tests
   integration/http_client_test.cpp
   integration/http_game_test.cpp
   integration/network_session_test.cpp
+  integration/movement_validation_test.cpp
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp
   integration/encrypted_connection_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
+  integration/route_choice_socket_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
