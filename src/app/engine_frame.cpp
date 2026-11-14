@@ -74,6 +74,8 @@ void Engine::poll_network() {
   const float seconds = std::min(lap, config::kMaxFrameSeconds);
   network_.forgive_stall(lap - seconds);  // (what the others sent while this one stood still)
   for (const net::NetworkEvent& event : network_.poll(seconds)) scripts_->dispatch(event);
+  // Out of the game, nobody is waited for: the world is never left held (whatever the scripts did).
+  if (network_.state() == net::NetworkSession::State::Offline) context_.level_held = false;
   // A game hosted on this machine's own port answers the neighbours looking for one.
   if (!found_by_neighbours()) discovery_.stop_announcing();
   discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);

@@ -4,7 +4,7 @@
 #   Game.load_scene("level2")                          # on the host (a player's, or a dedicated server)
 #   Network.on_level_loading { |name| show_banner }    # every machine, as the change starts
 #   Network.on_level_ready { |name| start_round }      # every machine, as the new level starts
-#   Network.level_timeout = 20                         # seconds to wait for the slowest machine
+#   Network.level_timeout = 20                         # seconds the host, once it has the level, waits for the rest
 #
 # A machine late past the timeout is let go (on_leave, there; on_disconnect, on that machine).
 # The handlers last across levels, like Network.authenticate: each call replaces the one before.
@@ -90,6 +90,7 @@ module Network
 
         @arrived = true
         @held_back = []
+        @waited = 0.0  # (the others are waited for from here: the host's own load is not theirs)
       end
 
       # A frame while the world is held: the level is waited for, then everyone else.
@@ -144,6 +145,7 @@ module Network
 
       def start(change, name)
         Game.__load_scene_async(name)
+        Network.__despawn_mine  # (a newcomer loading the game's level takes back what it brought)
         @change = change
         @name = name
         @arrived = false
@@ -181,6 +183,7 @@ module Network
       def give_up(why)
         Debug.error("cannot change level with the others: #{why}")
         Network.leave
+        abandon
       end
 
       def say_ready
@@ -211,9 +214,12 @@ module Network
   end
 
   class << self
-    attr_writer :level_timeout
-
     def level_timeout = @level_timeout || LEVEL_TIMEOUT
+
+    # Seconds the host waits for the others once it has the level itself (a number, raising otherwise).
+    def level_timeout=(seconds)
+      @level_timeout = Float(seconds)
+    end
 
     # Whether the machines are between two levels: one loading, or waiting for the others.
     def changing_level? = Level.changing?

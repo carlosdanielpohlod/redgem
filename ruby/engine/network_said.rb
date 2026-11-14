@@ -123,13 +123,16 @@ module Network
         numbers?([time, speed]) && time >= 0 && flags.all? { |flag| boolean?(flag) }
       end
 
-      def clip_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_CLIP_NAME_SIZE
+      def clip_name?(name) = bounded_text?(name, MAX_CLIP_NAME_SIZE)
       def numbers?(list) = list.all? { |number| reachable?(number) }
 
       # A change of level, as the host orders it: [change, name].
       def level?(data) = list?(data, LEVEL_SIZE) && data[0].is_a?(Integer) && level_name?(data[1])
 
-      def level_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_LEVEL_NAME_SIZE
+      def level_name?(name) = bounded_text?(name, MAX_LEVEL_NAME_SIZE)
+
+      # A text that is not empty, and at most `most` bytes long.
+      def bounded_text?(text, most) = text.is_a?(String) && !text.empty? && text.bytesize <= most
 
       # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
       # seventh thing machine 2 spawned. Nothing else is a spawned object's key, so no machine

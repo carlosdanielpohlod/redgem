@@ -298,7 +298,7 @@ The connection stays up; nobody leaves the game.
 Game.load_scene("level2")                # on the host: true, and every machine loads level2
 Network.on_level_loading { |name| ... }  # on every machine, as the change starts (the old level is still there)
 Network.on_level_ready { |name| ... }    # on every machine, once all of them have the level: it starts now
-Network.level_timeout = 20               # seconds the host waits for the slowest machine (30 unless said)
+Network.level_timeout = 20               # seconds the host, once it has the level, waits for the rest (30 unless said)
 ```
 
 What happens, step by step:
@@ -308,9 +308,10 @@ What happens, step by step:
    screen (`Game.on_loading`).
 2. A machine that has the level waits, its new level frozen as while loading: its behaviours do
    not start, nothing moves, nothing it spawns is sent yet. It tells the host it is ready.
-3. When every machine is ready, or `Network.level_timeout` seconds passed, the host lets go of
-   the ones still loading (they hear `on_disconnect`, the others `on_leave`) and everyone starts
-   the level at once: `on_level_ready` runs, then the level's behaviours start.
+3. When every machine is ready, or `Network.level_timeout` seconds passed since the host itself
+   had the level, the host lets go of the ones still loading (they hear `on_disconnect`, the
+   others `on_leave`) and everyone starts the level at once: `on_level_ready` runs, then the
+   level's behaviours start.
 
 The objects of the old level are gone with it on every machine, the ones spawned with
 `Network.spawn` included: anything said about them on the way (a place, a spawn) is dropped, so

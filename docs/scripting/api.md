@@ -753,7 +753,7 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.on_level_loading(&block)`: the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call
 - `Network.on_level_ready(&block)`: every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call
 - `Network.changing_level?`: the machines are between two levels: loading, or waiting for each other
-- `Network.level_timeout`: seconds the host waits for every machine to have a new level (30); later ones are let go
+- `Network.level_timeout`: seconds the host, once it has a new level, waits for the others to have it (30); later ones are let go
 - `Network.level_timeout = seconds`: sets it
 - `Network.spawn(template, owner: Network.id, position:, rotation:)`: spawns a copy on every machine
 - `Network.allow_spawn(*templates)`: lets guests spawn those templates
