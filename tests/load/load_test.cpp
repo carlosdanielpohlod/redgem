@@ -9,75 +9,29 @@
 // It prints a table (Markdown) with a line for each number of players, and fails when a round
 // did not work as a game would (a bot could not join, or heard nothing).
 
-#include <unistd.h>
-
 #include <chrono>
 #include <cstdio>
-#include <fstream>
 #include <iterator>
-#include <memory>
-#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "load/load_bot.hpp"
+#include "load/load_play.hpp"
 #include "load/load_report.hpp"
 
 namespace {
 
-using redgem::load::LoadBot;
+using redgem::load::BotList;
+using redgem::load::cpu_seconds;
+using redgem::load::join_one;
+using redgem::load::now_seconds;
 using redgem::load::RoundResult;
-using BotList = std::vector<std::unique_ptr<LoadBot>>;
+using redgem::load::run_for;
 
-constexpr double kJoinTimeoutSeconds = 15.0;  // the first one waits for the room's game to start
-constexpr double kWarmUpSeconds = 1.0;        // everyone hears everyone before anything is counted
-constexpr double kRestSeconds = 1.0;          // between rounds: the last room closes
-constexpr std::chrono::milliseconds kTickPause{1};
+constexpr double kWarmUpSeconds = 1.0;  // everyone hears everyone before anything is counted
+constexpr double kRestSeconds = 1.0;    // between rounds: the last room closes
 constexpr int kDefaultSeconds = 10;
 constexpr int kDefaultPlayers[] = {4, 8, 15};
-// /proc/<pid>/stat: the processor time a process took (fields 14 and 15 of the line, in clock
-// ticks) comes after the name in parentheses and this many fields more.
-constexpr int kFieldsBeforeUserTime = 11;
-
-double now_seconds() {
-  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
-double cpu_seconds(int pid) {
-  std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
-  const std::string line((std::istreambuf_iterator<char>(stat)), std::istreambuf_iterator<char>());
-  std::istringstream fields(line.substr(line.rfind(')') + 1));
-  std::string field;
-  for (int i = 0; i < kFieldsBeforeUserTime; ++i) fields >> field;
-  double user = 0.0;
-  double system = 0.0;
-  fields >> user >> system;
-  return (user + system) / static_cast<double>(sysconf(_SC_CLK_TCK));
-}
-
-void tick_all(BotList& bots) {
-  for (auto& bot : bots) bot->tick(now_seconds());
-  std::this_thread::sleep_for(kTickPause);
-}
-
-void run_for(BotList& bots, double seconds) {
-  for (const double end = now_seconds() + seconds; now_seconds() < end;) tick_all(bots);
-}
-
-// One more bot in the room, joined once the others are in (a server lets only a few from one
-// address wait to be placed at once). False when it could not join.
-bool join_one(BotList& bots, std::uint16_t port) {
-  auto bot = std::make_unique<LoadBot>(static_cast<int>(bots.size()) + 1);
-  std::string error;
-  if (!bot->connect(port, error)) return false;
-  bots.push_back(std::move(bot));
-  for (const double end = now_seconds() + kJoinTimeoutSeconds; now_seconds() < end;) {
-    tick_all(bots);
-    if (bots.back()->welcomed()) return true;
-  }
-  return false;
-}
 
 RoundResult play_round(std::uint16_t port, int server_pid, int players, double seconds) {
   BotList bots;

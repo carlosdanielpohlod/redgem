@@ -3,9 +3,7 @@
 #include "net/socket/socket.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <thread>
 
 #include "net/socket/socket_native.hpp"
 
@@ -17,7 +15,6 @@ using namespace os;
 
 constexpr std::size_t kReadChunkBytes = 16 * 1024;
 constexpr float kMillisecondsPerSecond = 1000.0f;
-constexpr float kLongestWaitSeconds = 3600.0f;  // a wait asked to last longer is cut to this
 
 // Appends what one call takes from a connection to `into`. How many bytes that was: 0 when the
 // other side hung up, negative when nothing came (see would_block).
@@ -36,13 +33,6 @@ IoStatus nothing_more(std::size_t got) { return would_block() ? read_so_far(got)
 // Whether a wait of that length sleeps at all (one of no length, or of none that is a number, does not).
 bool lasts(float seconds) { return seconds > 0.0f; }
 
-// A wait's length as the system takes it: whole milliseconds, rounded up so that a short wait
-// still sleeps, and never negative (which the system reads as "for ever").
-int wait_milliseconds(float seconds) {
-  if (!lasts(seconds)) return 0;
-  return static_cast<int>(std::ceil(std::min(seconds, kLongestWaitSeconds) * kMillisecondsPerSecond));
-}
-
 bool can_be_watched(const Watched& watched) { return watched.socket != nullptr && watched.socket->valid(); }
 
 // What the system is asked to watch a socket for.
@@ -51,6 +41,11 @@ short events_of(const Watched& watched) {
 }
 
 }  // namespace
+
+int wait_milliseconds(float seconds) {
+  if (!lasts(seconds)) return 0;
+  return static_cast<int>(std::ceil(std::min(seconds, kLongestWaitSeconds) * kMillisecondsPerSecond));
+}
 
 IoStatus Socket::read(std::vector<std::uint8_t>& into, std::size_t limit) {
   if (!valid()) return IoStatus::Closed;
@@ -75,7 +70,7 @@ IoStatus Socket::write(std::vector<std::uint8_t>& bytes) {
   return IoStatus::Ok;
 }
 
-bool Socket::wait(const std::vector<Watched>& sockets, float seconds) {
+bool Socket::wait(const std::vector<Watched>& sockets, float seconds, Clock& clock) {
   std::vector<Waiting> waiting;
   for (const Watched& watched : sockets) {
     if (can_be_watched(watched)) waiting.push_back({native(watched.socket->handle_), events_of(watched), 0});
@@ -83,7 +78,7 @@ bool Socket::wait(const std::vector<Watched>& sockets, float seconds) {
   const int milliseconds = wait_milliseconds(seconds);
   if (waiting.empty()) {
     // With nothing to watch only the time can end the wait (and Windows refuses an empty list).
-    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+    clock.sleep(milliseconds / kMillisecondsPerSecond);
     return false;
   }
   return wait_native(waiting, milliseconds) > 0;

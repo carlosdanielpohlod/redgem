@@ -1,7 +1,6 @@
 #include "server/room_thread.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <exception>
 
 #include "core/config.hpp"
@@ -28,20 +27,22 @@ void RoomThread::add(std::shared_ptr<RoomSlot> slot) {
   new_rooms_.push_back(std::move(slot));
 }
 
+void RoomThread::ask_to_stop() {
+  const std::lock_guard<std::mutex> hold(lock_);
+  stopping_ = true;
+}
+
 void RoomThread::stop() {
-  {
-    const std::lock_guard<std::mutex> hold(lock_);
-    stopping_ = true;
-  }
-  wake_.notify_all();
+  ask_to_stop();
   if (thread_.joinable()) thread_.join();
 }
 
 void RoomThread::run() {
-  TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
-  while (wait_for_turn(pacer.until_next(steady_seconds()))) {
+  Clock& clock = *start_.clock;
+  TickPacer pacer(config::kFixedDeltaSeconds, clock.now());
+  while (wait_for_turn(pacer.until_next(clock.now()))) {
     take_new_rooms();
-    play_turn(pacer.take_turn(steady_seconds()));
+    play_turn(pacer.take_turn(clock.now()));
     drop_closed_rooms();
   }
   take_new_rooms();  // (handed over as it stopped: their slots close too)
@@ -50,8 +51,8 @@ void RoomThread::run() {
 }
 
 bool RoomThread::wait_for_turn(double seconds) {
-  std::unique_lock<std::mutex> hold(lock_);
-  wake_.wait_for(hold, std::chrono::duration<double>(seconds), [this] { return stopping_; });
+  start_.clock->sleep(seconds);
+  const std::lock_guard<std::mutex> hold(lock_);
   return !stopping_;
 }
 
@@ -63,11 +64,11 @@ void RoomThread::take_new_rooms() {
 
 void RoomThread::play_turn(float seconds) {
   loading_seconds_ = 0.0;
-  const double started = steady_seconds();
+  const double started = start_.clock->now();
   for (Room& room : rooms_) play_or_close(room, seconds);
   // What made the rooms of this thread late, or not: the turn of all of them, one after the other
   // (loading a new room's game aside: that happens once, as its first player arrives).
-  const double turn = steady_seconds() - started - loading_seconds_;
+  const double turn = start_.clock->now() - started - loading_seconds_;
   for (Room& room : rooms_) room.slot->note_frame(turn);
 }
 
@@ -93,9 +94,9 @@ void RoomThread::play(Room& room, float seconds) {
 }
 
 void RoomThread::open(Room& room) {
-  const double started = steady_seconds();
+  const double started = start_.clock->now();
   room.game = open_game(room.slot->code());
-  loading_seconds_ += steady_seconds() - started;
+  loading_seconds_ += start_.clock->now() - started;
 }
 
 std::unique_ptr<Engine> RoomThread::open_game(const std::string& code) const {

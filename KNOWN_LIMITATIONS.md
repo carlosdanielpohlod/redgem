@@ -78,8 +78,12 @@ the same pull request.
   the Inspector keeps a mirror it is given and the command-line tools refuse negative scales. A
   skeleton that mirrors a skinned mesh through its bones alone, and a mirrored parent of
   scattered copies, still draw those inside out.
-- Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
-  with cubic-spline interpolation are skipped with a warning (export linear or step keys).
+- Shape keys (glTF morph targets) move positions and normals; their tangents are not morphed. A
+  copy of a mesh shows its eight heaviest keys at once, and is culled by where its keys can take
+  it with weights between -1 and 1 (weights beyond that may be culled early). Their weights are
+  not sent to the other machines of a network game, and a node's own `weights` are ignored for
+  the mesh's. Animation keys with cubic-spline interpolation are skipped with a warning (export
+  linear or step keys).
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
@@ -207,8 +211,7 @@ not a promise of how it will be closed.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
-  existing blocks keep their old code. The script editor has no autocomplete, and console
-  backtraces do not jump to their lines.
+  existing blocks keep their old code. The script editor has no autocomplete.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
 - Scene recovery writes a separate copy at safe editing boundaries about once a minute. It is

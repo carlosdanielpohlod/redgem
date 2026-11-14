@@ -127,9 +127,9 @@ HttpResponse finished(HttpResponse response, const Url& url) {
 }  // namespace
 
 HttpResponse exchange(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
-                      const std::atomic<bool>& cancelled) {
+                      const std::atomic<bool>& cancelled, const Clock& clock) {
   // (The timeout is the whole request's, its redirects and all.)
-  const Patience patience(request.timeout_seconds, cancelled);
+  const Patience patience(request.timeout_seconds, cancelled, clock);
   HttpRequest next = request;
   Url at = url;
   for (int redirects = 0;; ++redirects) {

@@ -1,8 +1,6 @@
 #include "server/server_program.hpp"
 
-#include <chrono>
 #include <iostream>
-#include <thread>
 
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
@@ -62,11 +60,12 @@ int run_server(const ServerSettings& settings) {
 }  // namespace
 
 void serve_until(GameServer& server, const std::function<bool()>& stop, const std::function<bool()>& status_asked) {
-  TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
+  Clock& clock = server.clock();
+  TickPacer pacer(config::kFixedDeltaSeconds, clock.now());
   Census census;
   while (!stop()) {
-    std::this_thread::sleep_for(std::chrono::duration<double>(pacer.until_next(steady_seconds())));
-    server.tick(pacer.take_turn(steady_seconds()));
+    clock.sleep(pacer.until_next(clock.now()));
+    server.tick(pacer.take_turn(clock.now()));
     census.report(server);
     if (status_asked()) server.log_status();
   }

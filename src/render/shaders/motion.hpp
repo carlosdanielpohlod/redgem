@@ -100,7 +100,7 @@ inline std::string motion_fragment() { return std::string(kMotionHead) + kCopyFa
 
 // The motion pass's vertex shader, whole: the lit pass's placement, done twice.
 inline std::string motion_vertex() {
-  return std::string(kVertexHead) + kWaterWaves + kVertexPlacement + kMotionVertexMain;
+  return std::string(kVertexHead) + kWaterWaves + shape_key_limits() + kVertexPlacement + kMotionVertexMain;
 }
 
 }  // namespace redgem::shaders
