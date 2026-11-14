@@ -15,6 +15,7 @@ constexpr int kLookAt = kLookTexel * kFloatsPerTexel;
 constexpr int kCopyAt = kCopyTexel * kFloatsPerTexel;
 constexpr int kFourthFloat = 3;
 constexpr int kSwayAt = kNormalTexel * kFloatsPerTexel + kFourthFloat;  // the normal matrix's first column has room
+constexpr int kMorphAt = kMorphTexel * kFloatsPerTexel + kFourthFloat;
 constexpr int kRed = 0;
 constexpr int kGreen = 1;
 constexpr int kBlue = 2;
@@ -48,6 +49,7 @@ bool write_instance(TexelRows& texels, std::size_t number, const Matrix& model, 
   std::copy(normals.v, normals.v + kNormalColumnsFloats, record.begin() + kNormalTexel * kFloatsPerTexel);
   put_look(record, look);
   record[kSwayAt] = look.sway;
+  record[kMorphAt] = look.first_morph;
   return texels.write(record_texel(number), record.data(), kTexelsPerInstance);
 }
 

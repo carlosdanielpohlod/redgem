@@ -68,9 +68,12 @@ struct LitUniforms {
   int alpha_mixed = kNoLocation;
   int noise_shift = kNoLocation;
   int skinned = kNoLocation;
+  int morph_first = kNoLocation;
+  int morph_vertices = kNoLocation;
   int wind = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
   int frame_texels = kNoLocation;
+  int morph_texels = kNoLocation;
   int reflection_map = kNoLocation;
   int reflection_strength = kNoLocation;
   int sun_direction = kNoLocation;
@@ -102,7 +105,10 @@ struct DepthUniforms {
   int wind = kNoLocation;
   int time = kNoLocation;
   int skinned = kNoLocation;
+  int morph_first = kNoLocation;
+  int morph_vertices = kNoLocation;
   int frame_texels = kNoLocation;
+  int morph_texels = kNoLocation;
 };
 
 // Where the motion pass's shader takes its values (see shaders/motion.hpp): per material, and
@@ -114,6 +120,9 @@ struct MotionUniforms {
   int alpha_dithered = kNoLocation;
   int wind = kNoLocation;
   int skinned = kNoLocation;
+  int morph_first = kNoLocation;
+  int morph_vertices = kNoLocation;
+  int morph_texels = kNoLocation;
   int noise_shift = kNoLocation;
   int view_position = kNoLocation;
   int time = kNoLocation;

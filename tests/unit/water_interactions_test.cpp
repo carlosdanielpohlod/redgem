@@ -31,7 +31,7 @@ SceneDesc pond_scene() {
   MaterialDesc water;
   water.water.enabled = true;
   desc.materials = {water, MaterialDesc{}};
-  desc.meshes = {MeshDesc{"Pond", {flat_quad(-5.0f, 5.0f, 0)}, {}}};
+  desc.meshes = {MeshDesc{"Pond", {flat_quad(-5.0f, 5.0f, 0)}, {}, {}, {}}};
   NodeDesc pond;
   pond.name = "Pond";
   pond.mesh = 0;

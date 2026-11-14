@@ -7,8 +7,13 @@ add_executable(redgem_tests
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
+  unit/script_profile_test.cpp
+  unit/profile_overlay_test.cpp
+  unit/gpu_timers_test.cpp
+  unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
+  unit/clock_test.cpp
   unit/log_test.cpp
   unit/event_journal_test.cpp
   unit/files_test.cpp
@@ -52,6 +57,8 @@ add_executable(redgem_tests
   unit/input_bindings_store_test.cpp
   unit/mouse_bindings_test.cpp
   unit/run_input_test.cpp
+  unit/bench_stats_test.cpp
+  bench/bench_stats.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
   unit/recording_test.cpp
@@ -72,6 +79,7 @@ add_executable(redgem_tests
   unit/gltf_json_test.cpp
   unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
+  unit/glb_dedup_test.cpp
   unit/glb_usage_test.cpp
   unit/undo_history_test.cpp
   unit/model_import_test.cpp
@@ -107,6 +115,7 @@ add_executable(redgem_tests
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
   unit/instance_records_test.cpp
+  unit/morph_shapes_test.cpp
   unit/scatter_test.cpp
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
@@ -192,9 +201,11 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
+  integration/script_sampler_test.cpp
   integration/save_slot_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
+  integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
@@ -574,6 +585,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/material_pictures_render_test.cpp
+               render_system/morph_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
                render_system/hud_clip_render_test.cpp
@@ -647,13 +659,22 @@ add_test(NAME tools.license_notices_are_up_to_date
 # the network code. load.short is a short run of it, whose numbers the CI prints. (Linux only: it
 # reads the server's processor time from /proc.)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  add_executable(redgem_load_test load/load_test.cpp load/load_bot.cpp load/load_report.cpp)
+  add_executable(redgem_load_test load/load_test.cpp load/load_bot.cpp load/load_play.cpp load/load_report.cpp)
   target_link_libraries(redgem_load_test PRIVATE redgem_net)
   target_include_directories(redgem_load_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME load.short
            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/load/run_load_test.sh $<TARGET_FILE:redgem_server>
                    $<TARGET_FILE:redgem_load_test> ${CMAKE_SOURCE_DIR}/games/platformer --seconds 5 4 8 15)
   set_tests_properties(load.short PROPERTIES LABELS load RUN_SERIAL TRUE)
+
+  # The server load test of the Benchmarks workflow (see load/server_load.cpp, and docs/contributing.md):
+  # K rooms filled by bots while the server's status port is read. Built only when asked for
+  # (cmake --build build --target redgem_server_load), never by the tests.
+  add_executable(redgem_server_load EXCLUDE_FROM_ALL load/server_load.cpp load/status_probe.cpp load/load_bot.cpp
+                 load/load_play.cpp bench/bench_stats.cpp bench/bench_results.cpp)
+  target_link_libraries(redgem_server_load PRIVATE redgem_net)
+  target_include_directories(redgem_server_load PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_options(redgem_server_load PRIVATE -Wall -Wextra)
 endif()
 
 # How long a frame of a field of grass and trees takes to draw (see benchmark/field_benchmark.cpp):
@@ -672,6 +693,31 @@ add_executable(redgem_scripting_benchmark benchmark/scripting_benchmark.cpp)
 target_link_libraries(redgem_scripting_benchmark PRIVATE redgem_runtime)
 target_compile_definitions(redgem_scripting_benchmark PRIVATE
   REDGEM_BENCHMARK_GAME="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/sandbox")
+
+# The engine's benchmarks (see bench/bench_main.cpp, and docs/contributing.md): the hot paths
+# that need no window, timed, for the Benchmarks workflow to hold to bench/thresholds.json. Built
+# only when asked for (cmake --build build --target redgem_bench), never by the tests.
+add_executable(redgem_bench EXCLUDE_FROM_ALL
+  bench/bench_main.cpp
+  bench/bench_case.cpp
+  bench/bench_stats.cpp
+  bench/bench_results.cpp
+  bench/bench_script.cpp
+  bench/bench_physics.cpp
+  bench/bench_scene.cpp
+  bench/bench_network.cpp
+  bench/bench_save.cpp
+  bench/bench_http.cpp)
+target_link_libraries(redgem_bench PRIVATE redgem_runtime)
+target_include_directories(redgem_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(redgem_bench PRIVATE -Wall -Wextra)
+target_compile_definitions(redgem_bench PRIVATE
+  REDGEM_BENCH_SANDBOX="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/sandbox"
+  REDGEM_BENCH_SCENE="${CMAKE_SOURCE_DIR}/games/platformer/scene.glb")
+
+# The threshold checker of the benchmarks (tools/bench/check_thresholds.py) and the committed
+# thresholds it reads.
+add_test(NAME tools.bench_thresholds COMMAND python3 -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_thresholds_test.py)
 
 # The parsers of untrusted input, fuzzed (tests/fuzz): their corpora replayed by every build.
 add_subdirectory(fuzz)
