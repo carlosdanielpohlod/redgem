@@ -668,7 +668,8 @@ drawn at any size. `Camera.world_to_screen` and `Camera.screen_ray` are in units
 
 The player makes everything bigger or smaller with `Settings.ui_scale` (0.5 to 2; the settings
 screen's "Interface size"), which `UI.scale` is multiplied by and which is kept with the other
-settings. The game's menus grow with it as far as the screen has room.
+settings. The game's menus already take the screen's height: they shrink with a smaller one, and
+stay as they are with a larger one, where only the HUD grows.
 
 ### Long texts: word wrap
 
