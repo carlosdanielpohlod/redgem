@@ -381,6 +381,7 @@ redgem_add_library(redgem_runtime
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
   script/bindings/object_state_bindings.cpp
+  script/bindings/shape_key_bindings.cpp
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
@@ -470,6 +471,7 @@ redgem_add_library(redgem_runtime
   render/texel_rows.cpp
   render/instance_records.cpp
   render/instance_batches.cpp
+  render/morph_shapes.cpp
   render/scatter_chunks.cpp
   render/capture_views.cpp
   render/shader_source.cpp

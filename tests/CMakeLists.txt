@@ -110,6 +110,7 @@ add_executable(redgem_tests
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
   unit/instance_records_test.cpp
+  unit/morph_shapes_test.cpp
   unit/scatter_test.cpp
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
@@ -198,6 +199,7 @@ add_executable(redgem_tests
   integration/save_slot_api_test.cpp
   integration/scene_identity_api_test.cpp
   integration/object_state_api_test.cpp
+  integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
@@ -577,6 +579,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/material_pictures_render_test.cpp
+               render_system/morph_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
                render_system/hud_clip_render_test.cpp
