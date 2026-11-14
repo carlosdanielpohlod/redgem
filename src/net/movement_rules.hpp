@@ -21,6 +21,12 @@
 namespace redgem::net {
 
 inline constexpr const char* kMovementSectionKey = "movement_validation";
+// Its keys, which are also what Network.validate_movement and Network.movement_rules call them.
+inline constexpr const char* kMaxSpeedKey = "max_speed";
+inline constexpr const char* kTeleportDistanceKey = "teleport_distance";
+inline constexpr const char* kToleranceKey = "tolerance";
+inline constexpr const char* kKickAfterKey = "kick_after";
+inline constexpr const char* kUndoKey = "undo";
 // What a setting may be: anything else is left at its default, with a warning (also what
 // Network.validate_movement takes).
 inline constexpr float kMostMaxSpeed = 1000.0f;           // meters a second

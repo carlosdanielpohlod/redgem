@@ -9,6 +9,7 @@
 using redgem::Vec3;
 using redgem::net::kCorrectionSeconds;
 using redgem::net::kJitterSeconds;
+using redgem::net::kMaxCheckedObjects;
 using redgem::net::MovementRules;
 using redgem::net::MovementValidator;
 using redgem::net::MovementVerdict;
@@ -31,6 +32,8 @@ constexpr float kNear = 0.001f;
 constexpr int kBunchedPoses = 4;  // arriving at once after a pause as long as they took
 constexpr float kFarAway = 3.0f;  // times the teleport distance
 constexpr float kStallSeconds = 2.0f;
+constexpr int kStaleTicks = static_cast<int>(redgem::net::kStaleTrackSeconds / kTick) + 2;  // past it
+constexpr float kWeeksOfSeconds = 3.0e6f;                                                   // about five weeks
 
 MovementRules rules(float speed, float teleport, int kick_after = 0) {
   MovementRules made;
@@ -162,4 +165,34 @@ TEST_CASE("a stall of the host is not held against the moves that arrive at once
   validator.forgive(kStallSeconds, kStallSeconds);
   validator.advance(kTick);
   CHECK(validator.check(kPeer, kHero, along_x(kMaxSpeed * kStallSeconds)).valid);
+}
+
+TEST_CASE("an object started again on the host starts where its machine next says") {
+  MovementValidator validator = validating(rules(0.0f, kTeleport));
+  validator.check(kPeer, kHero, along_x(0.0f));
+  validator.forget_object(kHero);  // the hero died and was spawned again, under the same key
+  CHECK(validator.check(kPeer, kHero, along_x(kTeleport * kFarAway)).valid);
+  CHECK(validator.violations(kPeer) == 0);
+}
+
+TEST_CASE("inventing objects never makes the host forget one it follows") {
+  MovementValidator validator = validating(rules(0.0f, kTeleport));
+  validator.check(kPeer, kHero, along_x(0.0f));
+  for (std::size_t i = 1; i < kMaxCheckedObjects; ++i) validator.check(kPeer, "decoy-" + std::to_string(i), {});
+  // Full: a new object is not used at all, and the hero is still held to where it was.
+  CHECK(validator.check(kPeer, "one-too-many", {}).ignored);
+  CHECK_FALSE(validator.check(kPeer, kHero, along_x(kTeleport * kFarAway)).valid);
+  // Objects left still for long make room again; the hero, moving all along, is kept.
+  for (int i = 0; i < kStaleTicks; ++i) {
+    validator.advance(kTick);
+    validator.check(kPeer, kHero, along_x(0.0f));
+  }
+  CHECK_FALSE(validator.check(kPeer, "one-more", {}).ignored);
+  CHECK_FALSE(validator.check(kPeer, kHero, along_x(kTeleport * kFarAway)).valid);
+}
+
+TEST_CASE("the host's clock stays precise after weeks of a dedicated server") {
+  MovementValidator validator = validating(rules(kMaxSpeed, 0.0f));
+  validator.advance(kWeeksOfSeconds);
+  CHECK(refused_while_moving(validator, kFairStep, kTicks) == 0);
 }

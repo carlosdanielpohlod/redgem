@@ -24,7 +24,9 @@ void MovementValidator::forgive(float seconds, float most_seconds) {
 }
 
 MovementVerdict MovementValidator::check(int peer, const std::string& key, Vec3 position) {
-  Track& track = track_of({peer, key}, position);
+  const Source source{peer, key};
+  if (!can_track(source)) return {false, position, false, true};
+  Track& track = track_of(source, position);
   refill(track);
   const float moved = length(position - track.accepted);
   if (allowed(track, moved)) return accept(track, position, moved);
@@ -41,10 +43,28 @@ void MovementValidator::forget(int peer) {
   violations_.erase(peer);
 }
 
+void MovementValidator::forget_object(const std::string& key) {
+  for (auto track = tracks_.begin(); track != tracks_.end();) {
+    track = track->first.second == key ? tracks_.erase(track) : std::next(track);
+  }
+}
+
+bool MovementValidator::can_track(const Source& source) {
+  if (tracked_or_room(source)) return true;
+  forget_stale_tracks_of(source.first);
+  return tracked_or_room(source);
+}
+
+void MovementValidator::forget_stale_tracks_of(int peer) {
+  const auto end = first_track_of(peer + 1);
+  for (auto track = tracks_.lower_bound({peer, std::string()}); track != end;) {
+    track = clock_ - track->second.checked_at > kStaleTrackSeconds ? tracks_.erase(track) : std::next(track);
+  }
+}
+
 MovementValidator::Track& MovementValidator::track_of(const Source& source, Vec3 position) {
   const auto found = tracks_.find(source);
   if (found != tracks_.end()) return found->second;
-  if (tracks_of(source.first) >= kMaxCheckedObjects) forget_tracks_of(source.first);
   // An object heard of for the first time is where its machine says: there is nothing to check it against.
   Track fresh;
   fresh.accepted = position;
@@ -60,7 +80,8 @@ std::size_t MovementValidator::tracks_of(int peer) const {
 void MovementValidator::forget_tracks_of(int peer) { tracks_.erase(first_track_of(peer), first_track_of(peer + 1)); }
 
 void MovementValidator::refill(Track& track) {
-  track.budget = std::min(burst(), track.budget + (clock_ - track.checked_at) * allowed_speed());
+  const auto elapsed = static_cast<float>(clock_ - track.checked_at);
+  track.budget = std::min(burst(), track.budget + elapsed * allowed_speed());
   track.checked_at = clock_;
 }
 

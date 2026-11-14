@@ -2,17 +2,16 @@
 
 #include "net/movement_rules.hpp"
 
+#include <sstream>
+
 #include <nlohmann/json.hpp>
 
 namespace redgem::net {
 namespace {
 
-constexpr const char* kMaxSpeedKey = "max_speed";
-constexpr const char* kTeleportDistanceKey = "teleport_distance";
-constexpr const char* kToleranceKey = "tolerance";
-constexpr const char* kKickAfterKey = "kick_after";
-constexpr const char* kUndoKey = "undo";
 constexpr const char* kWarningStart = "game.json: movement_validation.";
+constexpr const char* kNumber = "a number";
+constexpr const char* kWholeNumber = "a whole number";
 
 // The numbers a setting may be, both ends included.
 struct Range {
@@ -30,9 +29,16 @@ bool whole_within(const nlohmann::json& value, Range range) {
   return value.is_number_integer() && within(value, range);
 }
 
-std::string refusal(const char* key, Range range) {
-  return std::string(kWarningStart) + key + " must be a number from " + std::to_string(range.low) + " to " +
-         std::to_string(range.high) + "; the default is used";
+// A bound as a person reads it: 1000 or 0.25, not 1000.000000.
+std::string shown(double bound) {
+  std::ostringstream text;
+  text << bound;
+  return text.str();
+}
+
+std::string refusal(const char* key, const char* kind, Range range) {
+  return std::string(kWarningStart) + key + " must be " + kind + " from " + shown(range.low) + " to " +
+         shown(range.high) + "; the default is used";
 }
 
 // One number of the section: kept when it is in range, refused with a warning otherwise.
@@ -43,7 +49,7 @@ void read_number(const nlohmann::json& section, const char* key, Range range, fl
     value = section[key].get<float>();
     return;
   }
-  warnings.push_back(refusal(key, range));
+  warnings.push_back(refusal(key, kNumber, range));
 }
 
 void read_kick_after(const nlohmann::json& section, MovementRulesReading& reading) {
@@ -53,7 +59,7 @@ void read_kick_after(const nlohmann::json& section, MovementRulesReading& readin
     reading.rules.kick_after = section[kKickAfterKey].get<int>();
     return;
   }
-  reading.warnings.push_back(refusal(kKickAfterKey, range));
+  reading.warnings.push_back(refusal(kKickAfterKey, kWholeNumber, range));
 }
 
 void read_undo(const nlohmann::json& section, MovementRulesReading& reading) {

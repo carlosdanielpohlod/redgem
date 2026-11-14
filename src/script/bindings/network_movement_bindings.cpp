@@ -5,21 +5,18 @@
 #include <mruby.h>
 #include <mruby/hash.h>
 
+#include <string>
+
 #include "net/movement_rules.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/network_bindings.hpp"
+#include "script/script_context.hpp"
 
 namespace redgem {
 namespace {
 
 using namespace binding;
-
-constexpr const char* kMaxSpeedKey = "max_speed";
-constexpr const char* kTeleportDistanceKey = "teleport_distance";
-constexpr const char* kToleranceKey = "tolerance";
-constexpr const char* kKickAfterKey = "kick_after";
-constexpr const char* kUndoKey = "undo";
 
 // A setting a script gave, from 0 to `most`: an ArgumentError naming it otherwise.
 float setting(mrb_state* mrb, mrb_float given, double most, const char* key) {
@@ -34,11 +31,11 @@ mrb_value network_validate_movement(mrb_state* mrb, mrb_value) {
   mrb_bool undo = false;
   mrb_get_args(mrb, "fffib", &speed, &teleport, &tolerance, &kick_after, &undo);
   net::MovementRules rules;
-  rules.max_speed = setting(mrb, speed, net::kMostMaxSpeed, kMaxSpeedKey);
-  rules.teleport_distance = setting(mrb, teleport, net::kMostTeleportDistance, kTeleportDistanceKey);
-  rules.tolerance = setting(mrb, tolerance, net::kMostMovementTolerance, kToleranceKey);
+  rules.max_speed = setting(mrb, speed, net::kMostMaxSpeed, net::kMaxSpeedKey);
+  rules.teleport_distance = setting(mrb, teleport, net::kMostTeleportDistance, net::kTeleportDistanceKey);
+  rules.tolerance = setting(mrb, tolerance, net::kMostMovementTolerance, net::kToleranceKey);
   const mrb_float kicks = static_cast<mrb_float>(kick_after);
-  rules.kick_after = static_cast<int>(setting(mrb, kicks, net::kMostKickAfter, kKickAfterKey));
+  rules.kick_after = static_cast<int>(setting(mrb, kicks, net::kMostKickAfter, net::kKickAfterKey));
   rules.undo = undo;
   network(mrb).validate_movement(rules);
   return mrb_nil_value();
@@ -48,11 +45,11 @@ mrb_value network_validate_movement(mrb_state* mrb, mrb_value) {
 mrb_value network_movement_rules(mrb_state* mrb, mrb_value) {
   const net::MovementRules& rules = network(mrb).movement_rules();
   const mrb_value hash = mrb_hash_new(mrb);
-  set_entry(mrb, hash, kMaxSpeedKey, mrb_float_value(mrb, rules.max_speed));
-  set_entry(mrb, hash, kTeleportDistanceKey, mrb_float_value(mrb, rules.teleport_distance));
-  set_entry(mrb, hash, kToleranceKey, mrb_float_value(mrb, rules.tolerance));
-  set_entry(mrb, hash, kKickAfterKey, mrb_int_value(mrb, rules.kick_after));
-  set_entry(mrb, hash, kUndoKey, mrb_bool_value(rules.undo));
+  set_entry(mrb, hash, net::kMaxSpeedKey, mrb_float_value(mrb, rules.max_speed));
+  set_entry(mrb, hash, net::kTeleportDistanceKey, mrb_float_value(mrb, rules.teleport_distance));
+  set_entry(mrb, hash, net::kToleranceKey, mrb_float_value(mrb, rules.tolerance));
+  set_entry(mrb, hash, net::kKickAfterKey, mrb_int_value(mrb, rules.kick_after));
+  set_entry(mrb, hash, net::kUndoKey, mrb_bool_value(rules.undo));
   return hash;
 }
 
@@ -66,6 +63,18 @@ mrb_value network_movement_violations(mrb_state* mrb, mrb_value) {
   return mrb_int_value(mrb, network(mrb).movement_violations(static_cast<int>(peer)));
 }
 
+// Network.__forget_movement(key): the object that goes by `key` started or stopped here (see
+// NetworkSync): when the host checks its moves, it starts where its machine next says. Nothing
+// where no network runs (a script's object may start anywhere).
+mrb_value network_forget_movement(mrb_state* mrb, mrb_value) {
+  const char* key = nullptr;
+  mrb_int key_size = 0;
+  mrb_get_args(mrb, "s", &key, &key_size);
+  net::NetworkSession* session = context(mrb).network;
+  if (session != nullptr) session->forget_movement_of_object(std::string(key, static_cast<std::size_t>(key_size)));
+  return mrb_nil_value();
+}
+
 }  // namespace
 
 void install_network_movement_bindings(RClass* network_module, mrb_state* mrb) {
@@ -74,6 +83,7 @@ void install_network_movement_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__validate_movement", network_validate_movement, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, network_module, "movement_rules", network_movement_rules, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "movement_violations", network_movement_violations, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, network_module, "__forget_movement", network_forget_movement, MRB_ARGS_REQ(1));
 }
 
 }  // namespace redgem

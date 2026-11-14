@@ -29,9 +29,12 @@ inline constexpr float kJitterSeconds = 0.5f;
 // Seconds after a violation of an object during which its next ones are corrected but not counted:
 // the machine's own poses that were already on their way before the correction reached it.
 inline constexpr float kCorrectionSeconds = 1.0f;
-// The objects of one machine whose movement is followed; past that, that machine's are forgotten
-// and start over (the receiver of poses keeps no more either, see kMaxRememberedPoses).
+// The objects of one machine whose movement is followed. Past that, the ones it has not moved for
+// kStaleTrackSeconds are forgotten; when none are, its new objects' poses are not used at all (an
+// object followed already is never forgotten for a new one: that would let a machine start its
+// hero over anywhere by inventing objects).
 inline constexpr std::size_t kMaxCheckedObjects = 4096;
+inline constexpr double kStaleTrackSeconds = 10.0;
 
 // What the host holds the moves of the others' objects to. A limit of 0 checks nothing of that kind.
 struct MovementRules {
@@ -49,7 +52,8 @@ struct MovementRules {
 struct MovementVerdict {
   bool valid = true;
   Vec3 position;
-  bool kick = false;  // the machine went past kick_after with this violation: it is let go
+  bool kick = false;     // the machine went past kick_after with this violation: it is let go
+  bool ignored = false;  // a new object of a machine with as many followed as there may be: unused
 };
 
 class MovementValidator {
@@ -59,7 +63,7 @@ class MovementValidator {
   const MovementRules& rules() const { return rules_; }
   bool enabled() const { return rules_.enabled(); }
   // Time passing on the host.
-  void advance(float seconds) { clock_ += seconds; }
+  void advance(float seconds) { clock_ += static_cast<double>(seconds); }
   // The host stood still for `seconds` (a level loading): what the others moved meanwhile, arriving
   // at once, is not held against them (up to `most_seconds` of it).
   void forgive(float seconds, float most_seconds);
@@ -69,22 +73,31 @@ class MovementValidator {
   int violations(int peer) const;
   // Machine `peer` left.
   void forget(int peer);
+  // The object that goes by `key` is new on the host (its NetworkSync started, or it is gone): it
+  // starts where its machine next says, whichever machine that is.
+  void forget_object(const std::string& key);
   // Everything followed, and every count, starts over (the rules stay).
   void clear();
 
  private:
   struct Track {
-    Vec3 accepted;                                            // where the object was last believed to be
-    float budget = 0.0f;                                      // meters it may still move now
-    float forgiven = 0.0f;                                    // ... and on top, what the host's stalls earned it
-    float checked_at = 0.0f;                                  // on the host's clock
-    float counted_at = std::numeric_limits<float>::lowest();  // its last violation counted
+    Vec3 accepted;                                              // where the object was last believed to be
+    float budget = 0.0f;                                        // meters it may still move now
+    float forgiven = 0.0f;                                      // ... and on top, what the host's stalls earned it
+    double checked_at = 0.0;                                    // on the host's clock
+    double counted_at = std::numeric_limits<double>::lowest();  // its last violation counted
   };
   using Source = std::pair<int, std::string>;  // a machine's id, and its object's key
 
   Track& track_of(const Source& source, Vec3 position);
+  // Whether the object is followed, or there is room to follow it (once the stale ones go).
+  bool can_track(const Source& source);
+  bool tracked_or_room(const Source& source) const {
+    return tracks_.count(source) != 0 || tracks_of(source.first) < kMaxCheckedObjects;
+  }
   std::size_t tracks_of(int peer) const;
   void forget_tracks_of(int peer);
+  void forget_stale_tracks_of(int peer);
   // Where the objects of `peer` start among those followed (the sources are in order of machine).
   std::map<Source, Track>::const_iterator first_track_of(int peer) const {
     return tracks_.lower_bound({peer, std::string()});
@@ -109,7 +122,8 @@ class MovementValidator {
   MovementRules rules_;
   std::map<Source, Track> tracks_;
   std::map<int, int> violations_;
-  float clock_ = 0.0f;
+  // Seconds on the host, as precise after weeks of a dedicated server as at its start.
+  double clock_ = 0.0;
 };
 
 }  // namespace redgem::net

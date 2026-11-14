@@ -3,6 +3,7 @@
 
 #include "net/network_session.hpp"
 
+#include <iterator>
 #include <utility>
 
 namespace redgem::net {
@@ -78,8 +79,9 @@ void NetworkSession::hear_pose(int from, const std::vector<std::uint8_t>& pose, 
 }
 
 void NetworkSession::validate_movement(const MovementRules& rules) {
+  // (What the others place where the host believed it stays so until its machine sends it whole:
+  // turned off, the host still passes its poses on whole until then.)
   movement_.configure(rules);
-  diverged_.clear();
 }
 
 void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events) {
@@ -91,6 +93,7 @@ void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed
     return;
   }
   const MovementVerdict verdict = movement_.check(link.peer, update->key, claimed->position);
+  if (verdict.ignored) return;  // more objects than are followed: nobody hears of it
   const Pose shown{verdict.position, claimed->rotation};
   relay_pose(link.peer, *update, shown, passed, verdict.valid);
   events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(*update, shown)));
@@ -105,7 +108,7 @@ void NetworkSession::relay_pose(int from, const PoseUpdate& update, const Pose& 
     queue_for_everyone_but(from, passed);
     return;
   }
-  if (diverged_.size() < kMaxDivergedObjects) diverged_.insert(source);
+  if (diverged_of(from) < kMaxDivergedObjects) diverged_.insert(source);
   queue_for_everyone_but(from, pose_message(encoded(whole_pose(update, shown)), from));
 }
 
@@ -117,12 +120,18 @@ bool NetworkSession::passes_as_sent(const std::pair<int, std::string>& source, c
 void NetworkSession::correct(Link& link, const std::string& key, Vec3 position, bool kick) {
   link.connection.send(
       game_message(kCorrectionMessageName, nlohmann::json::array({key, numbers_of(position)}), kHostId, link.peer));
-  if (kick) link.connection.close();  // past the game's kick_after: let go
+  if (!kick) return;
+  link.connection.flush();  // (a last try: told where its object is, then let go past kick_after)
+  link.connection.close();
 }
 
 void NetworkSession::forget_movement_of(int peer) {
   movement_.forget(peer);
-  diverged_.erase(diverged_.lower_bound({peer, std::string()}), diverged_.lower_bound({peer + 1, std::string()}));
+  diverged_.erase(first_diverged_of(peer), first_diverged_of(peer + 1));
+}
+
+std::size_t NetworkSession::diverged_of(int peer) const {
+  return static_cast<std::size_t>(std::distance(first_diverged_of(peer), first_diverged_of(peer + 1)));
 }
 
 }  // namespace redgem::net

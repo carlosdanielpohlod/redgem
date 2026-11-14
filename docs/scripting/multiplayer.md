@@ -318,8 +318,10 @@ object: a longer one is never believed. `tolerance` is the share of the limits a
 and still be believed, and half a second of movement at the top speed may arrive at once, so the
 network's jitter is never a violation. The poses that were already on their way when a correction
 went out count once. Set the limits above anything the game does on purpose (a dash, a launch pad):
-to move an object further, its owner's game can spawn it again, or the host can move it (the host's
-own objects are never checked). In a room on a relay the relay passes poses on and checks nothing.
+to move an object further, spawn it again (an object whose NetworkSync starts on the host starts
+where its owner next says), or let the host move it (the host's own objects are never checked).
+A machine's objects past 4096 that it has not moved for ten seconds are forgotten; while none are,
+the poses of its new ones are not used. In a room on a relay the relay passes poses on and checks nothing.
 
 ## Deciding things once
 
