@@ -229,7 +229,7 @@ bool SceneDocument::sync_for_writing(std::string& error) {
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
-  sync_buffer();  // (a terrain given vertices of its own made the binary chunk longer)
+  sync_buffer();  // terrain edits can append new vertex data
   return true;
 }
 
@@ -240,7 +240,7 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
   // document: undo and redo can bring back what used them, numbered as they were.
   std::optional<GlbFile> lean = compacted(glb_);
   GlbFile& written = lean ? *lean : glb_;
-  material_textures::forget_unused_webp(written.json);
+  material_textures::forget_unused_texture_extensions(written.json);
   if (!write_glb(path, written, error)) return false;
   report_save(path, written.bin.size());
   unsaved_meshes_.clear();
@@ -262,7 +262,7 @@ std::optional<GlbFile> SceneDocument::recovery_copy(std::string& error) {
   if (!sync_for_writing(error)) return std::nullopt;
   auto lean = lean_recovery(glb_, error);
   if (!lean) return std::nullopt;
-  material_textures::forget_unused_webp(lean->json);
+  material_textures::forget_unused_texture_extensions(lean->json);
   return lean;
 }
 

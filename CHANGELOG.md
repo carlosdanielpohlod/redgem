@@ -19,6 +19,90 @@ until 1.0, a release may change what games rely on (see
   `on_blur(actor)`, and the game `Interaction.on(:interact) { |actor, target| }`. Over the network
   a client's use is asked of the host, which checks range and line of sight again and runs it there.
   See the manual's Interaction page.
+- **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
+  model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
+  or folder has every word, best match first (a name that is the word, then one that starts with
+  it, holds it, a subfolder tag of that name, and the rest of the path); `redgem templates
+  [words]` does the same for the templates new games start from. MCP has both as the read-only
+  tools `asset_search` and `template_search`.
+- **Scene diff against Git**: `redgem scene diff <game> --against <revision>` (or `--revision`;
+  `HEAD`, `HEAD~1`, `main`, a commit hash) compares the scene with the one that commit saved,
+  read through `git show`; MCP's `scene_diff` takes the same as `revision`, and a connected editor compares
+  its open, unsaved document with it. A missing revision, or a game in no Git repository, is an
+  error that says so.
+- **Reconnecting after a drop**: `Network.reconnect_window = seconds` on the machine hosting
+  (directly, or a dedicated server's room) holds the place and id of a player whose connection
+  drops. That player stays in the game (`Network.reconnecting?`) and calls back every second with
+  a secret token from its welcome, single use, getting the same id back; a token that holds no
+  place, an old one, or one past the window is turned away. New events: `on_reconnecting`,
+  `on_reconnected` (on the host and on the machine that dropped) and `on_lost` (it could not get
+  back in time). The others hear the player left only once the window is over, and on its return
+  the host shows it the spawned objects as they are now. A player who leaves, and a host that
+  leaves, now say goodbye, so no place is held for them. Not in rooms on a relay, and there is
+  no host migration (see KNOWN_LIMITATIONS.md).
+- **A second key or button per action on the controls page**: each row of the menu's controls
+  page has two cells of keys and two of gamepad buttons, so a player binds W and Up both to
+  "Move up". A key caught for the second cell is added beside the first, one caught for the first
+  keeps the second in its place, Delete, Backspace or a gamepad's Y clears the focused cell, and a
+  key the row already has changes nothing. Both are kept for the next runs.
+- **`Input.rumble(pad, strength, seconds)` and `Input.rumble?`**: a hook for gamepad vibration
+  that does nothing yet (raylib 5.5 has none on desktops or Android) and says so: `rumble?` is
+  false and `rumble` returns false, checking its arguments all the same.
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
+- **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
+  (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
+  format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
+  ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
+  file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
+  encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
+
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
+  displace and drags as they move, so bodies bob, settle and flat ones right themselves. The new
+  `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep a body
+  floats; denser than water's 1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, fading in as the camera goes under the waves so crossing the surface
+  never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
+- **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
+  scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
+  scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
+  game keeps the default for it. Spawning past the limit still logs one error.
+- **Movement validation**, an anti-cheat on the host and on a dedicated server's rooms: the poses
+  of the others' objects (NetworkSync) are checked against a top speed and a teleport distance per
+  pose, with a tolerance and a short burst that absorb jitter. A move past them is cut down to what
+  was allowed (or undone with `undo: true`), everyone sees the object where the host believes it
+  is, its owner is told and puts it back (`Network::CORRECT`), and the violation counts against its
+  machine, let go after `kick_after` of them. Off by default; turned on by game.json's
+  `"movement_validation"` section or `Network.validate_movement`, with `Network.movement_rules`
+  and `Network.movement_violations(peer)`.
 - **STUN on the relay, and the first pieces of NAT traversal**: `redgem-relay` answers STUN
   Binding requests (RFC 8489, IPv4) on its own port number over UDP, so a machine can learn the
   public address and port its router gives it from the relay it already uses, with no third
@@ -299,6 +383,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries opening a window loads now stay
+  loaded until the program ends. A system test opens, draws in and closes 300 windows in one
+  process.
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).

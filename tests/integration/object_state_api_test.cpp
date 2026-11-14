@@ -21,7 +21,7 @@ SceneDesc parent_and_body() {
 }  // namespace
 
 TEST_CASE("object checkpoints survive Save and restore a pose and appearance after restart") {
-  const TempGame game(kShooterGame);
+  const TempGame game(shooter_game_saving_slowly());
   const auto desc = checkpoint_scene({node("Hero", {0, 10, 0}, {1, 1, 1}, moving("dynamic"))});
   {
     auto engine = engine_for(game, desc);

@@ -175,6 +175,20 @@ Export the coat with the material in glTF. A zero coat weight preserves the orig
 The editor keeps its factors, texture references and normal scale through import and saving.
 The layering follows the [glTF clearcoat extension](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat).
 
+### Compressed textures (KTX2)
+
+A texture may carry a KTX2 picture of Basis Universal data through `KHR_texture_basisu` (ETC1S
+or UASTC, the two kinds the extension allows; UASTC files may be Zstandard-compressed). The
+engine prefers it over the texture's plain picture (and over a WebP one), and transcodes it when
+the scene loads into what the graphics card takes: BC1 or BC3 (by whether the picture has alpha)
+on cards with S3TC, which desktop cards have; ASTC 4x4, or else ETC1/ETC2, on OpenGL ES (phones);
+plain RGBA8 on a card with none of them. A compressed texture takes a quarter to an eighth of the
+memory of an RGBA8 one, and is drawn from the mipmaps the file brought, so make them when you
+compress it (`basisu -ktx2 -mipmap picture.png`, or `toktx --t2 --encode uastc --genmipmap`). A
+KTX2 picture without mipmaps, or on a card that takes none of the formats, goes up as RGBA8 with
+mipmaps the card makes, as any PNG does. Its pixels are read as they are (no color conversion
+from the file's transfer function), and HDR Basis data is not read.
+
 ## Grass, forests and cities
 
 Tens of thousands of copies (a meadow's grass, a forest) are too many to be objects: a script
@@ -257,6 +271,10 @@ comes selected with the brush on: mountains, holes and plateaus are a drag of th
 *Radius* is the size of the brush in meters, *Strength* how fast it works. Each stroke is one
 undo step. Untick Sculpt to select and move objects again.
 
+Turn on **Paint** in the Terrain card, choose **Paint color**, and drag over the ground to tint
+it. White restores the material's original color. Each stroke is an undo step, and the tint saves
+with the scene as vertex colors. Brush detail follows the terrain grid.
+
 The terrain's collider follows its shape, so characters walk and things roll on the hills you
 make. Its color and roughness are in the Mesh card, like any object's. A terrain is made and
 shaped in the editor; one re-exported from Blender is an ordinary mesh.
@@ -282,6 +300,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `collider` | `box`, `sphere`, `capsule`, `mesh`             | Shape, sized from the mesh bounds × object scale. `collider` alone = static body |
 | `trigger`  | `true`                                         | Trigger volume: fires `on_trigger_enter/exit`, does not collide |
 | `mass`     | number                                         | Mass of dynamic bodies (and of kinematic ones, should a script make them dynamic) |
+| `density`  | number, kg/m³ (default 500)                    | How a dynamic body or vehicle floats in water (1000): less floats, more sinks (see "Water surfaces") |
 | `layer`    | a layer of `game.json`, e.g. `"enemy"`         | Collision layer of the body or trigger: what it meets (see "Collision layers" in the gameplay recipes). Without it, `default` |
 | `tag`      | string                                         | Used by `Scene.find_all(tag)` and `game_object.tag?` |
 | `visible`  | `false`                                        | Hide the mesh (the object still exists) |
@@ -350,7 +369,7 @@ most 16 impulses for three seconds; drawing never advances their ages. Pausing s
 them, and recording uses the same simulation steps. They reset when the world changes. Temporal
 motion uses the last snapshot actually drawn; a newly observed impulse starts with its current
 age in both poses to avoid an invented first-frame velocity. These ripples are a visual response:
-they do not apply buoyancy or forces to physics bodies and are not network-synchronized.
+they do not push physics bodies (buoyancy does, see "Floating") and are not network-synchronized.
 
 Contact detection uses the actual water triangles with a cached spatial tree. It supports rigid,
 horizontal planar mesh primitives; skinned or tilted surfaces and Scatter copies do not generate
@@ -396,8 +415,28 @@ bottom's local tangent plane may estimate its absorption distance; this remains 
 for hidden or curved geometry.
 Absorption filters the transmitted picture, but does not yet attenuate lighting on its way to submerged
 objects; a lit bottom can therefore be brighter than in a full participating-medium render.
-There is no underwater camera mode, buoyancy, fluid simulation, or wave collision. Use ordinary
-scene meshes for water surfaces rather than Scatter copies.
+There is no fluid simulation or wave collision. Use ordinary scene meshes for water surfaces
+rather than Scatter copies.
+
+**Floating.** Each water surface fills the world column under its footprint, down to whatever
+ground is there (or to the next surface below: a pool on a roof does not flood the lake under it).
+Dynamic bodies and vehicles in it are held up with no script: their collider's box is sampled as a
+2 × 2 grid of columns running along its axis that points most nearly up, and each column is pushed
+up by the weight of the water it displaces (Archimedes) at the middle of its wet part. A tipped
+body's lower side is deeper and pushed harder, so a flat one rights itself, and one half over a
+shore tips toward the dry side. Water also drags on each column as it moves (more vertically than
+horizontally), which settles bobbing in a few seconds. The object's `density` custom property
+(kilograms per cubic meter, 500 unless said) sets how deep it floats: the share of its height under
+water is its density over water's 1000; denser bodies sink. Buoyancy follows the calm surface, not
+the waves, and leaves sleeping bodies alone. Kinematic bodies, triggers and characters are not
+pushed.
+
+**Under the surface.** When the camera is below the water its picture fades with distance into
+the water's own color (what its absorption leaves of the light) and wobbles slightly. The look
+fades in from 5 cm above the calm surface to as deep as the waves are tall, so crossing it never
+flickers and a camera above the calm surface stays clear.
+The editor's scene camera does not get it. Scripts ask where the water is with `Water.height_at`,
+`Water.depth_at` and `Water.under?`.
 
 The [optical comparison](water-validation.md) records a fixed-camera Cycles reference and
 the remaining differences around refraction and incident lighting.

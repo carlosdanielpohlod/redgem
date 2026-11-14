@@ -19,6 +19,9 @@ struct ImageSize {
   std::uint32_t height = 0;
 };
 
+// Whether a picture of this size may be decoded: at least a pixel, at most kMaxImageSide a side.
+bool within_image_limits(ImageSize size);
+
 enum class EncodedImageFormat { Png, Jpeg, Webp };
 
 // A borrowed image whose encoded length, static format and dimensions were checked once.

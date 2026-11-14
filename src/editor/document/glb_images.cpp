@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "core/image_header.hpp"
+#include "core/ktx2_header.hpp"
 #include "core/safe_path.hpp"
 #include "editor/document/glb_geometry.hpp"
 #include "editor/document/gltf_json.hpp"
@@ -55,6 +56,7 @@ void embed_linked_image(GlbFile& glb, nlohmann::json& image, const std::filesyst
 }  // namespace
 
 std::string mime_type_of(const std::vector<std::uint8_t>& bytes) {
+  if (starts_as_ktx2(bytes.data(), bytes.size())) return kKtx2Mime;
   const std::optional<EncodedImage> image = EncodedImage::read(bytes.data(), bytes.size());
   if (!image) return {};
   if (image->format() == EncodedImageFormat::Png) return kPngMime;

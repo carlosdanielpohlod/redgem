@@ -2,7 +2,9 @@
 
 #include <mruby.h>
 #include <mruby/array.h>
+#include <mruby/error.h>
 
+#include <exception>
 #include <optional>
 
 #include "script/bindings/binding_helpers.hpp"
@@ -90,6 +92,49 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   return object_or_nil(mrb, spawned(mrb, request));
 }
 
+ObjectId spawned_prefab(mrb_state* mrb, const std::string& file, const SpawnRequest& request, std::string& failure) {
+  try {
+    const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+    return context(mrb).spawn_prefab(file, request);
+  } catch (const std::exception& error) {
+    failure = error.what();
+    return kNoObject;
+  }
+}
+
+SpawnRequest prefab_spawn_request(mrb_state* mrb, mrb_value position, mrb_value rotation, mrb_bool physics,
+                                  mrb_value name, mrb_value parent) {
+  SpawnRequest request;
+  Transform world;
+  if (!mrb_nil_p(position)) world.position = to_vec3(mrb, position);
+  if (!mrb_nil_p(rotation)) world.rotation = quat_from_euler_degrees(to_vec3(mrb, rotation));
+  request.world = world;
+  request.physics = physics;
+  request.name = spawn_name(mrb, name);
+  request.parent = spawn_parent(mrb, parent);
+  return request;
+}
+
+mrb_value prefab_spawn_result(mrb_state* mrb, mrb_value file, const SpawnRequest& request, bool& failed) {
+  std::string failure;
+  const ObjectId id = spawned_prefab(mrb, to_name(mrb, file), request, failure);
+  if (id != kNoObject) return object_or_nil(mrb, id);
+  failed = true;
+  return mrb_exc_new(mrb, E_ARGUMENT_ERROR, failure.data(), failure.size());
+}
+
+mrb_value scene_spawn_prefab(mrb_state* mrb, mrb_value) {
+  mrb_value file, position, rotation, name, parent;
+  mrb_bool physics = true;
+  mrb_get_args(mrb, "oooboo", &file, &position, &rotation, &physics, &name, &parent);
+  if (!context(mrb).spawn_prefab) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn_prefab only works while the game runs");
+  bool failed = false;
+  const mrb_value result =
+      prefab_spawn_result(mrb, file, prefab_spawn_request(mrb, position, rotation, physics, name, parent), failed);
+  if (failed) mrb_exc_raise(mrb, result);
+  return result;
+}
+
 }  // namespace
 
 void install_scene_bindings(mrb_state* mrb) {
@@ -99,6 +144,7 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_REQ(kSpawnArguments));
+  mrb_define_module_function(mrb, scene_module, "__spawn_prefab", scene_spawn_prefab, MRB_ARGS_REQ(kSpawnArguments));
 }
 
 }  // namespace redgem

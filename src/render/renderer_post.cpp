@@ -88,6 +88,7 @@ void Renderer::Impl::tone_map(const Environment& env) {
   send(composite_shader, shaders::kOcclusionAmount, env.ambient_occlusion);
   SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kOcclusionTexture),
                         occlusion_a.texture);
+  send_underwater();
   draw_full(lit_picture(), hdr.texture.width, hdr.texture.height);
   EndShaderMode();
   EndTextureMode();
@@ -104,6 +105,17 @@ void Renderer::Impl::send_grade(const Environment& env) {
                                                  {shaders::kMotionBlur, motion_blur},
                                                  {shaders::kGradeTime, now()}};
   for (const auto& [name, value] : grade) send(composite_shader, name, value);
+}
+
+// The underwater look's values: none of it above the water.
+void Renderer::Impl::send_underwater() {
+  const float amount = underwater_amount(underwater);
+  send(composite_shader, shaders::kUnderwater, amount);
+  if (amount <= 0.0f) return;
+  send(composite_shader, shaders::kUnderwaterAbsorption, render_math::to_raylib(underwater.absorption));
+  send(composite_shader, shaders::kNearPlane, static_cast<float>(rlGetCullDistanceNear()));
+  send(composite_shader, shaders::kFarPlane, static_cast<float>(rlGetCullDistanceFar()));
+  SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kDepthTexture), hdr.depth);
 }
 
 // Smooths the edges of the tone mapped picture into `output` (the screen when null); smoothed with
