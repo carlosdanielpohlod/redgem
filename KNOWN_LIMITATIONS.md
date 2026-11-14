@@ -35,6 +35,19 @@ the same pull request.
 
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
+- Animation events and root motion come from a character's own clips only: the scene's clips
+  (`Animation`) fire no events and move nothing, and a graph received from another machine fires
+  no events there. In a blend only the clip with the most weight fires events; a clip a
+  character fades from is silent. At most eight laps of a clip fire per frame.
+- Authored markers are read from one string custom property of the action (`redgem_events`):
+  Blender's timeline and pose markers are not exported by its glTF exporter.
+- Root motion takes the horizontal travel and the yaw of each clip's highest moving node; its
+  vertical motion stays in the pose (a jump lifts the mesh, not the character). A clip mixed
+  over a character (`mix`) adds none, a clip that moves the character's own object has none, and
+  a character controller follows it one frame late. Dynamic rigid bodies and vehicles are moved by
+  the physics only: root motion leaves them alone. Root motion is not sent over the network:
+  `NetworkSync` sends where the owner's character went, and on the other machines a character
+  following a graph received from the owner is not pinned (its root moves in the pose).
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -147,7 +160,7 @@ the same pull request.
   no longer restores.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
-- Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
+- Limits a game can reach: 65,536 physics bodies a scene (`max_bodies`), 64 hits per physics query, 4096 live particles and 256 emitters, 4096
   `Debug` shapes and 256 `Debug` labels a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
   opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
@@ -283,7 +296,7 @@ not a promise of how it will be closed.
 ### Gameplay API
 
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
-- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
+- Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
   cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
@@ -293,10 +306,11 @@ not a promise of how it will be closed.
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
-- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
-  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
-  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
-  longer needs.
+- A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
+  (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
+  that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
+  first happens. A game that keeps spawning (bullets, debris) has to destroy what it no longer
+  needs.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
@@ -510,9 +524,16 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   Slash commands and session modes are not offered, and answers are not selectable as text (code
   blocks have a Copy button). Past conversations are reopened through the agent (`session/load`): an
   agent that cannot do that starts anew, and a conversation the agent no longer keeps is gone.
-- An opt-in Ruby eval in a running game (localhost and a token, a timeout, compiled out of
-  release builds). `game_run` expressions cover headless runs; `game_query` covers inspection
-  and physics queries.
+- The opt-in Ruby eval (`game_eval`, [docs/mcp.md](docs/mcp.md#ruby-eval-in-the-playing-game))
+  runs in the game an editor plays, only: not in a game played with `--play`, a built game or a
+  dedicated server. It needs an editor started with `--ruby-eval` and its token, which the editor
+  prints to its terminal (the Agent panel's agent is not handed it). It is in development builds
+  only; the downloads are release builds, so they do not have it. The game waits while a snippet
+  runs: a snippet has 0.4 seconds of Ruby (less when the game's script budget is shorter), and the
+  engine's own work inside it, such as spawning, is not counted up to four times that. An answer is
+  cut at 8 KiB, as any tool's text.
+  Classes a snippet defines or reopens are tracked by hot reload as coming from `(game_eval)`, so
+  hot reloading their script files may not go cleanly afterwards: stop and play again.
 - MCP adds one object per `scene_edit` call; a row of copies takes one call each.
 - Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
   and pass back than the numeric ids of older objects.
