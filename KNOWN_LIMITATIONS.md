@@ -83,8 +83,19 @@ the same pull request.
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
-  be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
-  ordinary pixels; it does not provide GPU texture compression.
+  be Radiance `.hdr`). Animated WebP is not read. WebP is decoded on the CPU and uploaded as
+  ordinary pixels. Scene textures may also be KTX2 (Basis Universal ETC1S or UASTC, through
+  `KHR_texture_basisu`): they stay compressed on the card (BC1/BC3, ASTC 4x4 or ETC1/ETC2) only
+  when the file carries its mipmaps; one without goes up as RGBA8. BC7 is not used (the
+  higher-quality desktop target for UASTC: BC3 is used instead), nor are HDR Basis data, KTX2
+  arrays and cube maps, or KTX2 files that hold other formats than Basis data. KTX2 is
+  transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
+  textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
+  pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too. The
+  scene memory budget counts a KTX2 picture at its RGBA8 size even when it goes up compressed
+  (4 to 8 times smaller). The KTX2 transcoder is opened once per KTX2 texture as the scene is
+  read (to fall back when it refuses the data), and again when it is uploaded.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and
@@ -136,8 +147,9 @@ the same pull request.
   `Proxy-Authorization` are dropped: other headers a game sets (an `X-Api-Key`) go along. Pass
   `redirects: false` to see the redirect and decide.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
-  for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
-  thread ends on its own).
+  for can outlast its timeout by that long. A game that ends gives its requests up, hangs up
+  their connections and joins their threads, 2 seconds at most: a request still looking its name
+  up then is left behind, its thread ending on its own once the lookup does.
 - On Windows the certificates come from the system's ROOT store, which Windows fills on demand:
   an authority no program on the machine has used yet may be missing. Not tried on a real Windows
   machine, nor on a real Android device (whose system certificates the engine reads).
@@ -301,6 +313,19 @@ not a promise of how it will be closed.
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
+- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
+  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
+  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
+  longer needs.
+- `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
+  migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
+  no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
+  timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
+  hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
+- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
+  migrate it one after another. A room writing a key of that slot at the moment another room
+  writes the migrated values can make that migration fail as busy: the slot is then refused for
+  the migrating room's run, and migrated on its next first use.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
@@ -399,8 +424,8 @@ not a promise of how it will be closed.
 ### Engineering
 
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
-- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
-  most on phones.
+- Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
+  Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
   that open no window, not the system tests; the coverage report is of those tests too, and no
   share of it is required. The load test and the benchmarks print numbers but fail on none.
@@ -418,8 +443,12 @@ not a promise of how it will be closed.
   is updating waits for it at most 250 ms, whether or not the two rooms wait for each other, and
   then raises an error instead of writing. `Save.clear` takes no key's lock: an update whose block
   runs while another room clears the save writes its key back afterwards.
-- The threads of web requests are detached: one still running at exit may outlive the program's
-  static objects.
+- A web request still busy 2 seconds after its game ended is left behind: one looking its
+  server's name up (the system's lookup cannot be interrupted), or, on a slow device, loading the
+  system's certificates or decompressing a large answer. If the program exits meanwhile, its
+  thread may outlive the program's static objects. Ending the game waits those 2 seconds then,
+  which on a dedicated server holds up the other rooms of its thread. Every request that is
+  waiting on the network ends at once.
 - Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
   shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
   reflections march up to 32 steps, and the shore foam's distance is computed for every water
