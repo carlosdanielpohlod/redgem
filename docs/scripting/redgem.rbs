@@ -824,7 +824,7 @@ class UI::Focus
   # a focus on the first widget
   def initialize: () -> void
   # moves it among count widgets, as up or down was pressed this frame
-  def update: (Integer count) -> void
+  def update: (Integer count, ?pad: Integer) -> void
   # whether the widget of that index has it: pass it as focused:
   def at?: (Integer index) -> bool
   # puts it on a widget (one clicked, or the one a screen comes back to)

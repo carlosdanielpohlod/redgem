@@ -574,7 +574,7 @@ A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left
 Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. See [gameplay.md](gameplay.md).
 
 - `UI::Focus.new -> UI::Focus`: a focus on the first widget
-- `update(Integer count) -> void`: moves it among count widgets, as up or down was pressed this frame
+- `update(Integer count, pad: Integer = 0) -> void`: moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
 - `at?(Integer index) -> bool`: whether the widget of that index has it: pass it as focused:
 - `move_to(Integer index) -> void`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index -> Integer`: the widget that has it
