@@ -279,6 +279,8 @@ add_library(basisu_transcoder STATIC
   ${basis_universal_SOURCE_DIR}/zstd/zstddeclib.c)
 target_include_directories(basisu_transcoder SYSTEM PUBLIC ${basis_universal_SOURCE_DIR}/transcoder)
 target_compile_definitions(basisu_transcoder PUBLIC BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1)
+# UASTC reads at arbitrary byte offsets. Use Basis's bytewise path with every compiler.
+target_compile_definitions(basisu_transcoder PRIVATE BASISD_USE_UNALIGNED_WORD_READS=0)
 # Its headers call std::terminate without including <exception>, which some standard libraries
 # (the Windows toolchain's) do not bring in through others. Its own sources get it here; the one
 # engine file that includes them (core/ktx2_image.cpp) includes <exception> first.
