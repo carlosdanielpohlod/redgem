@@ -52,11 +52,20 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`NetworkSync`](#networksync) | A behaviour: the same object in the same place on every machine. |
 | [`Interactable`](#interactable) | A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor). |
 | [`Interactor`](#interactor) | A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. |
+| [`Dialogue`](#dialogue) | Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host. |
+| [`Dialogue::Conversation`](#dialogueconversation) | One player's way through a dialogue: the line it is at, the choices offered, and how it goes on. |
+| [`Dialogue::Conversation::Choice`](#dialogueconversationchoice) | An answer the player may give. |
+| [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. |
+| [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. |
+| [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
 | [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
 | [`Perception::Noise`](#perceptionnoise) | A noise someone heard (on_hear). |
 | [`Brain`](#brain) | A behaviour: an NPC's state machine, with states, transitions, guards, timers and events. |
+| [`GameClock`](#gameclock) | The time of day in the game's world, on game time: what schedules follow. |
+| [`Schedule`](#schedule) | A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). |
+| [`HeadLook`](#headlook) | A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target. |
 
 ## Behaviour
 
@@ -76,6 +85,7 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_see(GameObject object) -> void`: a Perception on the object saw something come into sight
 - `on_lose_sight(GameObject object) -> void`: ... and saw it go out of sight
 - `on_hear(Perception::Noise noise) -> void`: a Perception on the object heard a noise
+- `on_schedule(Symbol activity) -> void`: a Schedule on the object came to the hour of another activity
 - `Behaviour.persist(*Symbol | String fields) -> Array[Symbol]`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
 - `Behaviour.persisted_fields -> Array[Symbol]`: what persist named, in this class and those above it
 - `game_object -> GameObject`: the object this behaviour is attached to
@@ -479,6 +489,12 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `off(Integer listener) -> nil`: stops calling a block that on or on_marker returned
 - `root_motion = bool on`: whether all its clips move the object by their root's horizontal motion and turning
 - `root_motion? -> bool`: whether all its clips move the object
+- `look_at(Vector3 | GameObject target, bone: String | Symbol | GameObject = "Head", max_angle: Numeric = 60.0) -> void`: turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
+- `look_away(bone: String | Symbol | GameObject = "Head") -> void`: the bone goes back to its clips' pose, easing out
+- `looking?(bone: String | Symbol | GameObject = "Head") -> bool`: whether a bone is turned toward something, or on its way back
+- `bone(String | Symbol name) -> GameObject | nil`: the object under the character with that name (or that name after a rig's prefix:), or nil
+- `bone!(String | Symbol name) -> GameObject`: bone that raises when the character has none of that name
+- `Animator.bone_named?(String part, String name) -> bool`: whether a part's name is that bone's: the name, or the name after a prefix:
 
 ## Animation::Graph
 
@@ -890,6 +906,76 @@ A behaviour on the player's hero: picks the best Interactable in reach, shows it
 - `pad -> Integer`: the player whose :interact it reads (0 unless said)
 - `prompt_label(Interactable target) -> String`: what the prompt says for a target: "[E] Open"
 
+## Dialogue
+
+Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host. See [dialogue.md](dialogue.md).
+
+- `Dialogue.start(String | Symbol | Dialogue::Script name, actor: GameObject, speaker: GameObject | nil = nil) -> Dialogue::Conversation | bool`: starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client
+- `Dialogue.current -> Dialogue::Conversation | nil`: the conversation this machine's player is in, or nil
+- `Dialogue.busy? -> bool`: whether this machine's player is in a conversation, or left one this frame
+- `Dialogue.stop -> bool | nil`: ends the conversation this machine's player is in
+- `Dialogue.on(Symbol event) { (untyped, untyped, untyped) -> void } -> void`: :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
+- `Dialogue.load(String | Symbol name) -> Dialogue::Script`: the dialogue of that name, read from its file once (raises for one that is not there or not well made)
+- `Dialogue.quests -> untyped`: what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+- `Dialogue.quests = untyped quests`: what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
+
+## Dialogue::Conversation
+
+One player's way through a dialogue: the line it is at, the choices offered, and how it goes on. See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
+
+- `text -> String | nil`: the line, in the language in use (nil once it is over)
+- `text_key -> String | nil`: the I18n key of the line
+- `speaker_name -> String | nil`: who says it, in the language in use (nil when the node names nobody)
+- `speaker_key -> String | nil`: the I18n key of who says it, or nil
+- `voice -> String | nil`: the sound the line names, or nil (kept for later: nothing plays it yet)
+- `choices -> Array[Dialogue::Conversation::Choice]`: the choices offered now: those whose conditions hold
+- `choosing? -> bool`: whether the player answers this line by choosing
+- `continue -> bool`: on from a line with no choices: to what follows, or the end; false when it waits for a choice
+- `choose(Dialogue::Conversation::Choice | Integer choice) -> bool`: takes a choice: its effects happen, and it goes where the choice leads; false for one not offered
+- `stop(quietly: bool = false) -> bool`: ends it where it is (quietly: without telling the host)
+- `over? -> bool`: whether it ended
+- `node -> Hash[String, untyped] | nil`: the node it is at, or nil once it is over
+- `node_id -> String | nil`: the id of the node it is at, or nil
+- `script -> Dialogue::Script`: its dialogue
+- `actor -> GameObject | nil`: the hero of the player in it
+- `speaker -> GameObject | nil`: who talks to that player, or nil
+- `deciding? -> bool`: whether its effects happen on this machine (offline, and on the host)
+
+## Dialogue::Conversation::Choice
+
+An answer the player may give. See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
+
+- `index -> Integer`: its place among the node's choices (what choose takes)
+- `key -> String`: the I18n key of its text
+- `text -> String`: its text, in the language in use
+
+## Dialogue::Script
+
+A dialogue file as it was read. See [dialogue.md](dialogue.md).
+
+- `name -> String`: its name: that of its file in dialogues/, without .json
+- `start -> String | Array[Hash[String, untyped]]`: where it starts: a node's id, or branches
+- `node(String id) -> Hash[String, untyped] | nil`: the node of that id, or nil
+- `node?(String id) -> bool`: whether it has a node of that id
+
+## GameVariables
+
+The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. See [dialogue.md#gamevariables](dialogue.md#gamevariables).
+
+- `GameVariables[String | Symbol name] -> untyped`: the value of a variable, or nil when it was never set
+- `GameVariables[String | Symbol name] = untyped value`: sets a variable (nil, true, false, a number or a text); raises on a client
+- `GameVariables.to_h -> Hash[String, untyped]`: every variable that was set, by name (what to save)
+- `GameVariables.replace(Hash[String | Symbol, untyped] values) -> Hash[String, untyped]`: puts these in the place of every variable (a save read back)
+- `GameVariables.on_change { (String, untyped) -> void } -> void`: |name, value| on every change
+- `GameVariables.value?(untyped value) -> bool`: whether a variable can hold a value
+- `GameVariables.name?(untyped name) -> bool`: whether a variable can be called so
+
+## Talkable
+
+A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. See [dialogue.md](dialogue.md).
+
+- `dialogue -> String | nil`: the name of its dialogue file
+
 ## Interaction
 
 Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. See [interaction.md](interaction.md).
@@ -951,6 +1037,44 @@ A behaviour: an NPC's state machine, with states, transitions, guards, timers an
 - `in?(*Symbol | String names) -> bool`: whether it is in one of these states
 - `fire(Symbol | String event, untyped payload = nil) -> bool`: an event: the first transition waiting for it that may be taken is; true when the state changed
 - `go(Symbol | String name) -> bool`: goes to a state now, whatever the transitions say
+
+## GameClock
+
+The time of day in the game's world, on game time: what schedules follow. See [npcs.md#daily-schedules](npcs.md#daily-schedules).
+
+- `GameClock.hour -> Float`: the hour of the day, its minutes as a fraction: 0 up to 24
+- `GameClock.minute -> Integer`: the minute of the hour
+- `GameClock.minute_of_day -> Integer`: whole minutes since midnight: 0 up to 1439
+- `GameClock.day -> Integer`: the day it is, from 1
+- `GameClock.to_s -> String`: the time as "HH:MM"
+- `GameClock.set(hour: Integer, minute: Integer = 0, day: Integer = GameClock.day) -> void`: sets the time of day in whole hours and minutes (and the day, from 1)
+- `GameClock.speed -> Float`: game seconds for each second of game time (60 unless said)
+- `GameClock.speed = Numeric value`: changes it (0 stops the clock)
+- `GameClock.state -> Hash[Symbol, Float]`: what to save: { seconds:, speed: }
+- `GameClock.restore(Hash[Symbol | String, Numeric] | nil saved) -> void`: back to a saved state; nil (nothing saved yet) leaves the clock as it is
+- `GameClock.seconds -> Float`: seconds of the world's time since the first day began
+
+## Schedule
+
+A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). See [npcs.md#daily-schedules](npcs.md#daily-schedules).
+
+- `current -> Symbol | nil`: the activity it is time for, or nil
+- `plan -> Array[[Integer, Symbol]]`: [[minute of the day, activity], ...] in the order of the day
+- `plan = Hash[String, Symbol | String] | String given`: changes the plan: { "06:00" => :work } or "06:00 work, ..."
+- `Schedule.parse(Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]`: a plan as given, in the order of the day
+- `Schedule.activity_at(Array[[Integer, Symbol]] plan, Integer minute_of_day) -> Symbol | nil`: what a plan says for a minute of the day
+- `Schedule.minute_of(String time) -> Integer`: "06:30" as minutes of the day (390)
+
+## HeadLook
+
+A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target. See [npcs.md#head-look-at](npcs.md#head-look-at).
+
+- `target -> GameObject | Vector3 | nil`: what it looks at instead of the heroes, or nil
+- `target = GameObject | Vector3 | nil target`: sets it (nil: the heroes)
+- `nearest_hero -> GameObject | nil`: the nearest hero in range and in front of it, or nil
+- `bone -> GameObject`: the head's bone
+- `range -> Float`: meters to a hero (4 unless said)
+- `angle -> Float`: degrees off its forward a hero may be at, and the most the head turns (70 unless said)
 
 ## Notes
 

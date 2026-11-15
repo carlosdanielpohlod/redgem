@@ -26,6 +26,7 @@
 #include "physics/physics_world.hpp"
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
+#include "scene/animation/head_aim.hpp"
 #include "scene/particles.hpp"
 #include "scene/particle_emitters.hpp"
 #include "scene/water_interactions.hpp"
@@ -356,6 +357,7 @@ class Engine {
   int scene_generation_ = kFirstSceneGeneration;
   int last_generation_ = kFirstSceneGeneration;  // the last one reserved
   AnimationPlayer animations_;
+  HeadAims head_aims_;
   ParticleSystem particles_;
   ParticleEmitters particle_emitters_;
   WaterInteractions water_;

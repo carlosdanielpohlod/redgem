@@ -122,6 +122,8 @@ class SoundPool {
   // The sound that gives its place to `sound` when the pool is full: nullopt when there is room,
   // and kNoSoundSource when every sound playing is stronger.
   std::optional<SoundSourceId> place_for(const SpatialSound& sound) const;
+  SoundSourceId start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                            std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
   void refresh();
   void reap();  // lets go of the sounds that ended

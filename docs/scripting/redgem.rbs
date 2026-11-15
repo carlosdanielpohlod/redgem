@@ -37,6 +37,8 @@ class Behaviour
   def on_lose_sight: (GameObject object) -> void
   # a Perception on the object heard a noise
   def on_hear: (Perception::Noise noise) -> void
+  # a Schedule on the object came to the hour of another activity
+  def on_schedule: (Symbol activity) -> void
   # fields Save.checkpoint keeps for a spawned copy, given back before it starts
   def self.persist: (*Symbol | String fields) -> Array[Symbol]
   # what persist named, in this class and those above it
@@ -691,6 +693,18 @@ class Animator
   def root_motion=: (bool on) -> bool
   # whether all its clips move the object
   def root_motion?: () -> bool
+  # turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
+  def look_at: (Vector3 | GameObject target, ?bone: String | Symbol | GameObject, ?max_angle: Numeric) -> void
+  # the bone goes back to its clips' pose, easing out
+  def look_away: (?bone: String | Symbol | GameObject) -> void
+  # whether a bone is turned toward something, or on its way back
+  def looking?: (?bone: String | Symbol | GameObject) -> bool
+  # the object under the character with that name (or that name after a rig's prefix:), or nil
+  def bone: (String | Symbol name) -> (GameObject | nil)
+  # bone that raises when the character has none of that name
+  def bone!: (String | Symbol name) -> GameObject
+  # whether a part's name is that bone's: the name, or the name after a prefix:
+  def self.bone_named?: (String part, String name) -> bool
 end
 
 # Named states and transitions for one character (animation.use(graph)).
@@ -1295,6 +1309,110 @@ class Interactor < Behaviour
   def prompt_label: (Interactable target) -> String
 end
 
+# Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.
+module Dialogue
+  # starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client
+  def self.start: (String | Symbol | Dialogue::Script name, actor: GameObject, ?speaker: GameObject | nil) -> (Dialogue::Conversation | bool)
+  # the conversation this machine's player is in, or nil
+  def self.current: () -> (Dialogue::Conversation | nil)
+  # whether this machine's player is in a conversation, or left one this frame
+  def self.busy?: () -> bool
+  # ends the conversation this machine's player is in
+  def self.stop: () -> (bool | nil)
+  # :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
+  def self.on: (Symbol event) { (untyped, untyped, untyped) -> void } -> void
+  # the dialogue of that name, read from its file once (raises for one that is not there or not well made)
+  def self.load: (String | Symbol name) -> Dialogue::Script
+  # what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+  def self.quests: () -> untyped
+  # what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
+  def self.quests=: (untyped quests) -> untyped
+end
+
+# One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.
+class Dialogue::Conversation
+  # the line, in the language in use (nil once it is over)
+  def text: () -> (String | nil)
+  # the I18n key of the line
+  def text_key: () -> (String | nil)
+  # who says it, in the language in use (nil when the node names nobody)
+  def speaker_name: () -> (String | nil)
+  # the I18n key of who says it, or nil
+  def speaker_key: () -> (String | nil)
+  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  def voice: () -> (String | nil)
+  # the choices offered now: those whose conditions hold
+  def choices: () -> Array[Dialogue::Conversation::Choice]
+  # whether the player answers this line by choosing
+  def choosing?: () -> bool
+  # on from a line with no choices: to what follows, or the end; false when it waits for a choice
+  def continue: () -> bool
+  # takes a choice: its effects happen, and it goes where the choice leads; false for one not offered
+  def choose: (Dialogue::Conversation::Choice | Integer choice) -> bool
+  # ends it where it is (quietly: without telling the host)
+  def stop: (?quietly: bool) -> bool
+  # whether it ended
+  def over?: () -> bool
+  # the node it is at, or nil once it is over
+  def node: () -> (Hash[String, untyped] | nil)
+  # the id of the node it is at, or nil
+  def node_id: () -> (String | nil)
+  # its dialogue
+  def script: () -> Dialogue::Script
+  # the hero of the player in it
+  def actor: () -> (GameObject | nil)
+  # who talks to that player, or nil
+  def speaker: () -> (GameObject | nil)
+  # whether its effects happen on this machine (offline, and on the host)
+  def deciding?: () -> bool
+end
+
+# An answer the player may give.
+class Dialogue::Conversation::Choice
+  # its place among the node's choices (what choose takes)
+  def index: () -> Integer
+  # the I18n key of its text
+  def key: () -> String
+  # its text, in the language in use
+  def text: () -> String
+end
+
+# A dialogue file as it was read.
+class Dialogue::Script
+  # its name: that of its file in dialogues/, without .json
+  def name: () -> String
+  # where it starts: a node's id, or branches
+  def start: () -> (String | Array[Hash[String, untyped]])
+  # the node of that id, or nil
+  def node: (String id) -> (Hash[String, untyped] | nil)
+  # whether it has a node of that id
+  def node?: (String id) -> bool
+end
+
+# The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.
+module GameVariables
+  # the value of a variable, or nil when it was never set
+  def self.[]: (String | Symbol name) -> untyped
+  # sets a variable (nil, true, false, a number or a text); raises on a client
+  def self.[]=: (String | Symbol name, untyped value) -> untyped
+  # every variable that was set, by name (what to save)
+  def self.to_h: () -> Hash[String, untyped]
+  # puts these in the place of every variable (a save read back)
+  def self.replace: (Hash[String | Symbol, untyped] values) -> Hash[String, untyped]
+  # |name, value| on every change
+  def self.on_change: () { (String, untyped) -> void } -> void
+  # whether a variable can hold a value
+  def self.value?: (untyped value) -> bool
+  # whether a variable can be called so
+  def self.name?: (untyped name) -> bool
+end
+
+# A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue.
+class Talkable < Behaviour
+  # the name of its dialogue file
+  def dialogue: () -> (String | nil)
+end
+
 # Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.
 module Interaction
   # |actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)
@@ -1387,4 +1505,62 @@ class Brain < Behaviour
   def fire: (Symbol | String event, ?untyped payload) -> bool
   # goes to a state now, whatever the transitions say
   def go: (Symbol | String name) -> bool
+end
+
+# The time of day in the game's world, on game time: what schedules follow.
+module GameClock
+  # the hour of the day, its minutes as a fraction: 0 up to 24
+  def self.hour: () -> Float
+  # the minute of the hour
+  def self.minute: () -> Integer
+  # whole minutes since midnight: 0 up to 1439
+  def self.minute_of_day: () -> Integer
+  # the day it is, from 1
+  def self.day: () -> Integer
+  # the time as "HH:MM"
+  def self.to_s: () -> String
+  # sets the time of day in whole hours and minutes (and the day, from 1)
+  def self.set: (hour: Integer, ?minute: Integer, ?day: Integer) -> void
+  # game seconds for each second of game time (60 unless said)
+  def self.speed: () -> Float
+  # changes it (0 stops the clock)
+  def self.speed=: (Numeric value) -> Numeric
+  # what to save: { seconds:, speed: }
+  def self.state: () -> Hash[Symbol, Float]
+  # back to a saved state; nil (nothing saved yet) leaves the clock as it is
+  def self.restore: (Hash[Symbol | String, Numeric] | nil saved) -> void
+  # seconds of the world's time since the first day began
+  def self.seconds: () -> Float
+end
+
+# A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).
+class Schedule < Behaviour
+  # the activity it is time for, or nil
+  def current: () -> (Symbol | nil)
+  # [[minute of the day, activity], ...] in the order of the day
+  def plan: () -> Array[[Integer, Symbol]]
+  # changes the plan: { "06:00" => :work } or "06:00 work, ..."
+  def plan=: (Hash[String, Symbol | String] | String given) -> (Hash[String, Symbol | String] | String)
+  # a plan as given, in the order of the day
+  def self.parse: (Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]
+  # what a plan says for a minute of the day
+  def self.activity_at: (Array[[Integer, Symbol]] plan, Integer minute_of_day) -> (Symbol | nil)
+  # "06:30" as minutes of the day (390)
+  def self.minute_of: (String time) -> Integer
+end
+
+# A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.
+class HeadLook < Behaviour
+  # what it looks at instead of the heroes, or nil
+  def target: () -> (GameObject | Vector3 | nil)
+  # sets it (nil: the heroes)
+  def target=: (GameObject | Vector3 | nil target) -> (GameObject | Vector3 | nil)
+  # the nearest hero in range and in front of it, or nil
+  def nearest_hero: () -> (GameObject | nil)
+  # the head's bone
+  def bone: () -> GameObject
+  # meters to a hero (4 unless said)
+  def range: () -> Float
+  # degrees off its forward a hero may be at, and the most the head turns (70 unless said)
+  def angle: () -> Float
 end

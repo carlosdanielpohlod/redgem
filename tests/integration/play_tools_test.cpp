@@ -176,6 +176,38 @@ TEST_CASE("a check lists a screenful of problems unless asked for all") {
   CHECK_FALSE(has(tool({"check", game.dir(), "--all"}).out, "more (--all"));
 }
 
+TEST_CASE("a check reads every dialogue: what it names, where it leads, and its texts") {
+  GameCopy game("dialogues");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");  // (its texts go with the locales replaced here)
+  game.write("locales/en.json", R"({"baker.hello": "Hello!", "baker.bye": "Bye"})");
+  game.write("locales/pt.json", R"({"baker.hello": "Olá!"})");
+  game.write("dialogues/baker.json", R"({"start": "hello", "nodes": {
+    "hello": {"text": "baker.hello", "choices": [{"text": "baker.bye", "end": true},
+                                                  {"text": "baker.buy", "next": "sell"}]}}})");
+  game.write("dialogues/village/guard.json", R"({"start": "a", "nodes": {"a": {"text": "baker.hello"}}})");
+  game.write("quests/other.json", "{}");
+  game.write("dialogues/quest.json", R"({"start": "a", "nodes": {"a": {"text": "baker.hello", "end": true,
+    "effects": [{"quest": "bread", "to": "done"}]}}})");
+  const ToolResult checked = tool({"check", game.dir(), "--all"});
+  CHECK(checked.exit_code == kExitFailure);
+  CHECK(has(checked.out, "error dialogues/baker.json: node hello choice 2: there is no node \"sell\""));
+  CHECK(has(checked.out, "error dialogues/baker.json: node hello choice 2: no text for baker.buy in locales/"));
+  CHECK(
+      has(checked.out, "warning dialogues/baker.json: node hello choice 1: no text for baker.bye in locales/pt.json"));
+  CHECK(has(checked.out, "error dialogues/village/guard.json: node a: it leads nowhere"));
+  CHECK(has(checked.out, "error dialogues/quest.json: node a: there is no quest bread (quests/bread.json)"));
+  CHECK(has(checked.out, "check: 4 errors"));
+}
+
+TEST_CASE("a game without a quests folder may name any quest") {
+  GameCopy game("dialogue_quests");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.write("locales/en.json", R"({"sign.text": "Keep out"})");
+  game.write("dialogues/sign.json", R"({"start": "a", "nodes": {"a": {"text": "sign.text", "end": true,
+    "effects": [{"quest": "bread", "to": "started"}]}}})");
+  CHECK(tool({"check", game.dir()}).exit_code == kExitSuccess);
+}
+
 TEST_CASE("a check of what is no game says so") {
   CHECK(has(tool({"check", "no/such/game"}).err, "is not a game"));
   CHECK(tool({"check"}).exit_code == kExitUsage);
