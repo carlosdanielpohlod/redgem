@@ -128,15 +128,22 @@ void Engine::open_network(const GameSettings& settings) {
 
 void Engine::build_world(const GameSettings& settings) {
   collision_layers_ = settings.collision_layers;
+  physics_threads_ = chosen_physics_threads(settings);
   max_bodies_ = settings.max_bodies;
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
+  head_aims_.clear();
   particles_.set_gravity(gravity());
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
   find_water();
+}
+
+int Engine::chosen_physics_threads(const GameSettings& settings) const {
+  if (serves_a_room()) return config::kDefaultPhysicsThreads;  // (a room draws nothing to overlap)
+  return config::bounded_physics_threads(options_.physics_threads.value_or(settings.physics_threads));
 }
 
 void Engine::open_presenter(const GameSettings& settings) {
@@ -184,7 +191,7 @@ void Engine::release_audio() {
   if (!audio_open()) return;  // (the engine failed to start before it had any)
   audio().stop_sounds();
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
-  audio().set_music_ducking(MusicDucking{});
+  audio().reset_music_ducking();
   audio().forget_game_groups();
   audio().set_occlusion(OcclusionSettings{});
   audio().set_occlusion_query(nullptr);  // (the world goes after it)
@@ -247,6 +254,7 @@ void Engine::keep_bindings() {
 
 void Engine::connect_effects() {
   context_.animations = &animations_;
+  context_.head_aims = &head_aims_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
   context_.renders_particles = options_.presenter != nullptr;

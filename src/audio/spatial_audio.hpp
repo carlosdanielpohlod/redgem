@@ -84,14 +84,18 @@ void spatial_mono_frames(float* samples, unsigned frames);
 class SoundDriver {
  public:
   virtual ~SoundDriver() = default;
-  // False must leave no stream behind. Apply the initial mix and pitch before playback begins.
-  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) = 0;
+  // False must leave no stream behind. Apply the initial mix, pitch and effects (its group's)
+  // before playback begins.
+  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                     const VoiceEffects& effects) = 0;
   virtual void update(SoundSourceId id) = 0;
   virtual bool playing(SoundSourceId id) const = 0;
   virtual void mix(SoundSourceId id, SpatialMix mix) = 0;
   virtual void pitch(SoundSourceId id, float pitch) = 0;
-  // The effects of its group (a backend with none ignores them); after start, and when they change.
+  // The effects of its group when they change (a backend with none ignores them).
   virtual void effects(SoundSourceId, const VoiceEffects&) {}
+  // Ends every group's reverb and its tail, when the game's groups end.
+  virtual void close_reverbs() {}
   virtual void stop(SoundSourceId id) = 0;
 };
 
@@ -121,11 +125,13 @@ class SoundPool {
   // A gain the engine puts over a group, apart from the player's volume: the music ducked under a
   // voice.
   void set_group_gain(MixGroup group, float gain);
-  // Whether any sound of the group, or of a group under it, still plays.
-  bool group_playing(MixGroup group) const;
+  // Whether any sound of the group, or of a group under it, still plays and is heard (not at
+  // volume 0, out of reach or in a group the player muted).
+  bool group_heard(MixGroup group) const;
   // Every sound mixed again, and given its effects again: after the groups changed.
   void refresh();
   void refresh_effects();
+  void close_reverbs() { driver_.close_reverbs(); }
   // How a sound behind a wall is heard (false for settings that are not valid), and what says
   // whether a wall is in the way: none, and no sound is ever behind one.
   bool set_occlusion(const OcclusionSettings& settings);
@@ -139,9 +145,12 @@ class SoundPool {
 
  private:
   std::optional<SpatialMix> mix_of(const SpatialSound& sound) const;
+  bool heard(SoundSourceId id, const SpatialSound& sound) const;
   // The sound that gives its place to `sound` when the pool is full: nullopt when there is room,
   // and kNoSoundSource when every sound playing is stronger.
   std::optional<SoundSourceId> place_for(const SpatialSound& sound) const;
+  SoundSourceId start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                            std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
   VoiceEffects effects_of(const SpatialSound& sound) const;
   bool blocked(const SpatialSound& sound) const;

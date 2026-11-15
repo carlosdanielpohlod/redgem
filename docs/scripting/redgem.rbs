@@ -25,6 +25,24 @@ class Behaviour
   def on_collision_exit: (GameObject other) -> void
   # the object is being destroyed
   def on_destroy: () -> void
+  # an actor used this object (it has an Interactable; on the host in a game over the network)
+  def on_interact: (GameObject actor) -> void
+  # this object became what an actor's interaction prompt is for
+  def on_focus: (GameObject actor) -> void
+  # it stopped being what that prompt is for
+  def on_blur: (GameObject actor) -> void
+  # a Perception on the object saw something come into sight
+  def on_see: (GameObject object) -> void
+  # ... and saw it go out of sight
+  def on_lose_sight: (GameObject object) -> void
+  # a Perception on the object heard a noise
+  def on_hear: (Perception::Noise noise) -> void
+  # a Schedule on the object came to the hour of another activity
+  def on_schedule: (Symbol activity) -> void
+  # fields Save.checkpoint keeps for a spawned copy, given back before it starts
+  def self.persist: (*Symbol | String fields) -> Array[Symbol]
+  # what persist named, in this class and those above it
+  def self.persisted_fields: () -> Array[Symbol]
   # the object this behaviour is attached to
   def game_object: () -> GameObject
   # the object's name
@@ -89,6 +107,8 @@ class GameObject
   def tag?: (String | Symbol value) -> bool
   # its custom properties
   def props: () -> Hash[String, untyped]
+  # the Joint it came with in the scene (its Joint component, set up in the editor), or nil
+  def joint: () -> (Joint | nil)
   # false once it was destroyed
   def alive?: () -> bool
   # removes it at the end of the step
@@ -261,6 +281,8 @@ module Scene
   def self.objects: () -> Array[GameObject]
   # copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
   def self.spawn: (String | GameObject template, ?position: Vector3 | nil, ?rotation: Vector3 | nil, ?physics: bool, ?name: String | nil, ?parent: GameObject | nil) -> (GameObject | nil)
+  # instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
+  def self.spawn_prefab: (String file, ?position: Vector3 | nil, ?rotation: Vector3 | nil, ?physics: bool, ?name: String | nil, ?parent: GameObject | nil) -> (GameObject | nil)
 end
 
 # Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.
@@ -351,6 +373,10 @@ module Input
   def self.gamepad_pressed?: (Symbol button, ?pad: Integer) -> bool
   # whether a gamepad button went up this frame
   def self.gamepad_released?: (Symbol button, ?pad: Integer) -> bool
+  # whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)
+  def self.rumble?: () -> bool
+  # rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)
+  def self.rumble: (Integer pad, Numeric strength, Numeric seconds) -> bool
   # what was typed this frame
   def self.text: () -> String
   # shows the on-screen stick and buttons of a phone
@@ -401,7 +427,7 @@ module Physics
   def self.joint: (Symbol kind, GameObject object, ?GameObject | nil other, ?anchor: Vector3 | nil, ?other_anchor: Vector3 | nil, ?axis: Vector3 | nil, ?limits: Array[Numeric] | nil, ?motor_speed: Numeric | nil, ?motor_torque: Numeric | nil, ?min: Numeric | nil, ?max: Numeric | nil, ?spring: Numeric | nil, ?damping: Numeric | nil, ?break_force: Numeric | nil) -> Joint
 end
 
-# What holds two bodies together, or one to the world (made by Physics.joint).
+# What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint).
 class Joint
   # :fixed, :hinge, :slider, :point or :distance
   def kind: () -> Symbol
@@ -431,8 +457,10 @@ end
 
 # Where the characters a game moves can walk, and the way from one place to another.
 module Navigation
-  # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
-  def self.path: (Vector3 from, Vector3 to) -> (Array[Vector3] | nil)
+  # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
+  def self.path: (Vector3 from, Vector3 to, ?avoid: Array[GameObject] | GameObject) -> (Array[Vector3] | nil)
+  # the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
+  def self.steer: (Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, ?crowd: Array[[Vector3, Vector3, Numeric]], ?ignore: Array[GameObject] | GameObject) -> Vector3
   # the walkable point nearest a point (within 8 m of it), or nil
   def self.nearest: (Vector3 point) -> (Vector3 | nil)
   # whether a point is on walkable ground, up to a character's height above it
@@ -443,6 +471,42 @@ module Navigation
   def self.bake: () -> Hash[Symbol, Numeric | bool]
   # how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
   def self.stats: () -> Hash[Symbol, Numeric | bool]
+end
+
+# A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.
+class NavAgent < Behaviour
+  # sends it to a point; false when there is no way there
+  def go_to: (Vector3 point) -> bool
+  # stops it where it is
+  def stop: () -> void
+  # whether it got where it was sent
+  def arrived?: () -> bool
+  # whether it is on its way somewhere
+  def walking?: () -> bool
+  # where it was sent last, or nil
+  def destination: () -> (Vector3 | nil)
+  # the points it still walks through, the next first
+  def waypoints: () -> Array[Vector3]
+  # the velocity it walks at, as it steered this frame
+  def velocity: () -> Vector3
+  # meters per second at most (setting `speed`, 3)
+  def speed: () -> Float
+  # how wide it is kept from others, in meters (setting `radius`, 0.4)
+  def radius: () -> Float
+  # how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+  def arrive_distance: () -> Float
+  # the agents of the running scene
+  def self.all: () -> Array[NavAgent]
+end
+
+# Where the scene's water is: the height of its surface, and how deep a point is under it.
+module Water
+  # the height of the water surface over that point of the ground, or nil where there is no water
+  def self.height_at: (Numeric x, Numeric z) -> (Float | nil)
+  # how far below the water surface a point is in meters (negative above it), or nil where there is no water
+  def self.depth_at: (Vector3 point) -> (Float | nil)
+  # whether a point is below the water surface
+  def self.under?: (Vector3 point) -> bool
 end
 
 # The body of an object with body = "character": walks, jumps, climbs steps.
@@ -527,9 +591,9 @@ module Camera
   def self.cut_to: (GameObject camera, ?fade: Numeric) -> GameObject
   # whether a cut with a fade is still playing
   def self.cutting?: () -> bool
-  # [origin, direction] through a pixel of the screen
+  # [origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)
   def self.screen_ray: (Numeric x, Numeric y) -> ([Vector3, Vector3] | nil)
-  # [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
+  # [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera
   def self.world_to_screen: (Vector3 | GameObject point) -> ([Float, Float] | nil)
   # its vertical field of view, in degrees
   def self.fov: () -> (Float | nil)
@@ -539,6 +603,22 @@ module Camera
   def self.motion_blur: () -> Float
   # sets it
   def self.motion_blur=: (Numeric amount) -> Numeric
+  # whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides
+  def self.auto_exposure: () -> (bool | nil)
+  # turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene
+  def self.auto_exposure=: (bool | nil on) -> (bool | nil)
+  # EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides
+  def self.exposure_compensation: () -> (Float | nil)
+  # sets it, -16 to 16; nil gives it back to the scene
+  def self.exposure_compensation=: (Numeric | nil ev) -> (Numeric | nil)
+  # [darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides
+  def self.exposure_range: () -> ([Float, Float] | nil)
+  # sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene
+  def self.exposure_range=: ([Numeric, Numeric] | nil range) -> ([Numeric, Numeric] | nil)
+  # [up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides
+  def self.exposure_speed: () -> ([Float, Float] | nil)
+  # sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene
+  def self.exposure_speed=: ([Numeric, Numeric] | nil speeds) -> ([Numeric, Numeric] | nil)
   # follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
   def self.follow: (GameObject target, ?offset: Vector3 | Array[Numeric], ?relative: bool, ?smoothing: Numeric, ?look_at: bool, ?look_height: Numeric, ?avoid_walls: bool, ?dead_zone: Numeric, ?snap: bool) -> void
   # orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
@@ -609,8 +689,8 @@ end
 
 # game_object.animation (animation in a behaviour): an object's own clips.
 class Animator
-  # plays a clip, fading from the last one
-  def play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?fade: Numeric, ?restart: bool) -> void
+  # plays a clip, fading from the last one; root_motion: true lets the clip move the object
+  def play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?fade: Numeric, ?restart: bool, ?root_motion: bool | nil) -> void
   # plays a clip over the one playing
   def mix: (String | Symbol name, ?weight: Numeric, ?loop: bool, ?speed: Numeric) -> void
   # stops the clip mixed over
@@ -631,6 +711,28 @@ class Animator
   def set: (Symbol parameter, untyped value) -> void
   # the graph's state, or nil
   def state: () -> (Symbol | nil)
+  # calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+  def on: (String | Symbol clip, ?at: Numeric | nil, ?seconds: Numeric | nil) { (Animation::Event) -> void } -> Integer
+  # calls the block each time a clip passes a marker of that name authored in Blender
+  def on_marker: (String | Symbol name) { (Animation::Event) -> void } -> Integer
+  # stops calling a block that on or on_marker returned
+  def off: (Integer listener) -> nil
+  # whether all its clips move the object by their root's horizontal motion and turning
+  def root_motion=: (bool on) -> bool
+  # whether all its clips move the object
+  def root_motion?: () -> bool
+  # turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
+  def look_at: (Vector3 | GameObject target, ?bone: String | Symbol | GameObject, ?max_angle: Numeric) -> void
+  # the bone goes back to its clips' pose, easing out
+  def look_away: (?bone: String | Symbol | GameObject) -> void
+  # whether a bone is turned toward something, or on its way back
+  def looking?: (?bone: String | Symbol | GameObject) -> bool
+  # the object under the character with that name (or that name after a rig's prefix:), or nil
+  def bone: (String | Symbol name) -> (GameObject | nil)
+  # bone that raises when the character has none of that name
+  def bone!: (String | Symbol name) -> GameObject
+  # whether a part's name is that bone's: the name, or the name after a prefix:
+  def self.bone_named?: (String part, String name) -> bool
 end
 
 # Named states and transitions for one character (animation.use(graph)).
@@ -647,10 +749,22 @@ class Animation::Graph
   def transition: (Symbol from, Symbol to, parameter: Symbol, ?equals: untyped, ?above: Numeric | nil, ?below: Numeric | nil, ?fade: Numeric) -> self
 end
 
+# What the block of an animation event is given (animation.on).
+class Animation::Event
+  # the object that listened
+  def game_object: () -> GameObject
+  # the clip's name
+  def clip: () -> String
+  # the marker's name, or nil for a moment the script named
+  def name: () -> (String | nil)
+  # where in the clip, from 0 (its start) to 1 (its end)
+  def at: () -> Float
+end
+
 # Sounds and music from the game's sounds/ folder.
 module Audio
   # plays a sound; returns its id (for stop, playing? and set), or nil
-  def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol) -> (Integer | nil)
+  def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # plays music, crossfading over fade seconds from the track playing
   def self.music: (String | Symbol name, ?loop: bool, ?volume: Numeric, ?fade: Numeric) -> void
   # stops the music, fading it out over fade seconds
@@ -661,10 +775,16 @@ module Audio
   def self.music_volume=: (Numeric volume) -> Numeric
   # the volume of everything
   def self.volume=: (Numeric volume) -> Numeric
+  # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
+  def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
+  # makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given
+  def self.group: (Symbol name, ?parent: Symbol, ?volume: Numeric | nil) -> nil
+  # muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off
+  def self.effects: (Symbol group, ?low_pass: Numeric | nil, ?reverb: Numeric) -> nil
   # changes the volume or pitch of a sound that plays; false once it stopped
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
-  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol) -> (Integer | nil)
+  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # where the ears are (move it with the camera)
   def self.listener: (Vector3 position, Vector3 forward, Vector3 up) -> void
   # moves a sound played with play_at
@@ -691,11 +811,23 @@ module UI
   def self.text_field: (String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?max_length: Integer, ?color: RedGem::color, ?text_color: RedGem::color, ?secret: bool, ?anchor: Symbol | nil) -> String
   # whether a phone's on-screen keyboard covers the bottom of the screen
   def self.keyboard_visible?: () -> bool
-  # the width of the screen, in pixels
+  # the width of the screen, in the interface's units (UI.scale pixels each)
   def self.width: () -> Integer
-  # the height of the screen, in pixels
+  # the height of the screen, in the interface's units: the reference's height when it is matched
   def self.height: () -> Integer
-  # how wide a text is, in pixels (in the face selected)
+  # the width of the screen, in pixels
+  def self.pixel_width: () -> Integer
+  # the height of the screen, in pixels
+  def self.pixel_height: () -> Integer
+  # the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json "ui") times Settings.ui_scale
+  def self.scale: () -> Float
+  # [width, height] of the screen the interface is laid out for (game.json "ui": its "reference", or the game's window)
+  def self.reference: () -> [Integer, Integer]
+  # where the pointer is across the screen, in the interface's units
+  def self.mouse_x: () -> Float
+  # where the pointer is down the screen, in the interface's units
+  def self.mouse_y: () -> Float
+  # how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)
   def self.text_width: (String str, ?size: Numeric) -> Integer
   # the lines a text wraps to at word boundaries, none wider than width
   def self.wrap: (String str, width: Numeric, ?size: Numeric) -> Array[String]
@@ -713,10 +845,10 @@ module UI
   def self.choice: (String label, Array[String] choices, Integer index, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Integer
   # a row with a slider; returns the value
   def self.slider: (String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?min: Numeric, ?max: Numeric, ?step: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Float
-  # the face texts are drawn with: a file name of fonts/, or nil for the built-in one
-  def self.font: () -> (String | nil)
-  # draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
-  def self.font=: (String | nil name) -> (String | nil)
+  # the face texts are drawn with: a file name of fonts/, a list of them (a fallback chain; a list of one is its name), or nil for the built-in one
+  def self.font: () -> (String | Array[String] | nil)
+  # draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
+  def self.font=: (String | Array[String] | nil name) -> (String | Array[String] | nil)
 end
 
 # Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
@@ -724,7 +856,7 @@ class UI::Focus
   # a focus on the first widget
   def initialize: () -> void
   # moves it among count widgets, as up or down was pressed this frame
-  def update: (Integer count) -> void
+  def update: (Integer count, ?pad: Integer) -> void
   # whether the widget of that index has it: pass it as focused:
   def at?: (Integer index) -> bool
   # puts it on a widget (one clicked, or the one a screen comes back to)
@@ -833,6 +965,10 @@ module Settings
   def self.render_scale: () -> Float
   # changes it
   def self.render_scale=: (Numeric scale) -> Numeric
+  # how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it
+  def self.ui_scale: () -> Float
+  # changes it
+  def self.ui_scale=: (Numeric scale) -> Numeric
   # whether frames wait for the screen
   def self.vsync: () -> bool
   # changes it
@@ -983,6 +1119,16 @@ module Save
   def self.slot=: (String | Symbol name) -> (String | Symbol)
   # sorted names of persisted slots and slots opened in this run, including default
   def self.slots: () -> Array[String]
+  # the version of the saved data this game writes, or nil
+  def self.version: () -> (Integer | nil)
+  # declares that version (1 or more): older slots are migrated, newer ones refused
+  def self.version=: (Integer number) -> Integer
+  # the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one
+  def self.migrate: (from: Integer) { (Hash[String, untyped]) -> Hash[String, untyped] } -> void
+  # keeps this scene's spawned objects whose behaviours persist fields; returns how many
+  def self.checkpoint: (?String | Symbol key) -> Integer
+  # spawns them again in place of the current ones; returns the new copies
+  def self.restore_checkpoint: (?String | Symbol key) -> Array[GameObject]
 end
 
 # Web requests; the answer comes to the block.
@@ -1047,6 +1193,12 @@ module Network
   def self.online?: () -> bool
   # whether a join is on its way
   def self.connecting?: () -> bool
+  # whether this machine's connection dropped and it is getting back in
+  def self.reconnecting?: () -> bool
+  # seconds the game hosted here holds a dropped player's place (0: none)
+  def self.reconnect_window: () -> Float
+  # holds a dropped player's place and id that long, up to 300 (0 turns it off)
+  def self.reconnect_window=: (Numeric seconds) -> Numeric
   # whether this machine hosts
   def self.host?: () -> bool
   # whether this machine is a dedicated server
@@ -1057,6 +1209,12 @@ module Network
   def self.peers: () -> Array[Integer]
   # the peers without a dedicated server
   def self.players: () -> Array[Integer]
+  # on the host: corrects the others' objects that move faster or further than this (no limits: off)
+  def self.validate_movement: (?max_speed: Numeric, ?teleport_distance: Numeric, ?tolerance: Numeric, ?kick_after: Integer, ?undo: bool) -> nil
+  # the movement validation settings, as a hash
+  def self.movement_rules: () -> Hash[Symbol, Numeric | bool]
+  # how many moves of a machine the host did not believe in this game
+  def self.movement_violations: (Integer peer) -> Integer
   # the port of the game
   def self.port: () -> Integer
   # the room code, on a relay
@@ -1091,6 +1249,12 @@ module Network
   def self.on_leave: () { (Integer) -> void } -> void
   # a join did not work out: |reason|
   def self.on_fail: () { (String | nil) -> void } -> void
+  # a connection dropped and its place is held: |peer|
+  def self.on_reconnecting: () { (Integer) -> void } -> void
+  # a dropped machine is back in its place: |peer|
+  def self.on_reconnected: () { (Integer) -> void } -> void
+  # this machine could not get back in time: |reason|
+  def self.on_lost: () { (String | nil) -> void } -> void
   # decides who gets in: |peer, auth, decide|
   def self.authenticate: () { (Integer, untyped, Network::Decision) -> void } -> void
   # who a peer was accepted as
@@ -1133,4 +1297,316 @@ class NetworkSync < Behaviour
   def key: () -> String
   # sets its owner and key
   def assign: (owner: Integer, ?key: String) -> void
+end
+
+# A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).
+class Interactable < Behaviour
+  # every Interactable of the scene
+  def self.all: () -> Array[Interactable]
+  # the I18n key of its prompt, or nil for the engine's "Interact"
+  def prompt: () -> (String | Symbol | nil)
+  # changes the prompt
+  def prompt=: (String | Symbol | nil key) -> (String | Symbol | nil)
+  # the prompt in the language in use
+  def prompt_text: () -> String
+  # meters from the actor it can be used from (2 unless said)
+  def range: () -> Float
+  # changes the range
+  def range=: (Numeric meters) -> Numeric
+  # of those in reach, the highest wins (0 unless said)
+  def priority: () -> Float
+  # changes the priority
+  def priority=: (Numeric value) -> Numeric
+  # whether it can be picked
+  def enabled?: () -> bool
+  # false: never picked
+  def enabled=: (bool flag) -> bool
+  # degrees off the actor's forward it may be at; nil for any direction
+  def angle: () -> (Float | nil)
+  # changes the angle (nil: any direction)
+  def angle=: (Numeric | nil degrees) -> (Numeric | nil)
+end
+
+# A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.
+class Interactor < Behaviour
+  # every Interactor of the scene: the players' heroes
+  def self.all: () -> Array[Interactor]
+  # the Interactable in focus, or nil
+  def target: () -> (Interactable | nil)
+  # uses what is in focus now; false when nothing is
+  def use: () -> bool
+  # the player whose :interact it reads (0 unless said)
+  def pad: () -> Integer
+  # what the prompt says for a target: "[E] Open"
+  def prompt_label: (Interactable target) -> String
+end
+
+# Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.
+module Dialogue
+  # starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client
+  def self.start: (String | Symbol | Dialogue::Script name, actor: GameObject, ?speaker: GameObject | nil) -> (Dialogue::Conversation | bool)
+  # the conversation this machine's player is in, or nil
+  def self.current: () -> (Dialogue::Conversation | nil)
+  # whether this machine's player is in a conversation, or left one this frame
+  def self.busy?: () -> bool
+  # ends the conversation this machine's player is in
+  def self.stop: () -> (bool | nil)
+  # :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
+  def self.on: (Symbol event) { (untyped, untyped, untyped) -> void } -> void
+  # the dialogue of that name, read from its file once (raises for one that is not there or not well made)
+  def self.load: (String | Symbol name) -> Dialogue::Script
+  # what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+  def self.quests: () -> untyped
+  # what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
+  def self.quests=: (untyped quests) -> untyped
+end
+
+# One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.
+class Dialogue::Conversation
+  # the line, in the language in use (nil once it is over)
+  def text: () -> (String | nil)
+  # the I18n key of the line
+  def text_key: () -> (String | nil)
+  # who says it, in the language in use (nil when the node names nobody)
+  def speaker_name: () -> (String | nil)
+  # the I18n key of who says it, or nil
+  def speaker_key: () -> (String | nil)
+  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  def voice: () -> (String | nil)
+  # the choices offered now: those whose conditions hold
+  def choices: () -> Array[Dialogue::Conversation::Choice]
+  # whether the player answers this line by choosing
+  def choosing?: () -> bool
+  # on from a line with no choices: to what follows, or the end; false when it waits for a choice
+  def continue: () -> bool
+  # takes a choice: its effects happen, and it goes where the choice leads; false for one not offered
+  def choose: (Dialogue::Conversation::Choice | Integer choice) -> bool
+  # ends it where it is (quietly: without telling the host)
+  def stop: (?quietly: bool) -> bool
+  # whether it ended
+  def over?: () -> bool
+  # the node it is at, or nil once it is over
+  def node: () -> (Hash[String, untyped] | nil)
+  # the id of the node it is at, or nil
+  def node_id: () -> (String | nil)
+  # how many lines it has shown (a line it comes back to counts again)
+  def steps: () -> Integer
+  # its dialogue
+  def script: () -> Dialogue::Script
+  # the hero of the player in it
+  def actor: () -> (GameObject | nil)
+  # who talks to that player, or nil
+  def speaker: () -> (GameObject | nil)
+  # whether its effects happen on this machine (offline, and on the host)
+  def deciding?: () -> bool
+end
+
+# An answer the player may give.
+class Dialogue::Conversation::Choice
+  # its place among the node's choices (what choose takes)
+  def index: () -> Integer
+  # the I18n key of its text
+  def key: () -> String
+  # its text, in the language in use
+  def text: () -> String
+end
+
+# A dialogue file as it was read.
+class Dialogue::Script
+  # its name: that of its file in dialogues/, without .json
+  def name: () -> String
+  # where it starts: a node's id, or branches
+  def start: () -> (String | Array[Hash[String, untyped]])
+  # the node of that id, or nil
+  def node: (String id) -> (Hash[String, untyped] | nil)
+  # whether it has a node of that id
+  def node?: (String id) -> bool
+end
+
+# The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.
+module GameVariables
+  # the value of a variable, or nil when it was never set
+  def self.[]: (String | Symbol name) -> untyped
+  # sets a variable (nil, true, false, a number or a text); raises on a client
+  def self.[]=: (String | Symbol name, untyped value) -> untyped
+  # every variable that was set, by name (what to save)
+  def self.to_h: () -> Hash[String, untyped]
+  # puts these in the place of every variable (a save read back)
+  def self.replace: (Hash[String | Symbol, untyped] values) -> Hash[String, untyped]
+  # |name, value| on every change
+  def self.on_change: () { (String, untyped) -> void } -> void
+  # whether a variable can hold a value
+  def self.value?: (untyped value) -> bool
+  # whether a variable can be called so
+  def self.name?: (untyped name) -> bool
+end
+
+# A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue.
+class Talkable < Behaviour
+  # the name of its dialogue file
+  def dialogue: () -> (String | nil)
+end
+
+# A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.
+class DialogueBox < Behaviour
+  # how many of a line's letters show after that many seconds at that speed (0: all)
+  def self.letters_shown: (Integer letters, Float seconds, Float speed) -> Integer
+  # whether the line it shows has all of its letters out (true while it shows none)
+  def whole?: () -> bool
+  # the player whose gamepad works it (0 unless said)
+  def pad: () -> Integer
+  # how fast a line appears (45 unless said; 0: at once)
+  def letters_per_second: () -> Float
+end
+
+# Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.
+module Interaction
+  # |actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)
+  def self.on: (Symbol event) { (GameObject, GameObject) -> void } -> void
+  # the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client
+  def self.interact: (GameObject actor, GameObject | Interactable target) -> bool
+  # the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)
+  def self.best_for: (GameObject actor, ?Array[Interactable] candidates, ?lenient: bool) -> (Interactable | nil)
+  # whether an actor can use a target now: enabled, in range, in front, in sight
+  def self.reachable?: (GameObject actor, Interactable target, ?lenient: bool) -> bool
+  # meters from an actor to a target
+  def self.distance: (GameObject actor, GameObject | Interactable target) -> Float
+  # degrees between where the actor faces and where the target is, across the ground
+  def self.angle_to: (GameObject actor, GameObject | Interactable target) -> Float
+end
+
+# Whether one thing can see another: a ray to it hits nothing else first.
+module LineOfSight
+  # whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
+  def self.clear?: (Vector3 from, Vector3 to, GameObject target, ?ignore: Array[GameObject]) -> bool
+  # whether an object is the whole, or is under it
+  def self.part_of?: (GameObject | nil object, GameObject whole) -> bool
+end
+
+# A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear.
+class Perception < Behaviour
+  # a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it
+  def self.noise: (at: Vector3, ?loudness: Numeric, ?source: GameObject | nil) -> Array[GameObject]
+  # every Perception of the scene
+  def self.all: () -> Array[Perception]
+  # whether an object is in sight now: in range, in the cone, not hidden
+  def sees?: (GameObject object) -> bool
+  # what it sees, as of its last update
+  def in_sight: () -> Array[GameObject]
+  # whether it sees anything it watches
+  def sees_any?: () -> bool
+  # where it last saw an object, or nil
+  def last_seen: (GameObject object) -> (Vector3 | nil)
+  # what it looks for: the objects of its watch tag, or the players' heroes
+  def watched: () -> Array[GameObject]
+  # degrees between where it looks and where an object is, across the ground
+  def angle_to: (GameObject object) -> Float
+  # where it looks from
+  def eye_point: () -> Vector3
+  # meters it sees (15 unless said)
+  def sight: () -> Float
+  # degrees of the whole cone (120 unless said)
+  def fov: () -> Float
+  # meters above its origin it looks from (1.6 unless said)
+  def eyes: () -> Float
+  # meters above a watched object's origin it looks at (1 unless said)
+  def aim: () -> Float
+  # meters a noise of loudness 1 is heard from (10 unless said)
+  def hearing: () -> Float
+end
+
+# A noise someone heard (on_hear).
+class Perception::Noise
+  # where it was made
+  def position: () -> Vector3
+  # how loud: 1 is heard as far as a listener's hearing
+  def loudness: () -> Float
+  # the object that made it, or nil
+  def source: () -> (GameObject | nil)
+  # meters from the listener
+  def distance: () -> Float
+end
+
+# A behaviour: an NPC's state machine, with states, transitions, guards, timers and events.
+class Brain < Behaviour
+  # declares a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)
+  def self.state: (Symbol | String name, **Symbol | Proc hooks) -> void
+  # the state it starts in (the first declared unless said); with a name, sets it
+  def self.initial: (?Symbol | String | nil name) -> (Symbol | nil)
+  # declares a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards
+  def self.transition: (from: Symbol | Array[Symbol], to: Symbol, **untyped options) -> void
+  # its states, by name
+  def self.states: () -> Hash[Symbol, Hash[Symbol, Symbol | Proc]]
+  # its transitions, in the order they were declared
+  def self.transitions: () -> Array[untyped]
+  # the state it is in (nil before its first frame)
+  def state: () -> (Symbol | nil)
+  # the state it was in before
+  def previous_state: () -> (Symbol | nil)
+  # seconds of game time in this state
+  def time_in_state: () -> Float
+  # whether it is in one of these states
+  def in?: (*Symbol | String names) -> bool
+  # an event: the first transition waiting for it that may be taken is; true when the state changed
+  def fire: (Symbol | String event, ?untyped payload) -> bool
+  # goes to a state now, whatever the transitions say
+  def go: (Symbol | String name) -> bool
+end
+
+# The time of day in the game's world, on game time: what schedules follow.
+module GameClock
+  # the hour of the day, its minutes as a fraction: 0 up to 24
+  def self.hour: () -> Float
+  # the minute of the hour
+  def self.minute: () -> Integer
+  # whole minutes since midnight: 0 up to 1439
+  def self.minute_of_day: () -> Integer
+  # the day it is, from 1
+  def self.day: () -> Integer
+  # the time as "HH:MM"
+  def self.to_s: () -> String
+  # sets the time of day in whole hours and minutes (and the day, from 1)
+  def self.set: (hour: Integer, ?minute: Integer, ?day: Integer) -> void
+  # game seconds for each second of game time (60 unless said)
+  def self.speed: () -> Float
+  # changes it (0 stops the clock)
+  def self.speed=: (Numeric value) -> Numeric
+  # what to save: { seconds:, speed: }
+  def self.state: () -> Hash[Symbol, Float]
+  # back to a saved state; nil (nothing saved yet) leaves the clock as it is
+  def self.restore: (Hash[Symbol | String, Numeric] | nil saved) -> void
+  # seconds of the world's time since the first day began
+  def self.seconds: () -> Float
+end
+
+# A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).
+class Schedule < Behaviour
+  # the activity it is time for, or nil
+  def current: () -> (Symbol | nil)
+  # [[minute of the day, activity], ...] in the order of the day
+  def plan: () -> Array[[Integer, Symbol]]
+  # changes the plan: { "06:00" => :work } or "06:00 work, ..."
+  def plan=: (Hash[String, Symbol | String] | String given) -> (Hash[String, Symbol | String] | String)
+  # a plan as given, in the order of the day
+  def self.parse: (Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]
+  # what a plan says for a minute of the day
+  def self.activity_at: (Array[[Integer, Symbol]] plan, Integer minute_of_day) -> (Symbol | nil)
+  # "06:30" as minutes of the day (390)
+  def self.minute_of: (String time) -> Integer
+end
+
+# A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.
+class HeadLook < Behaviour
+  # what it looks at instead of the heroes, or nil
+  def target: () -> (GameObject | Vector3 | nil)
+  # sets it (nil: the heroes)
+  def target=: (GameObject | Vector3 | nil target) -> (GameObject | Vector3 | nil)
+  # the nearest hero in range and in front of it, or nil
+  def nearest_hero: () -> (GameObject | nil)
+  # the head's bone
+  def bone: () -> GameObject
+  # meters to a hero (4 unless said)
+  def range: () -> Float
+  # degrees off its forward a hero may be at, and the most the head turns (70 unless said)
+  def angle: () -> Float
 end

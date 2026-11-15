@@ -3,6 +3,8 @@
 // The music goes down while someone speaks: while a sound of the voice group plays, the music
 // group falls to a lower volume, and it comes back once every voice is quiet (Audio.ducking).
 
+#include <optional>
+
 #include "audio/mix_groups.hpp"
 
 namespace redgem {
@@ -29,12 +31,17 @@ class MusicDucker {
   // Moves the gain on by `seconds` and returns it.
   float update(bool voice_playing, float seconds);
   float gain() const { return gain_; }
+  // The default settings, and the music at full volume at once (a game ended).
+  void reset();
 
  private:
-  float step(float target, float seconds) const;
+  void start_ramp(float target);
 
   MusicDucking ducking_;
   float gain_ = kFullVolume;
+  std::optional<float> target_;  // where the ramp under way goes
+  float rate_ = 0.0f;            // gain a second
+  bool instant_ = false;
 };
 
 }  // namespace redgem

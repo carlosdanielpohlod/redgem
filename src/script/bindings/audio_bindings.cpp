@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <optional>
 #include <string>
 
 #include "script/bindings/binding_helpers.hpp"
@@ -49,16 +50,23 @@ mrb_value audio_occlusion(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).set_occlusion(settings));
 }
 
+// Audio.group's volume, none when nil.
+std::optional<float> group_volume(mrb_state* mrb, mrb_value volume) {
+  if (mrb_nil_p(volume)) return std::nullopt;
+  return static_cast<float>(at_least(mrb, mrb_as_float(mrb, volume), kSilent, "Audio.group's volume"));
+}
+
 // Audio.__group(name, parent, volume): a game's own group under another.
 mrb_value audio_group(mrb_state* mrb, mrb_value) {
-  mrb_value name, parent;
-  mrb_float volume = 0.0;
-  mrb_get_args(mrb, "oof", &name, &parent, &volume);
+  mrb_value name, parent, volume;
+  mrb_get_args(mrb, "ooo", &name, &parent, &volume);
   const std::string group = to_name(mrb, name);
   const MixGroup over = mix_group(mrb, parent);
-  const float heard = static_cast<float>(at_least(mrb, volume, kSilent, "Audio.group's volume"));
-  known(mrb, audio(mrb).define_group(group, over, heard),
-        "Audio.group cannot make :%s: an engine group's name, a parent under it, or more than 13 groups", group);
+  constexpr auto kGameGroups = static_cast<int>(kMaxMixGroups - kMixGroupCount);
+  if (!audio(mrb).define_group(group, over, group_volume(mrb, volume)))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR,
+               "Audio.group cannot make :%s: an engine group's name, a parent under it, or more than %d groups",
+               group.c_str(), kGameGroups);
   return mrb_nil_value();
 }
 
@@ -72,7 +80,8 @@ mrb_value audio_effects(mrb_state* mrb, mrb_value) {
     effects.low_pass_hz = static_cast<float>(
         from_to(mrb, mrb_as_float(mrb, low_pass), kLowestCutoff, kHighestCutoff, "Audio.effects's low_pass"));
   effects.reverb = static_cast<float>(from_to(mrb, reverb, kNoReverb, kFullReverb, "Audio.effects's reverb"));
-  return mrb_bool_value(audio(mrb).set_group_effects(mix_group(mrb, group), effects));
+  audio(mrb).set_group_effects(mix_group(mrb, group), effects);  // (checked above, so it takes)
+  return mrb_nil_value();
 }
 
 // A priority a sound may have, a whole number from kLowestSoundPriority to kHighestSoundPriority.

@@ -19,11 +19,84 @@ until 1.0, a release may change what games rely on (see
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
   it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
   game's group of `:voice` ducks the music too.
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
+- **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
+  one another by `next`, by branches with conditions, or by the player's choices, with conditions
+  on variables and quest stages and effects that set or add to variables, move quests and tell the
+  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
+  (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
+  `GameVariables` hold the values every player shares. Over the network each player has a
+  conversation of their own, the host follows it step by step and its effects happen there.
+  `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
+  keys and texts missing from `locales/`. Quest stages are variables until a game sets
+  `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
+- **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
+  time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
+  `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
+  its object hears `on_schedule(activity)`, its Brain the `:schedule` event, and a transition
+  `to: :scheduled` goes to the state of the activity it is time for. `animation.look_at(target)`
+  turns a character's head bone toward a point or an object in engine C++, on top of its clips'
+  pose, within a largest angle and easing in and out (`look_away`, `looking?`, `bone`). A
+  `HeadLook` behaviour looks at the nearest hero in range and in front, or at a target.
+- **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
+  states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
+  transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
+  event, `after:` seconds in the state, and when its `if:` and `unless:` guards agree (a guard
+  block may take the event's payload). A `Perception` behaviour gives it senses: a sight cone out to
+  a range, checked by a line-of-sight ray, that watches the players' heroes (or a tag), and a
+  hearing radius that `Perception.noise(at:, loudness:)` reaches. Its object's behaviours hear
+  `on_see`, `on_lose_sight` and `on_hear`, and a Brain gets them, and a use of its Interactable, as
+  the `:see`, `:lose_sight`, `:hear` and `:interact` events. Over the network only the host thinks
+  and perceives. `LineOfSight` is the ray check Interactors and Perceptions share, and
+  `Interactor.all` lists the heroes. See the manual's NPCs page.
 - **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
   that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
   quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
   stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
   default).
+- **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
+  physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
+  of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
+  scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
+- **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
+  letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
+  text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
+  Hebrew are drawn in their order on screen by the Unicode Bidirectional Algorithm (SheenBidi 2.9,
+  Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
+  vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
+  not joined yet (no shaping).
+
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
   connection that stays up. Each machine loads it in the background and waits, frozen, until all
@@ -132,10 +205,6 @@ until 1.0, a release may change what games rely on (see
   seconds) and takes at most 16 KiB of code. Release builds leave it
   out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
   `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
-- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
-  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
-  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
-  with the game.
 - **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
   block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
   passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
@@ -147,6 +216,17 @@ until 1.0, a release may change what games rely on (see
   for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
   across blends) and keeps the root over it; a `CharacterController` goes there through the
   physics, so walls stop it.
+- **A release opens its windows before it is published**: the release workflow unpacks the Linux
+  and Windows downloads and, with `tools/release/smoke.sh`, builds and plays a demo with the
+  download's player, runs a new game's tests (`redgem check --run-tests`), plays one system test
+  in a window and opens the editor on a demo, on Xvfb with Mesa's llvmpipe on Linux and with
+  Mesa's `opengl32.dll` on Windows. The draft release gets no download unless it passes. On a
+  machine with a graphics card, `tools/release/smoke.sh <download>` does the same by hand.
+- **`REDGEM_CLOSE_AFTER_FRAMES=<n>`**: every window of the engine (the editor, the project hub,
+  a game, a built game's player) closes itself once it has shown that many frames, as its close
+  button would.
+- **The Windows download has `redgem-test.exe`**, so `redgem check --run-tests` runs a game's tests
+  on Windows too.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
@@ -399,6 +479,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
 - In a network game, a machine that is not the host can no longer load a level on its own
   (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
   objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
@@ -457,6 +539,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Perception resets with each scene**: loading a scene logged "resetting the handlers of
+  Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
+  modules by name and Perception is a class. It now finds classes too, so a new scene starts with
+  no senses left from the one before.
 - **Web requests end with their game**: their threads used to be detached, so one still running
   at exit could outlive the program's static objects. A game that ends (or an editor play session
   that stops) now gives every request on its way up, hangs up its connection so its wait ends at

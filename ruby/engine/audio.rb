@@ -59,10 +59,11 @@ module Audio
   end
 
   # A group of the game's own under another (:effects unless it says), heard at its volume times
-  # the volumes over it: Audio.play(:drip, group: :cave). The same name again moves it or changes its
-  # volume. A game has 13 groups of its own at most; they end with it.
-  def self.group(name, parent: DEFAULT_GROUP, volume: FULL_VOLUME)
-    __group(name, parent, volume.to_f)
+  # the volumes over it (1 when none is given): Audio.play(:drip, group: :cave). The same name
+  # again moves it, and changes its volume only when one is given. A game has 13 groups of its own
+  # at most; they end with it.
+  def self.group(name, parent: DEFAULT_GROUP, volume: nil)
+    __group(name, parent, volume&.to_f)
   end
 
   # What a group does to its sounds and to the groups under it: low_pass (Hz, 20 to 20000, nil for

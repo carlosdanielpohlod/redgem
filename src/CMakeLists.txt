@@ -11,6 +11,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/nav_agent.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
@@ -50,9 +51,22 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_interactions.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/line_of_sight.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/interactable.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/interaction.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/interactor.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_variables.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_conversation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/schedule.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -322,6 +336,7 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_graph_player.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
+  scene/animation/head_aim.cpp
   scene/animation/animation_player_characters.cpp
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
@@ -347,6 +362,9 @@ redgem_add_library(redgem_runtime
   physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
+  physics/physics_threads.cpp
+  physics/step_worker.cpp
+  physics/overlapped_physics_world.cpp
   physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
   physics/jolt/jolt_vehicle.cpp
@@ -366,6 +384,7 @@ redgem_add_library(redgem_runtime
   navigation/nav_physics_probe.cpp
   navigation/nav_path.cpp
   navigation/nav_queries.cpp
+  navigation/nav_steering.cpp
   navigation/navigation.cpp
   audio/audio.cpp
   audio/ducking.cpp
@@ -415,6 +434,7 @@ redgem_add_library(redgem_runtime
   script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
+  script/dialogue_file.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -425,6 +445,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scene_bindings.cpp
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
+  script/bindings/exposure_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/physics_args.cpp
   script/bindings/physics_query_bindings.cpp
@@ -433,6 +454,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/navigation_crowd_bindings.cpp
   script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
@@ -444,6 +466,7 @@ redgem_add_library(redgem_runtime
   script/bindings/input_bindings.cpp
   script/bindings/input_action_bindings.cpp
   script/bindings/animation_bindings.cpp
+  script/bindings/head_aim_bindings.cpp
   script/bindings/animation_graph_bindings.cpp
   script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
@@ -453,6 +476,7 @@ redgem_add_library(redgem_runtime
   script/bindings/save_slot_bindings.cpp
   script/bindings/settings_bindings.cpp
   script/bindings/i18n_bindings.cpp
+  script/bindings/dialogue_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
@@ -519,6 +543,7 @@ redgem_add_library(redgem_runtime
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
+  render/auto_exposure.cpp
   render/scene_lights.cpp
   render/local_shadows.cpp
   render/renderer_local_shadows.cpp
@@ -528,6 +553,8 @@ redgem_add_library(redgem_runtime
   render/ui_scale.cpp
   render/quality.cpp
   render/font_rasterizer.cpp
+  render/font_chain.cpp
+  render/bidi_text.cpp
   render/game_fonts.cpp
   render/ui_font.cpp
   render/culling.cpp
@@ -575,7 +602,7 @@ redgem_embed_texts(redgem_runtime game)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
   "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
-target_link_libraries(redgem_runtime PRIVATE freetype)
+target_link_libraries(redgem_runtime PRIVATE freetype redgem_sheenbidi)
 target_link_libraries(redgem_runtime PRIVATE ${CMAKE_DL_LIBS})  # render/window.cpp keeps the OpenGL libraries loaded
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
@@ -810,6 +837,7 @@ if(NOT ANDROID)
     project/mcp_game_tools.cpp
     project/shot_command.cpp
     project/game_checks.cpp
+  project/dialogue_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
     project/api_types.cpp

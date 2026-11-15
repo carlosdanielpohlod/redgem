@@ -229,6 +229,7 @@ void install_animation_bindings(mrb_state* mrb) {
   install_object_animation_bindings(mrb);
   install_object_animation_event_bindings(mrb);
   install_animation_graph_bindings(mrb);
+  install_head_aim_bindings(mrb);
 }
 
 }  // namespace redgem
