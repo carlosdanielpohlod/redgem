@@ -348,8 +348,8 @@ not a promise of how it will be closed.
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
   [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
-  yet. Dialogue has no box or choice list on screen yet (a game draws its own from
-  `Dialogue.current`), a line's `voice` plays nothing, and quest stages are GameVariables until a
+  yet. The DialogueBox has one look (a game that wants another draws its own from
+  `Dialogue.current`) and does not stop the hero while it shows, a line's `voice` plays nothing, and quest stages are GameVariables until a
   game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
   hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
   A machine has one conversation at a time (two local players cannot talk at once), and over the

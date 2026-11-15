@@ -5500,6 +5500,47 @@
       "guide": "dialogue.md"
     },
     {
+      "name": "DialogueBox",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.",
+      "methods": [
+        {
+          "name": "letters_shown",
+          "static": true,
+          "params": [
+            {"name": "letters", "type": "Integer"},
+            {"name": "seconds", "type": "Float"},
+            {"name": "speed", "type": "Float"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "how many of a line's letters show after that many seconds at that speed (0: all)"
+        },
+        {
+          "name": "whole?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the line it shows has all of its letters out"
+        },
+        {
+          "name": "pad",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the player whose gamepad works it (0 unless said)"
+        },
+        {
+          "name": "letters_per_second",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how fast a line appears (45 unless said; 0: at once)"
+        }
+      ],
+      "internal": [
+        "update"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
       "name": "Interaction",
       "kind": "module",
       "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",

@@ -49,6 +49,7 @@ prompt "Talk" (unless it has one) and starts the dialogue from `on_interact`:
 ```ruby
 find!("Baker").add_component(Talkable, dialogue: "baker")
 find!("Player").add_component(Interactor)
+find!("Player").add_component(DialogueBox)
 ```
 
 `Talkable` takes `dialogue` and the Interactable's settings (`prompt`, `range`, `priority`,
@@ -128,7 +129,23 @@ its own quest system sets `Dialogue.quests` to an object with `stage(name)` and
 
 ## Showing a conversation
 
-`Dialogue.current` is the conversation this machine's player is in, or `nil`:
+`DialogueBox` shows the player's conversation: a box at the bottom of the screen with who speaks
+and the line, which appears letter by letter, and the choices under it.
+
+| What | Keyboard | Gamepad | Touch or mouse |
+|---|---|---|---|
+| Show the whole line, then go on | Enter, Space or E | A or Y | tap the box |
+| Move among the choices | Up and Down | D-pad | |
+| Take a choice | Enter, Space or E | A or Y | tap it |
+| Leave the conversation | Backspace | B | the Skip button |
+
+It takes `pad` (whose gamepad works it: 0 unless said) and `letters_per_second` (45 unless said;
+0 shows each line at once). While a menu is open the box shows but takes no input, and while the
+player talks the Interactor has nothing in focus: the press that ends a conversation uses nothing
+else. The box does not stop the hero; a game that wants it still checks `Dialogue.busy?`.
+
+A game with a look of its own draws the conversation itself. `Dialogue.current` is the
+conversation this machine's player is in, or `nil`:
 
 ```ruby
 Dialogue.on(:line) do |conversation|

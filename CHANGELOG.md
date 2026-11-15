@@ -21,6 +21,10 @@ until 1.0, a release may change what games rely on (see
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. Quest stages are variables until a game sets
   `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
 - **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
   physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
   of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
