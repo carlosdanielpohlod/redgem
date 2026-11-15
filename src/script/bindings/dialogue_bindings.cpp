@@ -17,14 +17,9 @@ namespace {
 
 using namespace binding;
 
-// "dialogues/baker.json", as a message names it.
-std::string shown_file(const std::string& name) {
-  return std::string(config::kDialoguesDirName) + "/" + name + dialogue::kFileExtension;
-}
-
 // Every problem of a file, one line each, after the file's name.
 std::string problems_of(const std::string& name, const dialogue::DialogueFile& file) {
-  std::string text = shown_file(name) + ":";
+  std::string text = dialogue::shown_file(name) + ":";
   for (const std::string& error : file.errors) text += "\n  " + printable(error);
   return text;
 }
@@ -35,7 +30,7 @@ std::string text_of_dialogue(mrb_state* mrb, const std::string& name) {
   const auto bytes = path ? read_file_up_to(*path, dialogue::kMaxFileBytes) : std::nullopt;
   if (!bytes) {
     mrb_raisef(mrb, E_ARGUMENT_ERROR, "no dialogue %s: %s is not there (or is larger than %d bytes)", name.c_str(),
-               shown_file(name).c_str(), static_cast<int>(dialogue::kMaxFileBytes));
+               dialogue::shown_file(name).c_str(), static_cast<int>(dialogue::kMaxFileBytes));
   }
   return {reinterpret_cast<const char*>(bytes->data()), bytes->size()};
 }

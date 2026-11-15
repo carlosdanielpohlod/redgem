@@ -8,20 +8,38 @@ module Network
     # The host starts a conversation for the player of another machine (see Dialogue.start). True.
     def __talk(peer, script, actor, speaker)
       Dialogue.__follow(peer, script, actor, speaker)
-      __deliver(TALK, [script.name, __key_of(actor), speaker && __key_of(speaker)], peer)
+      __deliver(TALK, [script.name, __key_of(actor), speaker_key(speaker)], peer)
       true
     end
 
     private
 
+    # What the client finds the speaker by; nil for one it could not (a name too long or empty).
+    def speaker_key(speaker)
+      key = speaker && __key_of(speaker)
+      Said.object_key?(key) ? key : nil
+    end
+
     # (From the host only: no other machine starts conversations.)
     def receive_talk(data, from)
       return unless from == HOST && Said.talk?(data)
 
-      actor = @synced[data[1]]&.game_object
-      Dialogue.__here(Dialogue.load(data[0]), actor, speaker_called(data[2]), deciding: false) do |*step|
+      script = dialogue_here(data[0])
+      return unless script
+
+      Dialogue.__here(script, @synced[data[1]]&.game_object, speaker_called(data[2]), deciding: false) do |*step|
         tell_host(data[0], *step)
       end
+    end
+
+    # The dialogue the host named, as this machine's file has it. One it cannot read is said in the
+    # log, and the host forgets the conversation.
+    def dialogue_here(name)
+      Dialogue.load(name)
+    rescue ArgumentError => e
+      Debug.error(e.message)
+      __deliver(TALK_LEFT, [name], :host)
+      nil
     end
 
     def speaker_called(key) = key && objects_called(key).first
@@ -51,11 +69,12 @@ module Network
 
     def take_step(mirror, choice) = choice.nil? ? mirror.continue : mirror.choose(choice)
 
+    # (The host may put back a conversation that ended here too soon: its effects had not come yet.)
     def receive_talk_at(data, from)
-      current = Dialogue.current
-      return unless from == HOST && Said.talk_at?(data) && following?(current, data[0])
+      conversation = Dialogue.current || Dialogue.__last
+      return unless from == HOST && Said.talk_at?(data) && following?(conversation, data[0])
 
-      current.__jump(data[1])
+      Dialogue.__resume(conversation, data[1])
     end
 
     def receive_talk_left(data, from)

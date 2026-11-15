@@ -69,7 +69,8 @@ module Dialogue
       # (A variable never set counts from 0.)
       def add(effect, _conversation)
         name = effect["add"]
-        now = GameVariables[name] || 0
+        now = GameVariables[name]
+        now = 0 if now.nil?
         raise ArgumentError, "dialogue: cannot add to #{name}, which holds #{now.inspect}" unless now.is_a?(Numeric)
 
         GameVariables[name] = now + effect["by"]

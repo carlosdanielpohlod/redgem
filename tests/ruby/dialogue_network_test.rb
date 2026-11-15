@@ -221,3 +221,34 @@ class DialogueNetworkTest < RedGemTest::Case
     refute said.variables?({ "gold" => 1 })
   end
 end
+
+# What the host and a guest do when they did not see the same thing.
+class DialogueNetworkRecoveryTest < DialogueNetworkTest
+  def test_variables_put_back_whole_reach_everyone
+    Network.forget_sent
+    GameVariables.replace(gold: GOLD)
+    assert_equal [[Network::VARIABLES, [["gold", GOLD]], :all]], sent(Network::VARIABLES)
+    assert Network::Said.variables?(sent(Network::VARIABLES).first[1])
+  end
+
+  def test_the_host_puts_back_a_conversation_that_ended_too_soon_here
+    as(:guest)
+    receive(Network::TALK, ["gate", "Hero#2.1", nil], Network::HOST)
+    Dialogue.current.choose(1)
+    assert_nil Dialogue.current
+    receive(Network::TALK_AT, %w[gate open], Network::HOST)
+    assert_equal "open", Dialogue.current&.node_id
+  end
+
+  def test_a_dialogue_a_guest_cannot_read_is_left
+    as(:guest)
+    receive(Network::TALK, ["nowhere", "Hero#2.1", nil], Network::HOST)
+    assert_nil Dialogue.current
+    assert_equal [[Network::TALK_LEFT, ["nowhere"], :host]], sent(Network::TALK_LEFT)
+  end
+
+  def test_a_speaker_the_guest_could_not_find_goes_as_nobody
+    Dialogue.start("gate", actor: @guest_hero, speaker: NetworkedTalker.new("x" * (Network::Said::MAX_KEY_SIZE + 1)))
+    assert_equal [[Network::TALK, ["gate", "Hero#2.1", nil], GUEST]], sent(Network::TALK)
+  end
+end

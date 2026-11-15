@@ -361,6 +361,10 @@ fs::path dialogue_file(const fs::path& game_dir, std::string_view name) {
   return game_dir / config::kDialoguesDirName / (std::string(name) + kFileExtension);
 }
 
+std::string shown_file(std::string_view name) {
+  return std::string(config::kDialoguesDirName) + "/" + std::string(name) + kFileExtension;
+}
+
 std::vector<std::string> dialogue_names(const fs::path& game_dir) {
   std::vector<std::string> names;
   const fs::path folder = game_dir / config::kDialoguesDirName;

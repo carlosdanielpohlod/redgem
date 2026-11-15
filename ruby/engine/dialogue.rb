@@ -77,13 +77,24 @@ module Dialogue
       (@handlers[event] ||= []) << block
     end
 
+    # This machine's player's last conversation, or nil.
+    def __last = @last
+
+    # Puts this machine's player's conversation where the host says (nil: the end), even one that
+    # had ended here.
+    def __resume(conversation, node_id)
+      @current = conversation unless node_id.nil?
+      conversation.__jump(node_id)
+    end
+
     # The host's copy of another player's conversation, or nil.
     def __mirror_of(peer) = @mirrors[peer]
 
     # Starts this machine's player's conversation. deciding: its effects happen here.
     def __here(script, actor, speaker, deciding:, &stepped)
       @current&.stop(quietly: true)
-      @current = Conversation.new(script, actor: actor, speaker: speaker, deciding: deciding, shown: true, &stepped)
+      @current = @last = Conversation.new(script, actor: actor, speaker: speaker, deciding: deciding, shown: true,
+                                          &stepped)
       tell(:start, @current)
       @current.begin
     end
@@ -101,6 +112,7 @@ module Dialogue
     def __network_gone
       @mirrors = {}
       @current&.stop(quietly: true) unless @current&.deciding?
+      @last = nil
     end
 
     # Called by a conversation as it moves on and ends.
@@ -114,6 +126,7 @@ module Dialogue
     # Called by the engine when a level is loaded: every conversation ends with it.
     def __scene_reset
       @current&.stop(quietly: true)
+      @last = nil
       @handlers = {}
       @scripts = {}
       @mirrors = {}

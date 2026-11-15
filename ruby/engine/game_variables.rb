@@ -39,7 +39,7 @@ module GameVariables
       raise ArgumentError, "only the host changes GameVariables in a game over the network" if client?
 
       put_all(checked_all(values))
-      Network.__deliver(Network::VARIABLES, @values, :all) if Network.online?
+      Network.__deliver(Network::VARIABLES, @values.to_a, :all) if Network.online?
       to_h
     end
 

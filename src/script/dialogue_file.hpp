@@ -53,6 +53,9 @@ bool is_dialogue_name(std::string_view name);
 // The file of a dialogue in a game: <game>/dialogues/<name>.json.
 std::filesystem::path dialogue_file(const std::filesystem::path& game_dir, std::string_view name);
 
+// How a message names a dialogue's file: "dialogues/baker.json".
+std::string shown_file(std::string_view name);
+
 // The dialogues of a game, by name ("village/baker"), sorted.
 std::vector<std::string> dialogue_names(const std::filesystem::path& game_dir);
 

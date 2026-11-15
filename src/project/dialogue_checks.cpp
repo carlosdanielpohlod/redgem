@@ -26,11 +26,6 @@ struct DialogueChecks {
   CheckReport& report;
 };
 
-// "dialogues/baker.json".
-std::string shown_file(const std::string& name) {
-  return std::string(config::kDialoguesDirName) + "/" + name + dialogue::kFileExtension;
-}
-
 bool game_has_text(const DialogueChecks& checks, const std::string& language, const std::string& key) {
   return checks.locales.texts.find(language_key(language), key) != nullptr;
 }
@@ -83,7 +78,7 @@ void add_lines(std::vector<std::string>& to, const std::string& file, const std:
 }
 
 void check_dialogue(const DialogueChecks& checks, const std::string& name) {
-  const std::string file = shown_file(name);
+  const std::string file = dialogue::shown_file(name);
   const auto bytes = read_file_up_to(dialogue::dialogue_file(checks.game_dir, name), dialogue::kMaxFileBytes);
   if (!bytes) {
     checks.report.errors.push_back(

@@ -352,6 +352,8 @@ not a promise of how it will be closed.
   `Dialogue.current`), a line's `voice` plays nothing, and quest stages are GameVariables until a
   game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
   hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
+  A machine has one conversation at a time (two local players cannot talk at once), and over the
+  network a speaker without a NetworkSync is found on the client by its name.
   An Interactor's line of sight is one ray
   between the actor's and the target's positions (a target whose position is inside the ground or
   a wall is never in sight, and a thin gap can show something mostly hidden), there is no
