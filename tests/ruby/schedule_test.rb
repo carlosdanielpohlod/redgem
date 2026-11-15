@@ -87,14 +87,22 @@ class ScheduleTest < RedGemTest::Case
     assert_raises(ArgumentError) { GameClock.set(hour: 24) }
     assert_raises(ArgumentError) { GameClock.set(hour: 6, minute: 60) }
     assert_raises(ArgumentError) { GameClock.speed = -1 }
+    assert_raises(ArgumentError) { GameClock.set(hour: 6, day: 0) }
+    assert_raises(ArgumentError) { GameClock.set(hour: 6.5) }
+  end
+
+  def test_nothing_saved_leaves_the_clock_as_it_is
+    GameClock.restore(nil)
+    assert_equal "06:00", GameClock.to_s
+    assert_raises(ArgumentError) { GameClock.restore({ seconds: 0.0, speed: -60.0 }) }
   end
 
   def test_a_plan_says_what_it_is_time_for_through_midnight
     plan = Schedule.parse(PLAN)
-    assert_equal :work, Schedule.activity_at(plan, 6.0)
-    assert_equal :eat, Schedule.activity_at(plan, 13.0)
-    assert_equal :sleep, Schedule.activity_at(plan, 23.0)
-    assert_equal :sleep, Schedule.activity_at(plan, 3.0), "the night goes on from the day before"
+    assert_equal :work, Schedule.activity_at(plan, Schedule.minute_of("06:00"))
+    assert_equal :eat, Schedule.activity_at(plan, Schedule.minute_of("13:00"))
+    assert_equal :sleep, Schedule.activity_at(plan, Schedule.minute_of("23:00"))
+    assert_equal :sleep, Schedule.activity_at(plan, Schedule.minute_of("03:00")), "the night goes on"
   end
 
   def test_a_plan_may_be_text_as_a_blender_property_is
@@ -105,6 +113,15 @@ class ScheduleTest < RedGemTest::Case
     assert_raises(ArgumentError) { Schedule.parse("6 work") }
     assert_raises(ArgumentError) { Schedule.parse("25:00 work") }
     assert_raises(ArgumentError) { Schedule.parse("06:00 work hard") }
+    assert_raises(ArgumentError) { Schedule.parse("06:30:99 work") }
+    assert_raises(ArgumentError) { Schedule.parse("06:00 work, 06:00 eat") }
+  end
+
+  def test_every_minute_set_reads_back_as_it_was
+    GameClock.set(hour: 1, minute: 1)
+    assert_equal "01:01", GameClock.to_s
+    GameClock.set(hour: 6, minute: 7)
+    assert_equal :sell, Schedule.activity_at(Schedule.parse("06:00 bake, 06:07 sell"), GameClock.minute_of_day)
   end
 
   def test_a_schedule_tells_its_object_when_an_activity_starts

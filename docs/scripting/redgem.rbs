@@ -693,7 +693,7 @@ class Animator
   def root_motion=: (bool on) -> bool
   # whether all its clips move the object
   def root_motion?: () -> bool
-  # turns a bone (the head unless said) toward a point or an object, at most max_angle degrees off its clips' pose, easing in; call it every frame to follow
+  # turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
   def look_at: (Vector3 | GameObject target, ?bone: String | Symbol | GameObject, ?max_angle: Numeric) -> void
   # the bone goes back to its clips' pose, easing out
   def look_away: (?bone: String | Symbol | GameObject) -> void
@@ -1407,20 +1407,22 @@ module GameClock
   def self.hour: () -> Float
   # the minute of the hour
   def self.minute: () -> Integer
+  # whole minutes since midnight: 0 up to 1439
+  def self.minute_of_day: () -> Integer
   # the day it is, from 1
   def self.day: () -> Integer
   # the time as "HH:MM"
   def self.to_s: () -> String
-  # sets the time of day (and the day)
-  def self.set: (hour: Numeric, ?minute: Numeric, ?day: Integer) -> void
+  # sets the time of day in whole hours and minutes (and the day, from 1)
+  def self.set: (hour: Integer, ?minute: Integer, ?day: Integer) -> void
   # game seconds for each second of game time (60 unless said)
   def self.speed: () -> Float
   # changes it (0 stops the clock)
   def self.speed=: (Numeric value) -> Numeric
   # what to save: { seconds:, speed: }
   def self.state: () -> Hash[Symbol, Float]
-  # back to a saved state
-  def self.restore: (Hash[Symbol | String, Numeric] saved) -> void
+  # back to a saved state; nil (nothing saved yet) leaves the clock as it is
+  def self.restore: (Hash[Symbol | String, Numeric] | nil saved) -> void
   # seconds of the world's time since the first day began
   def self.seconds: () -> Float
 end
@@ -1429,16 +1431,16 @@ end
 class Schedule < Behaviour
   # the activity it is time for, or nil
   def current: () -> (Symbol | nil)
-  # [[hour, activity], ...] in the order of the day
-  def plan: () -> Array[[Float, Symbol]]
+  # [[minute of the day, activity], ...] in the order of the day
+  def plan: () -> Array[[Integer, Symbol]]
   # changes the plan: { "06:00" => :work } or "06:00 work, ..."
   def plan=: (Hash[String, Symbol | String] | String given) -> (Hash[String, Symbol | String] | String)
   # a plan as given, in the order of the day
-  def self.parse: (Hash[String, Symbol | String] | String given) -> Array[[Float, Symbol]]
-  # what a plan says for an hour of the day
-  def self.activity_at: (Array[[Float, Symbol]] plan, Numeric hour) -> (Symbol | nil)
-  # "06:30" (or 6.5) as hours
-  def self.hour_of: (String | Numeric time) -> Float
+  def self.parse: (Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]
+  # what a plan says for a minute of the day
+  def self.activity_at: (Array[[Integer, Symbol]] plan, Integer minute_of_day) -> (Symbol | nil)
+  # "06:30" as minutes of the day (390)
+  def self.minute_of: (String time) -> Integer
 end
 
 # A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.

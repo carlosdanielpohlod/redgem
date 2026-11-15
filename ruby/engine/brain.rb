@@ -165,7 +165,7 @@ class Brain < Behaviour
     return if @checked
 
     names = self.class.states.keys
-    wrong = (sources - [ANY] + destinations - [SCHEDULED] + [self.class.initial]).uniq - names
+    wrong = (sources - [ANY] + (destinations - [SCHEDULED]) + [self.class.initial]).uniq - names
     raise ArgumentError, "#{self.class} has transitions or an initial state unknown: #{wrong.inspect}" unless
       wrong.empty?
 
@@ -178,6 +178,8 @@ class Brain < Behaviour
   # The state the first transition that may be taken leads to, or nil.
   def choice(transitions, payload)
     transitions.each do |transition|
+      next unless could_start?(transition)
+
       target = target_of(transition, payload)
       return target if target && allowed?(transition, target, payload)
     end
@@ -200,6 +202,10 @@ class Brain < Behaviour
   end
 
   def transitions_on(event) = self.class.transitions.select { |transition| transition.event == event }
+
+  # What a transition needs whatever it leads to: to start from this state (or :any), with its
+  # time in the state gone by.
+  def could_start?(transition) = [state, ANY].include?(transition.from) && waited?(transition)
 
   def allowed?(transition, target, payload)
     starts_here?(transition, target) && waited?(transition) && guards_agree?(transition, payload)

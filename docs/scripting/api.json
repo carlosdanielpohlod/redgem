@@ -2716,7 +2716,7 @@
             {"name": "max_angle", "type": "Numeric", "keyword": true, "optional": true, "default": "60.0"}
           ],
           "returns": {"type": "void"},
-          "about": "turns a bone (the head unless said) toward a point or an object, at most max_angle degrees off its clips' pose, easing in; call it every frame to follow"
+          "about": "turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away"
         },
         {
           "name": "look_away",
@@ -5617,6 +5617,13 @@
           "about": "the minute of the hour"
         },
         {
+          "name": "minute_of_day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "whole minutes since midnight: 0 up to 1439"
+        },
+        {
           "name": "day",
           "static": true,
           "params": [],
@@ -5634,12 +5641,12 @@
           "name": "set",
           "static": true,
           "params": [
-            {"name": "hour", "type": "Numeric", "keyword": true},
-            {"name": "minute", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "hour", "type": "Integer", "keyword": true},
+            {"name": "minute", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
             {"name": "day", "type": "Integer", "keyword": true, "optional": true, "default": "GameClock.day"}
           ],
           "returns": {"type": "void"},
-          "about": "sets the time of day (and the day)"
+          "about": "sets the time of day in whole hours and minutes (and the day, from 1)"
         },
         {
           "name": "speed",
@@ -5668,10 +5675,10 @@
           "name": "restore",
           "static": true,
           "params": [
-            {"name": "saved", "type": "Hash[Symbol | String, Numeric]"}
+            {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
           ],
           "returns": {"type": "void"},
-          "about": "back to a saved state"
+          "about": "back to a saved state; nil (nothing saved yet) leaves the clock as it is"
         },
         {
           "name": "seconds",
@@ -5698,8 +5705,8 @@
         {
           "name": "plan",
           "params": [],
-          "returns": {"type": "Array[[Float, Symbol]]"},
-          "about": "[[hour, activity], ...] in the order of the day"
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "[[minute of the day, activity], ...] in the order of the day"
         },
         {
           "name": "plan=",
@@ -5715,27 +5722,27 @@
           "params": [
             {"name": "given", "type": "Hash[String, Symbol | String] | String"}
           ],
-          "returns": {"type": "Array[[Float, Symbol]]"},
+          "returns": {"type": "Array[[Integer, Symbol]]"},
           "about": "a plan as given, in the order of the day"
         },
         {
           "name": "activity_at",
           "static": true,
           "params": [
-            {"name": "plan", "type": "Array[[Float, Symbol]]"},
-            {"name": "hour", "type": "Numeric"}
+            {"name": "plan", "type": "Array[[Integer, Symbol]]"},
+            {"name": "minute_of_day", "type": "Integer"}
           ],
           "returns": {"type": "Symbol | nil"},
-          "about": "what a plan says for an hour of the day"
+          "about": "what a plan says for a minute of the day"
         },
         {
-          "name": "hour_of",
+          "name": "minute_of",
           "static": true,
           "params": [
-            {"name": "time", "type": "String | Numeric"}
+            {"name": "time", "type": "String"}
           ],
-          "returns": {"type": "Float"},
-          "about": "\"06:30\" (or 6.5) as hours"
+          "returns": {"type": "Integer"},
+          "about": "\"06:30\" as minutes of the day (390)"
         }
       ],
       "internal": [
@@ -5790,6 +5797,7 @@
         }
       ],
       "internal": [
+        "on_destroy",
         "start",
         "update"
       ],

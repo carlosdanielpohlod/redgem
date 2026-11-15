@@ -13,13 +13,14 @@
 class Schedule < Behaviour
   ENTRY_SEPARATOR = ",".freeze
   TIME_SEPARATOR = ":".freeze
+  TIME_PARTS = 2   # hours and minutes
   DECIMAL = 10
   MINUTES_PER_HOUR = GameClock::MINUTES_PER_HOUR
 
   # The activity it is time for now, or nil when the plan is empty.
-  def current = Schedule.activity_at(plan, GameClock.hour)
+  def current = Schedule.activity_at(plan, GameClock.minute_of_day)
 
-  # [[hour, activity], ...], in the order of the day.
+  # [[minute of the day, activity], ...], in the order of the day.
   def plan = @plan ||= Schedule.parse(prop(:plan, {}))
 
   def plan=(given)
@@ -40,41 +41,46 @@ class Schedule < Behaviour
   class << self
     # A plan as given (a hash of "HH:MM" => activity, or "HH:MM activity, ..."), in the order of the day.
     def parse(given)
-      pairs = given.is_a?(String) ? given.split(ENTRY_SEPARATOR).map { |entry| split_entry(entry) } : given.to_a
-      pairs.map { |time, activity| [hour_of(time), activity.to_sym] }.sort_by(&:first)
+      plan = entries_of(given).map { |time, activity| [minute_of(time), activity.to_sym] }.sort_by(&:first)
+      starts = plan.map(&:first)
+      raise ArgumentError, "Schedule plan has two entries at one time: #{given.inspect}" unless starts.uniq == starts
+
+      plan
     end
 
-    # What a plan says for an hour of the day: the last entry started, or the day's last one.
-    def activity_at(plan, hour)
-      started = plan.select { |start, _activity| start <= hour }
+    # What a plan says for a minute of the day: the last entry started, or the day's last one.
+    def activity_at(plan, minute_of_day)
+      started = plan.select { |start, _activity| start <= minute_of_day }
       (started.last || plan.last)&.last
     end
 
-    # "06:30" (or 6.5) as hours.
-    def hour_of(time)
-      return check_hour(Float(time), time) if time.is_a?(Numeric)
+    # "06:30" as minutes of the day (390).
+    def minute_of(time)
+      parts = time.to_s.split(TIME_SEPARATOR)
+      raise ArgumentError, "Schedule time #{time.inspect} is not HH:MM" unless parts.size == TIME_PARTS
 
-      hours, minutes = time.to_s.split(TIME_SEPARATOR).map { |part| Integer(part, DECIMAL) }
-      raise ArgumentError, "Schedule time #{time.inspect} is not HH:MM" unless minute?(minutes)
-
-      check_hour(hours + minutes.to_f / MINUTES_PER_HOUR, time)
+      hours, minutes = parts.map { |part| Integer(part, DECIMAL) }
+      check(hours, GameClock::HOUR_RANGE, time)
+      check(minutes, GameClock::MINUTE_RANGE, time)
+      hours * MINUTES_PER_HOUR + minutes
     end
 
     private
 
-    def minute?(minutes) = !minutes.nil? && minutes.between?(0, MINUTES_PER_HOUR - 1)
+    # [time, activity] pairs, from a hash or from text.
+    def entries_of(given)
+      given.is_a?(String) ? given.split(ENTRY_SEPARATOR).map { |entry| split_entry(entry) } : given.to_a
+    end
+
+    def check(value, range, time)
+      raise ArgumentError, "Schedule time #{time.inspect} is not in the day" unless range.cover?(value)
+    end
 
     def split_entry(entry)
       time, activity, extra = entry.split
       raise ArgumentError, "Schedule entry #{entry.inspect} is not \"HH:MM activity\"" unless activity && extra.nil?
 
       [time, activity]
-    end
-
-    def check_hour(hour, given)
-      raise ArgumentError, "Schedule time #{given.inspect} is not in the day" unless GameClock::HOUR_RANGE.cover?(hour)
-
-      hour
     end
   end
 end

@@ -139,7 +139,7 @@ not; the noise's `source` does not hear itself. Its object's behaviours hear
 | `watch` | the tag of what it looks for | the heroes |
 
 Each setting is also a Blender property of the object. One that is not a number from 0 up
-raises as the behaviour starts. While the game is paused it notices nothing new.
+raises as the behaviour starts, and so does a plan with two entries at one time. While the game is paused it notices nothing new.
 
 ## Daily schedules
 
@@ -151,10 +151,10 @@ second, and a day takes 24 minutes. It goes on across levels.
 GameClock.to_s                        # "06:30"
 GameClock.hour                        # 6.5
 GameClock.day                         # 1
-GameClock.set(hour: 21, minute: 30)   # night falls (day: too, when given)
+GameClock.set(hour: 21, minute: 30)   # night falls (whole numbers; day: too, from 1)
 GameClock.speed = 120.0               # game seconds each second: a day in 12 minutes (0 stops it)
 Save.set(:clock, GameClock.state)     # saving it is the game's ...
-GameClock.restore(Save.get(:clock))   # ... and so is restoring it
+GameClock.restore(Save.get(:clock))   # ... and restoring it (nil, nothing saved yet: as it is)
 ```
 
 A `Schedule` is an NPC's day: what it does from what time. Each entry lasts until the next, and
@@ -183,7 +183,7 @@ end
 
 A transition to `:scheduled` is not taken when the brain has no state of that activity's name,
 and it never leads to the state the brain is in. A plan that is not `"HH:MM activity"` entries
-raises as the behaviour starts.
+raises as the behaviour starts, and so does a plan with two entries at one time.
 
 ## Head look-at
 
@@ -192,14 +192,15 @@ after the clips and the scripts each frame, no further than a largest angle off 
 gave it, and eases in as it starts and out as it stops:
 
 ```ruby
-animation.look_at(player)                                # the "Head" bone, at most 60 degrees
+animation.look_at(player)                                # the "Head" bone toward its eyes, at most 60 degrees
 animation.look_at(Vector3.new(0, 2, 5), bone: "Neck", max_angle: 45.0)
 animation.look_away                                      # back to the clips' pose
 animation.looking?                                       # still turned, or on its way back
 animation.bone("Head")                                   # the bone object, or nil
 ```
 
-Call `look_at` every frame to follow something that moves. A bone is found under the character by
+A bone looks at an object's eyes (1.6 m above its origin) and holds there until `look_away`; call
+`look_at` every frame to follow something that moves. A bone is found under the character by
 its name, or by that name after a rig's prefix (`"mixamorig:Head"` is a `"Head"`). Its forward is
 the way the character faced when it started to look.
 

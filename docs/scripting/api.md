@@ -483,7 +483,7 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `off(Integer listener) -> nil`: stops calling a block that on or on_marker returned
 - `root_motion = bool on`: whether all its clips move the object by their root's horizontal motion and turning
 - `root_motion? -> bool`: whether all its clips move the object
-- `look_at(Vector3 | GameObject target, bone: String | Symbol | GameObject = "Head", max_angle: Numeric = 60.0) -> void`: turns a bone (the head unless said) toward a point or an object, at most max_angle degrees off its clips' pose, easing in; call it every frame to follow
+- `look_at(Vector3 | GameObject target, bone: String | Symbol | GameObject = "Head", max_angle: Numeric = 60.0) -> void`: turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
 - `look_away(bone: String | Symbol | GameObject = "Head") -> void`: the bone goes back to its clips' pose, easing out
 - `looking?(bone: String | Symbol | GameObject = "Head") -> bool`: whether a bone is turned toward something, or on its way back
 - `bone(String | Symbol name) -> GameObject | nil`: the object under the character with that name (or that name after a rig's prefix:), or nil
@@ -967,13 +967,14 @@ The time of day in the game's world, on game time: what schedules follow. See [n
 
 - `GameClock.hour -> Float`: the hour of the day, its minutes as a fraction: 0 up to 24
 - `GameClock.minute -> Integer`: the minute of the hour
+- `GameClock.minute_of_day -> Integer`: whole minutes since midnight: 0 up to 1439
 - `GameClock.day -> Integer`: the day it is, from 1
 - `GameClock.to_s -> String`: the time as "HH:MM"
-- `GameClock.set(hour: Numeric, minute: Numeric = 0, day: Integer = GameClock.day) -> void`: sets the time of day (and the day)
+- `GameClock.set(hour: Integer, minute: Integer = 0, day: Integer = GameClock.day) -> void`: sets the time of day in whole hours and minutes (and the day, from 1)
 - `GameClock.speed -> Float`: game seconds for each second of game time (60 unless said)
 - `GameClock.speed = Numeric value`: changes it (0 stops the clock)
 - `GameClock.state -> Hash[Symbol, Float]`: what to save: { seconds:, speed: }
-- `GameClock.restore(Hash[Symbol | String, Numeric] saved) -> void`: back to a saved state
+- `GameClock.restore(Hash[Symbol | String, Numeric] | nil saved) -> void`: back to a saved state; nil (nothing saved yet) leaves the clock as it is
 - `GameClock.seconds -> Float`: seconds of the world's time since the first day began
 
 ## Schedule
@@ -981,11 +982,11 @@ The time of day in the game's world, on game time: what schedules follow. See [n
 A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). See [npcs.md#daily-schedules](npcs.md#daily-schedules).
 
 - `current -> Symbol | nil`: the activity it is time for, or nil
-- `plan -> Array[[Float, Symbol]]`: [[hour, activity], ...] in the order of the day
+- `plan -> Array[[Integer, Symbol]]`: [[minute of the day, activity], ...] in the order of the day
 - `plan = Hash[String, Symbol | String] | String given`: changes the plan: { "06:00" => :work } or "06:00 work, ..."
-- `Schedule.parse(Hash[String, Symbol | String] | String given) -> Array[[Float, Symbol]]`: a plan as given, in the order of the day
-- `Schedule.activity_at(Array[[Float, Symbol]] plan, Numeric hour) -> Symbol | nil`: what a plan says for an hour of the day
-- `Schedule.hour_of(String | Numeric time) -> Float`: "06:30" (or 6.5) as hours
+- `Schedule.parse(Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]`: a plan as given, in the order of the day
+- `Schedule.activity_at(Array[[Integer, Symbol]] plan, Integer minute_of_day) -> Symbol | nil`: what a plan says for a minute of the day
+- `Schedule.minute_of(String time) -> Integer`: "06:30" as minutes of the day (390)
 
 ## HeadLook
 

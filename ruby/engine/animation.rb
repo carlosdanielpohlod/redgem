@@ -146,12 +146,14 @@ class Animator
   HEAD = "Head".freeze     # the bone look_at turns unless told
   LOOK_ANGLE = 60.0        # degrees: the most the bone turns off its pose
   PREFIX_SEPARATOR = ":".freeze   # "mixamorig:Head" is a "Head"
+  EYE_HEIGHT = 1.6         # meters above an object's origin look_at looks at: someone's eyes
 
-  # Turns a bone (a name, or the object; the head unless said) toward a point or an object, at
-  # most max_angle degrees off the pose its clips give it, easing in. Call it every frame to follow
-  # something that moves. The bone's forward is the way the character faces when it starts.
+  # Turns a bone (a name, or the object; the head unless said) toward a point, or an object's eyes
+  # (EYE_HEIGHT above its origin), at most max_angle degrees off the pose its clips give it, easing
+  # in. It holds there until look_away; call it every frame to follow something that moves. The
+  # bone's forward is the way the character faces when it starts.
   def look_at(target, bone: HEAD, max_angle: LOOK_ANGLE)
-    point = target.is_a?(Vector3) ? target : target.transform.position
+    point = target.is_a?(Vector3) ? target : target.transform.position + Vector3.up * EYE_HEIGHT
     @game_object.__look_at(bone_of(bone), point, Float(max_angle))
   end
 
@@ -179,5 +181,11 @@ class Animator
 
   private
 
-  def bone_of(given) = given.is_a?(GameObject) ? given : bone!(given)
+  # A bone given by its object, or by its name (found once, while it lasts).
+  def bone_of(given)
+    return given if given.is_a?(GameObject)
+
+    found = (@bones ||= {})[given.to_s]
+    found&.alive? ? found : @bones[given.to_s] = bone!(given)
+  end
 end

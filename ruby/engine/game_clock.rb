@@ -13,7 +13,9 @@
 module GameClock
   HOURS_PER_DAY = 24
   MINUTES_PER_HOUR = 60
-  SECONDS_PER_HOUR = 3600.0
+  SECONDS_PER_MINUTE = 60
+  SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
+  MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR
   SECONDS_PER_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR
   START_HOUR = 6
   FIRST_DAY = 1
@@ -25,20 +27,26 @@ module GameClock
 
   class << self
     # The hour of the day, with its minutes as a fraction: 0 up to (not including) 24.
-    def hour = (seconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR
+    def hour = time_of_day.to_f / SECONDS_PER_HOUR
 
-    def minute = ((hour % 1) * MINUTES_PER_HOUR).floor
+    # The minute of the hour.
+    def minute = minute_of_day % MINUTES_PER_HOUR
+
+    # Whole minutes since midnight: 0 up to 1439.
+    def minute_of_day = (time_of_day / SECONDS_PER_MINUTE).floor
 
     # The day it is, from 1.
     def day = FIRST_DAY + (seconds / SECONDS_PER_DAY).floor
 
-    def to_s = format(CLOCK_FORMAT, hour.floor, minute)
+    def to_s = format(CLOCK_FORMAT, minute_of_day / MINUTES_PER_HOUR, minute)
 
-    # Sets the time of day (and the day, when given).
+    # Sets the time of day, in whole hours and minutes (and the day, from 1, when given).
     def set(hour:, minute: 0, day: self.day)
       check(hour, HOUR_RANGE, :hour)
       check(minute, MINUTE_RANGE, :minute)
-      start_at(((day - FIRST_DAY) * HOURS_PER_DAY + hour + minute.to_f / MINUTES_PER_HOUR) * SECONDS_PER_HOUR)
+      raise ArgumentError, "GameClock day must be a whole number from 1, not #{day.inspect}" unless whole_day?(day)
+
+      start_at((day - FIRST_DAY) * SECONDS_PER_DAY + hour * SECONDS_PER_HOUR + minute * SECONDS_PER_MINUTE)
     end
 
     def speed = @speed || SPEED
@@ -56,10 +64,12 @@ module GameClock
     # What to save: { seconds:, speed: }.
     def state = { seconds: seconds, speed: speed }
 
-    # Back to a saved state.
+    # Back to a saved state; nil (nothing saved yet) leaves the clock as it is.
     def restore(saved)
+      return if saved.nil?
+
+      self.speed = saved[:speed] || saved["speed"] || SPEED
       start_at(Float(saved[:seconds] || saved["seconds"]))
-      @speed = Float(saved[:speed] || saved["speed"] || SPEED)
     end
 
     # Seconds of the world's time since the first day began.
@@ -67,14 +77,20 @@ module GameClock
 
     private
 
+    def time_of_day = seconds % SECONDS_PER_DAY
+
     def start_at(world_seconds)
+      raise ArgumentError, "GameClock cannot go before its first day, to #{world_seconds}" if world_seconds.negative?
+
       @since = world_seconds
       @set_at = Time.elapsed
     end
 
     def check(value, range, name)
-      raise ArgumentError, "GameClock #{name} must be in #{range}, not #{value.inspect}" unless
-        value.is_a?(Numeric) && range.cover?(value)
+      raise ArgumentError, "GameClock #{name} must be a whole number in #{range}, not #{value.inspect}" unless
+        value.is_a?(Integer) && range.cover?(value)
     end
+
+    def whole_day?(day) = day.is_a?(Integer) && day >= FIRST_DAY
   end
 end

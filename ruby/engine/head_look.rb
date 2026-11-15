@@ -28,6 +28,11 @@ class HeadLook < Behaviour
     animation.look_at(point_of(looked), bone: bone, max_angle: angle)
   end
 
+  # Its head goes back to its pose with it.
+  def on_destroy
+    animation.look_away(bone: @bone) if @bone&.alive?
+  end
+
   # The head's bone (an object under this one).
   def bone = @bone ||= animation.bone!(prop(:bone, Animator::HEAD))
 
