@@ -6,6 +6,9 @@
 #include <optional>
 #include <string>
 
+#include "audio/audio_effects.hpp"
+#include "audio/envelope_follower.hpp"
+#include "audio/mix_group_tree.hpp"
 #include "audio/mix_groups.hpp"
 #include "core/math.hpp"
 
@@ -72,25 +75,41 @@ bool valid_spatial_sound(const SpatialSound& sound);
 // A flat sound's mix is its own volume, centered.
 std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const SpatialSound& sound);
 // Raylib processors receive interleaved float stereo after conversion to the device mix format.
+inline constexpr std::size_t kDeviceChannels = 2;
 void spatial_mono_frames(float* samples, unsigned frames);
 
 class SoundDriver {
  public:
   virtual ~SoundDriver() = default;
-  // False must leave no stream behind. Apply the initial mix and pitch before playback begins.
-  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) = 0;
+  // False must leave no stream behind. Apply the initial mix, pitch and effects (its group's)
+  // before playback begins.
+  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                     const VoiceEffects& effects) = 0;
   virtual void update(SoundSourceId id) = 0;
   virtual bool playing(SoundSourceId id) const = 0;
   virtual void mix(SoundSourceId id, SpatialMix mix) = 0;
   virtual void pitch(SoundSourceId id, float pitch) = 0;
+  // The effects of its group when they change (a backend with none ignores them).
+  virtual void effects(SoundSourceId, const VoiceEffects&) {}
+  // Ends every group's reverb and its tail, when the game's groups end.
+  virtual void close_reverbs() {}
   virtual void stop(SoundSourceId id) = 0;
+  // Measures how loud a sound that started is from now on: one of the voice group or a group
+  // under it (a backend that cannot ignores it).
+  virtual void measure(SoundSourceId) {}
+  // How loud the source's own samples were in the last block it played (0 to 1, before its volume):
+  // for the sounds it measures, 0 for the others and where nothing measures.
+  virtual float level(SoundSourceId) const { return kSilence; }
 };
 
 // Every sound a game holds a handle to, flat or positional, in one id space. Logical voice
 // ownership is independent of the audio device, so lifecycle controls are testable.
 class SoundPool {
  public:
-  explicit SoundPool(SoundDriver& driver) : driver_(driver) {}
+  // Its own groups, or the audio's, which it reads (after a change to them, refresh and
+  // refresh_effects).
+  explicit SoundPool(SoundDriver& driver) : driver_(driver), groups_(own_groups_) {}
+  SoundPool(SoundDriver& driver, MixGroupTree& groups) : driver_(driver), groups_(groups) {}
   ~SoundPool() { clear(); }
   SoundPool(const SoundPool&) = delete;
   SoundPool& operator=(const SoundPool&) = delete;
@@ -103,15 +122,25 @@ class SoundPool {
   bool move(SoundSourceId id, Vec3 position);
   // False for a sound that no longer plays, or levels a sound cannot have (it keeps its own).
   bool set_levels(SoundSourceId id, const SoundLevels& levels);
-  // The volume every sound of the group is heard at, times its own.
+  // The player's volume of one of the engine's groups: every sound of it and under it is heard at
+  // it, times its own.
   void set_group_volume(MixGroup group, float volume);
   // A gain the engine puts over a group, apart from the player's volume: the music ducked under a
   // voice.
   void set_group_gain(MixGroup group, float gain);
-  // Whether any sound of the group still plays and is heard (not at volume 0, out of reach or in
-  // a group the player muted).
+  // Whether any sound of the group, or of a group under it, still plays and is heard (not at
+  // volume 0, out of reach or in a group the player muted).
   bool group_heard(MixGroup group) const;
+  // Every sound mixed again, and given its effects again: after the groups changed.
+  void refresh();
+  void refresh_effects();
+  void close_reverbs() { driver_.close_reverbs(); }
   bool playing(SoundSourceId id) const;
+  // How loud a sound of the voice group is as it plays, smoothed (see EnvelopeFollower); 0 for
+  // other sounds, and once it ended.
+  float loudness(SoundSourceId id) const;
+  // The loudness of every voice moves on by `seconds` toward what its driver measured.
+  void follow(float seconds);
   bool stop(SoundSourceId id);
   void clear();
   void update();
@@ -125,14 +154,16 @@ class SoundPool {
   SoundSourceId start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
                             std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
-  void refresh();
   void reap();  // lets go of the sounds that ended
+  void forget(std::map<SoundSourceId, SpatialSound>::iterator sound);
+  void keep(SoundSourceId id, const SpatialSound& sound);  // a sound that started
   SoundDriver& driver_;
+  MixGroupTree own_groups_;
+  MixGroupTree& groups_;
   AudioListener listener_;
-  GroupVolumes group_volumes_ = kFullGroupVolumes;
-  GroupVolumes group_gains_ = kFullGroupVolumes;
   std::map<SoundSourceId, SpatialSound> sounds_;
-  std::uint64_t next_ = 1;  // never reuse handles, including across game changes
+  std::map<SoundSourceId, EnvelopeFollower> loudness_;  // of the sounds of the voice group
+  std::uint64_t next_ = 1;                              // never reuse handles, including across game changes
 };
 
 }  // namespace redgem
