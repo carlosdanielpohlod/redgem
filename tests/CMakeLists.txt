@@ -224,6 +224,7 @@ add_executable(redgem_tests
   integration/scene_joints_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
+  integration/symbol_cache_test.cpp
   integration/script_budget_test.cpp
   integration/script_budget_clock_test.cpp
   integration/save_budget_test.cpp
