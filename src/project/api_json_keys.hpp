@@ -20,6 +20,8 @@ inline constexpr const char* kSuperclass = "superclass";
 inline constexpr const char* kGuide = "guide";
 inline constexpr const char* kMethods = "methods";
 inline constexpr const char* kInternal = "internal";
+// A class's and a method's: whether games may rely on it (see docs/scripting/stability.md).
+inline constexpr const char* kStability = "stability";
 // A method's.
 inline constexpr const char* kStatic = "static";
 inline constexpr const char* kParams = "params";
@@ -36,5 +38,8 @@ inline constexpr const char* kDefault = "default";
 // What a class's kind is.
 inline constexpr const char* kClassKind = "class";
 inline constexpr const char* kModuleKind = "module";
+// What a stability is.
+inline constexpr const char* kStable = "stable";
+inline constexpr const char* kExperimental = "experimental";
 
 }  // namespace redgem::tools::api_keys

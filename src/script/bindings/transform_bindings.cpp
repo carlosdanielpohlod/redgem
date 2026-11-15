@@ -56,6 +56,18 @@ mrb_value transform_set_rotation(mrb_state* mrb, mrb_value self) {
   return value;
 }
 
+mrb_value transform_local_rotation(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, quat_to_euler_degrees(alive_object(mrb, self).local.rotation));
+}
+
+mrb_value transform_set_local_rotation(mrb_state* mrb, mrb_value self) {
+  const mrb_value value = single_arg(mrb);
+  GameObject& object = alive_object(mrb, self);
+  object.local.rotation = quat_from_euler_degrees(to_vec3(mrb, value));
+  notify_transform_written(mrb, object.id, TransformWrite::Rotation);
+  return value;
+}
+
 mrb_value transform_rotate(mrb_state* mrb, mrb_value self) {
   const mrb_value value = single_arg(mrb);
   const ObjectId id = alive_id(mrb, self);
@@ -104,6 +116,8 @@ void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "local_position=", transform_set_local_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "rotation", transform_rotation, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "rotation=", transform_set_rotation, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, transform, "local_rotation", transform_local_rotation, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "local_rotation=", transform_set_local_rotation, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "rotate", transform_rotate, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "look_at", transform_look_at, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "scale", transform_scale, MRB_ARGS_NONE());

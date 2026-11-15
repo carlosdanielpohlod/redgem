@@ -492,7 +492,8 @@ sword.set_parent(hand, keep_world: false)         # its pose in the old parent, 
 
 `parent` reads it back. An object never goes under itself or anything it carries (an
 `ArgumentError`), nor under a template, and a vehicle's wheel stays on it. A kinematic body or a
-trigger under a parent goes where the parent takes it. A dynamic body, a character and a vehicle
+trigger under a parent goes where the parent takes it. A character passes through the kinematic bodies under it: a box in its hand never
+pushes it, and it cannot stand on one nor collide with it (no `on_collision` between them). A dynamic body, a character and a vehicle
 are simulated in the world: the parent does not carry them, and under it they keep their own
 motion (make a body kinematic, with `rigidbody.kinematic = true`, to carry it). A static collider
 stays where it was made. When `keep_world: false` moves a body, it is taken to its new place and
@@ -582,14 +583,60 @@ stairs and curbs but not a ledge. Cells over each other (a bridge over a road) a
 
 What it does not do yet:
 
-- Moving bodies, characters and triggers are not obstacles: a path goes through a closed door or a
-  crowd. Steer around them yourself (`Physics.sphere_cast` ahead of the character).
+- Moving bodies, characters and triggers are not in the grid: a path goes through a closed door or
+  a crowd unless it is told to `avoid:` them. A `NavAgent` steers around the rest as it walks (see
+  [Crowds](#crowds-agents-that-walk-among-others)).
 - The bake sees the level as it is: one a script changes (walls spawned or destroyed) needs
   `Navigation.bake`, which takes as long again. `Navigation.stats` says what the last one cost.
 - No jumps, ladders or teleporters between places the grid does not join.
 - A grid has at most 262,144 columns (512 by 512): a larger level is baked with larger cells,
   with a warning. A search looks at no more than 16,384 cells, so that no frame stalls: a way
   longer than that gives `nil` too. Ask for paths a few times a second, not every frame.
+
+## Crowds: agents that walk among others
+
+A `NavAgent` is a character that walks where it is sent: along `Navigation.path`, keeping clear of
+the other agents and of the bodies that move (crates, cars, the player), and finding another way
+when something stands in its way. Two agents face to face both keep to their right and pass:
+
+```ruby
+class Villager < Behaviour
+  def start
+    @agent = game_object.add_component(NavAgent, speed: 1.5, radius: 0.4)
+    @agent.go_to(Scene.find('Market').transform.position)
+  end
+
+  def update(_delta)
+    @agent.go_to(Scene.find('Home').transform.position) if @agent.arrived?
+  end
+end
+```
+
+`go_to` is `false` when there is no way there; `arrived?`, `walking?`, `waypoints` and `velocity`
+say how it is going, and `stop` stops it. Its settings (`speed`, `radius`, `arrive_distance`) are
+what `add_component` was given, else the object's Blender properties of those names. The object
+walks by its character controller (`body = "character"`), or by its transform when it has none.
+
+Each frame it steers: of the velocities around the one toward its next waypoint, it takes the
+nearest one that runs into nobody within the next 3 seconds and stays on walkable ground. Two agents
+share the avoidance, each taking half; a body that moves is avoided whole. When an agent gets less
+than a quarter of the way it would walk in a second (a crate pushed into a doorway, a crowd that
+does not move), it asks for a way around what moves within 2 m of it:
+
+```ruby
+waypoints = Navigation.path(transform.position, goal, avoid: [crate, cart])
+velocity = Navigation.steer(transform.position, velocity, toward * 3.0, speed: 3.0, radius: 0.4,
+                            crowd: [[other.position, other_velocity, 0.4]], ignore: game_object)
+```
+
+`Navigation.steer` is what an agent does each frame, for a character a script moves itself: `crowd`
+holds the characters that steer too, each `[position, velocity, radius]`; the bodies that move
+near `position` are found on their own (but those of `ignore`).
+
+What it does not do yet: agents see each other in Ruby, so a crowd costs more as it grows (each
+agent looks at every other one each frame); there are no formations or queues; and a body is
+avoided as a disc around its box seen from above, so a long one (a bus) is kept further from than
+it needs.
 
 ## Follow, orbit and shake the camera
 
@@ -981,6 +1028,22 @@ Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0) # lower, slower to come b
 Audio.ducking(volume: Audio::NO_DUCKING)               # off
 ```
 
+A game adds groups of its own under the engine's, each heard at its volume times the volumes over
+it, and puts effects on a group: a low-pass that muffles its sounds and a reverb they echo in. The
+groups under it get them too (the lowest cutoff, and the reverb of the nearest group that has one):
+
+```ruby
+Audio.group(:cave, parent: :effects, volume: 0.8)
+Audio.effects(:cave, low_pass: 2_000, reverb: 0.4)   # Hz; 0 to 1 of each sound goes to the reverb
+Audio.play_at(:drip, position, group: :cave)
+Audio.effects(:cave)                                 # off again
+```
+
+The engine follows how loud each voice is as it plays, from its own samples (before its volume):
+`Audio.loudness(handle)` is 0 to 1 for a sound of the `:voice` group or a group under it, and 0 for the others. A `VoiceMouth` opens a
+speaker's mouth with it (see [Dialogue](dialogue.md#voice)), and a dialogue line's voice plays in
+this group.
+
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
 playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then
@@ -1369,8 +1432,9 @@ Save.migrate(from: 2) { |data| data.merge("lives" => 3) }
 
 Declare them where scripts run before the game first reads its save (the top of the first
 scene's script, say). A hook gets the slot's values as a Hash with String keys and returns the
-new ones; a version that changed nothing needs no hook. The first use of a slot after that (any
-`get`, `set`, `keys`... or `Save.slot =`) checks it:
+new ones. Use that Hash for reads and writes inside the hook. Accessing a slot's values through
+`Save` or switching slots inside a hook raises. A version that changed nothing needs no hook.
+The first use of a slot after that (any `get`, `set`, `keys`... or `Save.slot =`) checks it:
 
 - a slot of an older version goes through the hooks it needs, in order, and is written back whole
   and at once (one file write, or one database transaction), stamped with the new version, so

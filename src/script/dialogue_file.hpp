@@ -39,6 +39,7 @@ struct DialogueFile {
   std::vector<std::string> warnings;  // what may be a mistake: a node never reached
   std::vector<NameUse> texts;         // the I18n keys it shows
   std::vector<NameUse> quests;        // the quests its conditions and effects name
+  std::vector<NameUse> voices;        // the sounds its lines' voices play
 
   bool ok() const { return errors.empty(); }
 };

@@ -203,6 +203,8 @@ the same pull request.
   a vehicle are simulated in the world and keep their own motion; a static collider stays where
   it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
   and an object put under a vehicle does not become a wheel.
+- A character passes through every kinematic body under it, so it cannot stand on one it carries
+  (a board under its feet): make such a board the parent, or keep it out of the character.
 - An object that an animation clip poses keeps being posed by it under a new parent; a part taken
   out of a spawned copy is no longer posed by that copy's clip.
 - An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it
@@ -260,25 +262,15 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): crowds, the dialogue box, voice, missions,
-the editor's support for them, a stable API, a multi-level multiplayer template, the packed
-Android app on the emulator, and the test cases still on the real clock.
+The 1.0 blockers still open (see the 1.0 cut plan): missions, the editor's support for NPCs,
+dialogue and missions, a multi-level multiplayer template, the packed Android app on the
+emulator, and the test cases still on the real clock.
 
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md): there is no voice or mission system yet. Dialogue
-  has no box or choice list on screen yet (a game draws its own from `Dialogue.current`), a line's
-  `voice` plays nothing, and quest stages are GameVariables until a game gives `Dialogue.quests`.
-- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
-  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
-  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
-  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
-  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
-  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
-  the scene loads.
-- A dialogue line's voice clip does not play from the speaker's head: there are no subtitles timed
-  to it, the music does not duck while someone speaks, and no mouth follows it.
+  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox, with voiced lines: there is
+  no mission system yet, and quest stages are GameVariables until a game gives `Dialogue.quests`.
 - There are no quest files or mission objectives: no journal page in `GameMenu`, no world markers
   or on-screen pointer to the current objective, and no quest state shared by a party in
   multiplayer.
@@ -302,9 +294,6 @@ Android app on the emulator, and the test cases still on the real clock.
 
 ### Documentation
 
-- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
-  across.
-- The API reference does not mark its classes and methods stable or experimental.
 - No template is a game of several levels with multiplayer: each template has one scene.
 
 ## After 1.0
@@ -372,10 +361,12 @@ promise of how it will be closed.
   (by priority, then loudness) stops for a new one, and there are no virtual voices that come
   back later. Positional sound provides stereo panning and distance falloff; games update source
   positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
-- One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
-  effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
-  filters). Only the music group ducks, and only under the voice group. Fades and ducking are
-  linear in volume, and only the music fades by itself; a sound's levels change at once.
+- One music track at a time, two while they crossfade. A game adds at most 13 mix groups of its
+  own. A group's effects are a one-pole low-pass and one fixed reverb (no room size, delay or EQ);
+  they are on sounds, not on the music's tracks. The filter and the reverb's delays are tuned for
+  48 kHz: a device at 44.1 kHz hears a cutoff about 9% higher and a reverb about 9% longer. Only
+  the music group ducks, and only under the voice group. Fades and ducking are linear in volume, and only the music fades by itself; a sound's
+  levels change at once.
 
 ### Text
 
@@ -398,39 +389,15 @@ promise of how it will be closed.
 
 ### Gameplay API
 
-- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
-  yet. The DialogueBox has one look (a game that wants another draws its own from
-  `Dialogue.current`) and does not stop the hero while it shows, a line's `voice` plays nothing, and quest stages are GameVariables until a
-  game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
-  hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
-  A machine has one conversation at a time (two local players cannot talk at once), and over the
-  network a speaker without a NetworkSync is found on the client by its name.
-  An Interactor's line of sight is one ray
-- NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
-  daily schedules on a `GameClock` and head look-at, and can be used and talked to through
-  [interaction](docs/scripting/interaction.md); there is no dialogue, voice or mission system yet.
-  Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
-  character faces when it starts to look, and it does not avoid turning through the body when the
-  target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the
-  game saves it. A Perception's sight is one
-  ray from its eyes to a point on each watched object (a body mostly behind a low wall is hidden,
-  and a thin gap shows it whole), it looks every frame for every watched object, and hearing goes
-  through walls. Brains and Perceptions work on the host only: a noise made on a client is heard by
-  nobody, so a client's footsteps reach the host's NPCs only through the game's own messages. A
-  brain's state is not saved with `Save`. An Interactor's line of sight is one ray
-  between the actor's and the target's positions (a target whose position is inside the ground or
-  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
-  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
-  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
-  the on-screen controls being turned on). Over the network the host runs every use, checking
-  sight from the hero's late pose: a client hears of what it did only through the game's own
-  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
-  them to an action of its own rebinds one.
 - A dialogue's texts take no placeholder values, and GameVariables hold only nil, true, false,
   numbers and texts (at most 1024 of them), which a game saves itself. A machine has one
   conversation at a time (two local players cannot talk at once), and over the network a speaker
-  without a NetworkSync is found on the client by its name.
+  without a NetworkSync is found on the client by its name. The DialogueBox has one look (a game
+  that wants another draws its own from `Dialogue.current`) and does not stop the hero while it
+  shows. A line's voice is heard only on the machine of the player in the conversation, and voice
+  clips are files (no text-to-speech). A mouth follows a voice's loudness, not its sounds (no
+  visemes or lip sync); the raylib backend measures at most 8 voices at once (another one waits for
+  a meter to be free, its mouth shut until then), and a jaw turns about its own X axis only.
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see
   [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
   used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one
@@ -454,6 +421,16 @@ promise of how it will be closed.
   one whose other end is in another scene, or was deleted, is not made (the log says so). The
   editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
 - Animation clips have no IK.
+- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
+  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not in the grid: a
+  path goes around those it is told to `avoid:` (at most 64, each a disc around its box seen from
+  above), and a `NavAgent` steers around the rest. Agents find each other in Ruby, each looking at
+  every other one each frame, so a large crowd costs more as it grows; there are no formations or
+  queues. A level a script changes needs `Navigation.bake`; there are no off-grid links (jumps,
+  ladders, teleporters), no navigation areas with costs and no bake preview in the editor
+  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
+  the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
 - `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
@@ -461,10 +438,9 @@ promise of how it will be closed.
   no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
   timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
   hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
-- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
-  migrate it one after another. A room writing a key of that slot at the moment another room
-  writes the migrated values can make that migration fail as busy: the slot is then refused for
-  the migrating room's run, and migrated on its next first use.
+- On a dedicated server, rooms serialize migrations of the same slot, but ordinary writes to
+  other keys can still run while a migration is preparing its replacement. Those writes may be
+  overwritten. Migrate a shared slot before letting other rooms write to it.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
@@ -674,6 +650,9 @@ promise of how it will be closed.
 
 ### Documentation
 
+- Migration notes start with the release after 0.5.0: CHANGELOG.md's earlier releases say what
+  changed, not how to move a game across. The stability marks of the API reference are set by
+  hand: nothing checks that a stable call really kept its shape between two releases.
 - The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
   and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
   the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
@@ -708,7 +687,10 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
   viewport images, runtime queries and event history. Live add creates empty objects only;
   asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
-  calls run serially and cannot be interrupted by a cancellation notification.
+  calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
+  answer the editor's dialogs: `status` says when the editor offers to recover an earlier
+  session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
+  again once someone answered it in the editor).
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
