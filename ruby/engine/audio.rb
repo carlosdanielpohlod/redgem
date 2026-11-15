@@ -6,6 +6,8 @@
 #   Audio.play(:line_042, group: :voice)                     # the player's voice volume applies
 #   Audio.music(:night, fade: 2.0)                           # crossfades from the track playing
 #   Audio.ducking(volume: 0.25)                              # the music goes lower under voices
+#   Audio.group(:cave, parent: :effects)                     # a group of the game's own
+#   Audio.effects(:cave, low_pass: 2_000, reverb: 0.4)       # muffled, with an echo
 module Audio
   FULL_VOLUME = 1.0
   NORMAL_PITCH = 1.0
@@ -23,6 +25,7 @@ module Audio
   DUCK_ATTACK = 0.15
   DUCK_RELEASE = 0.6
   NO_DUCKING = 1.0
+  NO_REVERB = 0.0
 
   # A sound with no place in the world. Returns its handle (for stop, playing? and set), or nil
   # when the sound file does not exist or 128 sounds of a higher priority already play.
@@ -47,6 +50,21 @@ module Audio
   # volume: NO_DUCKING turns it off. The game's ducking ends with it.
   def self.ducking(volume: DUCKED_VOLUME, attack: DUCK_ATTACK, release: DUCK_RELEASE)
     __ducking(volume.to_f, attack.to_f, release.to_f)
+  end
+
+  # A group of the game's own under another (:effects unless it says), heard at its volume times
+  # the volumes over it (1 when none is given): Audio.play(:drip, group: :cave). The same name
+  # again moves it, and changes its volume only when one is given. A game has 13 groups of its own
+  # at most; they end with it.
+  def self.group(name, parent: DEFAULT_GROUP, volume: nil)
+    __group(name, parent, volume&.to_f)
+  end
+
+  # What a group does to its sounds and to the groups under it: low_pass (Hz, 20 to 20000, nil for
+  # none) muffles them, reverb (0 to 1) sends that much of them to the group's reverb. Calling it
+  # again replaces them; Audio.effects(:cave) takes them off.
+  def self.effects(group, low_pass: nil, reverb: NO_REVERB)
+    __effects(group, low_pass&.to_f, reverb.to_f)
   end
 
   def self.stop_music(fade: NO_FADE)

@@ -10,6 +10,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
+  adds a group under another (13 at most, ending with the game), and sounds play in it by name.
+  `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
+  it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
+  game's group of `:voice` ducks the music too.
 - **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
   `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
   that move, and finding another way when something stands in its way for a second. Steering is a
@@ -535,6 +540,10 @@ until 1.0, a release may change what games rely on (see
   `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
   them. The prelude's growth made it most of the scripts' frame. The engine now looks each name up
   once: a frame of 1000 behaviours takes about 0.65 ms instead of 2.
+- **A character is not pushed by what it carries**: a kinematic body under a character (a box in
+  its hand) that touched its capsule pushed it, and the character, moving, took the body on with
+  it: a courier standing still drifted away, and one teleported with a parcel in hand was shoved
+  meters past where it was put. A character now passes through the kinematic bodies under it.
 - **Perception resets with each scene**: loading a scene logged "resetting the handlers of
   Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
   modules by name and Perception is a class. It now finds classes too, so a new scene starts with
