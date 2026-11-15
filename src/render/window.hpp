@@ -63,8 +63,8 @@ class Window {
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
 
-  // Whether the person asked for it to close (true for one frame only), or it has shown the frames
-  // kCloseAfterFramesVariable gives it (true from then on).
+  // Whether the person asked for it to close, or it has just shown the frames
+  // kCloseAfterFramesVariable gives it (each true for one frame only).
   bool close_requested() const;
   // How long the frame before this one took.
   float frame_seconds() const;

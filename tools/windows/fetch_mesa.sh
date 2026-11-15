@@ -17,24 +17,24 @@ URL="https://github.com/pal1000/mesa-dist-win/releases/download/${RELEASE}/${ARC
 # What a program loads instead of Windows' own OpenGL, and the renderer it loads in turn.
 LIBRARIES=(x64/opengl32.dll x64/libgallium_wgl.dll)
 STAMP="${DEST}/release"   # which release the folder holds
+WORK=""                   # (a global: the trap runs after main has returned)
 
 main() {
   if [[ "$(cat "${STAMP}" 2>/dev/null)" == "${RELEASE}" ]]; then
     echo "${DEST}"
     return
   fi
-  local work
-  work="$(mktemp -d)"
-  trap 'rm -rf "${work}"' EXIT
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "${WORK}"' EXIT
   echo "Downloading ${ARCHIVE}..." >&2
-  curl -fsSL --retry 3 -o "${work}/${ARCHIVE}" "${URL}"
-  echo "${SHA256}  ${work}/${ARCHIVE}" | sha256sum --check --status - ||
+  curl -fsSL --retry 3 -o "${WORK}/${ARCHIVE}" "${URL}"
+  echo "${SHA256}  ${WORK}/${ARCHIVE}" | sha256sum --check --status - ||
     { echo "${URL}: not the file pinned (sha256 ${SHA256})" >&2; exit 1; }
-  7z x -y -o"${work}/unpacked" "${work}/${ARCHIVE}" "${LIBRARIES[@]}" > /dev/null
+  7z x -y -o"${WORK}/unpacked" "${WORK}/${ARCHIVE}" "${LIBRARIES[@]}" > /dev/null
   rm -rf "${DEST}"
   mkdir -p "${DEST}"
   local library
-  for library in "${LIBRARIES[@]}"; do cp "${work}/unpacked/${library}" "${DEST}/"; done
+  for library in "${LIBRARIES[@]}"; do cp "${WORK}/unpacked/${library}" "${DEST}/"; done
   echo "${RELEASE}" > "${STAMP}"
   echo "${DEST}"
 }

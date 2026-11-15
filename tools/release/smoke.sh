@@ -20,13 +20,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/unpack_download.sh"
 
 CLOSE_AFTER_FRAMES=120     # what the player and the editor show before they close themselves
-WINDOW_SECONDS=600         # the longest a window may stay open (a software card starts slowly)
+WINDOW_SECONDS=300         # the longest a window may stay open (a software card starts slowly)
 TEMPLATE="third-person"    # a template whose game comes with tests of its own
 SMOKE_GAME="smoke_game"
 WINDOW_TEST="${REPO_ROOT}/tools/release/smoke_window_test.rb"
 WINDOW_PICTURE="smoke_window.png"   # what that test takes (t.screenshot("smoke_window"))
 GL_OPTION="--gl"
-GL_LIBRARIES="*.dll"       # what --gl copies beside every program
+GL_LIBRARIES=(opengl32.dll libgallium_wgl.dll)   # what --gl copies beside every program
 
 GL_DIR=""   # --gl: Mesa's libraries, copied beside the Windows programs
 
@@ -36,20 +36,18 @@ say() { echo "smoke: $*"; }
 add_gl() {
   [[ -n "${GL_DIR}" ]] || return 0
   local library
-  for library in "${GL_DIR}"/${GL_LIBRARIES}; do cp "${library}" "$1/"; done
+  for library in "${GL_LIBRARIES[@]}"; do
+    [[ -f "${GL_DIR}/${library}" ]] || { echo "${GL_OPTION} ${GL_DIR}: has no ${library}" >&2; exit 1; }
+    cp "${GL_DIR}/${library}" "$1/"
+  done
 }
 
-# The program a build made in folder $1 for this system: the only one at its top.
+# The program a build of game folder $1 made in folder $2: named after the game's folder.
 built_program() {
-  local file
-  for file in "$1"/*; do
-    if [[ -f "${file}" && -x "${file}" && "${file}" != *.dll ]]; then
-      echo "${file}"
-      return
-    fi
-  done
-  echo "the build in $1 made no program" >&2
-  exit 1
+  local program
+  program="$2/$(basename "$1")${PROGRAM_SUFFIX}"
+  [[ -x "${program}" ]] || { echo "the build in $2 made no ${program}" >&2; exit 1; }
+  echo "${program}"
 }
 
 # Runs a program that opens a window ($@) until it closes itself, and fails unless it ends well.
@@ -62,7 +60,7 @@ play_built_demo() {
   local demo="$1" built="$2" program
   expect_success "${EDITOR_RUN[@]}" build "${demo}" "${built}"
   add_gl "${built}"
-  program="$(built_program "${built}")"
+  program="$(built_program "${demo}" "${built}")"
   say "playing ${program}"
   expect_window_closes "${program}"
 }

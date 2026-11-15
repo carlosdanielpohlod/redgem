@@ -34,6 +34,7 @@ TESTER_RUN=()
 # are in.
 ROOT=""
 BIN_DIR=""
+PROGRAM_SUFFIX=""   # what the names of the download's programs end with (".exe" on Windows)
 
 # Unpacks download $1 (called $2) into folder $3 and says how its programs are run.
 unpack() {
@@ -74,6 +75,7 @@ unpack() {
       ;;
   esac
   BIN_DIR="${bin}"
+  PROGRAM_SUFFIX="${suffix}"
   EDITOR_RUN=("${bin}/redgem${suffix}")
   RELAY_RUN=("${bin}/redgem-relay${suffix}")
   SERVER_RUN=("${bin}/redgem-server${suffix}")

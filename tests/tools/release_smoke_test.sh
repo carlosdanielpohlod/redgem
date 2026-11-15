@@ -30,11 +30,12 @@ case "$1" in
   build)
     mkdir -p "$3"
     echo pak > "$3/game.rgpak"
+    program="$3/$(basename "$2")"
     printf '%s\n' '#!/usr/bin/env bash' \
       '[[ -n "${REDGEM_CLOSE_AFTER_FRAMES:-}" ]] || exit 1' \
-      '[[ -z "${FAKE_NEEDS_GL:-}" || -f "$(dirname "$0")/fake.dll" ]] || { echo "no fake.dll"; exit 1; }' \
-      '[[ -z "${FAKE_PLAYER_FAILS:-}" ]] || { echo "the player crashed"; exit 1; }' > "$3/platformer"
-    chmod +x "$3/platformer"
+      '[[ -z "${FAKE_NEEDS_GL:-}" || -f "$(dirname "$0")/opengl32.dll" ]] || { echo "no opengl32.dll"; exit 1; }' \
+      '[[ -z "${FAKE_PLAYER_FAILS:-}" ]] || { echo "the player crashed"; exit 1; }' > "${program}"
+    chmod +x "${program}"
     ;;
   new) mkdir -p "$2/tests" ;;
   check) [[ -z "${FAKE_TESTS_FAIL:-}" ]] || { echo "FAIL walk_test.rb"; exit 1; } ;;
@@ -89,10 +90,12 @@ expect fails "the player crashed" FAKE_PLAYER_FAILS=1
 expect fails "the editor crashed" FAKE_EDITOR_FAILS=1
 expect fails "FAIL walk_test.rb" FAKE_TESTS_FAIL=1
 expect fails "left no smoke_window.png" FAKE_NO_PICTURE=1
-# The libraries of --gl are beside the built game.
+# The libraries of --gl are beside the built game, and a --gl folder without them is refused.
 mkdir -p "${work}/gl"
-echo library > "${work}/gl/fake.dll"
-expect fails "no fake.dll" FAKE_NEEDS_GL=1
+echo library > "${work}/gl/opengl32.dll"
+expect fails "has no libgallium_wgl.dll" -- --gl "${work}/gl"
+echo library > "${work}/gl/libgallium_wgl.dll"
+expect fails "no opengl32.dll" FAKE_NEEDS_GL=1
 expect passes "opens its windows." FAKE_NEEDS_GL=1 -- --gl "${work}/gl"
 
 if [[ "${failures}" -gt 0 ]]; then

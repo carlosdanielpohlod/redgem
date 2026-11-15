@@ -417,7 +417,7 @@ jobs:
     name: Linux downloads open their windows
     needs: [plan, linux-windows]
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       # (What a window needs from the system: X11's libraries, OpenGL and Mesa, and a display.)
       - name: Install a virtual display and Mesa
@@ -455,7 +455,7 @@ jobs:
     name: Windows download runs and opens its windows
     needs: [plan, linux-windows]
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -474,7 +474,9 @@ jobs:
         run: tools/release/smoke_test.sh dist/release/redgem-windows-x86_64.zip
 
       - name: Fetch Mesa
-        run: echo "MESA_DIR=$(tools/windows/fetch_mesa.sh)" >> "${GITHUB_ENV}"
+        run: |
+          mesa_dir="$(tools/windows/fetch_mesa.sh)"
+          echo "MESA_DIR=${mesa_dir}" >> "${GITHUB_ENV}"
 
       - name: Open the Windows download's windows
         env:

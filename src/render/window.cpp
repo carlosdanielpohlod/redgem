@@ -187,7 +187,8 @@ Window::~Window() { CloseWindow(); }
 
 bool Window::close_requested() const { return WindowShouldClose() || shown_enough(); }
 
-bool Window::shown_enough() const { return close_after_ && frames_shown_ >= *close_after_; }
+// (Once, on the frame the count is reached, as the close button is reported for one frame.)
+bool Window::shown_enough() const { return close_after_ && frames_shown_ == *close_after_; }
 
 float Window::frame_seconds() const { return GetFrameTime(); }
 
