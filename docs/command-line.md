@@ -233,7 +233,9 @@ Transform: Where an object is, how it is turned and how big it is.
 with the types of its parameters and of what it returns; `redgem api --search <word>` the methods
 that have to do with a word (at most 20). `--json` says the
 same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown` writes,
-and which is made from `docs/scripting/api.json`.
+and which is made from `docs/scripting/api.json`. What may change in any release says
+`(experimental)`, and has a `"stability": "experimental"` in `--json`; the rest is stable (see
+[API stability](scripting/stability.md)).
 
 `--rbs` writes the API as Ruby type signatures (RBS), the file
 [`docs/scripting/redgem.rbs`](https://github.com/carlosdanielpohlod/redgem/blob/main/docs/scripting/redgem.rbs)
@@ -249,6 +251,7 @@ target :game do
 end
 ```
 
+Each class and method there is annotated `%a{redgem:stable}` or `%a{redgem:experimental}`.
 After updating the engine, `redgem api --rbs > sig/redgem.rbs` brings a game's signatures up to
 date. Types are written in a small language: `Integer`, `Float`, `Numeric`, `String`, `Symbol`,
 `bool`, `nil`, `untyped`, `Color` (a name such as `:orange`, or `[r, g, b]`), the API's classes,

@@ -661,6 +661,9 @@ promise of how it will be closed.
 
 ### Documentation
 
+- Migration notes start with the release after 0.5.0: CHANGELOG.md's earlier releases say what
+  changed, not how to move a game across. The stability marks of the API reference are set by
+  hand: nothing checks that a stable call really kept its shape between two releases.
 - The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
   and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
   the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
