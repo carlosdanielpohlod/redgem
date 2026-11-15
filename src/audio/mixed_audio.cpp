@@ -17,6 +17,7 @@ bool MixedAudio::set_sound_levels(SoundSourceId id, const SoundLevels& levels) {
 }
 bool MixedAudio::sound_playing(SoundSourceId id) const { return sounds_.playing(id); }
 bool MixedAudio::stop_sound(SoundSourceId id) { return sounds_.stop(id); }
+float MixedAudio::sound_loudness(SoundSourceId id) const { return sounds_.loudness(id); }
 void MixedAudio::stop_sounds() { sounds_.clear(); }
 
 void MixedAudio::set_group_volume(MixGroup group, float volume) {
@@ -61,6 +62,7 @@ void MixedAudio::set_music_volume(float volume) { music_.set_volume(volume); }
 
 void MixedAudio::update(float seconds) {
   sounds_.update(seconds);  // (a voice that ended no longer ducks)
+  sounds_.follow(seconds);
   duck(seconds);
   music_.update(seconds);
 }

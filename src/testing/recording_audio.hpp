@@ -17,6 +17,7 @@ struct RecordedVoice {
   SpatialMix mix;
   bool playing = true;  // until RecordingAudio::finish says it came to its end
   VoiceEffects effects;
+  float level = kSilence;  // how loud its own samples are now, as RecordingAudio::speak says
 };
 
 // A music stream it would be playing, at the volume it would be heard at.
@@ -44,6 +45,7 @@ class RecordingSoundDriver final : public SoundDriver {
   void pitch(SoundSourceId id, float pitch) override { voices.at(id).sound.pitch = pitch; }
   void effects(SoundSourceId id, const VoiceEffects& effects) override { voices.at(id).effects = effects; }
   void stop(SoundSourceId id) override { voices.erase(id); }
+  float level(SoundSourceId id) const override { return voices.at(id).level; }
 
   std::map<SoundSourceId, RecordedVoice> voices;
   std::vector<std::string> started;  // every name that started, in order
@@ -104,6 +106,8 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   }
   // The end of a sound that does not loop.
   void finish(SoundSourceId id) { sound_driver.voices.at(id).playing = false; }
+  // How loud a sound's own samples are from now on, as a meter would measure them (0 to 1).
+  void speak(SoundSourceId id, float level) { sound_driver.voices.at(id).level = level; }
 
   const std::vector<std::string>& played() const { return sound_driver.started; }
   const std::map<SoundSourceId, RecordedVoice>& voices() const { return sound_driver.voices; }

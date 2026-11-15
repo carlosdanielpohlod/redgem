@@ -15,7 +15,6 @@ struct AudioVector {
   double x, y, z;
 };
 constexpr double kMinimumAudioAxis = 0.000001;  // reject nearly parallel listener directions
-constexpr std::size_t kStereoChannels = 2;
 constexpr float kMonoShare = 0.5f;
 constexpr double kSmoothFadeCubic = 3.0;
 constexpr double kSmoothFadeQuadratic = 2.0;
@@ -95,7 +94,7 @@ std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const
 void spatial_mono_frames(float* samples, unsigned frames) {
   if (samples == nullptr) return;
   for (unsigned frame = 0; frame < frames; ++frame) {
-    float* stereo = samples + static_cast<std::size_t>(frame) * kStereoChannels;
+    float* stereo = samples + static_cast<std::size_t>(frame) * kDeviceChannels;
     const float mono = stereo[0] * kMonoShare + stereo[1] * kMonoShare;
     stereo[0] = mono;
     stereo[1] = mono;
@@ -130,9 +129,15 @@ SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound
   // (The one it would replace goes on when it cannot start.)
   if (!driver_.start(id, name, sound, mix, effects_of(sound))) return kNoSoundSource;
   if (place) stop(*place);
-  sounds_.emplace(id, sound);
+  keep(id, sound);
   ++next_;
   return id;
+}
+void SoundPool::keep(SoundSourceId id, const SpatialSound& sound) {
+  sounds_.emplace(id, sound);
+  if (!groups_.within(sound.group, MixGroup::Voice)) return;
+  loudness_.emplace(id, EnvelopeFollower{});
+  driver_.measure(id);
 }
 std::optional<SoundSourceId> SoundPool::place_for(const SpatialSound& sound) const {
   if (sounds_.size() < kMaxSounds) return std::nullopt;
@@ -198,12 +203,24 @@ bool SoundPool::heard(SoundSourceId id, const SpatialSound& sound) const {
   return driver_.playing(id);
 }
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
+float SoundPool::loudness(SoundSourceId id) const {
+  const auto found = loudness_.find(id);
+  return found == loudness_.end() ? kSilence : found->second.value();
+}
+void SoundPool::follow(float seconds) {
+  for (auto& [id, envelope] : loudness_) envelope.update(driver_.level(id), seconds);
+}
 bool SoundPool::stop(SoundSourceId id) {
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
-  driver_.stop(id);
-  sounds_.erase(found);
+  forget(found);
   return true;
+}
+// Stops a sound and lets go of it.
+void SoundPool::forget(std::map<SoundSourceId, SpatialSound>::iterator sound) {
+  driver_.stop(sound->first);
+  loudness_.erase(sound->first);
+  sounds_.erase(sound);
 }
 void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
@@ -263,8 +280,7 @@ void SoundPool::reap() {
       ++it;
       continue;
     }
-    driver_.stop(it->first);
-    it = sounds_.erase(it);
+    forget(it++);
   }
 }
 

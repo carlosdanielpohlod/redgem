@@ -199,6 +199,20 @@ TEST_CASE("a check reads every dialogue: what it names, where it leads, and its 
   CHECK(has(checked.out, "check: 4 errors"));
 }
 
+TEST_CASE("a check warns of a dialogue's voice that has no sound") {
+  GameCopy game("dialogue_voices");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.write("locales/en.json", R"({"baker.hello": "Hello!", "baker.bye": "Bye"})");
+  game.write("sounds/baker/hello.ogg", "(a clip)");
+  game.write("dialogues/baker.json", R"({"start": "hello", "nodes": {
+    "hello": {"text": "baker.hello", "voice": "baker/hello", "next": "bye"},
+    "bye": {"text": "baker.bye", "voice": "baker/bye", "end": true}}})");
+  const ToolResult checked = tool({"check", game.dir()});
+  CHECK(checked.exit_code == kExitSuccess);  // (the line plays silently)
+  CHECK(has(checked.out, "warning dialogues/baker.json: node bye: its voice baker/bye is not in sounds/"));
+  CHECK_FALSE(has(checked.out, "voice baker/hello"));
+}
+
 TEST_CASE("a game without a quests folder may name any quest") {
   GameCopy game("dialogue_quests");
   fs::remove(fs::path(game.dir()) / "dialogues/tree.json");

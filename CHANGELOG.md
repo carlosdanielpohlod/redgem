@@ -15,6 +15,15 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Added
+
+- **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
+  (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
+  listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
+  fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
+
+## [0.6.0] - 2026-11-15
+
 ### Migrating
 
 From a game made with 0.5.0:
@@ -35,10 +44,15 @@ From a game made with 0.5.0:
 
 ### Added
 
-- **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
-  (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
-  listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
-  fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
+- **Voice**: a dialogue line's `voice` plays its clip as the line is shown, in the `:voice` group
+  (the music ducks under it), from the speaker's head bone (or the speaker) as it moves. The line
+  shows while the clip plays and goes on when it ends, unless the player skips it; a line with
+  choices waits for one. A `VoiceMouth` behaviour opens a speaker's mouth with the clip's loudness,
+  through a shape key (`morph:`) or a jaw bone (`jaw:`, `angle:`). The engine follows a voice's
+  loudness as it plays (`Audio.loudness(handle)`), `conversation.speaking?` says whether its clip
+  plays, and `Transform#local_rotation` reads and sets a rotation relative to the parent.
+  `redgem check` warns of a voice whose sound is not in `sounds/`. A voice is now named as
+  `Audio.play` names a sound, without its extension.
 - **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
   adds a group under another (13 at most, ending with the game), and sounds play in it by name.
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
@@ -58,7 +72,7 @@ From a game made with 0.5.0:
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
-  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  game (`Dialogue.on(:event)`). Each line can name a `voice`. A `Talkable`
   behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
   (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
   `GameVariables` hold the values every player shares. Over the network each player has a
@@ -574,6 +588,10 @@ From a game made with 0.5.0:
 
 ### Fixed
 
+- **The editor bridge says when a recovery waits**: after an editor closed without saving, the
+  next one offers to recover its edits, and that dialog made every live change fail with "editor
+  is busy" while `status` showed nothing. `status` now has `recovery_pending`, and a change refused
+  while it waits names the recovery prompt.
 - **Behaviour updates are about three times faster**: each call the engine made into Ruby (every
   behaviour's update, every frame) and each binding on a GameObject looked up a name (the method's,
   `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
@@ -1003,7 +1021,8 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...v0.4.0

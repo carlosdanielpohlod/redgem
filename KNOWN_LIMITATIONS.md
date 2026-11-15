@@ -262,25 +262,15 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): crowds, voice, missions,
-the editor's support for them, a stable API, a multi-level multiplayer template, the packed
-Android app on the emulator, and the test cases still on the real clock.
+The 1.0 blockers still open (see the 1.0 cut plan): missions, the editor's support for NPCs,
+dialogue and missions, a multi-level multiplayer template, the packed Android app on the
+emulator, and the test cases still on the real clock.
 
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox: there is no voice or
-  mission system yet. A line's `voice` plays nothing, and quest stages are GameVariables until a
-  game gives `Dialogue.quests`.
-- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
-  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
-  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
-  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
-  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
-  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
-  the scene loads.
-- A dialogue line's voice clip does not play from the speaker's head: there are no subtitles timed
-  to it, and no mouth follows it.
+  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox, with voiced lines: there is
+  no mission system yet, and quest stages are GameVariables until a game gives `Dialogue.quests`.
 - There are no quest files or mission objectives: no journal page in `GameMenu`, no world markers
   or on-screen pointer to the current objective, and no quest state shared by a party in
   multiplayer.
@@ -304,9 +294,6 @@ Android app on the emulator, and the test cases still on the real clock.
 
 ### Documentation
 
-- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
-  across.
-- The API reference does not mark its classes and methods stable or experimental.
 - No template is a game of several levels with multiplayer: each template has one scene.
 
 ## After 1.0
@@ -409,7 +396,10 @@ promise of how it will be closed.
   conversation at a time (two local players cannot talk at once), and over the network a speaker
   without a NetworkSync is found on the client by its name. The DialogueBox has one look (a game
   that wants another draws its own from `Dialogue.current`) and does not stop the hero while it
-  shows.
+  shows. A line's voice is heard only on the machine of the player in the conversation, and voice
+  clips are files (no text-to-speech). A mouth follows a voice's loudness, not its sounds (no
+  visemes or lip sync); the raylib backend measures at most 8 voices at once (another one waits for
+  a meter to be free, its mouth shut until then), and a jaw turns about its own X axis only.
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see
   [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
   used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one
@@ -700,7 +690,10 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
   viewport images, runtime queries and event history. Live add creates empty objects only;
   asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
-  calls run serially and cannot be interrupted by a cancellation notification.
+  calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
+  answer the editor's dialogs: `status` says when the editor offers to recover an earlier
+  session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
+  again once someone answered it in the editor).
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.

@@ -17,6 +17,9 @@ namespace redgem::tools {
 namespace {
 using namespace mcp;
 
+constexpr const char* kRecoveryPending =
+    "the editor is busy, and offers to recover unsaved edits of an earlier session: answer it in "
+    "the editor (recover them, or discard them), then try again";
 constexpr const char* kExternalChange =
     "the scene changed on disk while the editor has unsaved edits; resolve it in the editor "
     "(reload the file, or keep the edits) first";
@@ -32,7 +35,8 @@ Json state(EditorSession& session) {
           {"selection", selected},
           {"can_undo", session.document().can_undo()},
           {"can_redo", session.document().can_redo()},
-          {"external_change_pending", session.external_change_pending()}};
+          {"external_change_pending", session.external_change_pending()},
+          {"recovery_pending", session.recovery_pending()}};
 }
 
 int object(EditorSession& session, const Json& args) {
@@ -60,8 +64,15 @@ void require_no_external_change(const EditorSession& session) {
   if (session.external_change_pending()) throw std::invalid_argument(kExternalChange);
 }
 
+// The editor is busy: when it found the copy of an earlier session's unsaved edits (it closed
+// without saving them), its offer to recover them is the likely reason, and is named.
+void require_no_recovery_offer(const EditorSession& session, bool busy) {
+  if (busy && session.recovery_pending()) throw std::invalid_argument(kRecoveryPending);
+}
+
 void require_editable(const EditorSession& session, bool busy) {
   require_no_external_change(session);
+  require_no_recovery_offer(session, busy);
   if (!session.editing() || busy)
     throw std::invalid_argument("editor is busy; stop playing or finish the current gesture");
 }
@@ -146,7 +157,8 @@ bool refuses_when_busy(const std::string& action, bool busy) { return busy && ac
 Json use_window(EditorSession& session, const std::string& action, const Json& args, bool busy, const Invoke& window) {
   if (!window) throw std::invalid_argument("this action requires an editor window");
   if (refuses_when_busy(action, busy)) {
-    require_no_external_change(session);  // (the reason the editor is busy, when it is that)
+    require_no_external_change(session);  // (the reason the editor is busy, when it is one of these)
+    require_no_recovery_offer(session, busy);
     throw std::invalid_argument("finish the current editor gesture or dialog first");
   }
   if (action == "play") require_editable(session, false);

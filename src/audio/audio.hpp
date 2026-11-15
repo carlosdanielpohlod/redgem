@@ -32,6 +32,9 @@ class AudioSystem {
   virtual bool set_sound_levels(SoundSourceId, const SoundLevels&) { return false; }
   virtual bool sound_playing(SoundSourceId) const { return false; }
   virtual bool stop_sound(SoundSourceId) { return false; }
+  // How loud a sound of the voice group is as it plays (0 to 1, smoothed, before its volume): what
+  // a mouth follows (Audio.loudness). 0 for other sounds, and once it ended.
+  virtual float sound_loudness(SoundSourceId) const { return kSilence; }
   // Releases every sound with a handle; the music keeps playing.
   virtual void stop_sounds() {}
   // The player's volume of one of the engine's groups (Settings.music_volume...): what each sound
@@ -54,7 +57,7 @@ class AudioSystem {
   // not valid.
   virtual bool set_occlusion(const OcclusionSettings&) { return false; }
   // What says whether a wall stands between the listener and a sound; none, and no sound is muffled.
-  virtual void set_occlusion_query(OcclusionQuery) {}
+  virtual void set_occlusion_query(const OcclusionQuery&) {}
   // The game's groups and every group's effects go (the game ended); its sounds went before.
   virtual void forget_game_groups() { groups_.forget_game_groups(); }
   // How the music group goes down while a voice plays (Audio.ducking); false for ducking that is
@@ -129,13 +132,14 @@ class MixedAudio : public AudioSystem {
   bool set_sound_levels(SoundSourceId id, const SoundLevels& levels) override;
   bool sound_playing(SoundSourceId id) const override;
   bool stop_sound(SoundSourceId id) override;
+  float sound_loudness(SoundSourceId id) const override;
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
   std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) override;
   bool set_group_effects(MixGroup group, const GroupEffects& effects) override;
   void forget_game_groups() override;
   bool set_occlusion(const OcclusionSettings& settings) override { return sounds_.set_occlusion(settings); }
-  void set_occlusion_query(OcclusionQuery query) override { sounds_.set_occlusion_query(std::move(query)); }
+  void set_occlusion_query(const OcclusionQuery& query) override { sounds_.set_occlusion_query(query); }
   bool set_music_ducking(const MusicDucking& ducking) override;
   void reset_music_ducking() override;
   bool play_music(const std::string& name, const MusicRequest& request) override;

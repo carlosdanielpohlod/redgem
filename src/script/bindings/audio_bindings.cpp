@@ -207,6 +207,13 @@ MixGroup spatial_group(mrb_state* mrb, mrb_value value) {
 int spatial_priority(mrb_state* mrb, mrb_value value) {
   return mrb_undef_p(value) ? kDefaultSoundPriority : sound_priority(mrb, value, "Audio.play_at's priority");
 }
+
+void check_spatial_sound(mrb_state* mrb, const SpatialSound& sound) {
+  if (valid_spatial_sound(sound)) return;
+  mrb_raise(mrb, E_ARGUMENT_ERROR,
+            "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+}
+
 SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   SpatialSound sound;
   sound.position = to_vec3(mrb, arguments.position);
@@ -219,9 +226,7 @@ SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   sound.occludable =
       spatial_flag(mrb, arguments.options[Occlusion], true, "Audio.play_at's occlusion must be true or false");
   sound.priority = spatial_priority(mrb, arguments.options[Priority]);
-  if (!valid_spatial_sound(sound))
-    mrb_raise(mrb, E_ARGUMENT_ERROR,
-              "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+  check_spatial_sound(mrb, sound);
   return sound;
 }
 mrb_value audio_play_at(mrb_state* mrb, mrb_value) {
@@ -257,6 +262,10 @@ mrb_value audio_move(mrb_state* mrb, mrb_value) {
 mrb_value audio_playing(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).sound_playing(spatial_source_id(mrb, single_arg(mrb))));
 }
+// Audio.loudness(id): how loud a voice is as it plays (0 to 1), what a mouth follows.
+mrb_value audio_loudness(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, audio(mrb).sound_loudness(spatial_source_id(mrb, single_arg(mrb))));
+}
 mrb_value audio_stop(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).stop_sound(spatial_source_id(mrb, single_arg(mrb))));
 }
@@ -281,6 +290,7 @@ void install_spatial_audio_bindings(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "move", audio_move, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, module, "playing?", audio_playing, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "stop", audio_stop, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, module, "loudness", audio_loudness, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "__set", audio_set, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, module, "stop_sources", audio_stop_all, MRB_ARGS_NONE());
 }

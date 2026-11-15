@@ -1039,6 +1039,11 @@ Audio.play_at(:drip, position, group: :cave)
 Audio.effects(:cave)                                 # off again
 ```
 
+The engine follows how loud each voice is as it plays, from its own samples (before its volume):
+`Audio.loudness(handle)` is 0 to 1 for a sound of the `:voice` group or a group under it, and 0 for the others. A `VoiceMouth` opens a
+speaker's mouth with it (see [Dialogue](dialogue.md#voice)), and a dialogue line's voice plays in
+this group.
+
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
 playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then
