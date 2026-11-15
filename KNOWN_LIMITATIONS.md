@@ -203,6 +203,8 @@ the same pull request.
   a vehicle are simulated in the world and keep their own motion; a static collider stays where
   it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
   and an object put under a vehicle does not become a wheel.
+- A character passes through every kinematic body under it, so it cannot stand on one it carries
+  (a board under its feet): make such a board the parent, or keep it out of the character.
 - An object that an animation clip poses keeps being posed by it under a new parent; a part taken
   out of a spawned copy is no longer posed by that copy's clip.
 - An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it

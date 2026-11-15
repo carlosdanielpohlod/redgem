@@ -122,11 +122,19 @@ void collect_riders(const Scene& scene, PhysicsWorld& physics, ObjectId id, std:
   }
 }
 
+bool solid_kinematic(PhysicsWorld& physics, ObjectId id) {
+  return physics.body_type(id) == BodyType::Kinematic && !physics.is_trigger(id);
+}
+
+// The kinematic bodies under a character, which it passes through (a trigger has no body to meet).
 std::vector<ObjectId> carried_by(const Scene& scene, PhysicsWorld& physics, ObjectId character) {
   std::vector<ObjectId> riders;
   collect_riders(scene, physics, character, riders);
+  const auto no_body = [&](ObjectId rider) { return !solid_kinematic(physics, rider); };
+  riders.erase(std::remove_if(riders.begin(), riders.end(), no_body), riders.end());
   return riders;
 }
+
 
 }  // namespace
 

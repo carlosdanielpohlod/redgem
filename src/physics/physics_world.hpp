@@ -151,8 +151,8 @@ class PhysicsWorld {
   // Moves a character this much further (horizontally) during its next step, on top of its move:
   // it slides along what it meets on the way. Offsets add up until a step goes through them.
   virtual void add_character_displacement(ObjectId object, Vec3 offset) = 0;
-  // The bodies a character carries (kinematic bodies and triggers under it, such as a box in its
-  // hand): it neither bumps into them nor is pushed by them. Replaces the ones said before.
+  // The bodies a character carries (kinematic bodies under it, such as a box in its hand): it
+  // neither bumps into them, stands on them nor is pushed by them. Replaces the ones said before.
   virtual void set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) = 0;
   // Jumps on the next step if the character is grounded then.
   virtual void character_jump(ObjectId object, float speed) = 0;
