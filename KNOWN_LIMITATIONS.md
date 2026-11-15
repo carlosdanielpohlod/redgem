@@ -349,8 +349,14 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
-  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
+- NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
+  and can be used and talked to through [interaction](docs/scripting/interaction.md); there are no
+  daily schedules, head look-at, dialogue, voice or mission system yet. A Perception's sight is one
+  ray from its eyes to a point on each watched object (a body mostly behind a low wall is hidden,
+  and a thin gap shows it whole), it looks every frame for every watched object, and hearing goes
+  through walls. Brains and Perceptions work on the host only: a noise made on a client is heard by
+  nobody, so a client's footsteps reach the host's NPCs only through the game's own messages. A
+  brain's state is not saved with `Save`. An Interactor's line of sight is one ray
   between the actor's and the target's positions (a target whose position is inside the ground or
   a wall is never in sight, and a thin gap can show something mostly hidden), there is no
   hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the

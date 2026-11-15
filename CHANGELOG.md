@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
+  states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
+  transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
+  event, `after:` seconds in the state, and when its `if:` and `unless:` guards agree (a guard
+  block may take the event's payload). A `Perception` behaviour gives it senses: a sight cone out to
+  a range, checked by a line-of-sight ray, that watches the players' heroes (or a tag), and a
+  hearing radius that `Perception.noise(at:, loudness:)` reaches. Its object's behaviours hear
+  `on_see`, `on_lose_sight` and `on_hear`, and a Brain gets them, and a use of its Interactable, as
+  the `:see`, `:lose_sight`, `:hear` and `:interact` events. Over the network only the host thinks
+  and perceives. `LineOfSight` is the ray check Interactors and Perceptions share, and
+  `Interactor.all` lists the heroes. See the manual's NPCs page.
 - **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
   that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
   quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
