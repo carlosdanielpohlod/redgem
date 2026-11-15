@@ -36,7 +36,7 @@ LINUX_LIBGCC_FLOOR="7.0.0"
 # the editor).
 PROGRAMS=(redgem redgem-player redgem-relay redgem-server redgem-test)
 # The Windows download's programs.
-WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe redgem-server.exe)
+WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe redgem-server.exe redgem-test.exe)
 # The players for other systems the Linux download carries in bin/runtimes/.
 WINDOWS_RUNTIME="runtimes/windows/redgem-player.exe"
 ANDROID_RUNTIMES=(runtimes/android/arm64-v8a/libredgem.so runtimes/android/x86_64/libredgem.so)

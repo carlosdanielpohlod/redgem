@@ -8,8 +8,10 @@ the same pull request.
 
 - The editor is developed and tested on Linux. The Windows download is compiled from Linux. On a
   real Windows machine (GitHub's, which has no graphics card) the engine is built with the same
-  compiler and its unit, integration and Ruby tests run on every change, but no window has been
-  opened there: the editor and the games have been seen running on Windows under Wine only.
+  compiler and its unit, integration and Ruby tests run on every change. Windows are opened there
+  only before a release, drawn by Mesa's software renderer (`tools/release/smoke.sh`): the editor
+  and a game for a few frames, and one system test. The editor and the games have not been used
+  on a Windows machine with a graphics card, only under Wine.
 - The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
   can use: there the editor is drawn by Apple's software renderer (its system test takes about
   an hour instead of a minute), and the games' system tests are not run on the Mac. Never
@@ -490,9 +492,12 @@ not a promise of how it will be closed.
   save, in a new folder, and nothing moves the old one. Two games of the same studio and title
   share it.
 - Saves, settings and bindings are plain JSON with no integrity check: a player can edit them.
-- The downloads are built and packed by the continuous integration, on GitHub's runners, and
-  checked there only by listing them and running their programs' `--version` and `--help`: no
-  one opens the Windows and Linux editors from a download before a release is published.
+- The downloads are built and packed by the continuous integration, on GitHub's runners. Before
+  a release gets them, the Linux and Windows ones open the editor and a built demo for a few
+  frames and run one system test in a window (`tools/release/smoke.sh`), drawn by Mesa's software
+  renderer, as the runners have no graphics card: what only a real card shows is not seen there.
+  On a machine with one, run `tools/release/smoke.sh` by hand. The Mac's downloads open no window
+  that is checked.
 
 ### Engineering
 
