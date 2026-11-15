@@ -180,9 +180,16 @@ std::string text_mark(ApiStability stability) {
   return is_experimental(stability) ? " (" + std::string(tr("project.api.experimental")) + ")" : std::string();
 }
 
+// "[Stable](stability.md)" or "[Experimental](stability.md)"; nothing for a class with no mark.
 std::string stability_title(ApiStability stability) {
+  if (stability == ApiStability::Unmarked) return {};
   return "[" + std::string(is_experimental(stability) ? kExperimentalTitle : kStableTitle) + "](" + kStabilityPage +
          ")";
+}
+
+// The mark in a class's or a method's data, left out when it has none.
+void add_stability(nlohmann::json& data, ApiStability stability) {
+  if (stability != ApiStability::Unmarked) data[kStability] = stability_name(stability);
 }
 
 std::string markdown_method(const ApiClass& owner, const ApiMethod& method) {
@@ -218,10 +225,8 @@ nlohmann::json param_data(const ApiParam& param) {
 }
 
 nlohmann::json method_data(const ApiMethod& method) {
-  nlohmann::json data = {{kName, method.name},
-                         {kStability, stability_name(method.stability)},
-                         {kAbout, method.about},
-                         {kParams, nlohmann::json::array()}};
+  nlohmann::json data = {{kName, method.name}, {kAbout, method.about}, {kParams, nlohmann::json::array()}};
+  add_stability(data, method.stability);
   for (const ApiParam& param : method.params) data[kParams].push_back(param_data(param));
   data[kReturns] = {{kType, method.returns}};
   if (method.on_class) data[kStatic] = true;
@@ -232,10 +237,10 @@ nlohmann::json method_data(const ApiMethod& method) {
 
 nlohmann::json class_data(const ApiClass& owner) {
   nlohmann::json data = {{kName, owner.name},
-                         {kStability, stability_name(owner.stability)},
                          {kKind, owner.is_module ? kModuleKind : kClassKind},
                          {kAbout, owner.about},
                          {kMethods, nlohmann::json::array()}};
+  add_stability(data, owner.stability);
   if (!owner.superclass.empty()) data[kSuperclass] = owner.superclass;
   if (!owner.guide.empty()) data[kGuide] = owner.guide;
   if (!owner.notes.empty()) data[kNotes] = owner.notes;

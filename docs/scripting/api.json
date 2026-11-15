@@ -1,6 +1,6 @@
 {
   "description": "Every class and method of the scripting API, a line each (also: redgem api).",
-  "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine. A class or method marked *Experimental.* may change in any release; the rest is stable: from 1.0, no breaking change within a 1.x minor release (see [API stability](stability.md)).",
+  "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine. Each class and method is stable (from 1.0, no breaking change within a 1.x minor release) or experimental (it may change in any release).",
   "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "internal_classes": [
     "Behaviour::Tween",
@@ -359,20 +359,20 @@
     },
     {
       "name": "Behaviour::Timer",
-      "stability": "experimental",
+      "stability": "stable",
       "kind": "class",
       "about": "What after, every and tween return: something waiting to happen, which can be called off.",
       "methods": [
         {
           "name": "cancel",
-          "stability": "experimental",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "calls it off (also from inside its own block)"
         },
         {
           "name": "cancelled?",
-          "stability": "experimental",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it was called off"

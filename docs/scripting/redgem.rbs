@@ -120,13 +120,13 @@ class Behaviour
 end
 
 # What after, every and tween return: something waiting to happen, which can be called off.
-%a{redgem:experimental}
+%a{redgem:stable}
 class Behaviour::Timer
   # calls it off (also from inside its own block)
-  %a{redgem:experimental}
+  %a{redgem:stable}
   def cancel: () -> void
   # whether it was called off
-  %a{redgem:experimental}
+  %a{redgem:stable}
   def cancelled?: () -> bool
 end
 

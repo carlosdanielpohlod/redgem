@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iterator>
+#include <set>
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
@@ -30,6 +31,7 @@ constexpr const char* kInstanceCall = "#";
 constexpr const char* kNewMethod = "new";
 constexpr const char* kElementWriter = "[]=";
 constexpr std::size_t kElementWriterParams = 2;  // at least a key and the value
+constexpr const char* kPathSeparator = "::";     // Dialogue::Script is in Dialogue
 
 [[noreturn]] void refuse(const std::string& where, const std::string& why) {
   throw std::invalid_argument(std::string(kReferenceFile) + ": " + where + ": " + why);
@@ -48,11 +50,11 @@ bool flag_of(const json& data, const char* key) { return data.value(key, false);
 
 // A class's or a method's stability; Unmarked when it has none (which the tests refuse).
 ApiStability stability_of(const json& data, const std::string& where) {
-  const std::string mark = text_of(data, kStability);
-  if (mark.empty()) return ApiStability::Unmarked;
+  if (!data.contains(kStability)) return ApiStability::Unmarked;
+  const json& mark = data.at(kStability);
   if (mark == kStable) return ApiStability::Stable;
   if (mark == kExperimental) return ApiStability::Experimental;
-  refuse(where, "its stability is stable or experimental, not " + mark);
+  refuse(where, "its stability is stable or experimental, not " + mark.dump());
 }
 
 ApiParam param_from(const json& data, const std::string& where) {
@@ -199,8 +201,13 @@ bool is_stable_in_experimental(const ApiClass& owner, const ApiMethod& method) {
   return owner.stability == ApiStability::Experimental && method.stability == ApiStability::Stable;
 }
 
+// "Input.axis", "Transform#rotate".
+std::string method_where(const ApiClass& owner, const ApiMethod& method) {
+  return owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name;
+}
+
 void check_method(const ApiClass& owner, const ApiMethod& method, const std::vector<std::string>& classes) {
-  const std::string where = owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name;
+  const std::string where = method_where(owner, method);
   if (has_line_break(method.about)) refuse(where, "its about is one line");
   if (is_module_new(owner, method)) refuse(where, "a module has no new: call its maker otherwise");
   if (is_short_element_writer(method)) refuse(where, "[]= takes its keys, then the value");
@@ -220,11 +227,79 @@ void check_class(const ApiClass& owner, const std::vector<std::string>& classes)
   for (const ApiMethod& method : owner.methods) check_method(owner, method, classes);
 }
 
+bool is_stable(ApiStability stability) { return stability == ApiStability::Stable; }
+
+// The classes games may not rely on yet.
+std::set<std::string> experimental_classes(const ApiReference& reference) {
+  std::set<std::string> experimental;
+  for (const ApiClass& owner : reference.classes) {
+    if (owner.stability == ApiStability::Experimental) experimental.insert(owner.name);
+  }
+  return experimental;
+}
+
+bool is_path_letter(char letter) { return is_name_letter(letter) || letter == ':'; }
+
+// The words of a type, class paths kept whole: "Array[Behaviour::Timer] | nil" has Array,
+// Behaviour::Timer and nil.
+std::vector<std::string> words_in(const std::string& type) {
+  std::vector<std::string> words;
+  for (std::size_t at = 0; at < type.size();) {
+    std::size_t end = at;
+    while (end < type.size() && is_path_letter(type[end])) ++end;
+    if (end > at) words.push_back(type.substr(at, end - at));
+    at = end + 1;
+  }
+  return words;
+}
+
+bool names_experimental(const std::string& type, const std::set<std::string>& experimental) {
+  const std::vector<std::string> words = words_in(type);
+  return std::any_of(words.begin(), words.end(), [&](const std::string& word) { return experimental.count(word) > 0; });
+}
+
+// Whether a method takes or returns a class that may change.
+bool leans_on_experimental(const ApiMethod& method, const std::set<std::string>& experimental) {
+  if (names_experimental(method.returns, experimental)) return true;
+  return std::any_of(method.params.begin(), method.params.end(),
+                     [&](const ApiParam& param) { return names_experimental(param.type, experimental); });
+}
+
+bool is_stable_on_experimental(const ApiMethod& method, const std::set<std::string>& experimental) {
+  return is_stable(method.stability) && leans_on_experimental(method, experimental);
+}
+
+// The class a nested one is in: "Dialogue" for "Dialogue::Script"; nothing for one at the top.
+std::string outer_of(const std::string& name) {
+  const std::size_t at = name.rfind(kPathSeparator);
+  return at == std::string::npos ? std::string() : name.substr(0, at);
+}
+
+// Whether a stable class is in, or comes from, a class that may change.
+bool is_stable_on_experimental(const ApiClass& owner, const std::set<std::string>& experimental) {
+  const bool in_or_from = experimental.count(outer_of(owner.name)) > 0 || experimental.count(owner.superclass) > 0;
+  return is_stable(owner.stability) && in_or_from;
+}
+
+// Nothing stable rests on what may change: a stable class is in and comes from stable ones, and
+// a stable method takes and returns stable classes.
+void check_stability(const ApiClass& owner, const std::set<std::string>& experimental) {
+  if (is_stable_on_experimental(owner, experimental)) refuse(owner.name, "stable, in or from an experimental class");
+  for (const ApiMethod& method : owner.methods) {
+    if (is_stable_on_experimental(method, experimental))
+      refuse(method_where(owner, method), "stable, but takes or returns an experimental class");
+  }
+}
+
 void check_reference(const ApiReference& reference) {
   std::vector<std::string> classes;
   classes.reserve(reference.classes.size());
   for (const ApiClass& owner : reference.classes) classes.push_back(owner.name);
-  for (const ApiClass& owner : reference.classes) check_class(owner, classes);
+  const std::set<std::string> experimental = experimental_classes(reference);
+  for (const ApiClass& owner : reference.classes) {
+    check_class(owner, classes);
+    check_stability(owner, experimental);
+  }
 }
 
 }  // namespace

@@ -20,8 +20,10 @@ parameter removed, made required or given another meaning, a default changed, or
 of another type. Adding a method, an optional parameter or a keyword is not breaking, and neither
 is a fix that makes a call do what its reference line says.
 
-An experimental class has only experimental methods. A stable class may have a few experimental
-ones, which are marked one by one.
+Nothing stable rests on what may change. An experimental class has only experimental methods,
+and the classes nested in it or made from it are experimental too. A stable method takes and
+returns only stable classes. A stable class may have a few experimental methods, which are marked
+one by one.
 
 Before 1.0, every release may change anything (see the CHANGELOG): the marks already say which
 calls are meant to stay as they are.

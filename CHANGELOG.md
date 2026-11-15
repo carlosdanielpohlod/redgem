@@ -17,9 +17,21 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Migrating
 
-- Nothing to change in a game for the stability marks below. Every class and method of the
-  scripting API is now marked stable or experimental; what came in the last two releases is
-  experimental (see [API stability](docs/scripting/stability.md)).
+From a game made with 0.5.0:
+
+- **`game.json`**: add `"studio"`. A game's save, settings, bindings and crash reports now live in
+  `<studio>/<title>/` in the player's data folder, and nothing is moved there: to keep a player's
+  save, copy their old `redgem/saves` file to `save.json` in the new folder.
+- **`Audio.play`** returns an id or `nil`: a script that compares its result with `true` or
+  `false` tests it for `nil` instead.
+- **`Game.load_scene` in a network game** returns `false` on a machine that is not the host: load
+  levels on the host, and every machine follows. Drop any use of `Network::RESEND`.
+- **Network games** are encrypted: players of this version cannot join hosts, relays or servers of
+  an earlier one. Update the relay and the server with the game.
+- **Leaves**: a scene that wants its foliage as before sets `foliage_translucency` to 0.
+- The stability marks below change no game: every class and method is now stable or
+  experimental, and what came in the last two releases is experimental (see
+  [API stability](docs/scripting/stability.md)).
 
 ### Added
 

@@ -54,7 +54,8 @@ constexpr std::size_t kLeastRubyMethods = 100;
 constexpr const char* kTestFile = "api_reference_test.rb";
 constexpr const char* kNewMethod = "new";
 constexpr const char* kInitializeMethod = "initialize";
-// What is likely to change before it settles: a class under one of these names is experimental.
+// What is likely to change before it settles: a class whose path holds one of these names is
+// experimental (Dialogue::Script, a UI::DialogueBox).
 constexpr const char* kExperimentalAreas[] = {"NPC",      "Brain",    "Perception", "LineOfSight",
                                               "Interact", "Talkable", "HeadLook",   "Schedule",
                                               "Dialogue", "Quest",    "Assistant"};
@@ -410,7 +411,7 @@ TEST_CASE("every class and method of the API reference is marked stable or exper
 TEST_CASE("NPCs, their interaction, dialogue, quests and the assistant's tools are experimental") {
   for (const ApiClass& owner : api_reference().classes) {
     const bool in_area = std::any_of(std::begin(kExperimentalAreas), std::end(kExperimentalAreas),
-                                     [&owner](const char* area) { return owner.name.rfind(area, 0) == 0; });
+                                     [&owner](const char* area) { return owner.name.find(area) != std::string::npos; });
     if (in_area) CHECK_MESSAGE(owner.stability == ApiStability::Experimental, owner.name);
   }
 }

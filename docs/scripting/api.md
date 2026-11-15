@@ -4,12 +4,12 @@ description: "Every class and method of the scripting API, a line each (also: re
 
 # API reference
 
-The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine. A class or method marked *Experimental.* may change in any release; the rest is stable: from 1.0, no breaking change within a 1.x minor release (see [API stability](stability.md)).
+The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine. Each class and method is stable (from 1.0, no breaking change within a 1.x minor release) or experimental (it may change in any release).
 
 | Class | What it is | Stability |
 |---|---|---|
 | [`Behaviour`](#behaviour) | A Ruby class attached to an object: the engine calls its methods as the game runs. | [Stable](stability.md) |
-| [`Behaviour::Timer`](#behaviourtimer) | What after, every and tween return: something waiting to happen, which can be called off. | [Experimental](stability.md) |
+| [`Behaviour::Timer`](#behaviourtimer) | What after, every and tween return: something waiting to happen, which can be called off. | [Stable](stability.md) |
 | [`GameObject`](#gameobject) | An object of the scene, as scripts see it. | [Stable](stability.md) |
 | [`Transform`](#transform) | Where an object is, how it is turned and how big it is. | [Stable](stability.md) |
 | [`Vector3`](#vector3) | A point or a direction in meters: x, y, z. | [Stable](stability.md) |
@@ -109,10 +109,10 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 
 ## Behaviour::Timer
 
-What after, every and tween return: something waiting to happen, which can be called off. *Experimental.*
+What after, every and tween return: something waiting to happen, which can be called off.
 
-- `cancel -> void`: calls it off (also from inside its own block) *Experimental.*
-- `cancelled? -> bool`: whether it was called off *Experimental.*
+- `cancel -> void`: calls it off (also from inside its own block)
+- `cancelled? -> bool`: whether it was called off
 
 ## GameObject
 

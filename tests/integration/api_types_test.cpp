@@ -159,13 +159,35 @@ TEST_CASE("the classes and methods with no stability mark") {
 TEST_CASE("stability marks: two words, and no stable method in an experimental class") {
   nlohmann::json data = reference_data();
   data["classes"][0]["methods"][1]["stability"] = "beta";
-  CHECK(has(refusal(data), "Mover#move: its stability is stable or experimental, not beta"));
+  CHECK(has(refusal(data), "Mover#move: its stability is stable or experimental, not \"beta\""));
   data = reference_data();
-  data["classes"][3]["stability"] = "frozen";
-  CHECK(has(refusal(data), "Tools: its stability is stable or experimental, not frozen"));
+  data["classes"][3]["stability"] = "";
+  CHECK(has(refusal(data), "Tools: its stability is stable or experimental, not \"\""));
+  data = reference_data();
+  data["classes"][3]["stability"] = true;
+  CHECK(has(refusal(data), "Tools: its stability is stable or experimental, not true"));
   data = reference_data();
   data["classes"][3]["methods"][0]["stability"] = "stable";
   CHECK(has(refusal(data), "Tools.tint: stable, in an experimental class"));
+}
+
+TEST_CASE("nothing stable rests on what may change") {
+  nlohmann::json data = reference_data();
+  data["classes"][0]["methods"][2]["returns"]["type"] = "Array[Tools] | nil";
+  CHECK(has(refusal(data), "Mover#speed=: stable, but takes or returns an experimental class"));
+  data = reference_data();
+  move_params(data)[0]["type"] = "Tools";  // (an experimental method may)
+  CHECK(refusal(data).empty());
+  data = reference_data();
+  data["classes"].push_back({{"name", "Tools::Box"},
+                             {"stability", "stable"},
+                             {"kind", "class"},
+                             {"about", "a box"},
+                             {"methods", nlohmann::json::array()}});
+  CHECK(has(refusal(data), "Tools::Box: stable, in or from an experimental class"));
+  data["classes"].back()["name"] = "Box";
+  data["classes"].back()["superclass"] = "Tools";
+  CHECK(has(refusal(data), "Box: stable, in or from an experimental class"));
 }
 
 TEST_CASE("what may change is marked in the manual's page, the texts and the data of redgem api") {
@@ -181,6 +203,8 @@ TEST_CASE("what may change is marked in the manual's page, the texts and the dat
   CHECK(has(api_index(reference), "tools (experimental)\n"));
   CHECK(has(class_json(reference.classes[0]), "\"stability\":\"stable\""));
   CHECK(has(class_json(reference.classes[0]), "\"stability\":\"experimental\""));
+  CHECK(!has(class_json(reference.classes[2]), "stability"));  // (Runner has no mark: it says none)
+  CHECK(has(page, "| [`Runner`](#runner) | runs |  |\n"));
 }
 
 TEST_CASE("the reference refuses what it may not hold, saying where") {
@@ -277,9 +301,7 @@ TEST_CASE("the engine's type signatures have every class and method of its refer
     CHECK_MESSAGE(has(rbs, (owner.is_module ? "\nmodule " : "\nclass ") + owner.name), owner.name);
     methods += owner.methods.size();
   }
-  std::size_t definitions = 0;
-  for (std::size_t at = rbs.find("\n  def "); at != std::string::npos; at = rbs.find("\n  def ", at + 1)) ++definitions;
-  CHECK(definitions == methods);
+  CHECK(occurrences(rbs, "\n  def ") == methods);
   const std::size_t marks = occurrences(rbs, std::string("\n") + kStabilityAnnotation) +
                             occurrences(rbs, std::string("\n  ") + kStabilityAnnotation);
   CHECK(marks == methods + api_reference().classes.size());  // (every one is marked)
