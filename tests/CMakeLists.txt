@@ -186,6 +186,7 @@ add_executable(redgem_tests
   unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/head_aim_test.cpp
   unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp
@@ -234,6 +235,7 @@ add_executable(redgem_tests
   integration/save_migration_api_test.cpp
   integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp

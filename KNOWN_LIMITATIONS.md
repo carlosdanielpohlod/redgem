@@ -359,8 +359,12 @@ not a promise of how it will be closed.
   network a speaker without a NetworkSync is found on the client by its name.
   An Interactor's line of sight is one ray
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
-  and can be used and talked to through [interaction](docs/scripting/interaction.md); there are no
-  daily schedules, head look-at, dialogue, voice or mission system yet. A Perception's sight is one
+  daily schedules on a `GameClock` and head look-at, and can be used and talked to through
+  [interaction](docs/scripting/interaction.md); there is no dialogue, voice or mission system yet.
+  Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
+  character faces when it starts to look, and it does not avoid turning through the body when the
+  target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the
+  game saves it. A Perception's sight is one
   ray from its eyes to a point on each watched object (a body mostly behind a low wall is hidden,
   and a thin gap shows it whole), it looks every frame for every watched object, and hearing goes
   through walls. Brains and Perceptions work on the host only: a noise made on a client is heard by

@@ -145,6 +145,14 @@
           "about": "a Perception on the object heard a noise"
         },
         {
+          "name": "on_schedule",
+          "params": [
+            {"name": "activity", "type": "Symbol"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Schedule on the object came to the hour of another activity"
+        },
+        {
           "name": "persist",
           "static": true,
           "params": [
@@ -2701,6 +2709,58 @@
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether all its clips move the object"
+        },
+        {
+          "name": "look_at",
+          "params": [
+            {"name": "target", "type": "Vector3 | GameObject"},
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""},
+            {"name": "max_angle", "type": "Numeric", "keyword": true, "optional": true, "default": "60.0"}
+          ],
+          "returns": {"type": "void"},
+          "about": "turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away"
+        },
+        {
+          "name": "look_away",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "void"},
+          "about": "the bone goes back to its clips' pose, easing out"
+        },
+        {
+          "name": "looking?",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a bone is turned toward something, or on its way back"
+        },
+        {
+          "name": "bone",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the object under the character with that name (or that name after a rig's prefix:), or nil"
+        },
+        {
+          "name": "bone!",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
+          "about": "bone that raises when the character has none of that name"
+        },
+        {
+          "name": "bone_named?",
+          "static": true,
+          "params": [
+            {"name": "part", "type": "String"},
+            {"name": "name", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a part's name is that bone's: the name, or the name after a prefix:"
         }
       ],
       "guide": "animation.md"
@@ -5879,11 +5939,218 @@
         "on_hear",
         "on_interact",
         "on_lose_sight",
+        "on_schedule",
         "on_see",
         "thinks_here?",
         "update"
       ],
       "guide": "npcs.md#brain"
+    },
+    {
+      "name": "GameClock",
+      "kind": "module",
+      "about": "The time of day in the game's world, on game time: what schedules follow.",
+      "methods": [
+        {
+          "name": "hour",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "the hour of the day, its minutes as a fraction: 0 up to 24"
+        },
+        {
+          "name": "minute",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the minute of the hour"
+        },
+        {
+          "name": "minute_of_day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "whole minutes since midnight: 0 up to 1439"
+        },
+        {
+          "name": "day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the day it is, from 1"
+        },
+        {
+          "name": "to_s",
+          "static": true,
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the time as \"HH:MM\""
+        },
+        {
+          "name": "set",
+          "static": true,
+          "params": [
+            {"name": "hour", "type": "Integer", "keyword": true},
+            {"name": "minute", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "day", "type": "Integer", "keyword": true, "optional": true, "default": "GameClock.day"}
+          ],
+          "returns": {"type": "void"},
+          "about": "sets the time of day in whole hours and minutes (and the day, from 1)"
+        },
+        {
+          "name": "speed",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "game seconds for each second of game time (60 unless said)"
+        },
+        {
+          "name": "speed=",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "changes it (0 stops the clock)"
+        },
+        {
+          "name": "state",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Float]"},
+          "about": "what to save: { seconds:, speed: }"
+        },
+        {
+          "name": "restore",
+          "static": true,
+          "params": [
+            {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
+          ],
+          "returns": {"type": "void"},
+          "about": "back to a saved state; nil (nothing saved yet) leaves the clock as it is"
+        },
+        {
+          "name": "seconds",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds of the world's time since the first day began"
+        }
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "Schedule",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).",
+      "methods": [
+        {
+          "name": "current",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the activity it is time for, or nil"
+        },
+        {
+          "name": "plan",
+          "params": [],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "[[minute of the day, activity], ...] in the order of the day"
+        },
+        {
+          "name": "plan=",
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Hash[String, Symbol | String] | String"},
+          "about": "changes the plan: { \"06:00\" => :work } or \"06:00 work, ...\""
+        },
+        {
+          "name": "parse",
+          "static": true,
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "a plan as given, in the order of the day"
+        },
+        {
+          "name": "activity_at",
+          "static": true,
+          "params": [
+            {"name": "plan", "type": "Array[[Integer, Symbol]]"},
+            {"name": "minute_of_day", "type": "Integer"}
+          ],
+          "returns": {"type": "Symbol | nil"},
+          "about": "what a plan says for a minute of the day"
+        },
+        {
+          "name": "minute_of",
+          "static": true,
+          "params": [
+            {"name": "time", "type": "String"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "\"06:30\" as minutes of the day (390)"
+        }
+      ],
+      "internal": [
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "HeadLook",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.",
+      "methods": [
+        {
+          "name": "target",
+          "params": [],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "what it looks at instead of the heroes, or nil"
+        },
+        {
+          "name": "target=",
+          "params": [
+            {"name": "target", "type": "GameObject | Vector3 | nil"}
+          ],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "sets it (nil: the heroes)"
+        },
+        {
+          "name": "nearest_hero",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the nearest hero in range and in front of it, or nil"
+        },
+        {
+          "name": "bone",
+          "params": [],
+          "returns": {"type": "GameObject"},
+          "about": "the head's bone"
+        },
+        {
+          "name": "range",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters to a hero (4 unless said)"
+        },
+        {
+          "name": "angle",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "degrees off its forward a hero may be at, and the most the head turns (70 unless said)"
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#head-look-at"
     }
   ]
 }
