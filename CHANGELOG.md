@@ -4,9 +4,34 @@ What changed in each release of RedGem. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every release so far is experimental:
 until 1.0, a release may change what games rely on (see
-[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)). From 1.0, a stable call of the scripting API has no
+breaking change within a 1.x minor release, and an experimental one may change in any release
+([API stability](docs/scripting/stability.md)).
+
+Each release has these parts, in this order, each only when it has something: **Migrating** (what
+to change in a game made with the release before, step by step, for every breaking change; say
+when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves the
+`[Unreleased]` part under its version and starts a new one with the same headings.
 
 ## [Unreleased]
+
+### Migrating
+
+From a game made with 0.5.0:
+
+- **`game.json`**: add `"studio"`. A game's save, settings, bindings and crash reports now live in
+  `<studio>/<title>/` in the player's data folder, and nothing is moved there: to keep a player's
+  save, copy their old `redgem/saves` file to `save.json` in the new folder.
+- **`Audio.play`** returns an id or `nil`: a script that compares its result with `true` or
+  `false` tests it for `nil` instead.
+- **`Game.load_scene` in a network game** returns `false` on a machine that is not the host: load
+  levels on the host, and every machine follows. Drop any use of `Network::RESEND`.
+- **Network games** are encrypted: players of this version cannot join hosts, relays or servers of
+  an earlier one. Update the relay and the server with the game.
+- **Leaves**: a scene that wants its foliage as before sets `foliage_translucency` to 0.
+- The stability marks below change no game: every class and method is now stable or
+  experimental, and what came in the last two releases is experimental (see
+  [API stability](docs/scripting/stability.md)).
 
 ### Added
 
@@ -92,6 +117,16 @@ until 1.0, a release may change what games rely on (see
   Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
   vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
   not joined yet (no shaping).
+- **Stable and experimental calls**: every class and method of the API reference is marked
+  `stable` or `experimental`, in `docs/scripting/api.json`, the manual's API page (a Stability
+  column, and *Experimental.* after what may change), `redgem api` (`(experimental)`, and a
+  `"stability"` in `--json`) and the type signatures (`%a{redgem:stable}`). From 1.0, a stable call
+  has no breaking change within a 1.x minor release. A test fails when a class or method has no
+  mark. What came in 0.4.1, 0.5.0 and since is experimental for now, and so are the NPC classes
+  (Interactable, Interactor, Interaction, Brain, Perception, LineOfSight, Talkable, HeadLook,
+  Schedule, NavAgent) and dialogue (Dialogue, DialogueBox, GameVariables, GameClock): the cameras' follow, orbit and shake, joints,
+  navigation, water, scroll lists, emitters, the debug drawing and profiling calls, save slots,
+  asynchronous scene loading, prefab spawning and movement validation, among others.
 
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the

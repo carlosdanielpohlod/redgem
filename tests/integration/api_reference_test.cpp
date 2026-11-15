@@ -1,8 +1,8 @@
 // The API reference (docs/scripting/api.json) says what the engine really has: every public
 // method the engine adds to Ruby is in it, everything in it is there, each class as the class or
 // module it is and each method of the engine's Ruby with the parameters it takes; the manual's
-// page and the type signatures are made from it, and the guide new games get lists calls that
-// exist and compile.
+// page and the type signatures are made from it, every class and method in it says whether games
+// may rely on it, and the guide new games get lists calls that exist and compile.
 
 #include <doctest/doctest.h>
 
@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -53,6 +54,11 @@ constexpr std::size_t kLeastRubyMethods = 100;
 constexpr const char* kTestFile = "api_reference_test.rb";
 constexpr const char* kNewMethod = "new";
 constexpr const char* kInitializeMethod = "initialize";
+// What is likely to change before it settles: a class whose path holds one of these names is
+// experimental (Dialogue::Script, a UI::DialogueBox).
+constexpr const char* kExperimentalAreas[] = {"NPC",      "Brain",    "Perception", "LineOfSight",
+                                              "Interact", "Talkable", "HeadLook",   "Schedule",
+                                              "Dialogue", "Quest",    "Assistant"};
 
 // What Ruby says of every class and module reachable from the top, nested ones included, each
 // under its path: "Class.method" for a method of its own called on it, "Class#method" for one of
@@ -395,6 +401,19 @@ TEST_CASE("a method's shape: what the reference says against what Ruby says") {
   CHECK(shape_mismatch(ruby, documented) == "block");
   documented.optional = 1;
   CHECK(shape_mismatch(ruby, documented) == "the positional parameters it may go without");
+}
+
+TEST_CASE("every class and method of the API reference is marked stable or experimental") {
+  const std::vector<std::string> unmarked = unmarked_bindings(api_reference());
+  CHECK_MESSAGE(unmarked.empty(), "no \"stability\" in docs/scripting/api.json: " << joined(unmarked));
+}
+
+TEST_CASE("NPCs, their interaction, dialogue, quests and the assistant's tools are experimental") {
+  for (const ApiClass& owner : api_reference().classes) {
+    const bool in_area = std::any_of(std::begin(kExperimentalAreas), std::end(kExperimentalAreas),
+                                     [&owner](const char* area) { return owner.name.find(area) != std::string::npos; });
+    if (in_area) CHECK_MESSAGE(owner.stability == ApiStability::Experimental, owner.name);
+  }
 }
 
 TEST_CASE("the manual's API page and the type signatures are made from the reference") {

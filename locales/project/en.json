@@ -5,6 +5,7 @@
   "project.android.network_unsaid": "the game's scripts use the network (Network or HTTP), so its app asks for it: say \"network\": true in game.json",
   "project.android.no_bundletool": "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
   "project.api.did_you_mean": "Did you mean {names}?",
+  "project.api.experimental": "experimental",
   "project.api.guide": "guide: {page}",
   "project.api.index_header": "RedGem scripting API, {count} classes. redgem api <Class> for its methods; redgem api --search <word> to find one.",
   "project.api.more_found": "+{count} more: search a longer word",
