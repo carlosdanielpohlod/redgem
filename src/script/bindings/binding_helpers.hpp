@@ -41,6 +41,9 @@ ScriptContext& context(mrb_state* mrb);
 Scene& scene(mrb_state* mrb);
 // The interpreter's time budget (see script/script_budget.hpp).
 ScriptBudget& script_budget(mrb_state* mrb);
+// The symbol of a name the engine uses again and again, interned once (see SymbolCache): what a
+// binding called for every object, every frame, reads by name.
+mrb_sym symbol(mrb_state* mrb, const char* name);
 
 // Runs engine work known to be long (spawning, the disk): its time is the engine's, not the
 // call's (BudgetPause). Returns what `work` does.

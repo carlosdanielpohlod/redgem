@@ -497,10 +497,10 @@ until 1.0, a release may change what games rely on (see
 ### Fixed
 
 - **Behaviour updates are about three times faster**: each call the engine made into Ruby (every
-  behaviour's update, every frame) looked up its method's name among all of the interpreter's
-  symbols, and that lookup can scan every one of them. The prelude's growth made it most of the
-  scripts' frame. The engine now looks each name up once: a frame of 1000 behaviours takes about
-  0.65 ms instead of 2.
+  behaviour's update, every frame) and each binding on a GameObject looked up a name (the method's,
+  `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
+  them. The prelude's growth made it most of the scripts' frame. The engine now looks each name up
+  once: a frame of 1000 behaviours takes about 0.65 ms instead of 2.
 - **Web requests end with their game**: their threads used to be detached, so one still running
   at exit could outlive the program's static objects. A game that ends (or an editor play session
   that stops) now gives every request on its way up, hangs up its connection so its wait ends at

@@ -26,12 +26,12 @@ constexpr const char* kObjectVariable = "@object";
 PhysicsWorld& physics(mrb_state* mrb) { return *context(mrb).physics; }
 
 JointId stored_id(mrb_state* mrb, mrb_value self) {
-  return static_cast<JointId>(mrb_integer(mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable))));
+  return static_cast<JointId>(mrb_integer(mrb_iv_get(mrb, self, symbol(mrb, kIdVariable))));
 }
 
 // Whether the joint's first object is gone, and the joint with it.
 bool object_gone(mrb_state* mrb, mrb_value self) {
-  const mrb_value object = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kObjectVariable));
+  const mrb_value object = mrb_iv_get(mrb, self, symbol(mrb, kObjectVariable));
   return scene(mrb).resolve(wrapped_handle(mrb, object)) == kNoObject;
 }
 
