@@ -191,6 +191,10 @@ mrb_value audio_move(mrb_state* mrb, mrb_value) {
 mrb_value audio_playing(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).sound_playing(spatial_source_id(mrb, single_arg(mrb))));
 }
+// Audio.loudness(id): how loud a voice is as it plays (0 to 1), what a mouth follows.
+mrb_value audio_loudness(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, audio(mrb).sound_loudness(spatial_source_id(mrb, single_arg(mrb))));
+}
 mrb_value audio_stop(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).stop_sound(spatial_source_id(mrb, single_arg(mrb))));
 }
@@ -215,6 +219,7 @@ void install_spatial_audio_bindings(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "move", audio_move, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, module, "playing?", audio_playing, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "stop", audio_stop, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, module, "loudness", audio_loudness, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "__set", audio_set, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, module, "stop_sources", audio_stop_all, MRB_ARGS_NONE());
 }

@@ -18,7 +18,7 @@ namespace {
 constexpr const char* kBaker = R"({
   "start": [{ "if": [{ "var": "met_baker", "is": true }], "next": "again" }, { "next": "hello" }],
   "nodes": {
-    "hello": { "speaker": "baker.name", "text": "baker.hello", "voice": "baker/hello.ogg",
+    "hello": { "speaker": "baker.name", "text": "baker.hello", "voice": "baker/hello",
                "effects": [{ "set": "met_baker", "to": true }], "next": "offer" },
     "again": { "speaker": "baker.name", "text": "baker.again", "next": "offer" },
     "offer": { "text": "baker.offer", "choices": [
@@ -46,7 +46,7 @@ TEST_CASE("a well made dialogue reads, with the texts and quests it names") {
   const DialogueFile file = read_dialogue(kBaker);
   CHECK(file.ok());
   CHECK(file.warnings.empty());
-  CHECK(file.json["nodes"]["hello"]["voice"] == "baker/hello.ogg");
+  CHECK(file.json["nodes"]["hello"]["voice"] == "baker/hello");
   const auto has_text = [&](const std::string& key) {
     return std::any_of(file.texts.begin(), file.texts.end(), [&](const NameUse& use) { return use.name == key; });
   };
@@ -116,7 +116,7 @@ TEST_CASE("effects are those a dialogue can have, with what each needs") {
 }
 
 TEST_CASE("a voice is a sound's name inside the game") {
-  CHECK(errors_of_node(R"({"text": "t", "end": true, "voice": "baker/hi.ogg"})").empty());
+  CHECK(errors_of_node(R"({"text": "t", "end": true, "voice": "baker/hi"})").empty());
   CHECK(says(errors_of_node(R"({"text": "t", "end": true, "voice": "../../secret"})"), "\"voice\" is a sound's"));
 }
 

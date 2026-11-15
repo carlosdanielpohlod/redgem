@@ -9,9 +9,13 @@
 
 #include <raylib.h>
 
+#include <array>
+#include <cstddef>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
+#include <utility>
 #include <variant>
 
 #include "audio/audio.hpp"
@@ -114,6 +118,57 @@ void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mi
   apply_mix(stream, mix);
 }
 
+// The meters of the voices that play: raylib calls a stream's processor with no word of which
+// stream it is, so each meter has a callback of its own, and a voice takes a free one as it starts.
+// Past kVoiceMeters voices at once, the next ones are not measured (their loudness stays 0).
+constexpr std::size_t kVoiceMeters = 8;
+std::array<LevelMeter, kVoiceMeters> voice_meters;
+constexpr std::size_t kStereo = 2;  // raylib's processors see the device's interleaved stereo
+
+template <std::size_t kMeter>
+void measure_voice(void* buffer, unsigned frames) {
+  voice_meters[kMeter].measure(static_cast<const float*>(buffer), static_cast<std::size_t>(frames) * kStereo);
+}
+template <std::size_t... kMeters>
+constexpr std::array<AudioCallback, kVoiceMeters> meter_callbacks(std::index_sequence<kMeters...>) {
+  return {measure_voice<kMeters>...};
+}
+constexpr std::array<AudioCallback, kVoiceMeters> kMeterCallbacks =
+    meter_callbacks(std::make_index_sequence<kVoiceMeters>{});
+
+// Which voice has which meter.
+class VoiceMeters {
+ public:
+  void attach(SoundSourceId id, AudioStream stream) {
+    const auto meter = free_meter();
+    if (!meter) return;
+    voice_meters[*meter].reset();
+    taken_[*meter] = id;
+    AttachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+  }
+  void detach(SoundSourceId id, AudioStream stream) {
+    const auto meter = meter_of(id);
+    if (!meter) return;
+    DetachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    taken_[*meter] = kNoSoundSource;
+  }
+  float level(SoundSourceId id) const {
+    const auto meter = meter_of(id);
+    return meter ? voice_meters[*meter].level() : kSilence;
+  }
+
+ private:
+  std::optional<std::size_t> free_meter() const { return meter_of(kNoSoundSource); }
+  std::optional<std::size_t> meter_of(SoundSourceId id) const {
+    for (std::size_t meter = 0; meter < kVoiceMeters; ++meter) {
+      if (taken_[meter] == id) return meter;
+    }
+    return std::nullopt;
+  }
+
+  std::array<SoundSourceId, kVoiceMeters> taken_{};  // kNoSoundSource: free
+};
+
 class RaylibSoundDriver final : public SoundDriver {
  public:
   explicit RaylibSoundDriver(SoundLibrary& library) : library_(library) {}
@@ -123,6 +178,7 @@ class RaylibSoundDriver final : public SoundDriver {
     if (!voice) return false;
     const auto stream = voice_stream(*voice);
     prepare_stream(stream, sound, mix);
+    if (sound.group == MixGroup::Voice) meters_.attach(id, stream);
     voices_.emplace(id, *voice);
     PlayAudioStream(stream);
     return true;
@@ -133,12 +189,14 @@ class RaylibSoundDriver final : public SoundDriver {
   bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(voice_stream(voices_.at(id))); }
   void mix(SoundSourceId id, SpatialMix mix) override { apply_mix(voice_stream(voices_.at(id)), mix); }
   void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(voice_stream(voices_.at(id)), pitch); }
+  float level(SoundSourceId id) const override { return meters_.level(id); }
   void stop(SoundSourceId id) override {
     const auto found = voices_.find(id);
     if (found == voices_.end()) return;
     const auto stream = voice_stream(found->second);
     StopAudioStream(stream);
     DetachAudioStreamProcessor(stream, spatial_mono_callback);  // (nothing to detach from a flat one)
+    meters_.detach(id, stream);
     std::visit([](const auto& voice) { unload_voice(voice); }, found->second);
     voices_.erase(found);
   }
@@ -146,6 +204,7 @@ class RaylibSoundDriver final : public SoundDriver {
  private:
   SoundLibrary& library_;
   std::map<SoundSourceId, Voice> voices_;
+  VoiceMeters meters_;
 };
 
 class RaylibMusicDriver final : public MusicDriver {

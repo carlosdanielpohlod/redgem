@@ -621,6 +621,20 @@
           "about": "turns it to those Euler degrees"
         },
         {
+          "name": "local_rotation",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "its rotation relative to its parent, Euler degrees (Vector3)"
+        },
+        {
+          "name": "local_rotation=",
+          "params": [
+            {"name": "degrees", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
+          "about": "turns it to those Euler degrees relative to its parent"
+        },
+        {
           "name": "rotate",
           "params": [
             {"name": "degrees", "type": "Vector3"}
@@ -3012,6 +3026,15 @@
           "about": "stops that sound"
         },
         {
+          "name": "loudness",
+          "static": true,
+          "params": [
+            {"name": "id", "type": "Integer | nil"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended"
+        },
+        {
           "name": "stop_sources",
           "static": true,
           "params": [],
@@ -5367,7 +5390,13 @@
           "name": "voice",
           "params": [],
           "returns": {"type": "String | nil"},
-          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+          "about": "the sound of the line's voice clip (in sounds/), or nil"
+        },
+        {
+          "name": "speaking?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the line's voice clip plays; a line with no choices goes on by itself as it ends"
         },
         {
           "name": "choices",
@@ -6162,6 +6191,90 @@
         "update"
       ],
       "guide": "npcs.md#head-look-at"
+    },
+    {
+      "name": "VoiceMouth",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:).",
+      "methods": [
+        {
+          "name": "follow",
+          "params": [
+            {"name": "handle", "type": "Integer | nil"}
+          ],
+          "returns": {"type": "Integer | nil"},
+          "about": "moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker"
+        },
+        {
+          "name": "openness",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how open the mouth is now, 0 to 1"
+        },
+        {
+          "name": "openness_at",
+          "static": true,
+          "params": [
+            {"name": "loudness", "type": "Numeric"},
+            {"name": "full", "type": "Numeric"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "how open a mouth is (0 to 1) for a voice of that loudness, all open from full"
+        }
+      ],
+      "internal": [
+        "update"
+      ],
+      "guide": "dialogue.md#voice"
+    },
+    {
+      "name": "Dialogue::Voice",
+      "kind": "class",
+      "about": "The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown).",
+      "methods": [
+        {
+          "name": "play",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "speaker", "type": "GameObject | nil"}
+          ],
+          "returns": {"type": "Dialogue::Voice | nil"},
+          "about": "plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play"
+        },
+        {
+          "name": "handle",
+          "params": [],
+          "returns": {"type": "Integer | nil"},
+          "about": "the clip's sound handle"
+        },
+        {
+          "name": "playing?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the clip still plays"
+        },
+        {
+          "name": "follow",
+          "params": [],
+          "returns": {"type": "void"},
+          "about": "moves the clip to where the speaker's head is now"
+        },
+        {
+          "name": "place",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "where the clip plays from: the speaker's head, or the speaker"
+        },
+        {
+          "name": "stop",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "stops the clip"
+        }
+      ],
+      "guide": "dialogue.md#voice"
     }
   ]
 }

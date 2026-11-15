@@ -239,6 +239,7 @@ add_executable(redgem_tests
   integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
+  integration/dialogue_voice_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/scene_activation_test.cpp

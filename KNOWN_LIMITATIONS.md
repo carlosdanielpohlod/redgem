@@ -350,17 +350,20 @@ not a promise of how it will be closed.
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
+  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour or mission system
   yet. Dialogue has no box or choice list on screen yet (a game draws its own from
-  `Dialogue.current`), a line's `voice` plays nothing, and quest stages are GameVariables until a
-  game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
+  `Dialogue.current`), and quest stages are GameVariables until a game gives `Dialogue.quests`. A
+  line's voice is heard only on the machine of the player in the conversation, and voice clips are
+  files (no text-to-speech). A mouth follows a voice's loudness, not its sounds (no visemes or lip
+  sync); at most 8 voices are measured at once by the raylib backend (the next ones leave their
+  mouths shut), and a jaw turns about its own X axis only. A dialogue's texts take no placeholder values, and GameVariables
   hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
   A machine has one conversation at a time (two local players cannot talk at once), and over the
   network a speaker without a NetworkSync is found on the client by its name.
   An Interactor's line of sight is one ray
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
   daily schedules on a `GameClock` and head look-at, and can be used and talked to through
-  [interaction](docs/scripting/interaction.md); there is no dialogue, voice or mission system yet.
+  [interaction](docs/scripting/interaction.md), with voiced lines; there is no mission system yet.
   Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
   character faces when it starts to look, and it does not avoid turning through the body when the
   target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the

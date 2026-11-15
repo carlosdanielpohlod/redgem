@@ -981,6 +981,11 @@ Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0) # lower, slower to come b
 Audio.ducking(volume: Audio::NO_DUCKING)               # off
 ```
 
+The engine follows how loud each voice is as it plays, from its own samples (before its volume):
+`Audio.loudness(handle)` is 0 to 1, and 0 for sounds of the other groups. A `VoiceMouth` opens a
+speaker's mouth with it (see [Dialogue](dialogue.md#voice)), and a dialogue line's voice plays in
+this group.
+
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
 playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then

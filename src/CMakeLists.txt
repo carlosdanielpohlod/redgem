@@ -58,6 +58,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_conversation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_voice.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
@@ -65,6 +66,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/schedule.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/voice_mouth.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -385,6 +387,7 @@ redgem_add_library(redgem_runtime
   navigation/navigation.cpp
   audio/audio.cpp
   audio/ducking.cpp
+  audio/envelope_follower.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp

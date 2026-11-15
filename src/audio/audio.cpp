@@ -121,6 +121,7 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
   if (place) stop(*place);
   sounds_.emplace(id, sound);
+  if (sound.group == MixGroup::Voice) loudness_.emplace(id, EnvelopeFollower{});
   ++next_;
   return id;
 }
@@ -185,12 +186,24 @@ bool SoundPool::group_playing(MixGroup group) const {
   return false;
 }
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
+float SoundPool::loudness(SoundSourceId id) const {
+  const auto found = loudness_.find(id);
+  return found == loudness_.end() ? kSilence : found->second.value();
+}
+void SoundPool::follow(float seconds) {
+  for (auto& [id, envelope] : loudness_) envelope.update(driver_.level(id), seconds);
+}
 bool SoundPool::stop(SoundSourceId id) {
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
-  driver_.stop(id);
-  sounds_.erase(found);
+  forget(found);
   return true;
+}
+// Stops a sound and lets go of it.
+void SoundPool::forget(std::map<SoundSourceId, SpatialSound>::iterator sound) {
+  driver_.stop(sound->first);
+  loudness_.erase(sound->first);
+  sounds_.erase(sound);
 }
 void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
@@ -219,8 +232,7 @@ void SoundPool::reap() {
       ++it;
       continue;
     }
-    driver_.stop(it->first);
-    it = sounds_.erase(it);
+    forget(it++);
   }
 }
 

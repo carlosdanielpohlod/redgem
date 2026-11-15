@@ -4,6 +4,8 @@
 
 # What a scene object answers that a conversation asks.
 class Talker
+  Place = Struct.new(:position)
+
   attr_reader :name, :behaviours
 
   def initialize(name)
@@ -13,6 +15,9 @@ class Talker
 
   def props = {}
   def alive? = true
+  def children = []
+  def animation = Animator.new(self)
+  def transform = Place.new(Vector3.zero)
   def get_component(klass) = @behaviours.find { |behaviour| behaviour.is_a?(klass) }
   def __add_behaviour(behaviour) = @behaviours << behaviour
 
@@ -30,7 +35,7 @@ class DialogueTest < RedGemTest::Case
   BAKER = {
     "start" => [{ "if" => [{ "var" => "met_baker", "is" => true }], "next" => "again" }, { "next" => "hello" }],
     "nodes" => {
-      "hello" => { "speaker" => "baker.name", "text" => "baker.hello", "voice" => "baker/hello.ogg",
+      "hello" => { "speaker" => "baker.name", "text" => "baker.hello", "voice" => "baker/hello",
                    "effects" => [{ "set" => "met_baker", "to" => true }], "next" => "offer" },
       "again" => { "text" => "baker.again", "next" => "offer" },
       "offer" => { "text" => "baker.offer", "choices" => [
@@ -63,8 +68,27 @@ class DialogueTest < RedGemTest::Case
     assert_equal "hello", conversation.node_id
     assert_equal "baker.hello", conversation.text, "a key with no text shows as itself"
     assert_equal "baker.name", conversation.speaker_name
-    assert_equal "baker/hello.ogg", conversation.voice
+    assert_equal "baker/hello", conversation.voice
     assert @baker.equal?(conversation.speaker)
+  end
+
+  def test_a_voice_with_no_sound_plays_nothing_and_the_line_waits
+    conversation = talk
+    refute conversation.speaking?
+    conversation.__update
+    assert_equal "hello", conversation.node_id
+  end
+
+  def test_a_mouth_opens_as_far_as_its_voice_is_loud
+    assert_in_delta 0.5, VoiceMouth.openness_at(0.1, 0.2), 1e-6
+    assert_in_delta VoiceMouth::OPEN, VoiceMouth.openness_at(0.9, 0.2), 1e-6
+    assert_in_delta VoiceMouth::SHUT, VoiceMouth.openness_at(0.0, 0.2), 1e-6
+  end
+
+  def test_a_mouth_that_follows_nothing_stays_shut
+    mouth = @baker.add_component(VoiceMouth, morph: "MouthOpen")
+    mouth.update(0.1)
+    assert_in_delta VoiceMouth::SHUT, mouth.openness, 1e-6
   end
 
   def test_the_start_takes_the_first_branch_that_holds

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 
+#include "audio/envelope_follower.hpp"
 #include "audio/mix_groups.hpp"
 #include "core/math.hpp"
 
@@ -84,6 +85,9 @@ class SoundDriver {
   virtual void mix(SoundSourceId id, SpatialMix mix) = 0;
   virtual void pitch(SoundSourceId id, float pitch) = 0;
   virtual void stop(SoundSourceId id) = 0;
+  // How loud the source's own samples were in the last block it played (0 to 1, before its volume):
+  // measured for the sounds of the voice group, 0 for the others and where nothing measures.
+  virtual float level(SoundSourceId) const { return kSilence; }
 };
 
 // Every sound a game holds a handle to, flat or positional, in one id space. Logical voice
@@ -111,6 +115,11 @@ class SoundPool {
   // Whether any sound of the group still plays.
   bool group_playing(MixGroup group) const;
   bool playing(SoundSourceId id) const;
+  // How loud a sound of the voice group is as it plays, smoothed (see EnvelopeFollower); 0 for
+  // other sounds, and once it ended.
+  float loudness(SoundSourceId id) const;
+  // The loudness of every voice moves on by `seconds` toward what its driver measured.
+  void follow(float seconds);
   bool stop(SoundSourceId id);
   void clear();
   void update();
@@ -123,12 +132,14 @@ class SoundPool {
   SoundSourceId weakest() const;
   void refresh();
   void reap();  // lets go of the sounds that ended
+  void forget(std::map<SoundSourceId, SpatialSound>::iterator sound);
   SoundDriver& driver_;
   AudioListener listener_;
   GroupVolumes group_volumes_ = kFullGroupVolumes;
   GroupVolumes group_gains_ = kFullGroupVolumes;
   std::map<SoundSourceId, SpatialSound> sounds_;
-  std::uint64_t next_ = 1;  // never reuse handles, including across game changes
+  std::map<SoundSourceId, EnvelopeFollower> loudness_;  // of the sounds of the voice group
+  std::uint64_t next_ = 1;                              // never reuse handles, including across game changes
 };
 
 }  // namespace redgem

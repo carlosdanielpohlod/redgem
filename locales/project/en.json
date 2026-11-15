@@ -40,6 +40,7 @@
   "project.check.missing_text": "{file}: {where}: no text for {key} in locales/ (nor among the engine's)",
   "project.check.missing_translation": "{file}: {where}: no text for {key} in locales/{language}.json",
   "project.check.unknown_quest": "{file}: {where}: there is no quest {quest} (quests/{quest}.json)",
+  "project.check.missing_voice": "{file}: {where}: its voice {voice} is not in sounds/ (.wav, .ogg, .mp3 or .flac): the line plays silently",
   "project.check.missing_script": "{where}: {script} is not there; {hint}",
   "project.check.missing_sky": "{where}: sky_image {image} is not in images/ (.hdr, .png or .jpg)",
   "project.check.more": "+{count} more (--all shows every one)",

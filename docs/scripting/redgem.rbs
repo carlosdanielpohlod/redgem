@@ -171,6 +171,10 @@ class Transform
   def rotation: () -> Vector3
   # turns it to those Euler degrees
   def rotation=: (Vector3 degrees) -> Vector3
+  # its rotation relative to its parent, Euler degrees (Vector3)
+  def local_rotation: () -> Vector3
+  # turns it to those Euler degrees relative to its parent
+  def local_rotation=: (Vector3 degrees) -> Vector3
   # turns it by those Euler degrees
   def rotate: (Vector3 degrees) -> void
   # turns it to face a point
@@ -761,6 +765,8 @@ module Audio
   def self.playing?: (Integer id) -> bool
   # stops that sound
   def self.stop: (Integer id) -> void
+  # how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended
+  def self.loudness: (Integer | nil id) -> Float
   # stops every sound played with play or play_at
   def self.stop_sources: () -> void
 end
@@ -1339,8 +1345,10 @@ class Dialogue::Conversation
   def speaker_name: () -> (String | nil)
   # the I18n key of who says it, or nil
   def speaker_key: () -> (String | nil)
-  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  # the sound of the line's voice clip (in sounds/), or nil
   def voice: () -> (String | nil)
+  # whether the line's voice clip plays; a line with no choices goes on by itself as it ends
+  def speaking?: () -> bool
   # the choices offered now: those whose conditions hold
   def choices: () -> Array[Dialogue::Conversation::Choice]
   # whether the player answers this line by choosing
@@ -1563,4 +1571,30 @@ class HeadLook < Behaviour
   def range: () -> Float
   # degrees off its forward a hero may be at, and the most the head turns (70 unless said)
   def angle: () -> Float
+end
+
+# A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:).
+class VoiceMouth < Behaviour
+  # moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker
+  def follow: (Integer | nil handle) -> (Integer | nil)
+  # how open the mouth is now, 0 to 1
+  def openness: () -> Float
+  # how open a mouth is (0 to 1) for a voice of that loudness, all open from full
+  def self.openness_at: (Numeric loudness, Numeric full) -> Float
+end
+
+# The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown).
+class Dialogue::Voice
+  # plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play
+  def self.play: (String | Symbol name, GameObject | nil speaker) -> (Dialogue::Voice | nil)
+  # the clip's sound handle
+  def handle: () -> (Integer | nil)
+  # whether the clip still plays
+  def playing?: () -> bool
+  # moves the clip to where the speaker's head is now
+  def follow: () -> void
+  # where the clip plays from: the speaker's head, or the speaker
+  def place: () -> Vector3
+  # stops the clip
+  def stop: () -> bool
 end

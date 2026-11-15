@@ -10,10 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Voice**: a dialogue line's `voice` plays its clip as the line is shown, in the `:voice` group
+  (the music ducks under it), from the speaker's head bone (or the speaker) as it moves. The line
+  shows while the clip plays and goes on when it ends, unless the player skips it; a line with
+  choices waits for one. A `VoiceMouth` behaviour opens a speaker's mouth with the clip's loudness,
+  through a shape key (`morph:`) or a jaw bone (`jaw:`, `angle:`). The engine follows a voice's
+  loudness as it plays (`Audio.loudness(handle)`), `conversation.speaking?` says whether its clip
+  plays, and `Transform#local_rotation` reads and sets a rotation relative to the parent.
+  `redgem check` warns of a voice whose sound is not in `sounds/`. A voice is now named as
+  `Audio.play` names a sound, without its extension.
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
-  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  game (`Dialogue.on(:event)`). Each line can name a `voice`. A `Talkable`
   behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
   (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
   `GameVariables` hold the values every player shares. Over the network each player has a
