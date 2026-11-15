@@ -73,6 +73,7 @@ bool valid_spatial_sound(const SpatialSound& sound);
 // A flat sound's mix is its own volume, centered.
 std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const SpatialSound& sound);
 // Raylib processors receive interleaved float stereo after conversion to the device mix format.
+inline constexpr std::size_t kDeviceChannels = 2;
 void spatial_mono_frames(float* samples, unsigned frames);
 
 class SoundDriver {
@@ -133,6 +134,7 @@ class SoundPool {
   void refresh();
   void reap();  // lets go of the sounds that ended
   void forget(std::map<SoundSourceId, SpatialSound>::iterator sound);
+  void keep(SoundSourceId id, const SpatialSound& sound);  // a sound that started
   SoundDriver& driver_;
   AudioListener listener_;
   GroupVolumes group_volumes_ = kFullGroupVolumes;

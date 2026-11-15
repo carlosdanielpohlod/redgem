@@ -15,7 +15,6 @@ struct AudioVector {
   double x, y, z;
 };
 constexpr double kMinimumAudioAxis = 0.000001;  // reject nearly parallel listener directions
-constexpr std::size_t kStereoChannels = 2;
 constexpr float kMonoShare = 0.5f;
 constexpr double kSmoothFadeCubic = 3.0;
 constexpr double kSmoothFadeQuadratic = 2.0;
@@ -93,7 +92,7 @@ std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const
 void spatial_mono_frames(float* samples, unsigned frames) {
   if (samples == nullptr) return;
   for (unsigned frame = 0; frame < frames; ++frame) {
-    float* stereo = samples + static_cast<std::size_t>(frame) * kStereoChannels;
+    float* stereo = samples + static_cast<std::size_t>(frame) * kDeviceChannels;
     const float mono = stereo[0] * kMonoShare + stereo[1] * kMonoShare;
     stereo[0] = mono;
     stereo[1] = mono;
@@ -120,10 +119,13 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   const auto id = static_cast<SoundSourceId>(next_);
   if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
   if (place) stop(*place);
-  sounds_.emplace(id, sound);
-  if (sound.group == MixGroup::Voice) loudness_.emplace(id, EnvelopeFollower{});
+  keep(id, sound);
   ++next_;
   return id;
+}
+void SoundPool::keep(SoundSourceId id, const SpatialSound& sound) {
+  sounds_.emplace(id, sound);
+  if (sound.group == MixGroup::Voice) loudness_.emplace(id, EnvelopeFollower{});
 }
 std::optional<SoundSourceId> SoundPool::place_for(const SpatialSound& sound) const {
   if (sounds_.size() < kMaxSounds) return std::nullopt;

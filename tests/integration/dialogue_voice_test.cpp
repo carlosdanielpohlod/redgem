@@ -72,11 +72,7 @@ SoundSourceId voice_playing(const testing::RecordingAudio& audio) {
   return kNoSoundSource;
 }
 
-void check_at(const Vec3& position, const Vec3& expected) {
-  CHECK(position.x == doctest::Approx(expected.x).epsilon(kTolerance));
-  CHECK(position.y == doctest::Approx(expected.y).epsilon(kTolerance));
-  CHECK(position.z == doctest::Approx(expected.z).epsilon(kTolerance));
-}
+void check_at(const Vec3& position, const Vec3& expected) { CHECK(length(position - expected) < kTolerance); }
 
 }  // namespace
 

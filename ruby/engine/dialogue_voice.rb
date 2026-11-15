@@ -20,7 +20,7 @@ module Dialogue
       @speaker = speaker if speaker&.alive?
       @head = head_of(@speaker) if @speaker
       @handle = start(name)
-      mouth&.follow(@handle)
+      move_mouth
     end
 
     def playing? = Audio.playing?(@handle)
@@ -38,6 +38,11 @@ module Dialogue
     private
 
     def mouth = @speaker&.get_component(VoiceMouth)
+
+    # The speaker's mouth moves with the clip, once it plays.
+    def move_mouth
+      mouth&.follow(@handle) if @handle
+    end
 
     def start(name) = @speaker ? Audio.play_at(name, place, group: GROUP) : Audio.play(name, group: GROUP)
 

@@ -85,6 +85,12 @@ class DialogueTest < RedGemTest::Case
     assert_in_delta VoiceMouth::SHUT, VoiceMouth.openness_at(0.0, 0.2), 1e-6
   end
 
+  def test_a_mouth_needs_a_full_loudness_above_zero
+    mouth = @baker.add_component(VoiceMouth, morph: "MouthOpen", full: 0)
+    mouth.follow(1)
+    assert_raises(ArgumentError) { mouth.update(0.1) }
+  end
+
   def test_a_mouth_that_follows_nothing_stays_shut
     mouth = @baker.add_component(VoiceMouth, morph: "MouthOpen")
     mouth.update(0.1)

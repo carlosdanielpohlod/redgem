@@ -22,8 +22,9 @@ constexpr float kReleaseSeconds = 0.4f;
 constexpr float kNoTime = 0.0f;
 constexpr float kLongWhile = 10.0f;  // seconds: far past any attack or release
 constexpr std::size_t kBlock = 64;
+constexpr std::size_t kEveryOther = 2;
 // After one time constant, a one-pole follower is 1 - 1/e of the way.
-const float kOneTimeConstant = 1.0f - std::exp(-1.0f);
+float one_time_constant() { return 1.0f - std::exp(-1.0f); }
 
 // A driver whose sounds are as loud as it is told.
 class LevelDriver final : public SoundDriver {
@@ -58,7 +59,7 @@ TEST_CASE("the level of a block is the root mean square of its samples") {
   const std::vector<float> steady(kBlock, kHalfLevel);
   CHECK(rms_level(steady.data(), steady.size()) == doctest::Approx(kHalfLevel));
   std::vector<float> square(kBlock);
-  for (std::size_t index = 0; index < square.size(); ++index) square[index] = index % 2 == 0 ? 1.0f : -1.0f;
+  for (std::size_t index = 0; index < square.size(); ++index) square[index] = index % kEveryOther == 0 ? 1.0f : -1.0f;
   CHECK(rms_level(square.data(), square.size()) == doctest::Approx(1.0f));
   const std::vector<float> quiet(kBlock, kSilence);
   CHECK(rms_level(quiet.data(), quiet.size()) == doctest::Approx(kSilence));
@@ -77,15 +78,15 @@ TEST_CASE("a meter keeps the level of the last block, until it is reset") {
 
 TEST_CASE("the envelope rises over the attack and falls over the release") {
   EnvelopeFollower envelope(kAttackSeconds, kReleaseSeconds);
-  CHECK(envelope.update(kHalfLevel, kAttackSeconds) == doctest::Approx(kHalfLevel * kOneTimeConstant));
+  CHECK(envelope.update(kHalfLevel, kAttackSeconds) == doctest::Approx(kHalfLevel * one_time_constant()));
   CHECK(envelope.update(kHalfLevel, kLongWhile) == doctest::Approx(kHalfLevel));
   // Falling takes the release: one attack's time goes a smaller share of the way down.
   const float after_attack = envelope.update(kSilence, kAttackSeconds);
-  CHECK(after_attack > kHalfLevel * (1.0f - kOneTimeConstant));
+  CHECK(after_attack > kHalfLevel * (1.0f - one_time_constant()));
   CHECK(after_attack < kHalfLevel);
   EnvelopeFollower falling(kAttackSeconds, kReleaseSeconds);
   falling.update(kHalfLevel, kLongWhile);
-  CHECK(falling.update(kSilence, kReleaseSeconds) == doctest::Approx(kHalfLevel * (1.0f - kOneTimeConstant)));
+  CHECK(falling.update(kSilence, kReleaseSeconds) == doctest::Approx(kHalfLevel * (1.0f - one_time_constant())));
 }
 
 TEST_CASE("no time moves the envelope nowhere, and no attack or release follows the level at once") {

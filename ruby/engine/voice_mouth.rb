@@ -32,7 +32,7 @@ class VoiceMouth < Behaviour
   def update(_dt)
     return if @handle.nil?
 
-    @openness = VoiceMouth.openness_at(Audio.loudness(@handle), Float(prop(:full, FULL)))
+    @openness = VoiceMouth.openness_at(Audio.loudness(@handle), full)
     move_mouth
     stop_following unless Audio.playing?(@handle)
   end
@@ -61,7 +61,7 @@ class VoiceMouth < Behaviour
 
     turning = jaw.transform
     current = turning.local_rotation
-    @pose = current unless @written && near?(current, @written)
+    @pose = current unless still_written?(current)
     turning.local_rotation = @pose
     turning.rotate(Vector3.new(angle * openness, 0, 0))
     @written = turning.local_rotation
@@ -71,5 +71,14 @@ class VoiceMouth < Behaviour
 
   def jaw = @jaw ||= animation.bone!(prop(:jaw))
 
-  def near?(rotation, other) = (rotation - other).length <= SAME_POSE
+  # Whether the jaw is as this left it: nothing (its clips, a script) turned it since.
+  def still_written?(rotation) = !@written.nil? && (rotation - @written).length <= SAME_POSE
+
+  # The loudness that opens the mouth all the way: more than 0.
+  def full
+    value = Float(prop(:full, FULL))
+    raise ArgumentError, "#{name}'s VoiceMouth needs a full loudness above 0, not #{value}" unless value.positive?
+
+    value
+  end
 end

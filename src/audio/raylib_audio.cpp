@@ -120,14 +120,14 @@ void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mi
 
 // The meters of the voices that play: raylib calls a stream's processor with no word of which
 // stream it is, so each meter has a callback of its own, and a voice takes a free one as it starts.
-// Past kVoiceMeters voices at once, the next ones are not measured (their loudness stays 0).
+// Past kVoiceMeters voices at once, a new one waits for a meter to be free (its loudness stays 0
+// until then).
 constexpr std::size_t kVoiceMeters = 8;
 std::array<LevelMeter, kVoiceMeters> voice_meters;
-constexpr std::size_t kStereo = 2;  // raylib's processors see the device's interleaved stereo
 
 template <std::size_t kMeter>
 void measure_voice(void* buffer, unsigned frames) {
-  voice_meters[kMeter].measure(static_cast<const float*>(buffer), static_cast<std::size_t>(frames) * kStereo);
+  voice_meters[kMeter].measure(static_cast<const float*>(buffer), static_cast<std::size_t>(frames) * kDeviceChannels);
 }
 template <std::size_t... kMeters>
 constexpr std::array<AudioCallback, kVoiceMeters> meter_callbacks(std::index_sequence<kMeters...>) {
@@ -139,12 +139,14 @@ constexpr std::array<AudioCallback, kVoiceMeters> kMeterCallbacks =
 // Which voice has which meter.
 class VoiceMeters {
  public:
-  void attach(SoundSourceId id, AudioStream stream) {
+  // False when every meter is taken: the voice can ask again.
+  bool attach(SoundSourceId id, AudioStream stream) {
     const auto meter = free_meter();
-    if (!meter) return;
+    if (!meter) return false;
     voice_meters[*meter].reset();
     taken_[*meter] = id;
     AttachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    return true;
   }
   void detach(SoundSourceId id, AudioStream stream) {
     const auto meter = meter_of(id);
@@ -178,12 +180,14 @@ class RaylibSoundDriver final : public SoundDriver {
     if (!voice) return false;
     const auto stream = voice_stream(*voice);
     prepare_stream(stream, sound, mix);
-    if (sound.group == MixGroup::Voice) meters_.attach(id, stream);
+    if (sound.group == MixGroup::Voice) unmetered_.insert(id);
+    meter(id, stream);
     voices_.emplace(id, *voice);
     PlayAudioStream(stream);
     return true;
   }
   void update(SoundSourceId id) override {
+    meter(id, voice_stream(voices_.at(id)));
     if (auto* music = std::get_if<Music>(&voices_.at(id))) UpdateMusicStream(*music);
   }
   bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(voice_stream(voices_.at(id))); }
@@ -197,14 +201,21 @@ class RaylibSoundDriver final : public SoundDriver {
     StopAudioStream(stream);
     DetachAudioStreamProcessor(stream, spatial_mono_callback);  // (nothing to detach from a flat one)
     meters_.detach(id, stream);
+    unmetered_.erase(id);
     std::visit([](const auto& voice) { unload_voice(voice); }, found->second);
     voices_.erase(found);
   }
 
  private:
+  // A voice of the voice group takes a meter as it starts, or as soon as one is free.
+  void meter(SoundSourceId id, AudioStream stream) {
+    if (unmetered_.count(id) != 0 && meters_.attach(id, stream)) unmetered_.erase(id);
+  }
+
   SoundLibrary& library_;
   std::map<SoundSourceId, Voice> voices_;
   VoiceMeters meters_;
+  std::set<SoundSourceId> unmetered_;  // voices waiting for a meter
 };
 
 class RaylibMusicDriver final : public MusicDriver {
