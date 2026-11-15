@@ -733,6 +733,8 @@ module Audio
   def self.music_volume=: (Numeric volume) -> Numeric
   # the volume of everything
   def self.volume=: (Numeric volume) -> Numeric
+  # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
+  def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
   # changes the volume or pitch of a sound that plays; false once it stopped
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
