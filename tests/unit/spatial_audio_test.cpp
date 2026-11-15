@@ -33,7 +33,8 @@ class SpatialTestDriver final : public SoundDriver {
   bool accept = true;
   unsigned stopped = 0;
   unsigned started = 0;
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!accept) return false;
     voices.emplace(id, RecordedSpatialVoice{name, sound, mix});
     ++started;

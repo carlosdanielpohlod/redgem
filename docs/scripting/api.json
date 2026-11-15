@@ -1,6 +1,6 @@
 {
   "description": "Every class and method of the scripting API, a line each (also: redgem api).",
-  "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
+  "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine. Each class and method is stable (from 1.0, no breaking change within a 1.x minor release) or experimental (it may change in any release).",
   "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "internal_classes": [
     "Behaviour::Tween",
@@ -26,11 +26,13 @@
   "classes": [
     {
       "name": "Behaviour",
+      "stability": "stable",
       "kind": "class",
       "about": "A Ruby class attached to an object: the engine calls its methods as the game runs.",
       "methods": [
         {
           "name": "start",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "called once, before the first update",
@@ -39,6 +41,7 @@
         },
         {
           "name": "update",
+          "stability": "stable",
           "params": [
             {"name": "dt", "type": "Float"}
           ],
@@ -49,6 +52,7 @@
         },
         {
           "name": "fixed_update",
+          "stability": "stable",
           "params": [
             {"name": "dt", "type": "Float"}
           ],
@@ -57,6 +61,7 @@
         },
         {
           "name": "on_trigger_enter",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "GameObject"}
           ],
@@ -67,6 +72,7 @@
         },
         {
           "name": "on_trigger_exit",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "GameObject"}
           ],
@@ -75,6 +81,7 @@
         },
         {
           "name": "on_collision_enter",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "GameObject"}
           ],
@@ -83,6 +90,7 @@
         },
         {
           "name": "on_collision_exit",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "GameObject"}
           ],
@@ -91,12 +99,14 @@
         },
         {
           "name": "on_destroy",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "the object is being destroyed"
         },
         {
           "name": "on_interact",
+          "stability": "experimental",
           "params": [
             {"name": "actor", "type": "GameObject"}
           ],
@@ -105,6 +115,7 @@
         },
         {
           "name": "on_focus",
+          "stability": "experimental",
           "params": [
             {"name": "actor", "type": "GameObject"}
           ],
@@ -113,6 +124,7 @@
         },
         {
           "name": "on_blur",
+          "stability": "experimental",
           "params": [
             {"name": "actor", "type": "GameObject"}
           ],
@@ -121,6 +133,7 @@
         },
         {
           "name": "on_see",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject"}
           ],
@@ -129,6 +142,7 @@
         },
         {
           "name": "on_lose_sight",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject"}
           ],
@@ -137,6 +151,7 @@
         },
         {
           "name": "on_hear",
+          "stability": "experimental",
           "params": [
             {"name": "noise", "type": "Perception::Noise"}
           ],
@@ -145,6 +160,7 @@
         },
         {
           "name": "on_schedule",
+          "stability": "experimental",
           "params": [
             {"name": "activity", "type": "Symbol"}
           ],
@@ -153,6 +169,7 @@
         },
         {
           "name": "persist",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "fields", "type": "Symbol | String", "rest": true}
@@ -162,6 +179,7 @@
         },
         {
           "name": "persisted_fields",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -169,18 +187,21 @@
         },
         {
           "name": "game_object",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "GameObject"},
           "about": "the object this behaviour is attached to"
         },
         {
           "name": "name",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String"},
           "about": "the object's name"
         },
         {
           "name": "transform",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Transform"},
           "about": "the object's Transform",
@@ -189,6 +210,7 @@
         },
         {
           "name": "character",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "CharacterController | nil"},
           "about": "the object's CharacterController, or nil",
@@ -197,30 +219,35 @@
         },
         {
           "name": "rigidbody",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Rigidbody | nil"},
           "about": "the object's Rigidbody, or nil"
         },
         {
           "name": "vehicle",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vehicle | nil"},
           "about": "the object's Vehicle, or nil"
         },
         {
           "name": "animation",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Animator"},
           "about": "the object's own Animator"
         },
         {
           "name": "props",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Hash[String, untyped]"},
           "about": "the object's custom properties, as a Hash"
         },
         {
           "name": "prop",
+          "stability": "stable",
           "params": [
             {"name": "key", "type": "Symbol | String"},
             {"name": "default", "type": "untyped", "optional": true, "default": "nil"}
@@ -232,6 +259,7 @@
         },
         {
           "name": "find",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -242,6 +270,7 @@
         },
         {
           "name": "find!",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -250,6 +279,7 @@
         },
         {
           "name": "find_all",
+          "stability": "stable",
           "params": [
             {"name": "tag", "type": "String | Symbol"}
           ],
@@ -260,6 +290,7 @@
         },
         {
           "name": "destroy",
+          "stability": "stable",
           "params": [
             {"name": "target", "type": "GameObject", "optional": true, "default": "game_object"}
           ],
@@ -270,6 +301,7 @@
         },
         {
           "name": "get_component",
+          "stability": "stable",
           "params": [
             {"name": "klass", "type": "Class"}
           ],
@@ -280,6 +312,7 @@
         },
         {
           "name": "after",
+          "stability": "stable",
           "params": [
             {"name": "seconds", "type": "Numeric"},
             {"name": "block", "type": "^() -> void", "block": true}
@@ -291,6 +324,7 @@
         },
         {
           "name": "every",
+          "stability": "stable",
           "params": [
             {"name": "seconds", "type": "Numeric"},
             {"name": "block", "type": "^() -> void", "block": true}
@@ -300,6 +334,7 @@
         },
         {
           "name": "tween",
+          "stability": "stable",
           "params": [
             {"name": "seconds", "type": "Numeric"},
             {"name": "ease", "type": "Symbol", "keyword": true, "optional": true, "default": ":smooth"},
@@ -310,6 +345,7 @@
         },
         {
           "name": "cancel_timers",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "stops every after, every and tween of this behaviour"
@@ -322,17 +358,20 @@
     },
     {
       "name": "Behaviour::Timer",
+      "stability": "stable",
       "kind": "class",
       "about": "What after, every and tween return: something waiting to happen, which can be called off.",
       "methods": [
         {
           "name": "cancel",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "calls it off (also from inside its own block)"
         },
         {
           "name": "cancelled?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it was called off"
@@ -341,35 +380,41 @@
     },
     {
       "name": "GameObject",
+      "stability": "stable",
       "kind": "class",
       "about": "An object of the scene, as scripts see it.",
       "methods": [
         {
           "name": "name",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String"},
           "about": "its name"
         },
         {
           "name": "id",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "its number in the running game"
         },
         {
           "name": "stable_id",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "its persistent scene-file identity as a String; nil for runtime copies"
         },
         {
           "name": "capture_state",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Hash[Symbol, untyped]"},
           "about": "a versioned checkpoint of local pose, tint and visibility, suitable for Save"
         },
         {
           "name": "restore_state",
+          "stability": "experimental",
           "params": [
             {"name": "state", "type": "Hash[Symbol, untyped]"}
           ],
@@ -378,12 +423,14 @@
         },
         {
           "name": "tag",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "its tag property"
         },
         {
           "name": "tag?",
+          "stability": "stable",
           "params": [
             {"name": "value", "type": "String | Symbol"}
           ],
@@ -392,12 +439,14 @@
         },
         {
           "name": "props",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Hash[String, untyped]"},
           "about": "its custom properties"
         },
         {
           "name": "joint",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Joint | nil"},
           "about": "the Joint it came with in the scene (its Joint component, set up in the editor), or nil",
@@ -405,24 +454,28 @@
         },
         {
           "name": "alive?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "false once it was destroyed"
         },
         {
           "name": "destroy",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "removes it at the end of the step"
         },
         {
           "name": "visible",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it is drawn"
         },
         {
           "name": "visible=",
+          "stability": "stable",
           "params": [
             {"name": "value", "type": "bool"}
           ],
@@ -431,18 +484,21 @@
         },
         {
           "name": "behaviours",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Array[Behaviour]"},
           "about": "its behaviours"
         },
         {
           "name": "parent",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "the object it is under, or nil"
         },
         {
           "name": "parent=",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject | nil"}
           ],
@@ -451,6 +507,7 @@
         },
         {
           "name": "set_parent",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject | nil"},
             {"name": "keep_world", "type": "bool", "keyword": true, "optional": true, "default": "true"}
@@ -460,54 +517,63 @@
         },
         {
           "name": "children",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Array[GameObject]"},
           "about": "the objects under it"
         },
         {
           "name": "transform",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Transform"},
           "about": "its Transform"
         },
         {
           "name": "character",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "CharacterController | nil"},
           "about": "its CharacterController, or nil"
         },
         {
           "name": "rigidbody",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Rigidbody | nil"},
           "about": "its Rigidbody, or nil"
         },
         {
           "name": "vehicle",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vehicle | nil"},
           "about": "its Vehicle, or nil"
         },
         {
           "name": "light",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Light | nil"},
           "about": "the Light it shines with, or nil"
         },
         {
           "name": "animation",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Animator"},
           "about": "its Animator"
         },
         {
           "name": "animation_offset",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "seconds its animations run ahead of the original's (a spawned copy)"
         },
         {
           "name": "animation_offset=",
+          "stability": "stable",
           "params": [
             {"name": "seconds", "type": "Numeric"}
           ],
@@ -516,6 +582,7 @@
         },
         {
           "name": "get_component",
+          "stability": "stable",
           "params": [
             {"name": "klass", "type": "Class"}
           ],
@@ -524,6 +591,7 @@
         },
         {
           "name": "add_component",
+          "stability": "stable",
           "params": [
             {"name": "klass", "type": "Class"},
             {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
@@ -535,12 +603,14 @@
         },
         {
           "name": "tint",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the color its colors are multiplied by"
         },
         {
           "name": "tint=",
+          "stability": "stable",
           "params": [
             {"name": "color", "type": "Vector3 | Array[Numeric]"}
           ],
@@ -549,6 +619,7 @@
         },
         {
           "name": "morph",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "weight", "type": "Numeric | nil", "optional": true, "default": "nil"}
@@ -558,6 +629,7 @@
         },
         {
           "name": "morph_names",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[Symbol]"},
           "about": "the names of the shape keys of its mesh and the meshes under it, as symbols"
@@ -572,17 +644,20 @@
     },
     {
       "name": "Transform",
+      "stability": "stable",
       "kind": "class",
       "about": "Where an object is, how it is turned and how big it is.",
       "methods": [
         {
           "name": "position",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its position in the world (Vector3)"
         },
         {
           "name": "position=",
+          "stability": "stable",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -593,12 +668,14 @@
         },
         {
           "name": "local_position",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its position relative to its parent"
         },
         {
           "name": "local_position=",
+          "stability": "stable",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -607,12 +684,14 @@
         },
         {
           "name": "rotation",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its rotation, Euler degrees (Vector3)"
         },
         {
           "name": "rotation=",
+          "stability": "stable",
           "params": [
             {"name": "degrees", "type": "Vector3"}
           ],
@@ -620,7 +699,24 @@
           "about": "turns it to those Euler degrees"
         },
         {
+          "name": "local_rotation",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "its rotation relative to its parent, Euler degrees (Vector3)"
+        },
+        {
+          "name": "local_rotation=",
+          "stability": "experimental",
+          "params": [
+            {"name": "degrees", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
+          "about": "turns it to those Euler degrees relative to its parent"
+        },
+        {
           "name": "rotate",
+          "stability": "stable",
           "params": [
             {"name": "degrees", "type": "Vector3"}
           ],
@@ -631,6 +727,7 @@
         },
         {
           "name": "look_at",
+          "stability": "stable",
           "params": [
             {"name": "target", "type": "Vector3 | GameObject"},
             {"name": "up", "type": "Vector3", "optional": true, "default": "Vector3.up"}
@@ -640,6 +737,7 @@
         },
         {
           "name": "translate",
+          "stability": "stable",
           "params": [
             {"name": "offset", "type": "Vector3"}
           ],
@@ -648,12 +746,14 @@
         },
         {
           "name": "scale",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its scale (Vector3)"
         },
         {
           "name": "scale=",
+          "stability": "stable",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -662,6 +762,7 @@
         },
         {
           "name": "forward",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the direction it faces (-Z)",
@@ -670,12 +771,14 @@
         },
         {
           "name": "right",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its right (+X)"
         },
         {
           "name": "up",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its up (+Y)"
@@ -687,11 +790,13 @@
     },
     {
       "name": "Vector3",
+      "stability": "stable",
       "kind": "class",
       "about": "A point or a direction in meters: x, y, z.",
       "methods": [
         {
           "name": "new",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric"},
@@ -705,6 +810,7 @@
         },
         {
           "name": "[]",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric"},
@@ -716,6 +822,7 @@
         },
         {
           "name": "zero",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -723,6 +830,7 @@
         },
         {
           "name": "one",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -730,6 +838,7 @@
         },
         {
           "name": "up",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -737,6 +846,7 @@
         },
         {
           "name": "down",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -744,6 +854,7 @@
         },
         {
           "name": "left",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -751,6 +862,7 @@
         },
         {
           "name": "right",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -758,6 +870,7 @@
         },
         {
           "name": "forward",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -765,6 +878,7 @@
         },
         {
           "name": "back",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Vector3"},
@@ -772,6 +886,7 @@
         },
         {
           "name": "blender",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric"},
@@ -783,24 +898,28 @@
         },
         {
           "name": "x",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its x"
         },
         {
           "name": "y",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its y"
         },
         {
           "name": "z",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its z"
         },
         {
           "name": "+",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -809,6 +928,7 @@
         },
         {
           "name": "-",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -817,12 +937,14 @@
         },
         {
           "name": "-@",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the opposite vector"
         },
         {
           "name": "*",
+          "stability": "stable",
           "params": [
             {"name": "number", "type": "Numeric"}
           ],
@@ -831,6 +953,7 @@
         },
         {
           "name": "/",
+          "stability": "stable",
           "params": [
             {"name": "number", "type": "Numeric"}
           ],
@@ -839,6 +962,7 @@
         },
         {
           "name": "==",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "untyped"}
           ],
@@ -847,6 +971,7 @@
         },
         {
           "name": "dot",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -855,6 +980,7 @@
         },
         {
           "name": "cross",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -863,24 +989,28 @@
         },
         {
           "name": "length",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its length"
         },
         {
           "name": "length_squared",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its length squared (faster)"
         },
         {
           "name": "normalized",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the same direction, length 1"
         },
         {
           "name": "clamped",
+          "stability": "stable",
           "params": [
             {"name": "max_length", "type": "Numeric", "optional": true, "default": "1.0"}
           ],
@@ -889,6 +1019,7 @@
         },
         {
           "name": "lerp",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"},
             {"name": "t", "type": "Numeric"}
@@ -898,12 +1029,14 @@
         },
         {
           "name": "flat",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the same with y = 0"
         },
         {
           "name": "with",
+          "stability": "stable",
           "params": [
             {"name": "x", "type": "Numeric", "keyword": true},
             {"name": "y", "type": "Numeric", "keyword": true},
@@ -914,6 +1047,7 @@
         },
         {
           "name": "distance_to",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -924,6 +1058,7 @@
         },
         {
           "name": "approx?",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"},
             {"name": "tolerance", "type": "Numeric", "optional": true, "default": "1e-6"}
@@ -933,12 +1068,14 @@
         },
         {
           "name": "to_a",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "[Float, Float, Float]"},
           "about": "[x, y, z]"
         },
         {
           "name": "set",
+          "stability": "stable",
           "params": [
             {"name": "x", "type": "Numeric"},
             {"name": "y", "type": "Numeric"},
@@ -949,6 +1086,7 @@
         },
         {
           "name": "add!",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -957,6 +1095,7 @@
         },
         {
           "name": "sub!",
+          "stability": "stable",
           "params": [
             {"name": "other", "type": "Vector3"}
           ],
@@ -965,6 +1104,7 @@
         },
         {
           "name": "scale!",
+          "stability": "stable",
           "params": [
             {"name": "number", "type": "Numeric"}
           ],
@@ -973,6 +1113,7 @@
         },
         {
           "name": "normalize!",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "self"},
           "about": "normalizes in place"
@@ -988,11 +1129,13 @@
     },
     {
       "name": "Scene",
+      "stability": "stable",
       "kind": "module",
       "about": "The objects of the running scene.",
       "methods": [
         {
           "name": "find",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -1002,6 +1145,7 @@
         },
         {
           "name": "find_by_id",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "identity", "type": "String | Symbol"}
@@ -1011,6 +1155,7 @@
         },
         {
           "name": "find!",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -1021,6 +1166,7 @@
         },
         {
           "name": "find_all",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "tag", "type": "String | Symbol"}
@@ -1030,6 +1176,7 @@
         },
         {
           "name": "objects",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[GameObject]"},
@@ -1037,6 +1184,7 @@
         },
         {
           "name": "spawn",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "template", "type": "String | GameObject"},
@@ -1053,6 +1201,7 @@
         },
         {
           "name": "spawn_prefab",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "file", "type": "String"},
@@ -1070,11 +1219,13 @@
     },
     {
       "name": "SceneScript",
+      "stability": "stable",
       "kind": "class",
       "about": "Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.",
       "methods": [
         {
           "name": "setup",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "runs when the level loads, before any behaviour starts",
@@ -1083,6 +1234,7 @@
         },
         {
           "name": "find",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -1091,6 +1243,7 @@
         },
         {
           "name": "find!",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -1099,6 +1252,7 @@
         },
         {
           "name": "find_all",
+          "stability": "stable",
           "params": [
             {"name": "tag", "type": "String | Symbol"}
           ],
@@ -1110,11 +1264,13 @@
     },
     {
       "name": "Input",
+      "stability": "stable",
       "kind": "module",
       "about": "Keyboard, mouse, gamepad and touch, read every frame.",
       "methods": [
         {
           "name": "axis",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1127,6 +1283,7 @@
         },
         {
           "name": "down?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "Symbol"}
@@ -1136,6 +1293,7 @@
         },
         {
           "name": "pressed?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "Symbol"}
@@ -1147,6 +1305,7 @@
         },
         {
           "name": "released?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "Symbol"}
@@ -1156,6 +1315,7 @@
         },
         {
           "name": "action?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1166,6 +1326,7 @@
         },
         {
           "name": "action_pressed?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1176,6 +1337,7 @@
         },
         {
           "name": "action_released?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1186,6 +1348,7 @@
         },
         {
           "name": "define_action",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1199,6 +1362,7 @@
         },
         {
           "name": "define_axis",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1212,6 +1376,7 @@
         },
         {
           "name": "actions",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -1219,6 +1384,7 @@
         },
         {
           "name": "axes",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -1226,6 +1392,7 @@
         },
         {
           "name": "axis_stick",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"}
@@ -1235,6 +1402,7 @@
         },
         {
           "name": "bindings",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1245,6 +1413,7 @@
         },
         {
           "name": "bindings_changes",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -1252,6 +1421,7 @@
         },
         {
           "name": "bind",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1267,6 +1437,7 @@
         },
         {
           "name": "unbind",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol"},
@@ -1282,6 +1453,7 @@
         },
         {
           "name": "reset_bindings",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol | nil", "optional": true, "default": "nil"},
@@ -1292,6 +1464,7 @@
         },
         {
           "name": "capture_next",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "cancel", "type": "Array[String]", "keyword": true, "optional": true, "default": "[\"key:escape\", \"pad:b\", \"pad:back\"]"},
@@ -1303,6 +1476,7 @@
         },
         {
           "name": "capturing?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -1310,6 +1484,7 @@
         },
         {
           "name": "capturing_for?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "Proc"}
@@ -1319,6 +1494,7 @@
         },
         {
           "name": "cancel_capture",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -1326,6 +1502,7 @@
         },
         {
           "name": "mouse_x",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1333,6 +1510,7 @@
         },
         {
           "name": "mouse_y",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1340,6 +1518,7 @@
         },
         {
           "name": "mouse_dx",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1347,6 +1526,7 @@
         },
         {
           "name": "mouse_dy",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1354,6 +1534,7 @@
         },
         {
           "name": "mouse_wheel",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1361,6 +1542,7 @@
         },
         {
           "name": "mouse_down?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"}
@@ -1370,6 +1552,7 @@
         },
         {
           "name": "mouse_pressed?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"}
@@ -1379,6 +1562,7 @@
         },
         {
           "name": "mouse_released?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"}
@@ -1388,6 +1572,7 @@
         },
         {
           "name": "mouse_locked=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "locked", "type": "bool"}
@@ -1397,6 +1582,7 @@
         },
         {
           "name": "mouse_locked?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -1404,6 +1590,7 @@
         },
         {
           "name": "pads",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Integer]"},
@@ -1411,6 +1598,7 @@
         },
         {
           "name": "gamepad?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
@@ -1420,6 +1608,7 @@
         },
         {
           "name": "gamepad_axis",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "axis", "type": "Symbol"},
@@ -1430,6 +1619,7 @@
         },
         {
           "name": "gamepad_down?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"},
@@ -1440,6 +1630,7 @@
         },
         {
           "name": "gamepad_pressed?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"},
@@ -1450,6 +1641,7 @@
         },
         {
           "name": "gamepad_released?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "button", "type": "Symbol"},
@@ -1460,6 +1652,7 @@
         },
         {
           "name": "rumble?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -1467,6 +1660,7 @@
         },
         {
           "name": "rumble",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "pad", "type": "Integer"},
@@ -1478,6 +1672,7 @@
         },
         {
           "name": "text",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -1485,6 +1680,7 @@
         },
         {
           "name": "touch_controls=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "on", "type": "bool"}
@@ -1494,6 +1690,7 @@
         },
         {
           "name": "touch_controls?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -1505,11 +1702,13 @@
     },
     {
       "name": "Time",
+      "stability": "stable",
       "kind": "class",
       "about": "The game's clock (added to Ruby's Time).",
       "methods": [
         {
           "name": "delta",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1517,6 +1716,7 @@
         },
         {
           "name": "unscaled_delta",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1524,6 +1724,7 @@
         },
         {
           "name": "fixed_delta",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1531,6 +1732,7 @@
         },
         {
           "name": "elapsed",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1538,6 +1740,7 @@
         },
         {
           "name": "frame",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -1545,6 +1748,7 @@
         },
         {
           "name": "scale",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -1552,6 +1756,7 @@
         },
         {
           "name": "scale=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "value", "type": "Numeric"}
@@ -1563,11 +1768,13 @@
     },
     {
       "name": "Physics",
+      "stability": "stable",
       "kind": "module",
       "about": "Questions to the physics world: rays, moving shapes and shapes in place.",
       "methods": [
         {
           "name": "raycast",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "origin", "type": "Vector3"},
@@ -1584,6 +1791,7 @@
         },
         {
           "name": "raycast_all",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "origin", "type": "Vector3"},
@@ -1598,6 +1806,7 @@
         },
         {
           "name": "sphere_cast",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -1611,6 +1820,7 @@
         },
         {
           "name": "box_cast",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -1625,6 +1835,7 @@
         },
         {
           "name": "capsule_cast",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -1640,6 +1851,7 @@
         },
         {
           "name": "overlap_sphere",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "center", "type": "Vector3"},
@@ -1653,6 +1865,7 @@
         },
         {
           "name": "overlap_box",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "center", "type": "Vector3"},
@@ -1666,6 +1879,7 @@
         },
         {
           "name": "overlap_capsule",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "center", "type": "Vector3"},
@@ -1680,6 +1894,7 @@
         },
         {
           "name": "layers",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -1687,6 +1902,7 @@
         },
         {
           "name": "joint",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "kind", "type": "Symbol"},
@@ -1714,53 +1930,62 @@
     },
     {
       "name": "Joint",
+      "stability": "experimental",
       "kind": "class",
       "about": "What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint).",
       "methods": [
         {
           "name": "kind",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol"},
           "about": ":fixed, :hinge, :slider, :point or :distance"
         },
         {
           "name": "object",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject"},
           "about": "the object it holds"
         },
         {
           "name": "other",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "the other object it holds, or nil for the world"
         },
         {
           "name": "alive?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it still holds them"
         },
         {
           "name": "broken?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it was pulled past its break force"
         },
         {
           "name": "remove",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "lets go"
         },
         {
           "name": "enabled?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it holds right now"
         },
         {
           "name": "enabled=",
+          "stability": "experimental",
           "params": [
             {"name": "flag", "type": "bool"}
           ],
@@ -1769,12 +1994,14 @@
         },
         {
           "name": "break_force",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks"
         },
         {
           "name": "break_force=",
+          "stability": "experimental",
           "params": [
             {"name": "newtons", "type": "Numeric"}
           ],
@@ -1783,6 +2010,7 @@
         },
         {
           "name": "motor",
+          "stability": "experimental",
           "params": [
             {"name": "speed", "type": "Numeric"},
             {"name": "torque", "type": "Numeric"}
@@ -1792,6 +2020,7 @@
         },
         {
           "name": "angle",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how far a hinge turned from where it started, in degrees"
@@ -1806,11 +2035,13 @@
     },
     {
       "name": "Navigation",
+      "stability": "experimental",
       "kind": "module",
       "about": "Where the characters a game moves can walk, and the way from one place to another.",
       "methods": [
         {
           "name": "path",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -1823,6 +2054,7 @@
         },
         {
           "name": "steer",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "position", "type": "Vector3"},
@@ -1839,6 +2071,7 @@
         },
         {
           "name": "nearest",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "point", "type": "Vector3"}
@@ -1848,6 +2081,7 @@
         },
         {
           "name": "walkable?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "point", "type": "Vector3"}
@@ -1857,6 +2091,7 @@
         },
         {
           "name": "draw",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "around", "type": "Vector3"},
@@ -1869,6 +2104,7 @@
         },
         {
           "name": "bake",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, Numeric | bool]"},
@@ -1876,6 +2112,7 @@
         },
         {
           "name": "stats",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, Numeric | bool]"},
@@ -1887,12 +2124,14 @@
     },
     {
       "name": "NavAgent",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.",
       "methods": [
         {
           "name": "go_to",
+          "stability": "experimental",
           "params": [
             {"name": "point", "type": "Vector3"}
           ],
@@ -1902,60 +2141,70 @@
         },
         {
           "name": "stop",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "stops it where it is"
         },
         {
           "name": "arrived?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it got where it was sent"
         },
         {
           "name": "walking?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it is on its way somewhere"
         },
         {
           "name": "destination",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Vector3 | nil"},
           "about": "where it was sent last, or nil"
         },
         {
           "name": "waypoints",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[Vector3]"},
           "about": "the points it still walks through, the next first"
         },
         {
           "name": "velocity",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "the velocity it walks at, as it steered this frame"
         },
         {
           "name": "speed",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters per second at most (setting `speed`, 3)"
         },
         {
           "name": "radius",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how wide it is kept from others, in meters (setting `radius`, 0.4)"
         },
         {
           "name": "arrive_distance",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how near the goal is there, in meters (setting `arrive_distance`, 0.3)"
         },
         {
           "name": "all",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[NavAgent]"},
           "about": "the agents of the running scene",
@@ -1974,11 +2223,13 @@
     },
     {
       "name": "Water",
+      "stability": "experimental",
       "kind": "module",
       "about": "Where the scene's water is: the height of its surface, and how deep a point is under it.",
       "methods": [
         {
           "name": "height_at",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric"},
@@ -1990,6 +2241,7 @@
         },
         {
           "name": "depth_at",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "point", "type": "Vector3"}
@@ -1999,6 +2251,7 @@
         },
         {
           "name": "under?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "point", "type": "Vector3"}
@@ -2012,11 +2265,13 @@
     },
     {
       "name": "CharacterController",
+      "stability": "stable",
       "kind": "class",
       "about": "The body of an object with body = \"character\": walks, jumps, climbs steps.",
       "methods": [
         {
           "name": "move",
+          "stability": "stable",
           "params": [
             {"name": "velocity", "type": "Vector3"}
           ],
@@ -2025,6 +2280,7 @@
         },
         {
           "name": "jump",
+          "stability": "stable",
           "params": [
             {"name": "speed", "type": "Numeric"}
           ],
@@ -2033,24 +2289,28 @@
         },
         {
           "name": "grounded?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it stands on something"
         },
         {
           "name": "velocity",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its velocity"
         },
         {
           "name": "layer",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol"},
           "about": "its collision layer, a Symbol"
         },
         {
           "name": "layer=",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "Symbol"}
           ],
@@ -2062,17 +2322,20 @@
     },
     {
       "name": "Rigidbody",
+      "stability": "stable",
       "kind": "class",
       "about": "The body of an object with body = \"dynamic\" or \"kinematic\" (or a vehicle's chassis).",
       "methods": [
         {
           "name": "velocity",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its velocity"
         },
         {
           "name": "velocity=",
+          "stability": "stable",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -2081,6 +2344,7 @@
         },
         {
           "name": "add_impulse",
+          "stability": "stable",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -2089,6 +2353,7 @@
         },
         {
           "name": "add_force",
+          "stability": "experimental",
           "params": [
             {"name": "force", "type": "Vector3"},
             {"name": "at", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"}
@@ -2099,6 +2364,7 @@
         },
         {
           "name": "add_torque",
+          "stability": "experimental",
           "params": [
             {"name": "torque", "type": "Vector3"}
           ],
@@ -2107,12 +2373,14 @@
         },
         {
           "name": "angular_velocity",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "how fast it spins, degrees per second around each axis"
         },
         {
           "name": "angular_velocity=",
+          "stability": "experimental",
           "params": [
             {"name": "vector", "type": "Vector3"}
           ],
@@ -2121,12 +2389,14 @@
         },
         {
           "name": "mass",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its mass in kilograms"
         },
         {
           "name": "mass=",
+          "stability": "experimental",
           "params": [
             {"name": "kilograms", "type": "Numeric"}
           ],
@@ -2135,12 +2405,14 @@
         },
         {
           "name": "kinematic?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether scripts move it (instead of forces)"
         },
         {
           "name": "kinematic=",
+          "stability": "experimental",
           "params": [
             {"name": "flag", "type": "bool"}
           ],
@@ -2149,12 +2421,14 @@
         },
         {
           "name": "dynamic?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether forces move it"
         },
         {
           "name": "dynamic=",
+          "stability": "experimental",
           "params": [
             {"name": "flag", "type": "bool"}
           ],
@@ -2163,12 +2437,14 @@
         },
         {
           "name": "gravity_scale",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how much gravity pulls it (1 is normal)"
         },
         {
           "name": "gravity_scale=",
+          "stability": "experimental",
           "params": [
             {"name": "scale", "type": "Numeric"}
           ],
@@ -2177,30 +2453,35 @@
         },
         {
           "name": "sleep",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "stops simulating it until something touches it"
         },
         {
           "name": "wake",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "simulates it again"
         },
         {
           "name": "sleeping?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it sleeps"
         },
         {
           "name": "layer",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol"},
           "about": "its collision layer, a Symbol"
         },
         {
           "name": "layer=",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "Symbol"}
           ],
@@ -2214,11 +2495,13 @@
     },
     {
       "name": "Vehicle",
+      "stability": "stable",
       "kind": "class",
       "about": "The body of an object with body = \"vehicle\" and wheels.",
       "methods": [
         {
           "name": "drive",
+          "stability": "stable",
           "params": [
             {"name": "throttle", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
             {"name": "steering", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
@@ -2230,18 +2513,21 @@
         },
         {
           "name": "stop",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "brakes fully"
         },
         {
           "name": "speed",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "its speed in m/s, signed"
         },
         {
           "name": "velocity",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "its velocity"
@@ -2252,11 +2538,13 @@
     },
     {
       "name": "Camera",
+      "stability": "stable",
       "kind": "module",
       "about": "The camera the game is seen through, and what it does on its own: follow, orbit, shake.",
       "methods": [
         {
           "name": "main",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "GameObject | nil"},
@@ -2264,6 +2552,7 @@
         },
         {
           "name": "main=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "camera", "type": "GameObject | nil"}
@@ -2273,6 +2562,7 @@
         },
         {
           "name": "cut_to",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "camera", "type": "GameObject"},
@@ -2284,6 +2574,7 @@
         },
         {
           "name": "cutting?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -2291,6 +2582,7 @@
         },
         {
           "name": "screen_ray",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric"},
@@ -2301,6 +2593,7 @@
         },
         {
           "name": "world_to_screen",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "point", "type": "Vector3 | GameObject"}
@@ -2311,6 +2604,7 @@
         },
         {
           "name": "fov",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float | nil"},
@@ -2318,6 +2612,7 @@
         },
         {
           "name": "fov=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "degrees", "type": "Numeric"}
@@ -2327,6 +2622,7 @@
         },
         {
           "name": "motion_blur",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -2334,6 +2630,7 @@
         },
         {
           "name": "motion_blur=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "amount", "type": "Numeric"}
@@ -2343,6 +2640,7 @@
         },
         {
           "name": "auto_exposure",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool | nil"},
@@ -2350,6 +2648,7 @@
         },
         {
           "name": "auto_exposure=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "on", "type": "bool | nil"}
@@ -2360,6 +2659,7 @@
         },
         {
           "name": "exposure_compensation",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float | nil"},
@@ -2367,6 +2667,7 @@
         },
         {
           "name": "exposure_compensation=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "ev", "type": "Numeric | nil"}
@@ -2377,6 +2678,7 @@
         },
         {
           "name": "exposure_range",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "[Float, Float] | nil"},
@@ -2384,6 +2686,7 @@
         },
         {
           "name": "exposure_range=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "range", "type": "[Numeric, Numeric] | nil"}
@@ -2394,6 +2697,7 @@
         },
         {
           "name": "exposure_speed",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "[Float, Float] | nil"},
@@ -2401,6 +2705,7 @@
         },
         {
           "name": "exposure_speed=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "speeds", "type": "[Numeric, Numeric] | nil"}
@@ -2411,6 +2716,7 @@
         },
         {
           "name": "follow",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "target", "type": "GameObject"},
@@ -2429,6 +2735,7 @@
         },
         {
           "name": "orbit",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "target", "type": "GameObject | Vector3"},
@@ -2447,6 +2754,7 @@
         },
         {
           "name": "stop_following",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -2454,6 +2762,7 @@
         },
         {
           "name": "following?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -2461,6 +2770,7 @@
         },
         {
           "name": "shake",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "strength", "type": "Numeric"},
@@ -2472,6 +2782,7 @@
         },
         {
           "name": "trauma",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -2479,6 +2790,7 @@
         },
         {
           "name": "stop_shaking",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -2489,35 +2801,41 @@
     },
     {
       "name": "Camera::Orbit",
+      "stability": "experimental",
       "kind": "class",
       "about": "What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.",
       "methods": [
         {
           "name": "yaw",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right"
         },
         {
           "name": "pitch",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "degrees above it"
         },
         {
           "name": "distance",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters from it"
         },
         {
           "name": "target",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | Vector3"},
           "about": "the object or point it orbits"
         },
         {
           "name": "turn",
+          "stability": "experimental",
           "params": [
             {"name": "yaw", "type": "Numeric"},
             {"name": "pitch", "type": "Numeric"}
@@ -2527,6 +2845,7 @@
         },
         {
           "name": "zoom",
+          "stability": "experimental",
           "params": [
             {"name": "meters", "type": "Numeric"}
           ],
@@ -2544,17 +2863,20 @@
     },
     {
       "name": "Light",
+      "stability": "stable",
       "kind": "class",
       "about": "game_object.light: the light an object shines with.",
       "methods": [
         {
           "name": "intensity",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "watts for a point or spot light, lux for the sun"
         },
         {
           "name": "intensity=",
+          "stability": "stable",
           "params": [
             {"name": "value", "type": "Numeric"}
           ],
@@ -2563,12 +2885,14 @@
         },
         {
           "name": "color",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "[Integer, Integer, Integer]"},
           "about": "its color [r, g, b], 0 to 255"
         },
         {
           "name": "color=",
+          "stability": "stable",
           "params": [
             {"name": "color", "type": "Color"}
           ],
@@ -2577,12 +2901,14 @@
         },
         {
           "name": "cone_angles",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "[Float, Float] | nil"},
           "about": "[inner, outer] in degrees for a spot light, or nil for other lights"
         },
         {
           "name": "set_cone",
+          "stability": "experimental",
           "params": [
             {"name": "inner", "type": "Numeric", "keyword": true},
             {"name": "outer", "type": "Numeric", "keyword": true}
@@ -2598,11 +2924,13 @@
     },
     {
       "name": "Animation",
+      "stability": "stable",
       "kind": "module",
       "about": "The scene's own animations (exported from Blender), by name.",
       "methods": [
         {
           "name": "names",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[String]"},
@@ -2610,6 +2938,7 @@
         },
         {
           "name": "play",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -2622,6 +2951,7 @@
         },
         {
           "name": "pause",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -2631,6 +2961,7 @@
         },
         {
           "name": "stop",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -2640,6 +2971,7 @@
         },
         {
           "name": "playing?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -2649,6 +2981,7 @@
         },
         {
           "name": "time",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -2658,6 +2991,7 @@
         },
         {
           "name": "duration",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -2667,6 +3001,7 @@
         },
         {
           "name": "seek",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -2680,11 +3015,13 @@
     },
     {
       "name": "Animator",
+      "stability": "stable",
       "kind": "class",
       "about": "game_object.animation (animation in a behaviour): an object's own clips.",
       "methods": [
         {
           "name": "play",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
@@ -2700,6 +3037,7 @@
         },
         {
           "name": "mix",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "weight", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
@@ -2711,18 +3049,21 @@
         },
         {
           "name": "unmix",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "stops the clip mixed over"
         },
         {
           "name": "pause",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "pauses its clips"
         },
         {
           "name": "follow_scene",
+          "stability": "stable",
           "params": [
             {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
           ],
@@ -2731,24 +3072,28 @@
         },
         {
           "name": "clip",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the clip playing"
         },
         {
           "name": "playing?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether a clip plays"
         },
         {
           "name": "time",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float"},
           "about": "where the clip is, in seconds"
         },
         {
           "name": "use",
+          "stability": "stable",
           "params": [
             {"name": "graph", "type": "Animation::Graph"}
           ],
@@ -2757,6 +3102,7 @@
         },
         {
           "name": "set",
+          "stability": "stable",
           "params": [
             {"name": "parameter", "type": "Symbol"},
             {"name": "value", "type": "untyped"}
@@ -2766,12 +3112,14 @@
         },
         {
           "name": "state",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the graph's state, or nil"
         },
         {
           "name": "on",
+          "stability": "experimental",
           "params": [
             {"name": "clip", "type": "String | Symbol"},
             {"name": "at", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
@@ -2784,6 +3132,7 @@
         },
         {
           "name": "on_marker",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "String | Symbol"},
             {"name": "block", "type": "^(Animation::Event) -> void", "block": true}
@@ -2793,6 +3142,7 @@
         },
         {
           "name": "off",
+          "stability": "experimental",
           "params": [
             {"name": "listener", "type": "Integer"}
           ],
@@ -2801,6 +3151,7 @@
         },
         {
           "name": "root_motion=",
+          "stability": "experimental",
           "params": [
             {"name": "on", "type": "bool"}
           ],
@@ -2809,12 +3160,14 @@
         },
         {
           "name": "root_motion?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether all its clips move the object"
         },
         {
           "name": "look_at",
+          "stability": "experimental",
           "params": [
             {"name": "target", "type": "Vector3 | GameObject"},
             {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""},
@@ -2825,6 +3178,7 @@
         },
         {
           "name": "look_away",
+          "stability": "experimental",
           "params": [
             {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
           ],
@@ -2833,6 +3187,7 @@
         },
         {
           "name": "looking?",
+          "stability": "experimental",
           "params": [
             {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
           ],
@@ -2841,6 +3196,7 @@
         },
         {
           "name": "bone",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -2849,6 +3205,7 @@
         },
         {
           "name": "bone!",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "String | Symbol"}
           ],
@@ -2857,6 +3214,7 @@
         },
         {
           "name": "bone_named?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "part", "type": "String"},
@@ -2870,11 +3228,13 @@
     },
     {
       "name": "Animation::Graph",
+      "stability": "stable",
       "kind": "class",
       "about": "Named states and transitions for one character (animation.use(graph)).",
       "methods": [
         {
           "name": "new",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "initial", "type": "Symbol", "keyword": true},
@@ -2885,6 +3245,7 @@
         },
         {
           "name": "clip",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "Symbol"},
             {"name": "clip", "type": "String | Symbol"},
@@ -2896,6 +3257,7 @@
         },
         {
           "name": "blend_1d",
+          "stability": "stable",
           "params": [
             {"name": "name", "type": "Symbol"},
             {"name": "parameter", "type": "Symbol", "keyword": true},
@@ -2908,6 +3270,7 @@
         },
         {
           "name": "blend_2d",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "Symbol"},
             {"name": "parameters", "type": "[Symbol, Symbol]", "keyword": true},
@@ -2920,6 +3283,7 @@
         },
         {
           "name": "transition",
+          "stability": "stable",
           "params": [
             {"name": "from", "type": "Symbol"},
             {"name": "to", "type": "Symbol"},
@@ -2937,29 +3301,34 @@
     },
     {
       "name": "Animation::Event",
+      "stability": "experimental",
       "kind": "class",
       "about": "What the block of an animation event is given (animation.on).",
       "methods": [
         {
           "name": "game_object",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject"},
           "about": "the object that listened"
         },
         {
           "name": "clip",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "the clip's name"
         },
         {
           "name": "name",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the marker's name, or nil for a moment the script named"
         },
         {
           "name": "at",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "where in the clip, from 0 (its start) to 1 (its end)"
@@ -2969,11 +3338,13 @@
     },
     {
       "name": "Audio",
+      "stability": "stable",
       "kind": "module",
       "about": "Sounds and music from the game's sounds/ folder.",
       "methods": [
         {
           "name": "play",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -2990,6 +3361,7 @@
         },
         {
           "name": "music",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -3002,6 +3374,7 @@
         },
         {
           "name": "stop_music",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
@@ -3011,6 +3384,7 @@
         },
         {
           "name": "music_pitch=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "pitch", "type": "Numeric"}
@@ -3020,6 +3394,7 @@
         },
         {
           "name": "music_volume=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -3029,6 +3404,7 @@
         },
         {
           "name": "volume=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -3038,6 +3414,7 @@
         },
         {
           "name": "ducking",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.4"},
@@ -3048,7 +3425,32 @@
           "about": "how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off"
         },
         {
+          "name": "group",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "parent", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "volume", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given"
+        },
+        {
+          "name": "effects",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "group", "type": "Symbol"},
+            {"name": "low_pass", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "reverb", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off"
+        },
+        {
           "name": "set",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "id", "type": "Integer"},
@@ -3060,6 +3462,7 @@
         },
         {
           "name": "play_at",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -3077,6 +3480,7 @@
         },
         {
           "name": "listener",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "position", "type": "Vector3"},
@@ -3088,6 +3492,7 @@
         },
         {
           "name": "move",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "id", "type": "Integer"},
@@ -3098,6 +3503,7 @@
         },
         {
           "name": "playing?",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "id", "type": "Integer"}
@@ -3107,6 +3513,7 @@
         },
         {
           "name": "stop",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "id", "type": "Integer"}
@@ -3115,22 +3522,35 @@
           "about": "stops that sound"
         },
         {
+          "name": "loudness",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "id", "type": "Integer | nil"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended"
+        },
+        {
           "name": "stop_sources",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A game makes groups of its own with `Audio.group(:cave, parent: :effects, volume: 0.8)`, 13 at most, and plays sounds in them by name; a group is heard at its volume times the volumes of the groups over it, and the game's groups end with it. `Audio.effects(group, low_pass:, reverb:)` puts effects on the sounds of a group and of the groups under it: `low_pass` (20 to 20000 Hz) muffles them, and the lowest cutoff over a sound is the one it gets; `reverb` (0 to 1) sends that much of each sound to the reverb of the nearest group that has one. Effects are on sounds, not on the music's tracks. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
+      "stability": "stable",
       "kind": "module",
       "about": "What a script draws over the game this frame: texts, rectangles, pictures, buttons.",
       "methods": [
         {
           "name": "text",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "str", "type": "String"},
@@ -3150,6 +3570,7 @@
         },
         {
           "name": "rect",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric", "keyword": true},
@@ -3166,6 +3587,7 @@
         },
         {
           "name": "image",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -3181,6 +3603,7 @@
         },
         {
           "name": "button",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "label", "type": "String"},
@@ -3201,6 +3624,7 @@
         },
         {
           "name": "text_field",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "value", "type": "String"},
@@ -3219,6 +3643,7 @@
         },
         {
           "name": "keyboard_visible?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3226,6 +3651,7 @@
         },
         {
           "name": "width",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -3233,6 +3659,7 @@
         },
         {
           "name": "height",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -3240,6 +3667,7 @@
         },
         {
           "name": "pixel_width",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -3247,6 +3675,7 @@
         },
         {
           "name": "pixel_height",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -3254,6 +3683,7 @@
         },
         {
           "name": "scale",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3261,6 +3691,7 @@
         },
         {
           "name": "reference",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "[Integer, Integer]"},
@@ -3268,6 +3699,7 @@
         },
         {
           "name": "mouse_x",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3275,6 +3707,7 @@
         },
         {
           "name": "mouse_y",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3282,6 +3715,7 @@
         },
         {
           "name": "text_width",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "str", "type": "String"},
@@ -3292,6 +3726,7 @@
         },
         {
           "name": "wrap",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "str", "type": "String"},
@@ -3303,6 +3738,7 @@
         },
         {
           "name": "text_height",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "str", "type": "String"},
@@ -3314,6 +3750,7 @@
         },
         {
           "name": "line_height",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "size", "type": "Numeric"}
@@ -3323,6 +3760,7 @@
         },
         {
           "name": "anchored",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "anchor", "type": "Symbol"},
@@ -3336,6 +3774,7 @@
         },
         {
           "name": "clip",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "x", "type": "Numeric", "keyword": true},
@@ -3350,6 +3789,7 @@
         },
         {
           "name": "toggle",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "label", "type": "String"},
@@ -3366,6 +3806,7 @@
         },
         {
           "name": "choice",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "label", "type": "String"},
@@ -3383,6 +3824,7 @@
         },
         {
           "name": "slider",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "label", "type": "String"},
@@ -3402,6 +3844,7 @@
         },
         {
           "name": "font",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String | Array[String] | nil"},
@@ -3409,6 +3852,7 @@
         },
         {
           "name": "font=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Array[String] | nil"}
@@ -3471,11 +3915,13 @@
     },
     {
       "name": "UI::Focus",
+      "stability": "stable",
       "kind": "class",
       "about": "Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.",
       "methods": [
         {
           "name": "new",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "UI::Focus"},
@@ -3483,6 +3929,7 @@
         },
         {
           "name": "update",
+          "stability": "stable",
           "params": [
             {"name": "count", "type": "Integer"},
             {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
@@ -3492,6 +3939,7 @@
         },
         {
           "name": "at?",
+          "stability": "stable",
           "params": [
             {"name": "index", "type": "Integer"}
           ],
@@ -3500,6 +3948,7 @@
         },
         {
           "name": "move_to",
+          "stability": "stable",
           "params": [
             {"name": "index", "type": "Integer"}
           ],
@@ -3508,12 +3957,14 @@
         },
         {
           "name": "index",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "the widget that has it"
         },
         {
           "name": "reset",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "back to the first widget"
@@ -3523,11 +3974,13 @@
     },
     {
       "name": "UI::ScrollList",
+      "stability": "experimental",
       "kind": "class",
       "about": "Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus.",
       "methods": [
         {
           "name": "new",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "UI::ScrollList"},
@@ -3535,6 +3988,7 @@
         },
         {
           "name": "draw",
+          "stability": "experimental",
           "params": [
             {"name": "count", "type": "Integer"},
             {"name": "x", "type": "Numeric", "keyword": true},
@@ -3554,12 +4008,14 @@
         },
         {
           "name": "offset",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Numeric"},
           "about": "how far it is scrolled, in pixels from its first row's top"
         },
         {
           "name": "offset=",
+          "stability": "experimental",
           "params": [
             {"name": "pixels", "type": "Numeric"}
           ],
@@ -3568,18 +4024,21 @@
         },
         {
           "name": "shown",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Range[Integer]"},
           "about": "the indexes of the rows that show, as a range"
         },
         {
           "name": "scrolls?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether its rows are taller than its box"
         },
         {
           "name": "reset",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "back to its first row"
@@ -3590,11 +4049,13 @@
     },
     {
       "name": "Debug",
+      "stability": "stable",
       "kind": "module",
       "about": "Developer diagnostics: console messages, frame timings and immediate world drawing.",
       "methods": [
         {
           "name": "log",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "message", "type": "untyped"}
@@ -3604,6 +4065,7 @@
         },
         {
           "name": "warn",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "message", "type": "untyped"}
@@ -3613,6 +4075,7 @@
         },
         {
           "name": "error",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "message", "type": "untyped"}
@@ -3622,6 +4085,7 @@
         },
         {
           "name": "profiling?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3629,6 +4093,7 @@
         },
         {
           "name": "profiling=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "enabled", "type": "bool"}
@@ -3638,6 +4103,7 @@
         },
         {
           "name": "stats_visible?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3645,6 +4111,7 @@
         },
         {
           "name": "stats_visible=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "visible", "type": "bool"}
@@ -3654,6 +4121,7 @@
         },
         {
           "name": "frame_stats",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, untyped]"},
@@ -3661,6 +4129,7 @@
         },
         {
           "name": "reset_frame_stats",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -3668,6 +4137,7 @@
         },
         {
           "name": "script_profile",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "count", "type": "Integer", "optional": true, "default": "20"}
@@ -3677,6 +4147,7 @@
         },
         {
           "name": "export_script_profile",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -3684,6 +4155,7 @@
         },
         {
           "name": "line",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -3697,6 +4169,7 @@
         },
         {
           "name": "box",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "center", "type": "Vector3"},
@@ -3710,6 +4183,7 @@
         },
         {
           "name": "label",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "text", "type": "untyped"},
@@ -3726,11 +4200,13 @@
     },
     {
       "name": "Game",
+      "stability": "stable",
       "kind": "module",
       "about": "The game itself.",
       "methods": [
         {
           "name": "load_scene",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -3740,6 +4216,7 @@
         },
         {
           "name": "load_scene_async",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -3749,6 +4226,7 @@
         },
         {
           "name": "loading?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3756,6 +4234,7 @@
         },
         {
           "name": "loading_scene",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -3763,6 +4242,7 @@
         },
         {
           "name": "loading_error",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -3770,6 +4250,7 @@
         },
         {
           "name": "cancel_scene_load",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3777,6 +4258,7 @@
         },
         {
           "name": "on_loading",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Float) -> void", "block": true, "optional": true}
@@ -3786,6 +4268,7 @@
         },
         {
           "name": "scene_name",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -3793,6 +4276,7 @@
         },
         {
           "name": "title",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -3800,6 +4284,7 @@
         },
         {
           "name": "quit",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -3807,6 +4292,7 @@
         },
         {
           "name": "stop_recording",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -3814,6 +4300,7 @@
         },
         {
           "name": "version",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -3825,11 +4312,13 @@
     },
     {
       "name": "Settings",
+      "stability": "stable",
       "kind": "module",
       "about": "How the player chose the game to be shown and heard; a change takes effect at once.",
       "methods": [
         {
           "name": "window_mode",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Symbol"},
@@ -3837,6 +4326,7 @@
         },
         {
           "name": "window_mode=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "mode", "type": "Symbol"}
@@ -3846,6 +4336,7 @@
         },
         {
           "name": "fullscreen?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3853,6 +4344,7 @@
         },
         {
           "name": "fullscreen=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "on", "type": "bool"}
@@ -3862,6 +4354,7 @@
         },
         {
           "name": "resolution",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "[Integer, Integer]"},
@@ -3869,6 +4362,7 @@
         },
         {
           "name": "resolution=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "size", "type": "[Integer, Integer]"}
@@ -3878,6 +4372,7 @@
         },
         {
           "name": "resolutions",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[[Integer, Integer]]"},
@@ -3885,6 +4380,7 @@
         },
         {
           "name": "render_scale",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3892,6 +4388,7 @@
         },
         {
           "name": "render_scale=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "scale", "type": "Numeric"}
@@ -3901,6 +4398,7 @@
         },
         {
           "name": "ui_scale",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3908,6 +4406,7 @@
         },
         {
           "name": "ui_scale=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "scale", "type": "Numeric"}
@@ -3918,6 +4417,7 @@
         },
         {
           "name": "vsync",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -3925,6 +4425,7 @@
         },
         {
           "name": "vsync=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "on", "type": "bool"}
@@ -3934,6 +4435,7 @@
         },
         {
           "name": "fps_cap",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer | nil"},
@@ -3941,6 +4443,7 @@
         },
         {
           "name": "fps_cap=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "cap", "type": "Integer | nil"}
@@ -3950,6 +4453,7 @@
         },
         {
           "name": "quality",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Symbol"},
@@ -3957,6 +4461,7 @@
         },
         {
           "name": "quality=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "quality", "type": "Symbol"}
@@ -3966,6 +4471,7 @@
         },
         {
           "name": "quality_details",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, untyped]"},
@@ -3973,6 +4479,7 @@
         },
         {
           "name": "quality_details=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "details", "type": "Hash[Symbol, untyped]"}
@@ -3982,6 +4489,7 @@
         },
         {
           "name": "volume",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -3989,6 +4497,7 @@
         },
         {
           "name": "volume=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -3998,6 +4507,7 @@
         },
         {
           "name": "music_volume",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -4005,6 +4515,7 @@
         },
         {
           "name": "music_volume=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -4014,6 +4525,7 @@
         },
         {
           "name": "effects_volume",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -4021,6 +4533,7 @@
         },
         {
           "name": "effects_volume=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -4030,6 +4543,7 @@
         },
         {
           "name": "voice_volume",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -4037,6 +4551,7 @@
         },
         {
           "name": "voice_volume=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric"}
@@ -4046,6 +4561,7 @@
         },
         {
           "name": "save",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4062,12 +4578,14 @@
     },
     {
       "name": "GameMenu",
+      "stability": "stable",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.",
       "methods": [
         {
           "name": "instance",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "GameMenu | nil"},
@@ -4075,6 +4593,7 @@
         },
         {
           "name": "show",
+          "stability": "stable",
           "params": [
             {"name": "screen", "type": "Symbol"}
           ],
@@ -4083,24 +4602,28 @@
         },
         {
           "name": "show_settings",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)"
         },
         {
           "name": "resume",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "closes the menu and goes on"
         },
         {
           "name": "restart",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "starts the scene again"
         },
         {
           "name": "finish",
+          "stability": "stable",
           "params": [
             {"name": "message", "type": "String"}
           ],
@@ -4109,24 +4632,28 @@
         },
         {
           "name": "open?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether the menu is open"
         },
         {
           "name": "screen",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the screen open"
         },
         {
           "name": "screens",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Hash[Symbol, GameMenu::Screen]"},
           "about": "the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)"
         },
         {
           "name": "button_box",
+          "stability": "stable",
           "params": [
             {"name": "index", "type": "Integer"}
           ],
@@ -4144,11 +4671,13 @@
     },
     {
       "name": "GameMenu::Screen",
+      "stability": "stable",
       "kind": "class",
       "about": "A screen of the GameMenu.",
       "methods": [
         {
           "name": "new",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "heading", "type": "String | Proc", "keyword": true},
@@ -4160,6 +4689,7 @@
         },
         {
           "name": "add_option",
+          "stability": "stable",
           "params": [
             {"name": "label", "type": "String | Proc"},
             {"name": "index", "type": "Integer", "keyword": true, "optional": true, "default": "-1"},
@@ -4170,12 +4700,14 @@
         },
         {
           "name": "heading",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String"},
           "about": "its heading"
         },
         {
           "name": "heading=",
+          "stability": "stable",
           "params": [
             {"name": "text", "type": "String | Proc"}
           ],
@@ -4184,30 +4716,35 @@
         },
         {
           "name": "options",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Array[[String, Proc]]"},
           "about": "its options"
         },
         {
           "name": "back",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the screen Esc goes back to"
         },
         {
           "name": "opened",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "called when it is shown"
         },
         {
           "name": "closed",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "called when it is left"
         },
         {
           "name": "draw",
+          "stability": "stable",
           "params": [
             {"name": "first_button", "type": "[Integer, Integer, Integer, Integer]"}
           ],
@@ -4216,36 +4753,42 @@
         },
         {
           "name": "space_above",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "pixels kept between its heading and its buttons"
         },
         {
           "name": "typing?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether letters are typed into it"
         },
         {
           "name": "rows",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "how many widgets it draws above its buttons that take the focus"
         },
         {
           "name": "first_button_share",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Float | nil"},
           "about": "where its first button sits, a share of the height (nil: the menu's)"
         },
         {
           "name": "focus",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "UI::Focus | nil"},
           "about": "its UI::Focus, which the menu gives it"
         },
         {
           "name": "focus=",
+          "stability": "stable",
           "params": [
             {"name": "focus", "type": "UI::Focus | nil"}
           ],
@@ -4257,11 +4800,13 @@
     },
     {
       "name": "Particles",
+      "stability": "stable",
       "kind": "module",
       "about": "Short-lived sparks, smoke and dust.",
       "methods": [
         {
           "name": "burst",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "position", "type": "Vector3"},
@@ -4288,6 +4833,7 @@
         },
         {
           "name": "emitter",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "object", "type": "GameObject"},
@@ -4300,6 +4846,7 @@
         },
         {
           "name": "count",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -4307,6 +4854,7 @@
         },
         {
           "name": "clear",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -4324,17 +4872,20 @@
     },
     {
       "name": "Particles::Emitter",
+      "stability": "experimental",
       "kind": "class",
       "about": "A continuous particle effect attached to an object, returned by Particles.emitter.",
       "methods": [
         {
           "name": "active?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether this emitter is still emitting from a live object"
         },
         {
           "name": "stop",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "void"},
           "about": "stops new births; existing particles finish their lives"
@@ -4344,11 +4895,13 @@
     },
     {
       "name": "Scatter",
+      "stability": "stable",
       "kind": "class",
       "about": "Great numbers of copies of a mesh (grass, trees, rocks), drawn only.",
       "methods": [
         {
           "name": "place",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "template", "type": "String | GameObject"},
@@ -4369,6 +4922,7 @@
         },
         {
           "name": "clear",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -4376,12 +4930,14 @@
         },
         {
           "name": "count",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "how many copies a set placed"
         },
         {
           "name": "remove",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "void"},
           "about": "removes a set"
@@ -4394,11 +4950,13 @@
     },
     {
       "name": "Save",
+      "stability": "stable",
       "kind": "module",
       "about": "What the game keeps between runs.",
       "methods": [
         {
           "name": "get",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"},
@@ -4409,6 +4967,7 @@
         },
         {
           "name": "set",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"},
@@ -4419,6 +4978,7 @@
         },
         {
           "name": "[]",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"}
@@ -4428,6 +4988,7 @@
         },
         {
           "name": "[]=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"},
@@ -4438,6 +4999,7 @@
         },
         {
           "name": "update",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"},
@@ -4449,6 +5011,7 @@
         },
         {
           "name": "delete",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"}
@@ -4458,6 +5021,7 @@
         },
         {
           "name": "clear",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -4465,6 +5029,7 @@
         },
         {
           "name": "keys",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -4472,6 +5037,7 @@
         },
         {
           "name": "slot",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -4479,6 +5045,7 @@
         },
         {
           "name": "slot=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -4488,6 +5055,7 @@
         },
         {
           "name": "slots",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[String]"},
@@ -4495,6 +5063,7 @@
         },
         {
           "name": "version",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer | nil"},
@@ -4502,6 +5071,7 @@
         },
         {
           "name": "version=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "number", "type": "Integer"}
@@ -4511,6 +5081,7 @@
         },
         {
           "name": "migrate",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Integer", "keyword": true},
@@ -4521,6 +5092,7 @@
         },
         {
           "name": "checkpoint",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol", "optional": true, "default": ":checkpoint"}
@@ -4530,6 +5102,7 @@
         },
         {
           "name": "restore_checkpoint",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol", "optional": true, "default": ":checkpoint"}
@@ -4543,11 +5116,13 @@
     },
     {
       "name": "HTTP",
+      "stability": "stable",
       "kind": "module",
       "about": "Web requests; the answer comes to the block.",
       "methods": [
         {
           "name": "get",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "url", "type": "String"},
@@ -4561,6 +5136,7 @@
         },
         {
           "name": "post",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "url", "type": "String"},
@@ -4576,6 +5152,7 @@
         },
         {
           "name": "put",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "url", "type": "String"},
@@ -4591,6 +5168,7 @@
         },
         {
           "name": "patch",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "url", "type": "String"},
@@ -4606,6 +5184,7 @@
         },
         {
           "name": "delete",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "url", "type": "String"},
@@ -4619,6 +5198,7 @@
         },
         {
           "name": "request",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "verb", "type": "String | Symbol"},
@@ -4638,47 +5218,55 @@
     },
     {
       "name": "HTTP::Response",
+      "stability": "stable",
       "kind": "class",
       "about": "What a web request's block is given.",
       "methods": [
         {
           "name": "ok?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it came back with a 2xx status"
         },
         {
           "name": "status",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "its status"
         },
         {
           "name": "headers",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Hash[String, String]"},
           "about": "its headers"
         },
         {
           "name": "body",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String"},
           "about": "its body (decompressed when it came with gzip or deflate)"
         },
         {
           "name": "json",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "untyped"},
           "about": "its body read as JSON"
         },
         {
           "name": "error",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "why there was no answer, or nil"
         },
         {
           "name": "url",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the address the answer came from, once redirects were followed"
@@ -4688,11 +5276,13 @@
     },
     {
       "name": "I18n",
+      "stability": "stable",
       "kind": "module",
       "about": "The game's texts in several languages (locales/*.json).",
       "methods": [
         {
           "name": "t",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "key", "type": "String | Symbol"},
@@ -4703,6 +5293,7 @@
         },
         {
           "name": "locale",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Symbol"},
@@ -4710,6 +5301,7 @@
         },
         {
           "name": "locale=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "language", "type": "Symbol | String"}
@@ -4719,6 +5311,7 @@
         },
         {
           "name": "available_locales",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Symbol]"},
@@ -4729,11 +5322,13 @@
     },
     {
       "name": "Network",
+      "stability": "stable",
       "kind": "module",
       "about": "Games played together: on a local network, through a relay or on a dedicated server.",
       "methods": [
         {
           "name": "host",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "port", "type": "Integer", "keyword": true, "optional": true, "default": "7777"},
@@ -4748,6 +5343,7 @@
         },
         {
           "name": "join",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "address", "type": "String | nil", "optional": true, "default": "nil"},
@@ -4761,6 +5357,7 @@
         },
         {
           "name": "fingerprint",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -4768,6 +5365,7 @@
         },
         {
           "name": "host_code",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -4775,6 +5373,7 @@
         },
         {
           "name": "leave",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -4782,6 +5381,7 @@
         },
         {
           "name": "online?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4789,6 +5389,7 @@
         },
         {
           "name": "connecting?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4796,6 +5397,7 @@
         },
         {
           "name": "reconnecting?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4803,6 +5405,7 @@
         },
         {
           "name": "reconnect_window",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -4810,6 +5413,7 @@
         },
         {
           "name": "reconnect_window=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "seconds", "type": "Numeric"}
@@ -4819,6 +5423,7 @@
         },
         {
           "name": "host?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4826,6 +5431,7 @@
         },
         {
           "name": "server?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4833,6 +5439,7 @@
         },
         {
           "name": "id",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -4840,6 +5447,7 @@
         },
         {
           "name": "peers",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Integer]"},
@@ -4847,6 +5455,7 @@
         },
         {
           "name": "players",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Integer]"},
@@ -4854,6 +5463,7 @@
         },
         {
           "name": "validate_movement",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "max_speed", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
@@ -4867,6 +5477,7 @@
         },
         {
           "name": "movement_rules",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, Numeric | bool]"},
@@ -4874,6 +5485,7 @@
         },
         {
           "name": "movement_violations",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "peer", "type": "Integer"}
@@ -4883,6 +5495,7 @@
         },
         {
           "name": "port",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -4890,6 +5503,7 @@
         },
         {
           "name": "room",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -4897,6 +5511,7 @@
         },
         {
           "name": "relay",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "String | nil"},
@@ -4904,6 +5519,7 @@
         },
         {
           "name": "relay=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "address", "type": "String | nil"}
@@ -4913,6 +5529,7 @@
         },
         {
           "name": "search",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4920,6 +5537,7 @@
         },
         {
           "name": "searching?",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -4927,6 +5545,7 @@
         },
         {
           "name": "stop_search",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "void"},
@@ -4934,6 +5553,7 @@
         },
         {
           "name": "games",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Hash[Symbol, untyped]]"},
@@ -4941,6 +5561,7 @@
         },
         {
           "name": "discovery_port",
+          "stability": "stable",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -4948,6 +5569,7 @@
         },
         {
           "name": "discovery_port=",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "port", "type": "Integer"}
@@ -4957,6 +5579,7 @@
         },
         {
           "name": "emit",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -4968,6 +5591,7 @@
         },
         {
           "name": "on",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -4978,6 +5602,7 @@
         },
         {
           "name": "on_connect",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^() -> void", "block": true}
@@ -4987,6 +5612,7 @@
         },
         {
           "name": "on_disconnect",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^() -> void", "block": true}
@@ -4996,6 +5622,7 @@
         },
         {
           "name": "on_join",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Integer) -> void", "block": true}
@@ -5005,6 +5632,7 @@
         },
         {
           "name": "on_leave",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Integer) -> void", "block": true}
@@ -5014,6 +5642,7 @@
         },
         {
           "name": "on_fail",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^(String | nil) -> void", "block": true}
@@ -5023,6 +5652,7 @@
         },
         {
           "name": "on_reconnecting",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Integer) -> void", "block": true}
@@ -5032,6 +5662,7 @@
         },
         {
           "name": "on_reconnected",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Integer) -> void", "block": true}
@@ -5041,6 +5672,7 @@
         },
         {
           "name": "on_lost",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(String | nil) -> void", "block": true}
@@ -5050,6 +5682,7 @@
         },
         {
           "name": "authenticate",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "block", "type": "^(Integer, untyped, Network::Decision) -> void", "block": true}
@@ -5059,6 +5692,7 @@
         },
         {
           "name": "identity",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "peer", "type": "Integer"}
@@ -5068,6 +5702,7 @@
         },
         {
           "name": "player_name",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "peer", "type": "Integer"}
@@ -5077,6 +5712,7 @@
         },
         {
           "name": "on_level_loading",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(String) -> void", "block": true}
@@ -5086,6 +5722,7 @@
         },
         {
           "name": "on_level_ready",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(String) -> void", "block": true}
@@ -5095,6 +5732,7 @@
         },
         {
           "name": "changing_level?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -5102,6 +5740,7 @@
         },
         {
           "name": "level_timeout",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -5109,6 +5748,7 @@
         },
         {
           "name": "level_timeout=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "seconds", "type": "Numeric"}
@@ -5118,6 +5758,7 @@
         },
         {
           "name": "spawn",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "template", "type": "String"},
@@ -5130,6 +5771,7 @@
         },
         {
           "name": "allow_spawn",
+          "stability": "stable",
           "static": true,
           "params": [
             {"name": "templates", "type": "String", "rest": true}
@@ -5142,11 +5784,13 @@
     },
     {
       "name": "Network::Decision",
+      "stability": "stable",
       "kind": "class",
       "about": "What an authenticate block decides with.",
       "methods": [
         {
           "name": "accept",
+          "stability": "stable",
           "params": [
             {"name": "identity", "type": "untyped", "keyword": true},
             {"name": "name", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"}
@@ -5156,6 +5800,7 @@
         },
         {
           "name": "deny",
+          "stability": "stable",
           "params": [
             {"name": "reason", "type": "String", "optional": true, "default": "\"not let in\""}
           ],
@@ -5167,24 +5812,28 @@
     },
     {
       "name": "NetworkSync",
+      "stability": "stable",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: the same object in the same place on every machine.",
       "methods": [
         {
           "name": "mine?",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether this machine owns it"
         },
         {
           "name": "owner",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "the peer that owns it"
         },
         {
           "name": "owner=",
+          "stability": "stable",
           "params": [
             {"name": "peer", "type": "Integer"}
           ],
@@ -5193,12 +5842,14 @@
         },
         {
           "name": "key",
+          "stability": "stable",
           "params": [],
           "returns": {"type": "String"},
           "about": "the name it is known by on every machine"
         },
         {
           "name": "assign",
+          "stability": "stable",
           "params": [
             {"name": "owner", "type": "Integer", "keyword": true},
             {"name": "key", "type": "String", "keyword": true, "optional": true, "default": "self.key"}
@@ -5219,12 +5870,14 @@
     },
     {
       "name": "Interactable",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).",
       "methods": [
         {
           "name": "all",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Interactable]"},
@@ -5232,12 +5885,14 @@
         },
         {
           "name": "prompt",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | Symbol | nil"},
           "about": "the I18n key of its prompt, or nil for the engine's \"Interact\""
         },
         {
           "name": "prompt=",
+          "stability": "experimental",
           "params": [
             {"name": "key", "type": "String | Symbol | nil"}
           ],
@@ -5246,18 +5901,21 @@
         },
         {
           "name": "prompt_text",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "the prompt in the language in use"
         },
         {
           "name": "range",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters from the actor it can be used from (2 unless said)"
         },
         {
           "name": "range=",
+          "stability": "experimental",
           "params": [
             {"name": "meters", "type": "Numeric"}
           ],
@@ -5266,12 +5924,14 @@
         },
         {
           "name": "priority",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "of those in reach, the highest wins (0 unless said)"
         },
         {
           "name": "priority=",
+          "stability": "experimental",
           "params": [
             {"name": "value", "type": "Numeric"}
           ],
@@ -5280,12 +5940,14 @@
         },
         {
           "name": "enabled?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it can be picked"
         },
         {
           "name": "enabled=",
+          "stability": "experimental",
           "params": [
             {"name": "flag", "type": "bool"}
           ],
@@ -5294,12 +5956,14 @@
         },
         {
           "name": "angle",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float | nil"},
           "about": "degrees off the actor's forward it may be at; nil for any direction"
         },
         {
           "name": "angle=",
+          "stability": "experimental",
           "params": [
             {"name": "degrees", "type": "Numeric | nil"}
           ],
@@ -5317,12 +5981,14 @@
     },
     {
       "name": "Interactor",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
       "methods": [
         {
           "name": "all",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Interactor]"},
@@ -5330,24 +5996,28 @@
         },
         {
           "name": "target",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Interactable | nil"},
           "about": "the Interactable in focus, or nil"
         },
         {
           "name": "use",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "uses what is in focus now; false when nothing is"
         },
         {
           "name": "pad",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "the player whose :interact it reads (0 unless said)"
         },
         {
           "name": "prompt_label",
+          "stability": "experimental",
           "params": [
             {"name": "target", "type": "Interactable"}
           ],
@@ -5365,11 +6035,13 @@
     },
     {
       "name": "Dialogue",
+      "stability": "experimental",
       "kind": "module",
       "about": "Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.",
       "methods": [
         {
           "name": "start",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol | Dialogue::Script"},
@@ -5381,6 +6053,7 @@
         },
         {
           "name": "current",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Dialogue::Conversation | nil"},
@@ -5388,6 +6061,7 @@
         },
         {
           "name": "busy?",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool"},
@@ -5395,6 +6069,7 @@
         },
         {
           "name": "stop",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "bool | nil"},
@@ -5402,6 +6077,7 @@
         },
         {
           "name": "on",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "event", "type": "Symbol"},
@@ -5412,6 +6088,7 @@
         },
         {
           "name": "load",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5421,6 +6098,7 @@
         },
         {
           "name": "quests",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "untyped"},
@@ -5428,6 +6106,7 @@
         },
         {
           "name": "quests=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "quests", "type": "untyped"}
@@ -5440,59 +6119,76 @@
     },
     {
       "name": "Dialogue::Conversation",
+      "stability": "experimental",
       "kind": "class",
       "about": "One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.",
       "methods": [
         {
           "name": "text",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the line, in the language in use (nil once it is over)"
         },
         {
           "name": "text_key",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the I18n key of the line"
         },
         {
           "name": "speaker_name",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "who says it, in the language in use (nil when the node names nobody)"
         },
         {
           "name": "speaker_key",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the I18n key of who says it, or nil"
         },
         {
           "name": "voice",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
-          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+          "about": "the sound of the line's voice clip (in sounds/), or nil"
+        },
+        {
+          "name": "speaking?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the line's voice clip plays; a line with no choices goes on by itself as it ends"
         },
         {
           "name": "choices",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[Dialogue::Conversation::Choice]"},
           "about": "the choices offered now: those whose conditions hold"
         },
         {
           "name": "choosing?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether the player answers this line by choosing"
         },
         {
           "name": "continue",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "on from a line with no choices: to what follows, or the end; false when it waits for a choice"
         },
         {
           "name": "choose",
+          "stability": "experimental",
           "params": [
             {"name": "choice", "type": "Dialogue::Conversation::Choice | Integer"}
           ],
@@ -5501,6 +6197,7 @@
         },
         {
           "name": "stop",
+          "stability": "experimental",
           "params": [
             {"name": "quietly", "type": "bool", "keyword": true, "optional": true, "default": "false"}
           ],
@@ -5509,48 +6206,56 @@
         },
         {
           "name": "over?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it ended"
         },
         {
           "name": "node",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Hash[String, untyped] | nil"},
           "about": "the node it is at, or nil once it is over"
         },
         {
           "name": "node_id",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the id of the node it is at, or nil"
         },
         {
           "name": "steps",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "how many lines it has shown (a line it comes back to counts again)"
         },
         {
           "name": "script",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Dialogue::Script"},
           "about": "its dialogue"
         },
         {
           "name": "actor",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "the hero of the player in it"
         },
         {
           "name": "speaker",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "who talks to that player, or nil"
         },
         {
           "name": "deciding?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether its effects happen on this machine (offline, and on the host)"
@@ -5564,23 +6269,27 @@
     },
     {
       "name": "Dialogue::Conversation::Choice",
+      "stability": "experimental",
       "kind": "class",
       "about": "An answer the player may give.",
       "methods": [
         {
           "name": "index",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "its place among the node's choices (what choose takes)"
         },
         {
           "name": "key",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "the I18n key of its text"
         },
         {
           "name": "text",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "its text, in the language in use"
@@ -5590,23 +6299,27 @@
     },
     {
       "name": "Dialogue::Script",
+      "stability": "experimental",
       "kind": "class",
       "about": "A dialogue file as it was read.",
       "methods": [
         {
           "name": "name",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "its name: that of its file in dialogues/, without .json"
         },
         {
           "name": "start",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | Array[Hash[String, untyped]]"},
           "about": "where it starts: a node's id, or branches"
         },
         {
           "name": "node",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String"}
           ],
@@ -5615,6 +6328,7 @@
         },
         {
           "name": "node?",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String"}
           ],
@@ -5629,11 +6343,13 @@
     },
     {
       "name": "GameVariables",
+      "stability": "experimental",
       "kind": "module",
       "about": "The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.",
       "methods": [
         {
           "name": "[]",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5643,6 +6359,7 @@
         },
         {
           "name": "[]=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -5653,6 +6370,7 @@
         },
         {
           "name": "to_h",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[String, untyped]"},
@@ -5660,6 +6378,7 @@
         },
         {
           "name": "replace",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "values", "type": "Hash[String | Symbol, untyped]"}
@@ -5669,6 +6388,7 @@
         },
         {
           "name": "on_change",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "block", "type": "^(String, untyped) -> void", "block": true}
@@ -5678,6 +6398,7 @@
         },
         {
           "name": "value?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "value", "type": "untyped"}
@@ -5687,6 +6408,7 @@
         },
         {
           "name": "name?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "untyped"}
@@ -5699,12 +6421,14 @@
     },
     {
       "name": "Talkable",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt \"Talk\" when it has none) starts its dialogue.",
       "methods": [
         {
           "name": "dialogue",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the name of its dialogue file"
@@ -5718,11 +6442,13 @@
     },
     {
       "name": "Quests",
+      "stability": "experimental",
       "kind": "module",
       "about": "The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them.",
       "methods": [
         {
           "name": "[]",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5732,6 +6458,7 @@
         },
         {
           "name": "load",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5741,6 +6468,7 @@
         },
         {
           "name": "started",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Quests::Quest]"},
@@ -5748,6 +6476,7 @@
         },
         {
           "name": "active",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Quests::Quest]"},
@@ -5755,6 +6484,7 @@
         },
         {
           "name": "completed",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Quests::Quest]"},
@@ -5762,6 +6492,7 @@
         },
         {
           "name": "stage",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5771,6 +6502,7 @@
         },
         {
           "name": "start",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5780,6 +6512,7 @@
         },
         {
           "name": "set_stage",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -5791,6 +6524,7 @@
         },
         {
           "name": "reset",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"}
@@ -5800,6 +6534,7 @@
         },
         {
           "name": "collected",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "item", "type": "String | Symbol"},
@@ -5810,6 +6545,7 @@
         },
         {
           "name": "delivered",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "item", "type": "String | Symbol"},
@@ -5821,6 +6557,7 @@
         },
         {
           "name": "defeated",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "who", "type": "GameObject | String"},
@@ -5831,6 +6568,7 @@
         },
         {
           "name": "reached",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "place", "type": "GameObject | String"}
@@ -5840,6 +6578,7 @@
         },
         {
           "name": "check",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
@@ -5850,6 +6589,7 @@
         },
         {
           "name": "on",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "event", "type": "Symbol"},
@@ -5860,6 +6600,7 @@
         },
         {
           "name": "to_h",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[String, Hash[String, untyped]]"},
@@ -5867,6 +6608,7 @@
         },
         {
           "name": "replace",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "saved", "type": "Hash[String | Symbol, untyped] | nil"}
@@ -5876,6 +6618,7 @@
         },
         {
           "name": "save",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "key", "type": "Symbol | String", "optional": true, "default": ":quests"}
@@ -5885,6 +6628,7 @@
         },
         {
           "name": "restore",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "key", "type": "Symbol | String", "optional": true, "default": ":quests"}
@@ -5897,71 +6641,83 @@
     },
     {
       "name": "Quests::Quest",
+      "stability": "experimental",
       "kind": "class",
       "about": "One quest and where the party is in it (Quests[name] gives one).",
       "methods": [
         {
           "name": "name",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "its name: that of its file in quests/, without .json"
         },
         {
           "name": "definition",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Quests::Definition | nil"},
           "about": "its file as read (nil for a quest with no file)"
         },
         {
           "name": "stage",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the stage it is at, or nil while it has not started"
         },
         {
           "name": "started?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it started"
         },
         {
           "name": "complete?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it reached a stage that ends it"
         },
         {
           "name": "active?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "started, and not complete"
         },
         {
           "name": "title",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "its title, in the language in use"
         },
         {
           "name": "description",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "its description, in the language in use, or nil"
         },
         {
           "name": "stage_text",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the text of the stage it is at, or nil"
         },
         {
           "name": "objectives",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[Quests::Objective]"},
           "about": "the objectives of the stage it is at"
         },
         {
           "name": "next_stage",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the stage it goes to once its objectives are done, or nil"
@@ -5975,83 +6731,97 @@
     },
     {
       "name": "Quests::Objective",
+      "stability": "experimental",
       "kind": "class",
       "about": "One thing the party does in a stage of a quest.",
       "methods": [
         {
           "name": "quest",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Quests::Quest"},
           "about": "the quest it is of"
         },
         {
           "name": "index",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "its place among the stage's objectives"
         },
         {
           "name": "kind",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol"},
           "about": ":go_to, :talk_to, :deliver, :collect, :defeat or :check"
         },
         {
           "name": "target",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "what it names: a place, someone, an item or a check"
         },
         {
           "name": "count",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "how many it takes (1 unless the file says)"
         },
         {
           "name": "progress",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "how many it has"
         },
         {
           "name": "done?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it has as many as it takes"
         },
         {
           "name": "text",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "its text, in the language in use, with {progress} and {count} filled in"
         },
         {
           "name": "radius",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float | Integer"},
           "about": "a go_to's meters from its place (2 unless the file says)"
         },
         {
           "name": "recipient",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "a deliver's: who the items go to"
         },
         {
           "name": "dialogue",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "a talk_to's: the dialogue it must be, or nil"
         },
         {
           "name": "node",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "a talk_to's: the node it must reach, or nil"
         },
         {
           "name": "data",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Hash[String, untyped]"},
           "about": "its line in the file"
@@ -6064,35 +6834,41 @@
     },
     {
       "name": "Quests::Definition",
+      "stability": "experimental",
       "kind": "class",
       "about": "A quest file as it was read.",
       "methods": [
         {
           "name": "name",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "its name"
         },
         {
           "name": "title_key",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "the I18n key of its title"
         },
         {
           "name": "description_key",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String | nil"},
           "about": "the I18n key of its description, or nil"
         },
         {
           "name": "start",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "String"},
           "about": "the stage it starts at"
         },
         {
           "name": "stage",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String"}
           ],
@@ -6101,6 +6877,7 @@
         },
         {
           "name": "stage?",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String | nil"}
           ],
@@ -6109,12 +6886,14 @@
         },
         {
           "name": "stage_ids",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[String]"},
           "about": "the ids of its stages"
         },
         {
           "name": "end?",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String | nil"}
           ],
@@ -6123,6 +6902,7 @@
         },
         {
           "name": "objectives",
+          "stability": "experimental",
           "params": [
             {"name": "id", "type": "String | nil"}
           ],
@@ -6137,6 +6917,7 @@
     },
     {
       "name": "QuestTracker",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host.",
@@ -6148,12 +6929,14 @@
     },
     {
       "name": "DialogueBox",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.",
       "methods": [
         {
           "name": "letters_shown",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "letters", "type": "Integer"},
@@ -6165,18 +6948,21 @@
         },
         {
           "name": "whole?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether the line it shows has all of its letters out (true while it shows none)"
         },
         {
           "name": "pad",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Integer"},
           "about": "the player whose gamepad works it (0 unless said)"
         },
         {
           "name": "letters_per_second",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how fast a line appears (45 unless said; 0: at once)"
@@ -6189,11 +6975,13 @@
     },
     {
       "name": "Interaction",
+      "stability": "experimental",
       "kind": "module",
       "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",
       "methods": [
         {
           "name": "on",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "event", "type": "Symbol"},
@@ -6204,6 +6992,7 @@
         },
         {
           "name": "interact",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "actor", "type": "GameObject"},
@@ -6214,6 +7003,7 @@
         },
         {
           "name": "best_for",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "actor", "type": "GameObject"},
@@ -6225,6 +7015,7 @@
         },
         {
           "name": "reachable?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "actor", "type": "GameObject"},
@@ -6236,6 +7027,7 @@
         },
         {
           "name": "distance",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "actor", "type": "GameObject"},
@@ -6246,6 +7038,7 @@
         },
         {
           "name": "angle_to",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "actor", "type": "GameObject"},
@@ -6259,11 +7052,13 @@
     },
     {
       "name": "LineOfSight",
+      "stability": "experimental",
       "kind": "module",
       "about": "Whether one thing can see another: a ray to it hits nothing else first.",
       "methods": [
         {
           "name": "clear?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
@@ -6276,6 +7071,7 @@
         },
         {
           "name": "part_of?",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "object", "type": "GameObject | nil"},
@@ -6289,12 +7085,14 @@
     },
     {
       "name": "Perception",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear.",
       "methods": [
         {
           "name": "noise",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "at", "type": "Vector3", "keyword": true},
@@ -6306,6 +7104,7 @@
         },
         {
           "name": "all",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[Perception]"},
@@ -6313,6 +7112,7 @@
         },
         {
           "name": "sees?",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject"}
           ],
@@ -6321,18 +7121,21 @@
         },
         {
           "name": "in_sight",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[GameObject]"},
           "about": "what it sees, as of its last update"
         },
         {
           "name": "sees_any?",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it sees anything it watches"
         },
         {
           "name": "last_seen",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject"}
           ],
@@ -6341,12 +7144,14 @@
         },
         {
           "name": "watched",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[GameObject]"},
           "about": "what it looks for: the objects of its watch tag, or the players' heroes"
         },
         {
           "name": "angle_to",
+          "stability": "experimental",
           "params": [
             {"name": "object", "type": "GameObject"}
           ],
@@ -6355,36 +7160,42 @@
         },
         {
           "name": "eye_point",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "where it looks from"
         },
         {
           "name": "sight",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters it sees (15 unless said)"
         },
         {
           "name": "fov",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "degrees of the whole cone (120 unless said)"
         },
         {
           "name": "eyes",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters above its origin it looks from (1.6 unless said)"
         },
         {
           "name": "aim",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters above a watched object's origin it looks at (1 unless said)"
         },
         {
           "name": "hearing",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters a noise of loudness 1 is heard from (10 unless said)"
@@ -6402,29 +7213,34 @@
     },
     {
       "name": "Perception::Noise",
+      "stability": "experimental",
       "kind": "class",
       "about": "A noise someone heard (on_hear).",
       "methods": [
         {
           "name": "position",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Vector3"},
           "about": "where it was made"
         },
         {
           "name": "loudness",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "how loud: 1 is heard as far as a listener's hearing"
         },
         {
           "name": "source",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "the object that made it, or nil"
         },
         {
           "name": "distance",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters from the listener"
@@ -6434,12 +7250,14 @@
     },
     {
       "name": "Brain",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: an NPC's state machine, with states, transitions, guards, timers and events.",
       "methods": [
         {
           "name": "state",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol | String"},
@@ -6450,6 +7268,7 @@
         },
         {
           "name": "initial",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "name", "type": "Symbol | String | nil", "optional": true, "default": "nil"}
@@ -6459,6 +7278,7 @@
         },
         {
           "name": "transition",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "from", "type": "Symbol | Array[Symbol]", "keyword": true},
@@ -6470,6 +7290,7 @@
         },
         {
           "name": "states",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, Hash[Symbol, Symbol | Proc]]"},
@@ -6477,6 +7298,7 @@
         },
         {
           "name": "transitions",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Array[untyped]"},
@@ -6484,24 +7306,28 @@
         },
         {
           "name": "state",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the state it is in (nil before its first frame)"
         },
         {
           "name": "previous_state",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the state it was in before"
         },
         {
           "name": "time_in_state",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "seconds of game time in this state"
         },
         {
           "name": "in?",
+          "stability": "experimental",
           "params": [
             {"name": "names", "type": "Symbol | String", "rest": true}
           ],
@@ -6510,6 +7336,7 @@
         },
         {
           "name": "fire",
+          "stability": "experimental",
           "params": [
             {"name": "event", "type": "Symbol | String"},
             {"name": "payload", "type": "untyped", "optional": true, "default": "nil"}
@@ -6519,6 +7346,7 @@
         },
         {
           "name": "go",
+          "stability": "experimental",
           "params": [
             {"name": "name", "type": "Symbol | String"}
           ],
@@ -6540,11 +7368,13 @@
     },
     {
       "name": "GameClock",
+      "stability": "experimental",
       "kind": "module",
       "about": "The time of day in the game's world, on game time: what schedules follow.",
       "methods": [
         {
           "name": "hour",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -6552,6 +7382,7 @@
         },
         {
           "name": "minute",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -6559,6 +7390,7 @@
         },
         {
           "name": "minute_of_day",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -6566,6 +7398,7 @@
         },
         {
           "name": "day",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Integer"},
@@ -6573,6 +7406,7 @@
         },
         {
           "name": "to_s",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "String"},
@@ -6580,6 +7414,7 @@
         },
         {
           "name": "set",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "hour", "type": "Integer", "keyword": true},
@@ -6591,6 +7426,7 @@
         },
         {
           "name": "speed",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -6598,6 +7434,7 @@
         },
         {
           "name": "speed=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "value", "type": "Numeric"}
@@ -6607,6 +7444,7 @@
         },
         {
           "name": "state",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Hash[Symbol, Float]"},
@@ -6614,6 +7452,7 @@
         },
         {
           "name": "restore",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
@@ -6623,6 +7462,7 @@
         },
         {
           "name": "seconds",
+          "stability": "experimental",
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
@@ -6633,24 +7473,28 @@
     },
     {
       "name": "Schedule",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).",
       "methods": [
         {
           "name": "current",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Symbol | nil"},
           "about": "the activity it is time for, or nil"
         },
         {
           "name": "plan",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Array[[Integer, Symbol]]"},
           "about": "[[minute of the day, activity], ...] in the order of the day"
         },
         {
           "name": "plan=",
+          "stability": "experimental",
           "params": [
             {"name": "given", "type": "Hash[String, Symbol | String] | String"}
           ],
@@ -6659,6 +7503,7 @@
         },
         {
           "name": "parse",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "given", "type": "Hash[String, Symbol | String] | String"}
@@ -6668,6 +7513,7 @@
         },
         {
           "name": "activity_at",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "plan", "type": "Array[[Integer, Symbol]]"},
@@ -6678,6 +7524,7 @@
         },
         {
           "name": "minute_of",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "time", "type": "String"}
@@ -6694,18 +7541,21 @@
     },
     {
       "name": "HeadLook",
+      "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
       "about": "A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.",
       "methods": [
         {
           "name": "target",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | Vector3 | nil"},
           "about": "what it looks at instead of the heroes, or nil"
         },
         {
           "name": "target=",
+          "stability": "experimental",
           "params": [
             {"name": "target", "type": "GameObject | Vector3 | nil"}
           ],
@@ -6714,24 +7564,28 @@
         },
         {
           "name": "nearest_hero",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject | nil"},
           "about": "the nearest hero in range and in front of it, or nil"
         },
         {
           "name": "bone",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "GameObject"},
           "about": "the head's bone"
         },
         {
           "name": "range",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "meters to a hero (4 unless said)"
         },
         {
           "name": "angle",
+          "stability": "experimental",
           "params": [],
           "returns": {"type": "Float"},
           "about": "degrees off its forward a hero may be at, and the most the head turns (70 unless said)"
@@ -6743,6 +7597,101 @@
         "update"
       ],
       "guide": "npcs.md#head-look-at"
+    },
+    {
+      "name": "VoiceMouth",
+      "stability": "experimental",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:).",
+      "methods": [
+        {
+          "name": "follow",
+          "stability": "experimental",
+          "params": [
+            {"name": "handle", "type": "Integer | nil"}
+          ],
+          "returns": {"type": "Integer | nil"},
+          "about": "moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker"
+        },
+        {
+          "name": "openness",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how open the mouth is now, 0 to 1"
+        },
+        {
+          "name": "openness_at",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "loudness", "type": "Numeric"},
+            {"name": "full", "type": "Numeric"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "how open a mouth is (0 to 1) for a voice of that loudness, all open from full"
+        }
+      ],
+      "internal": [
+        "update"
+      ],
+      "guide": "dialogue.md#voice"
+    },
+    {
+      "name": "Dialogue::Voice",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown).",
+      "methods": [
+        {
+          "name": "play",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "speaker", "type": "GameObject | nil"}
+          ],
+          "returns": {"type": "Dialogue::Voice | nil"},
+          "about": "plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play"
+        },
+        {
+          "name": "handle",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Integer | nil"},
+          "about": "the clip's sound handle"
+        },
+        {
+          "name": "playing?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the clip still plays"
+        },
+        {
+          "name": "follow",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "void"},
+          "about": "moves the clip to where the speaker's head is now"
+        },
+        {
+          "name": "place",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "where the clip plays from: the speaker's head, or the speaker"
+        },
+        {
+          "name": "stop",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "stops the clip"
+        }
+      ],
+      "guide": "dialogue.md#voice"
     }
   ]
 }

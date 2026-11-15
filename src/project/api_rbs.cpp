@@ -14,7 +14,9 @@ namespace {
 constexpr const char* kHeader =
     "# The scripting API of RedGem games as Ruby type signatures (RBS), for the language servers of\n"
     "# editors and type checkers (Steep, Solargraph and the like). Made from docs/scripting/api.json\n"
-    "# by `redgem api --rbs`: change that file, not this one.\n"
+    "# by `redgem api --rbs`: change that file, not this one. Each class and method is annotated\n"
+    "# %a{redgem:stable} (no breaking change within a 1.x minor release) or %a{redgem:experimental}\n"
+    "# (it may change in any release): see docs/scripting/stability.md.\n"
     "\n"
     "module RedGem\n"
     "  # A color: its name (:orange), or [r, g, b] from 0 to 255.\n"
@@ -32,6 +34,9 @@ constexpr const char* kKeywordRestMark = "**";
 constexpr const char* kNew = "new";
 constexpr const char* kInitialize = "initialize";
 constexpr const char* kVoid = "void";
+// The annotation that says whether games may rely on a class or a method: %a{redgem:stable}.
+constexpr const char* kAnnotationOpen = "%a{redgem:";
+constexpr const char* kAnnotationClose = "}\n";
 // The words RBS keeps for itself, which cannot name a parameter (it is then left unnamed).
 constexpr const char* kRbsKeywords[] = {"alias",    "attr_accessor", "attr_reader", "attr_writer", "bool",  "bot",
                                         "class",    "def",           "end",         "extend",      "false", "include",
@@ -85,9 +90,17 @@ std::string method_name(const ApiMethod& method) {
   return (method.on_class ? kClassStatic : "") + method.name;
 }
 
+// "%a{redgem:stable}\n", after a declaration's comment (which RBS still gives the declaration);
+// nothing for one with no mark.
+std::string annotation(ApiStability stability) {
+  if (stability == ApiStability::Unmarked) return {};
+  return std::string(kAnnotationOpen) + stability_name(stability) + kAnnotationClose;
+}
+
 std::string method_rbs(const ApiMethod& method) {
-  return std::string(kIndent) + kComment + method.about + "\n" + kIndent + "def " + method_name(method) + ": " +
-         method_type(method) + "\n";
+  const std::string marked = annotation(method.stability);
+  return std::string(kIndent) + kComment + method.about + "\n" + (marked.empty() ? "" : kIndent + marked) + kIndent +
+         "def " + method_name(method) + ": " + method_type(method) + "\n";
 }
 
 // "class GameMenu < Behaviour", "module Input".
@@ -97,7 +110,8 @@ std::string declaration(const ApiClass& owner) {
 }
 
 std::string class_rbs(const ApiClass& owner) {
-  std::string text = "\n" + std::string(kComment) + owner.about + "\n" + declaration(owner);
+  std::string text =
+      "\n" + std::string(kComment) + owner.about + "\n" + annotation(owner.stability) + declaration(owner);
   for (const ApiMethod& method : owner.methods) text += method_rbs(method);
   return text + kEnd;
 }

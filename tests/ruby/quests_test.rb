@@ -43,6 +43,12 @@ class QuestsTest < RedGemTest::Case
     "a" => { "text" => "t", "objectives" => [{ "check" => "always", "text" => "t" }], "next" => "b" },
     "b" => { "text" => "t", "objectives" => [{ "check" => "always", "text" => "t" }], "next" => "a" }
   } }.freeze
+  WALK = { "title" => "t", "start" => "path", "stages" => {
+    "path" => { "text" => "t", "objectives" => [
+      { "go_to" => "Mill", "text" => "t" }, { "collect" => "flour", "text" => "t" }
+    ], "next" => "done" },
+    "done" => { "text" => "t", "end" => true }
+  } }.freeze
 
   def setup
     [Quests, Dialogue, GameVariables].each(&:__scene_reset)
@@ -111,6 +117,16 @@ class QuestsTest < RedGemTest::Case
     assert_equal "bring", bread.stage
     assert_equal [0, 0], bread.objectives.map(&:progress), "the next stage starts from nothing"
     assert_equal %w[bread bring flour], heard(:stage).last
+  end
+
+  def test_a_tracker_reaches_the_last_open_objective_without_reading_the_old_stage_again
+    define_quest("walk", WALK)
+    Quests.start(:walk)
+    Quests.collected(:flour)
+    tracker = QuestTracker.allocate
+    def tracker.near?(_objective) = true
+    tracker.__send__(:look_around)
+    assert Quests[:walk].complete?
   end
 
   def test_a_copy_of_someone_counts_as_them

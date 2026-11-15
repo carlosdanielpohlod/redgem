@@ -151,8 +151,9 @@ class Reader {
     if (!node.contains(kVoice)) return;
     const Json& voice = node.at(kVoice);
     if (!voice.is_string() || !safe_asset_name(voice.get_ref<const std::string&>())) {
-      error(where, "\"voice\" is a sound's name inside the game's sounds folder");
+      return error(where, "\"voice\" is a sound's name inside the game's sounds folder");
     }
+    file_.voices.push_back({voice.get<std::string>(), where});
   }
 
   // How it goes on: "next", "end": true, or (a node) "choices"; one of them.

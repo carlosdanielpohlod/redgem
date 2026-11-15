@@ -492,7 +492,8 @@ sword.set_parent(hand, keep_world: false)         # its pose in the old parent, 
 
 `parent` reads it back. An object never goes under itself or anything it carries (an
 `ArgumentError`), nor under a template, and a vehicle's wheel stays on it. A kinematic body or a
-trigger under a parent goes where the parent takes it. A dynamic body, a character and a vehicle
+trigger under a parent goes where the parent takes it. A character passes through the kinematic bodies under it: a box in its hand never
+pushes it, and it cannot stand on one nor collide with it (no `on_collision` between them). A dynamic body, a character and a vehicle
 are simulated in the world: the parent does not carry them, and under it they keep their own
 motion (make a body kinematic, with `rigidbody.kinematic = true`, to carry it). A static collider
 stays where it was made. When `keep_world: false` moves a body, it is taken to its new place and
@@ -1026,6 +1027,22 @@ down, and come back once every voice is quiet. `Audio.ducking` says how far and 
 Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0) # lower, slower to come back
 Audio.ducking(volume: Audio::NO_DUCKING)               # off
 ```
+
+A game adds groups of its own under the engine's, each heard at its volume times the volumes over
+it, and puts effects on a group: a low-pass that muffles its sounds and a reverb they echo in. The
+groups under it get them too (the lowest cutoff, and the reverb of the nearest group that has one):
+
+```ruby
+Audio.group(:cave, parent: :effects, volume: 0.8)
+Audio.effects(:cave, low_pass: 2_000, reverb: 0.4)   # Hz; 0 to 1 of each sound goes to the reverb
+Audio.play_at(:drip, position, group: :cave)
+Audio.effects(:cave)                                 # off again
+```
+
+The engine follows how loud each voice is as it plays, from its own samples (before its volume):
+`Audio.loudness(handle)` is 0 to 1 for a sound of the `:voice` group or a group under it, and 0 for the others. A `VoiceMouth` opens a
+speaker's mouth with it (see [Dialogue](dialogue.md#voice)), and a dialogue line's voice plays in
+this group.
 
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one

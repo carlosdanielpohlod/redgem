@@ -5,7 +5,7 @@
 #   {
 #     "start": "hello",
 #     "nodes": {
-#       "hello": { "speaker": "baker.name", "text": "baker.hello", "voice": "baker/hello.ogg",
+#       "hello": { "speaker": "baker.name", "text": "baker.hello", "voice": "baker/hello",
 #                  "choices": [
 #                    { "text": "baker.buy", "if": [{ "var": "gold", "at_least": 5 }],
 #                      "effects": [{ "add": "gold", "by": -5 }, { "set": "has_bread", "to": true }],
@@ -15,8 +15,9 @@
 #     }
 #   }
 #
-# A node has a "text", maybe a "speaker" (the key of the name shown) and a "voice" (a sound kept for
-# later: nothing plays it yet), and goes on in one way: "next" (a node, or a list of branches, the
+# A node has a "text", maybe a "speaker" (the key of the name shown) and a "voice" (a sound in
+# sounds/, named as Audio.play names it: it plays from the speaker's head, and the line goes on as it
+# ends; see Dialogue::Voice), and goes on in one way: "next" (a node, or a list of branches, the
 # first whose "if" holds: [{ "if": [...], "next": "a" }, { "next": "b" }]), "choices", or
 # "end": true. "start" goes as "next" does. Its "effects" happen as it is reached; a choice's, as it
 # is chosen. A condition reads a { "var": name } or a { "quest": name } and holds when the value
@@ -68,6 +69,10 @@ module Dialogue
 
     # Ends the conversation this machine's player is in.
     def stop = @current&.stop
+
+    # Called by the engine every frame: the line of this machine's player's conversation goes on
+    # as its voice clip ends.
+    def __update(_dt) = @current&.__update
 
     # :start, :line and :end |conversation| (this machine's player's), and :event |name, data,
     # conversation| (where effects happen: the host).

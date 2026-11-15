@@ -17,7 +17,7 @@ namespace {
 constexpr mrb_int kLimitEnds = 2;  // [low, high]
 
 mrb_value option(mrb_state* mrb, mrb_value options, const char* key) {
-  return mrb_hash_get(mrb, options, mrb_symbol_value(mrb_intern_cstr(mrb, key)));
+  return mrb_hash_get(mrb, options, mrb_symbol_value(symbol(mrb, key)));
 }
 
 float number_or(mrb_state* mrb, mrb_value options, const char* key, float fallback) {

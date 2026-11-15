@@ -48,6 +48,7 @@ struct DialogueFile {
   std::vector<NameUse> texts;         // the I18n keys it shows
   std::vector<NameUse> quests;        // the quests its conditions and effects name
   std::vector<StageUse> stages;       // the stages of quests they name
+  std::vector<NameUse> voices;        // the sounds its lines' voices play
 
   bool ok() const { return errors.empty(); }
 };
