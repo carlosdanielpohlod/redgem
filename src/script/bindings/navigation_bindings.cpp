@@ -1,5 +1,6 @@
 // The Navigation module's natives: paths through the level, the nearest walkable point, and the
-// walkable cells drawn for a frame (ruby/engine/navigation.rb builds the methods games call).
+// walkable cells drawn for a frame (ruby/engine/navigation.rb builds the methods games call). Those
+// of crowds are in navigation_crowd_bindings.cpp.
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -13,6 +14,7 @@
 #include "render/debug_draw.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/bindings/navigation_crowd.hpp"
 
 namespace redgem {
 namespace {
@@ -24,18 +26,7 @@ constexpr float kDrawLift = 0.03f;            // how far above its ground a cell
 constexpr float kDrawFill = 0.8f;             // the share of a cell's width its square covers
 constexpr std::size_t kMaxDrawnCells = 2048;  // half of a frame's debug shapes
 
-// Whether the scene's grid is still to be baked, by an engine that can.
-bool bake_due(const Navigation& navigation, const ScriptContext& game) {
-  return !navigation.baked() && static_cast<bool>(game.bake_navigation);
-}
-
-// The running scene's navigation, its grid baked first when it is not yet.
-const Navigation& navigation(mrb_state* mrb) {
-  ScriptContext& game = context(mrb);
-  const Navigation& found = required(mrb, game.navigation, "Navigation is only available in a running game");
-  if (bake_due(found, game)) game.bake_navigation();
-  return found;
-}
+const Navigation& navigation(mrb_state* mrb) { return baked_navigation(mrb); }
 
 mrb_value points_value(mrb_state* mrb, const std::vector<Vec3>& points) {
   mrb_value list = mrb_ary_new_capa(mrb, static_cast<mrb_int>(points.size()));
@@ -57,13 +48,13 @@ mrb_value report_value(mrb_state* mrb, const NavBakeReport& report) {
   return result;
 }
 
-// __path(from, to): the waypoints, or nil.
+// __path(from, to, avoid): the waypoints around the bodies of `avoid` (game objects), or nil.
 mrb_value navigation_path(mrb_state* mrb, mrb_value) {
-  mrb_value from, to;
-  mrb_get_args(mrb, "oo", &from, &to);
+  mrb_value from, to, avoid;
+  mrb_get_args(mrb, "ooo", &from, &to, &avoid);
   const Vec3 start = to_vec3(mrb, from);
   const Vec3 goal = to_vec3(mrb, to);
-  const std::optional<std::vector<Vec3>> found = navigation(mrb).path(start, goal);
+  const std::optional<std::vector<Vec3>> found = navigation(mrb).path(start, goal, obstacles_arg(mrb, avoid));
   return found ? points_value(mrb, *found) : mrb_nil_value();
 }
 
@@ -174,12 +165,13 @@ mrb_value navigation_draw(mrb_state* mrb, mrb_value) {
 
 void install_navigation_bindings(mrb_state* mrb) {
   RClass* module = mrb_define_module(mrb, "Navigation");
-  mrb_define_module_function(mrb, module, "__path", navigation_path, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, module, "__path", navigation_path, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, module, "__nearest", navigation_nearest, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "__walkable", navigation_walkable, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "__draw", navigation_draw, MRB_ARGS_REQ(kDrawArgs));
   mrb_define_module_function(mrb, module, "bake", navigation_bake, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, module, "stats", navigation_stats, MRB_ARGS_NONE());
+  install_navigation_crowd_bindings(mrb, module);
 }
 
 }  // namespace redgem
