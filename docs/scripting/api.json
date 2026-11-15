@@ -5721,7 +5721,7 @@
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
-            {"name": "block", "type": "^(Quests::Quest) -> boolish", "block": true}
+            {"name": "block", "type": "^(Quests::Quest) -> bool", "block": true}
           ],
           "returns": {"type": "untyped"},
           "about": "a check of the game's own, for the objectives {\"check\": name}: |quest| true once it is passed (asked every frame on the host)"
