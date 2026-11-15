@@ -260,16 +260,16 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): crowds, the dialogue box, voice, missions,
+The 1.0 blockers still open (see the 1.0 cut plan): crowds, voice, missions,
 the editor's support for them, a stable API, a multi-level multiplayer template, the packed
 Android app on the emulator, and the test cases still on the real clock.
 
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md): there is no voice or mission system yet. Dialogue
-  has no box or choice list on screen yet (a game draws its own from `Dialogue.current`), a line's
-  `voice` plays nothing, and quest stages are GameVariables until a game gives `Dialogue.quests`.
+  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox: there is no voice or
+  mission system yet. A line's `voice` plays nothing, and quest stages are GameVariables until a
+  game gives `Dialogue.quests`.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
   cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
@@ -278,7 +278,7 @@ Android app on the emulator, and the test cases still on the real clock.
   while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
   the scene loads.
 - A dialogue line's voice clip does not play from the speaker's head: there are no subtitles timed
-  to it, the music does not duck while someone speaks, and no mouth follows it.
+  to it, and no mouth follows it.
 - There are no quest files or mission objectives: no journal page in `GameMenu`, no world markers
   or on-screen pointer to the current objective, and no quest state shared by a party in
   multiplayer.
@@ -409,7 +409,9 @@ promise of how it will be closed.
 - A dialogue's texts take no placeholder values, and GameVariables hold only nil, true, false,
   numbers and texts (at most 1024 of them), which a game saves itself. A machine has one
   conversation at a time (two local players cannot talk at once), and over the network a speaker
-  without a NetworkSync is found on the client by its name.
+  without a NetworkSync is found on the client by its name. The DialogueBox has one look (a game
+  that wants another draws its own from `Dialogue.current`) and does not stop the hero while it
+  shows.
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see
   [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
   used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one

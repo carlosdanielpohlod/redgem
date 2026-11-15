@@ -30,6 +30,10 @@ until 1.0, a release may change what games rely on (see
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. Quest stages are variables until a game sets
   `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):

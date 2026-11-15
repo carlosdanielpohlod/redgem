@@ -1361,6 +1361,8 @@ class Dialogue::Conversation
   def node: () -> (Hash[String, untyped] | nil)
   # the id of the node it is at, or nil
   def node_id: () -> (String | nil)
+  # how many lines it has shown (a line it comes back to counts again)
+  def steps: () -> Integer
   # its dialogue
   def script: () -> Dialogue::Script
   # the hero of the player in it
@@ -1415,6 +1417,18 @@ end
 class Talkable < Behaviour
   # the name of its dialogue file
   def dialogue: () -> (String | nil)
+end
+
+# A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.
+class DialogueBox < Behaviour
+  # how many of a line's letters show after that many seconds at that speed (0: all)
+  def self.letters_shown: (Integer letters, Float seconds, Float speed) -> Integer
+  # whether the line it shows has all of its letters out (true while it shows none)
+  def whole?: () -> bool
+  # the player whose gamepad works it (0 unless said)
+  def pad: () -> Integer
+  # how fast a line appears (45 unless said; 0: at once)
+  def letters_per_second: () -> Float
 end
 
 # Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.

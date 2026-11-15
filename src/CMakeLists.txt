@@ -60,6 +60,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_conversation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb

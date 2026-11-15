@@ -58,6 +58,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. |
 | [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. |
 | [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. |
+| [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
 | [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
@@ -938,6 +939,7 @@ One player's way through a dialogue: the line it is at, the choices offered, and
 - `over? -> bool`: whether it ended
 - `node -> Hash[String, untyped] | nil`: the node it is at, or nil once it is over
 - `node_id -> String | nil`: the id of the node it is at, or nil
+- `steps -> Integer`: how many lines it has shown (a line it comes back to counts again)
 - `script -> Dialogue::Script`: its dialogue
 - `actor -> GameObject | nil`: the hero of the player in it
 - `speaker -> GameObject | nil`: who talks to that player, or nil
@@ -977,6 +979,15 @@ The values every player shares, which dialogue conditions read and effects chang
 A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. See [dialogue.md](dialogue.md).
 
 - `dialogue -> String | nil`: the name of its dialogue file
+
+## DialogueBox
+
+A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
+
+- `DialogueBox.letters_shown(Integer letters, Float seconds, Float speed) -> Integer`: how many of a line's letters show after that many seconds at that speed (0: all)
+- `whole? -> bool`: whether the line it shows has all of its letters out (true while it shows none)
+- `pad -> Integer`: the player whose gamepad works it (0 unless said)
+- `letters_per_second -> Float`: how fast a line appears (45 unless said; 0: at once)
 
 ## Interaction
 
