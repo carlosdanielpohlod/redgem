@@ -117,7 +117,8 @@ std::string drawable_letters(const FaceRun& run, const HasGlyph& has_glyph) {
   return kept;
 }
 // Each face's letters in one string, so its atlas grows once for the whole text.
-std::vector<std::string> letters_by_face(std::size_t faces, const std::vector<FaceRun>& runs, const HasGlyph& has_glyph) {
+std::vector<std::string> letters_by_face(std::size_t faces, const std::vector<FaceRun>& runs,
+                                         const HasGlyph& has_glyph) {
   std::vector<std::string> letters(faces);
   for (const FaceRun& run : runs) {
     if (!is_line_break(run.text)) letters[run.face] += drawable_letters(run, has_glyph);

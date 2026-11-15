@@ -27,7 +27,7 @@ constexpr int kHdrFormat = PIXELFORMAT_UNCOMPRESSED_R16G16B16A16;  // linear lig
 // The adapted exposure, in full floats: in half floats a frame's small step toward the target is
 // rounded away and the exposure stops short of it.
 constexpr int kExposureFormat = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;
-constexpr int kScreenFormat = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;   // what ends up on screen
+constexpr int kScreenFormat = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;  // what ends up on screen
 
 // A depth texture (not a render buffer: the ambient occlusion pass and the lit shader read
 // depth), attached to the framebuffer being set up.
