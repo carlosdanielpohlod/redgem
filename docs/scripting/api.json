@@ -9,6 +9,8 @@
     "Camera::Follow",
     "Camera::Rig",
     "Camera::Shake",
+    "Dialogue::Rules",
+    "Dialogue::VariableQuests",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -5245,6 +5247,353 @@
         "update"
       ],
       "guide": "interaction.md"
+    },
+    {
+      "name": "Dialogue",
+      "kind": "module",
+      "about": "Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.",
+      "methods": [
+        {
+          "name": "start",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol | Dialogue::Script"},
+            {"name": "actor", "type": "GameObject", "keyword": true},
+            {"name": "speaker", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Dialogue::Conversation | bool"},
+          "about": "starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client"
+        },
+        {
+          "name": "current",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Dialogue::Conversation | nil"},
+          "about": "the conversation this machine's player is in, or nil"
+        },
+        {
+          "name": "busy?",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether this machine's player is in a conversation, or left one this frame"
+        },
+        {
+          "name": "stop",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool | nil"},
+          "about": "ends the conversation this machine's player is in"
+        },
+        {
+          "name": "on",
+          "static": true,
+          "params": [
+            {"name": "event", "type": "Symbol"},
+            {"name": "block", "type": "^(untyped, untyped, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": ":start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen"
+        },
+        {
+          "name": "load",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "the dialogue of that name, read from its file once (raises for one that is not there or not well made)"
+        },
+        {
+          "name": "quests",
+          "static": true,
+          "params": [],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages (GameVariables \"quest.<name>\" unless a game says)"
+        },
+        {
+          "name": "quests=",
+          "static": true,
+          "params": [
+            {"name": "quests", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)"
+        }
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "Dialogue::Conversation",
+      "kind": "class",
+      "about": "One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.",
+      "methods": [
+        {
+          "name": "text",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the line, in the language in use (nil once it is over)"
+        },
+        {
+          "name": "text_key",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of the line"
+        },
+        {
+          "name": "speaker_name",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "who says it, in the language in use (nil when the node names nobody)"
+        },
+        {
+          "name": "speaker_key",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of who says it, or nil"
+        },
+        {
+          "name": "voice",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+        },
+        {
+          "name": "choices",
+          "params": [],
+          "returns": {"type": "Array[Dialogue::Conversation::Choice]"},
+          "about": "the choices offered now: those whose conditions hold"
+        },
+        {
+          "name": "choosing?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the player answers this line by choosing"
+        },
+        {
+          "name": "continue",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "on from a line with no choices: to what follows, or the end; false when it waits for a choice"
+        },
+        {
+          "name": "choose",
+          "params": [
+            {"name": "choice", "type": "Dialogue::Conversation::Choice | Integer"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "takes a choice: its effects happen, and it goes where the choice leads; false for one not offered"
+        },
+        {
+          "name": "stop",
+          "params": [
+            {"name": "quietly", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "ends it where it is (quietly: without telling the host)"
+        },
+        {
+          "name": "over?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it ended"
+        },
+        {
+          "name": "node",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node it is at, or nil once it is over"
+        },
+        {
+          "name": "node_id",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the id of the node it is at, or nil"
+        },
+        {
+          "name": "script",
+          "params": [],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "its dialogue"
+        },
+        {
+          "name": "actor",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the hero of the player in it"
+        },
+        {
+          "name": "speaker",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "who talks to that player, or nil"
+        },
+        {
+          "name": "deciding?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether its effects happen on this machine (offline, and on the host)"
+        }
+      ],
+      "internal": [
+        "begin",
+        "inspect"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Conversation::Choice",
+      "kind": "class",
+      "about": "An answer the player may give.",
+      "methods": [
+        {
+          "name": "index",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "its place among the node's choices (what choose takes)"
+        },
+        {
+          "name": "key",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the I18n key of its text"
+        },
+        {
+          "name": "text",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its text, in the language in use"
+        }
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Script",
+      "kind": "class",
+      "about": "A dialogue file as it was read.",
+      "methods": [
+        {
+          "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its name: that of its file in dialogues/, without .json"
+        },
+        {
+          "name": "start",
+          "params": [],
+          "returns": {"type": "String | Array[Hash[String, untyped]]"},
+          "about": "where it starts: a node's id, or branches"
+        },
+        {
+          "name": "node",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node of that id, or nil"
+        },
+        {
+          "name": "node?",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether it has a node of that id"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "GameVariables",
+      "kind": "module",
+      "about": "The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.",
+      "methods": [
+        {
+          "name": "[]",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "the value of a variable, or nil when it was never set"
+        },
+        {
+          "name": "[]=",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "sets a variable (nil, true, false, a number or a text); raises on a client"
+        },
+        {
+          "name": "to_h",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "every variable that was set, by name (what to save)"
+        },
+        {
+          "name": "replace",
+          "static": true,
+          "params": [
+            {"name": "values", "type": "Hash[String | Symbol, untyped]"}
+          ],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "puts these in the place of every variable (a save read back)"
+        },
+        {
+          "name": "on_change",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(String, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "|name, value| on every change"
+        },
+        {
+          "name": "value?",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can hold a value"
+        },
+        {
+          "name": "name?",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can be called so"
+        }
+      ],
+      "guide": "dialogue.md#gamevariables"
+    },
+    {
+      "name": "Talkable",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt \"Talk\" when it has none) starts its dialogue.",
+      "methods": [
+        {
+          "name": "dialogue",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the name of its dialogue file"
+        }
+      ],
+      "internal": [
+        "start",
+        "on_interact"
+      ],
+      "guide": "dialogue.md"
     },
     {
       "name": "Interaction",

@@ -1,0 +1,22 @@
+{
+  "start": [
+    { "if": [{ "var": "tree_watered", "is": true }], "next": "again" },
+    { "next": "hello" }
+  ],
+  "nodes": {
+    "hello": {
+      "speaker": "tree.name",
+      "text": "tree.hello",
+      "choices": [
+        {
+          "text": "tree.water",
+          "effects": [{ "set": "tree_watered", "to": true }, { "add": "tree_waterings", "by": 1 }],
+          "next": "thanks"
+        },
+        { "text": "tree.bye", "end": true }
+      ]
+    },
+    "thanks": { "speaker": "tree.name", "text": "tree.thanks", "end": true },
+    "again": { "speaker": "tree.name", "text": "tree.again", "end": true }
+  }
+}
