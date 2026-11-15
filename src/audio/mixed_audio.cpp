@@ -17,11 +17,34 @@ bool MixedAudio::set_sound_levels(SoundSourceId id, const SoundLevels& levels) {
 }
 bool MixedAudio::sound_playing(SoundSourceId id) const { return sounds_.playing(id); }
 bool MixedAudio::stop_sound(SoundSourceId id) { return sounds_.stop(id); }
+float MixedAudio::sound_loudness(SoundSourceId id) const { return sounds_.loudness(id); }
 void MixedAudio::stop_sounds() { sounds_.clear(); }
 
 void MixedAudio::set_group_volume(MixGroup group, float volume) {
   sounds_.set_group_volume(group, volume);
   if (group == MixGroup::Music) music_.set_group_volume(volume);
+}
+
+std::optional<MixGroup> MixedAudio::define_group(const std::string& name, MixGroup parent,
+                                                 std::optional<float> volume) {
+  const auto group = AudioSystem::define_group(name, parent, volume);
+  if (!group) return group;
+  sounds_.refresh();  // (a group that moved is heard under its new parent, with its effects)
+  sounds_.refresh_effects();
+  return group;
+}
+
+bool MixedAudio::set_group_effects(MixGroup group, const GroupEffects& effects) {
+  if (!AudioSystem::set_group_effects(group, effects)) return false;
+  sounds_.refresh_effects();
+  return true;
+}
+
+void MixedAudio::forget_game_groups() {
+  AudioSystem::forget_game_groups();
+  sounds_.refresh();
+  sounds_.refresh_effects();
+  sounds_.close_reverbs();
 }
 
 bool MixedAudio::set_music_ducking(const MusicDucking& ducking) { return ducker_.set(ducking); }
@@ -39,6 +62,7 @@ void MixedAudio::set_music_volume(float volume) { music_.set_volume(volume); }
 
 void MixedAudio::update(float seconds) {
   sounds_.update();  // (a voice that ended no longer ducks)
+  sounds_.follow(seconds);
   duck(seconds);
   music_.update(seconds);
 }

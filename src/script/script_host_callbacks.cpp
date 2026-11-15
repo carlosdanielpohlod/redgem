@@ -14,6 +14,8 @@ namespace {
 constexpr const char* kStartEntry = "start";            // initialization must finish before an instance can resume
 constexpr const char* kUpdateEntry = "__update";        // Behaviour#__update: its timers, then its update
 constexpr const char* kDestroyedEntry = "__destroyed";  // GameObject's, in the prelude
+// Dialogue.__update: the conversation of this machine's player follows its line's voice.
+constexpr const char* kDialogueModule = "Dialogue";
 
 }  // namespace
 
@@ -87,7 +89,15 @@ void ScriptHost::fixed_update(float dt) {
 
 void ScriptHost::update(float dt) {
   update_running(kUpdateEntry, dt, false);
+  update_dialogue(dt);
   restore_engine_constants();  // (after each round of callbacks: a method that set one is caught here)
+}
+
+void ScriptHost::update_dialogue(float dt) {
+  const int arena = mrb_gc_arena_save(vm_.state());
+  const RubyResult result = vm_.call(module_named(kDialogueModule), kUpdateEntry, {mrb_float_value(vm_.state(), dt)});
+  mrb_gc_arena_restore(vm_.state(), arena);
+  if (!result.ok) report_error("the dialogue's voice", result.error);
 }
 
 void ScriptHost::draw_loading(float unscaled_delta) {

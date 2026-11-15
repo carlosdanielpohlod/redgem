@@ -6,15 +6,24 @@
 //     (footsteps, shots) is never decoded again and its plays overlap. Raylib cannot loop a Sound;
 //   - a Music stream decodes as it plays, fed every frame, and loops without a gap. Loops (an
 //     engine's hum, an ambience) and the music are streams; a crossfade is two of them.
+//
+// Each sound goes through a slot of the effect rack (its group's low-pass and reverb send), and
+// the buses' reverbs go into the device's mix after every sound of a period. Raylib's processors
+// take no context, so each slot has a function of its own.
 
 #include <raylib.h>
 
+#include <array>
+#include <cstddef>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
+#include <utility>
 #include <variant>
 
 #include "audio/audio.hpp"
+#include "audio/effect_rack.hpp"
 #include "audio/game_music.hpp"
 #include "core/log.hpp"
 
@@ -101,6 +110,46 @@ std::optional<Voice> load_voice(SoundLibrary& library, const std::string& name, 
 }
 
 void spatial_mono_callback(void* buffer, unsigned frames) { spatial_mono_frames(static_cast<float*>(buffer), frames); }
+
+// One rack for the device, which is one for the process.
+EffectRack& effect_rack() {
+  static EffectRack rack;
+  return rack;
+}
+template <EffectSlot Slot>
+void slot_callback(void* buffer, unsigned frames) {
+  effect_rack().process_voice(Slot, static_cast<float*>(buffer), frames);
+}
+template <EffectSlot... Slots>
+constexpr std::array<AudioCallback, sizeof...(Slots)> slot_callbacks(std::index_sequence<Slots...> /*slots*/) {
+  return {&slot_callback<Slots>...};
+}
+constexpr auto kSlotCallbacks = slot_callbacks(std::make_index_sequence<kEffectSlots>{});
+void mix_callback(void* buffer, unsigned frames) { effect_rack().process_mix(static_cast<float*>(buffer), frames); }
+
+// A sound playing: its voice, and its slot of the rack (none when every slot is taken: it plays
+// with no effects).
+struct PlayingVoice {
+  Voice voice;
+  std::optional<EffectSlot> slot;
+  float send_volume;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
+};
+void send_volume(PlayingVoice& playing, float volume) {
+  if (!playing.slot || playing.send_volume == volume) return;
+  playing.send_volume = volume;
+  effect_rack().set_volume(*playing.slot, volume);
+}
+std::optional<EffectSlot> attach_slot(AudioStream stream) {
+  const auto slot = effect_rack().claim();
+  if (slot) AttachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
+  return slot;
+}
+// (Detached first: the audio thread no longer runs the slot once it is free again.)
+void detach_slot(AudioStream stream, std::optional<EffectSlot> slot) {
+  if (!slot) return;
+  DetachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
+  effect_rack().release(*slot);
+}
 void apply_mix(AudioStream stream, SpatialMix mix) {
   constexpr float kPanCenter = 0.5f;  // raylib uses 0 for right and 1 for left
   SetAudioStreamVolume(stream, mix.volume);
@@ -114,38 +163,120 @@ void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mi
   apply_mix(stream, mix);
 }
 
+// The meters of the voices that play: raylib calls a stream's processor with no word of which
+// stream it is, so each meter has a callback of its own, and a voice takes a free one as it starts.
+// Past kVoiceMeters voices at once, a new one waits for a meter to be free (its loudness stays 0
+// until then).
+constexpr std::size_t kVoiceMeters = 8;
+std::array<LevelMeter, kVoiceMeters> voice_meters;
+
+template <std::size_t kMeter>
+void measure_voice(void* buffer, unsigned frames) {
+  voice_meters[kMeter].measure(static_cast<const float*>(buffer), static_cast<std::size_t>(frames) * kDeviceChannels);
+}
+template <std::size_t... kMeters>
+constexpr std::array<AudioCallback, kVoiceMeters> meter_callbacks(std::index_sequence<kMeters...>) {
+  return {measure_voice<kMeters>...};
+}
+constexpr std::array<AudioCallback, kVoiceMeters> kMeterCallbacks =
+    meter_callbacks(std::make_index_sequence<kVoiceMeters>{});
+
+// Which voice has which meter.
+class VoiceMeters {
+ public:
+  // False when every meter is taken: the voice can ask again.
+  bool attach(SoundSourceId id, AudioStream stream) {
+    const auto meter = free_meter();
+    if (!meter) return false;
+    voice_meters[*meter].reset();
+    taken_[*meter] = id;
+    AttachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    return true;
+  }
+  void detach(SoundSourceId id, AudioStream stream) {
+    const auto meter = meter_of(id);
+    if (!meter) return;
+    DetachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    taken_[*meter] = kNoSoundSource;
+  }
+  float level(SoundSourceId id) const {
+    const auto meter = meter_of(id);
+    return meter ? voice_meters[*meter].level() : kSilence;
+  }
+
+ private:
+  std::optional<std::size_t> free_meter() const { return meter_of(kNoSoundSource); }
+  std::optional<std::size_t> meter_of(SoundSourceId id) const {
+    for (std::size_t meter = 0; meter < kVoiceMeters; ++meter) {
+      if (taken_[meter] == id) return meter;
+    }
+    return std::nullopt;
+  }
+
+  std::array<SoundSourceId, kVoiceMeters> taken_{};  // kNoSoundSource: free
+};
+
 class RaylibSoundDriver final : public SoundDriver {
  public:
   explicit RaylibSoundDriver(SoundLibrary& library) : library_(library) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!library_.ready()) return false;
     auto voice = load_voice(library_, name, sound.loop);
     if (!voice) return false;
     const auto stream = voice_stream(*voice);
     prepare_stream(stream, sound, mix);
-    voices_.emplace(id, *voice);
+    const auto slot = attach_slot(stream);
+    if (slot) effect_rack().set_effects(*slot, effects);
+    if (slot) effect_rack().set_volume(*slot, mix.volume);
+    voices_.emplace(id, PlayingVoice{*voice, slot, mix.volume});
     PlayAudioStream(stream);
     return true;
   }
   void update(SoundSourceId id) override {
-    if (auto* music = std::get_if<Music>(&voices_.at(id))) UpdateMusicStream(*music);
+    meter(id, stream_of(id));
+    if (auto* music = std::get_if<Music>(&voices_.at(id).voice)) UpdateMusicStream(*music);
   }
-  bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(voice_stream(voices_.at(id))); }
-  void mix(SoundSourceId id, SpatialMix mix) override { apply_mix(voice_stream(voices_.at(id)), mix); }
-  void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(voice_stream(voices_.at(id)), pitch); }
+  bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(stream_of(id)); }
+  void mix(SoundSourceId id, SpatialMix mix) override {
+    apply_mix(stream_of(id), mix);
+    send_volume(voices_.at(id), mix.volume);
+  }
+  void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(stream_of(id), pitch); }
+  void effects(SoundSourceId id, const VoiceEffects& effects) override {
+    const auto slot = voices_.at(id).slot;
+    if (slot) effect_rack().set_effects(*slot, effects);
+  }
+  void close_reverbs() override { effect_rack().close_buses(); }
+  void measure(SoundSourceId id) override {
+    unmetered_.insert(id);
+    meter(id, stream_of(id));
+  }
+  float level(SoundSourceId id) const override { return meters_.level(id); }
   void stop(SoundSourceId id) override {
     const auto found = voices_.find(id);
     if (found == voices_.end()) return;
-    const auto stream = voice_stream(found->second);
+    const auto stream = voice_stream(found->second.voice);
     StopAudioStream(stream);
     DetachAudioStreamProcessor(stream, spatial_mono_callback);  // (nothing to detach from a flat one)
-    std::visit([](const auto& voice) { unload_voice(voice); }, found->second);
+    meters_.detach(id, stream);
+    unmetered_.erase(id);
+    detach_slot(stream, found->second.slot);
+    std::visit([](const auto& voice) { unload_voice(voice); }, found->second.voice);
     voices_.erase(found);
   }
 
  private:
+  AudioStream stream_of(SoundSourceId id) const { return voice_stream(voices_.at(id).voice); }
+  // A voice being measured takes a meter as it starts, or as soon as one is free.
+  void meter(SoundSourceId id, AudioStream stream) {
+    if (unmetered_.count(id) != 0 && meters_.attach(id, stream)) unmetered_.erase(id);
+  }
+
   SoundLibrary& library_;
-  std::map<SoundSourceId, Voice> voices_;
+  std::map<SoundSourceId, PlayingVoice> voices_;
+  VoiceMeters meters_;
+  std::set<SoundSourceId> unmetered_;  // voices waiting for a meter
 };
 
 class RaylibMusicDriver final : public MusicDriver {
@@ -186,9 +317,12 @@ class RaylibDevice {
     InitAudioDevice();
     ready_ = IsAudioDeviceReady();
     if (!ready_) log::warning("no audio device: the game runs silently");
+    if (ready_) AttachAudioMixedProcessor(mix_callback);
   }
   ~RaylibDevice() {
-    if (ready_) CloseAudioDevice();
+    if (!ready_) return;
+    DetachAudioMixedProcessor(mix_callback);
+    CloseAudioDevice();
   }
   RaylibDevice(const RaylibDevice&) = delete;
   RaylibDevice& operator=(const RaylibDevice&) = delete;

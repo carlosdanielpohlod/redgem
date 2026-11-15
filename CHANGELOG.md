@@ -4,12 +4,60 @@ What changed in each release of RedGem. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every release so far is experimental:
 until 1.0, a release may change what games rely on (see
-[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)). From 1.0, a stable call of the scripting API has no
+breaking change within a 1.x minor release, and an experimental one may change in any release
+([API stability](docs/scripting/stability.md)).
+
+Each release has these parts, in this order, each only when it has something: **Migrating** (what
+to change in a game made with the release before, step by step, for every breaking change; say
+when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves the
+`[Unreleased]` part under its version and starts a new one with the same headings.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-15
+
+### Migrating
+
+From a game made with 0.5.0:
+
+- **`game.json`**: add `"studio"`. A game's save, settings, bindings and crash reports now live in
+  `<studio>/<title>/` in the player's data folder, and nothing is moved there: to keep a player's
+  save, copy their old `redgem/saves` file to `save.json` in the new folder.
+- **`Audio.play`** returns an id or `nil`: a script that compares its result with `true` or
+  `false` tests it for `nil` instead.
+- **`Game.load_scene` in a network game** returns `false` on a machine that is not the host: load
+  levels on the host, and every machine follows. Drop any use of `Network::RESEND`.
+- **Network games** are encrypted: players of this version cannot join hosts, relays or servers of
+  an earlier one. Update the relay and the server with the game.
+- **Leaves**: a scene that wants its foliage as before sets `foliage_translucency` to 0.
+- The stability marks below change no game: every class and method is now stable or
+  experimental, and what came in the last two releases is experimental (see
+  [API stability](docs/scripting/stability.md)).
+
 ### Added
 
+- **Voice**: a dialogue line's `voice` plays its clip as the line is shown, in the `:voice` group
+  (the music ducks under it), from the speaker's head bone (or the speaker) as it moves. The line
+  shows while the clip plays and goes on when it ends, unless the player skips it; a line with
+  choices waits for one. A `VoiceMouth` behaviour opens a speaker's mouth with the clip's loudness,
+  through a shape key (`morph:`) or a jaw bone (`jaw:`, `angle:`). The engine follows a voice's
+  loudness as it plays (`Audio.loudness(handle)`), `conversation.speaking?` says whether its clip
+  plays, and `Transform#local_rotation` reads and sets a rotation relative to the parent.
+  `redgem check` warns of a voice whose sound is not in `sounds/`. A voice is now named as
+  `Audio.play` names a sound, without its extension.
+- **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
+  adds a group under another (13 at most, ending with the game), and sounds play in it by name.
+  `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
+  it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
+  game's group of `:voice` ducks the music too.
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
 - **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
   `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
   plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
@@ -17,7 +65,7 @@ until 1.0, a release may change what games rely on (see
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
-  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  game (`Dialogue.on(:event)`). Each line can name a `voice`. A `Talkable`
   behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
   (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
   `GameVariables` hold the values every player shares. Over the network each player has a
@@ -25,6 +73,10 @@ until 1.0, a release may change what games rely on (see
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. Quest stages are variables until a game sets
   `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
@@ -76,6 +128,16 @@ until 1.0, a release may change what games rely on (see
   Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
   vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
   not joined yet (no shaping).
+- **Stable and experimental calls**: every class and method of the API reference is marked
+  `stable` or `experimental`, in `docs/scripting/api.json`, the manual's API page (a Stability
+  column, and *Experimental.* after what may change), `redgem api` (`(experimental)`, and a
+  `"stability"` in `--json`) and the type signatures (`%a{redgem:stable}`). From 1.0, a stable call
+  has no breaking change within a 1.x minor release. A test fails when a class or method has no
+  mark. What came in 0.4.1, 0.5.0 and since is experimental for now, and so are the NPC classes
+  (Interactable, Interactor, Interaction, Brain, Perception, LineOfSight, Talkable, HeadLook,
+  Schedule, NavAgent) and dialogue (Dialogue, DialogueBox, GameVariables, GameClock): the cameras' follow, orbit and shake, joints,
+  navigation, water, scroll lists, emitters, the debug drawing and profiling calls, save slots,
+  asynchronous scene loading, prefab spawning and movement validation, among others.
 
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
@@ -519,6 +581,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **The editor bridge says when a recovery waits**: after an editor closed without saving, the
+  next one offers to recover its edits, and that dialog made every live change fail with "editor
+  is busy" while `status` showed nothing. `status` now has `recovery_pending`, and a change refused
+  while it waits names the recovery prompt.
+- **Behaviour updates are about three times faster**: each call the engine made into Ruby (every
+  behaviour's update, every frame) and each binding on a GameObject looked up a name (the method's,
+  `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
+  them. The prelude's growth made it most of the scripts' frame. The engine now looks each name up
+  once: a frame of 1000 behaviours takes about 0.65 ms instead of 2.
+- **A character is not pushed by what it carries**: a kinematic body under a character (a box in
+  its hand) that touched its capsule pushed it, and the character, moving, took the body on with
+  it: a courier standing still drifted away, and one teleported with a parcel in hand was shoved
+  meters past where it was put. A character now passes through the kinematic bodies under it.
 - **Perception resets with each scene**: loading a scene logged "resetting the handlers of
   Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
   modules by name and Perception is a class. It now finds classes too, so a new scene starts with
@@ -939,7 +1014,8 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...v0.4.0

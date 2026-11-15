@@ -184,6 +184,8 @@ class ScriptHost {
   // Calls `entry` with the frame's seconds on every behaviour that is running (and, for
   // fixed_update, has one of its own).
   void update_running(const char* entry, float dt, bool fixed);
+  // Dialogue.__update: the line being spoken goes on as its clip ends.
+  void update_dialogue(float dt);
   // Enabled, on an object that is still there.
   bool runnable(const BehaviourSlot& slot) const;
   // A copy of where the object's behaviours are: callbacks may attach more while it is walked.
