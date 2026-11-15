@@ -56,7 +56,8 @@ constexpr const char* kNewMethod = "new";
 constexpr const char* kInitializeMethod = "initialize";
 // What is likely to change before it settles: a class under one of these names is experimental.
 constexpr const char* kExperimentalAreas[] = {"NPC",      "Brain",    "Perception", "LineOfSight",
-                                              "Interact", "Dialogue", "Quest",      "Assistant"};
+                                              "Interact", "Talkable", "HeadLook",   "Schedule",
+                                              "Dialogue", "Quest",    "Assistant"};
 
 // What Ruby says of every class and module reachable from the top, nested ones included, each
 // under its path: "Class.method" for a method of its own called on it, "Class#method" for one of

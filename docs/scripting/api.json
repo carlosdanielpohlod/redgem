@@ -9,6 +9,8 @@
     "Camera::Follow",
     "Camera::Rig",
     "Camera::Shake",
+    "Dialogue::Rules",
+    "Dialogue::VariableQuests",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -156,6 +158,15 @@
           ],
           "returns": {"type": "void"},
           "about": "a Perception on the object heard a noise"
+        },
+        {
+          "name": "on_schedule",
+          "stability": "experimental",
+          "params": [
+            {"name": "activity", "type": "Symbol"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Schedule on the object came to the hour of another activity"
         },
         {
           "name": "persist",
@@ -3021,6 +3032,64 @@
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether all its clips move the object"
+        },
+        {
+          "name": "look_at",
+          "stability": "experimental",
+          "params": [
+            {"name": "target", "type": "Vector3 | GameObject"},
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""},
+            {"name": "max_angle", "type": "Numeric", "keyword": true, "optional": true, "default": "60.0"}
+          ],
+          "returns": {"type": "void"},
+          "about": "turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away"
+        },
+        {
+          "name": "look_away",
+          "stability": "experimental",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "void"},
+          "about": "the bone goes back to its clips' pose, easing out"
+        },
+        {
+          "name": "looking?",
+          "stability": "experimental",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a bone is turned toward something, or on its way back"
+        },
+        {
+          "name": "bone",
+          "stability": "experimental",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the object under the character with that name (or that name after a rig's prefix:), or nil"
+        },
+        {
+          "name": "bone!",
+          "stability": "experimental",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
+          "about": "bone that raises when the character has none of that name"
+        },
+        {
+          "name": "bone_named?",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "part", "type": "String"},
+            {"name": "name", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a part's name is that bone's: the name, or the name after a prefix:"
         }
       ],
       "guide": "animation.md"
@@ -5786,6 +5855,399 @@
       "guide": "interaction.md"
     },
     {
+      "name": "Dialogue",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.",
+      "methods": [
+        {
+          "name": "start",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol | Dialogue::Script"},
+            {"name": "actor", "type": "GameObject", "keyword": true},
+            {"name": "speaker", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Dialogue::Conversation | bool"},
+          "about": "starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client"
+        },
+        {
+          "name": "current",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Dialogue::Conversation | nil"},
+          "about": "the conversation this machine's player is in, or nil"
+        },
+        {
+          "name": "busy?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether this machine's player is in a conversation, or left one this frame"
+        },
+        {
+          "name": "stop",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool | nil"},
+          "about": "ends the conversation this machine's player is in"
+        },
+        {
+          "name": "on",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "event", "type": "Symbol"},
+            {"name": "block", "type": "^(untyped, untyped, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": ":start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen"
+        },
+        {
+          "name": "load",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "the dialogue of that name, read from its file once (raises for one that is not there or not well made)"
+        },
+        {
+          "name": "quests",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages (GameVariables \"quest.<name>\" unless a game says)"
+        },
+        {
+          "name": "quests=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "quests", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)"
+        }
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "Dialogue::Conversation",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.",
+      "methods": [
+        {
+          "name": "text",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the line, in the language in use (nil once it is over)"
+        },
+        {
+          "name": "text_key",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of the line"
+        },
+        {
+          "name": "speaker_name",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "who says it, in the language in use (nil when the node names nobody)"
+        },
+        {
+          "name": "speaker_key",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of who says it, or nil"
+        },
+        {
+          "name": "voice",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+        },
+        {
+          "name": "choices",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Array[Dialogue::Conversation::Choice]"},
+          "about": "the choices offered now: those whose conditions hold"
+        },
+        {
+          "name": "choosing?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the player answers this line by choosing"
+        },
+        {
+          "name": "continue",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "on from a line with no choices: to what follows, or the end; false when it waits for a choice"
+        },
+        {
+          "name": "choose",
+          "stability": "experimental",
+          "params": [
+            {"name": "choice", "type": "Dialogue::Conversation::Choice | Integer"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "takes a choice: its effects happen, and it goes where the choice leads; false for one not offered"
+        },
+        {
+          "name": "stop",
+          "stability": "experimental",
+          "params": [
+            {"name": "quietly", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "ends it where it is (quietly: without telling the host)"
+        },
+        {
+          "name": "over?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it ended"
+        },
+        {
+          "name": "node",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node it is at, or nil once it is over"
+        },
+        {
+          "name": "node_id",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the id of the node it is at, or nil"
+        },
+        {
+          "name": "script",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "its dialogue"
+        },
+        {
+          "name": "actor",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the hero of the player in it"
+        },
+        {
+          "name": "speaker",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "who talks to that player, or nil"
+        },
+        {
+          "name": "deciding?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether its effects happen on this machine (offline, and on the host)"
+        }
+      ],
+      "internal": [
+        "begin",
+        "inspect"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Conversation::Choice",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "An answer the player may give.",
+      "methods": [
+        {
+          "name": "index",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "its place among the node's choices (what choose takes)"
+        },
+        {
+          "name": "key",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the I18n key of its text"
+        },
+        {
+          "name": "text",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its text, in the language in use"
+        }
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Script",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "A dialogue file as it was read.",
+      "methods": [
+        {
+          "name": "name",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its name: that of its file in dialogues/, without .json"
+        },
+        {
+          "name": "start",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | Array[Hash[String, untyped]]"},
+          "about": "where it starts: a node's id, or branches"
+        },
+        {
+          "name": "node",
+          "stability": "experimental",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node of that id, or nil"
+        },
+        {
+          "name": "node?",
+          "stability": "experimental",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether it has a node of that id"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "GameVariables",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.",
+      "methods": [
+        {
+          "name": "[]",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "the value of a variable, or nil when it was never set"
+        },
+        {
+          "name": "[]=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "sets a variable (nil, true, false, a number or a text); raises on a client"
+        },
+        {
+          "name": "to_h",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "every variable that was set, by name (what to save)"
+        },
+        {
+          "name": "replace",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "values", "type": "Hash[String | Symbol, untyped]"}
+          ],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "puts these in the place of every variable (a save read back)"
+        },
+        {
+          "name": "on_change",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(String, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "|name, value| on every change"
+        },
+        {
+          "name": "value?",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can hold a value"
+        },
+        {
+          "name": "name?",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can be called so"
+        }
+      ],
+      "guide": "dialogue.md#gamevariables"
+    },
+    {
+      "name": "Talkable",
+      "stability": "experimental",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt \"Talk\" when it has none) starts its dialogue.",
+      "methods": [
+        {
+          "name": "dialogue",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the name of its dialogue file"
+        }
+      ],
+      "internal": [
+        "start",
+        "on_interact"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
       "name": "Interaction",
       "stability": "experimental",
       "kind": "module",
@@ -6171,11 +6633,244 @@
         "on_hear",
         "on_interact",
         "on_lose_sight",
+        "on_schedule",
         "on_see",
         "thinks_here?",
         "update"
       ],
       "guide": "npcs.md#brain"
+    },
+    {
+      "name": "GameClock",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The time of day in the game's world, on game time: what schedules follow.",
+      "methods": [
+        {
+          "name": "hour",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "the hour of the day, its minutes as a fraction: 0 up to 24"
+        },
+        {
+          "name": "minute",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the minute of the hour"
+        },
+        {
+          "name": "minute_of_day",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "whole minutes since midnight: 0 up to 1439"
+        },
+        {
+          "name": "day",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the day it is, from 1"
+        },
+        {
+          "name": "to_s",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the time as \"HH:MM\""
+        },
+        {
+          "name": "set",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "hour", "type": "Integer", "keyword": true},
+            {"name": "minute", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "day", "type": "Integer", "keyword": true, "optional": true, "default": "GameClock.day"}
+          ],
+          "returns": {"type": "void"},
+          "about": "sets the time of day in whole hours and minutes (and the day, from 1)"
+        },
+        {
+          "name": "speed",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "game seconds for each second of game time (60 unless said)"
+        },
+        {
+          "name": "speed=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "changes it (0 stops the clock)"
+        },
+        {
+          "name": "state",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Float]"},
+          "about": "what to save: { seconds:, speed: }"
+        },
+        {
+          "name": "restore",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
+          ],
+          "returns": {"type": "void"},
+          "about": "back to a saved state; nil (nothing saved yet) leaves the clock as it is"
+        },
+        {
+          "name": "seconds",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds of the world's time since the first day began"
+        }
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "Schedule",
+      "stability": "experimental",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).",
+      "methods": [
+        {
+          "name": "current",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the activity it is time for, or nil"
+        },
+        {
+          "name": "plan",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "[[minute of the day, activity], ...] in the order of the day"
+        },
+        {
+          "name": "plan=",
+          "stability": "experimental",
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Hash[String, Symbol | String] | String"},
+          "about": "changes the plan: { \"06:00\" => :work } or \"06:00 work, ...\""
+        },
+        {
+          "name": "parse",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "a plan as given, in the order of the day"
+        },
+        {
+          "name": "activity_at",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "plan", "type": "Array[[Integer, Symbol]]"},
+            {"name": "minute_of_day", "type": "Integer"}
+          ],
+          "returns": {"type": "Symbol | nil"},
+          "about": "what a plan says for a minute of the day"
+        },
+        {
+          "name": "minute_of",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "time", "type": "String"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "\"06:30\" as minutes of the day (390)"
+        }
+      ],
+      "internal": [
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "HeadLook",
+      "stability": "experimental",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.",
+      "methods": [
+        {
+          "name": "target",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "what it looks at instead of the heroes, or nil"
+        },
+        {
+          "name": "target=",
+          "stability": "experimental",
+          "params": [
+            {"name": "target", "type": "GameObject | Vector3 | nil"}
+          ],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "sets it (nil: the heroes)"
+        },
+        {
+          "name": "nearest_hero",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the nearest hero in range and in front of it, or nil"
+        },
+        {
+          "name": "bone",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "GameObject"},
+          "about": "the head's bone"
+        },
+        {
+          "name": "range",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters to a hero (4 unless said)"
+        },
+        {
+          "name": "angle",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "degrees off its forward a hero may be at, and the most the head turns (70 unless said)"
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#head-look-at"
     }
   ]
 }

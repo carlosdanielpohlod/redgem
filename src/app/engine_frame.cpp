@@ -161,6 +161,7 @@ void Engine::update_frame(float delta) {
   hand_on_animation_events();
   scripts_->update(delta);
   process_destroyed();
+  head_aims_.apply(scene_, delta);  // heads turn on top of the clips' pose and the scripts'
   if (context_.renders_particles) particle_emitters_.advance(delta, scene_, particles_);
 }
 
