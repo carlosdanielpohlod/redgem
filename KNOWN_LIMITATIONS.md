@@ -117,8 +117,22 @@ the same pull request.
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
-  probes or baked lighting, so interiors and deep shade are lit by the sky. Exposure is a fixed
-  environment property; there is no eye adaptation.
+  probes or baked lighting, so interiors and deep shade are lit by the sky. Baked lightmaps are a
+  planned follow-up.
+- Auto exposure (`auto_exposure = true`) measures the whole picture, every pixel alike: there is
+  no metering that favors the middle of the picture, no histogram that leaves out the darkest and
+  brightest pixels, and no exposure for a part of the screen (a minimap). It samples a 256 x 256
+  grid of the picture rather than every pixel, so at high resolutions a small, very bright spot
+  (a glint, a distant lamp) can fall between samples as the camera moves; the slow adaptation
+  hides most of it. Its state is one per
+  renderer: a game drawn through two cameras in the same frame (a split screen) shares one
+  exposure, which starts anew whenever the camera drawn changes. It has been seen on desktop
+  OpenGL only.
+- Leaves lit from behind (`foliage_translucency`) take the sun's light only, through every
+  textured cut-out or blended material alike, as if each were a thin leaf: point and spot lights
+  do not shine through, there is no per-material thickness or translucency map, and a fence
+  drawn as a cut-out glows in the sun the same way. Far-away foliage is still each copy's own
+  mesh: impostors and a separate far-grass layer are planned follow-ups.
 - A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
@@ -282,8 +296,9 @@ not a promise of how it will be closed.
   `Input.rumble?` is false. A capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
-- Text fields take single key presses: there is no input-method composition, so languages typed
-  through a composition window cannot be entered even with a game font that draws them.
+- Text fields take single key presses: there is no input-method composition (pre-edit text), so
+  languages typed through a composition window cannot be entered even with a game font that draws
+  them. raylib 5.5 and the GLFW 3.4 inside it expose no pre-edit text to build it on.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
   hyphenation, no line-breaking rules of scripts written without spaces). Sizes scale with the
   screen from one reference screen (game.json's `"ui"`) and one player multiplier
@@ -312,10 +327,22 @@ not a promise of how it will be closed.
 
 ### Text
 
-- Text uses individual Unicode glyphs without bidirectional layout, complex-script shaping or
-  automatic font fallback chains. The built-in font supports its own glyphs; other scripts, such as
-  CJK, need a game-provided font. Each face caches at most 2048 codepoints; four named game fonts
-  can be cached at once, with at most 32 MB per font file. Unsupported glyphs show a question mark.
+- Text uses individual Unicode glyphs without complex-script shaping: Arabic letters are drawn in
+  their isolated forms (not joined), Indic scripts without their conjuncts or reordered vowels, and
+  there are no ligatures or kerning. Right-to-left text is put in its order on screen
+  (the Unicode Bidirectional Algorithm, with SheenBidi) one line at a time; the line breaks
+  `UI.wrap` chooses are made before that ordering, and each wrapped line goes the way of its own
+  first strong letter, so a line of a right-to-left paragraph that starts with a number or a Latin
+  word is laid out left to right. A right-to-left line is still placed by its left edge (use
+  `align: :right`). Texts over 64 KB are drawn as written.
+- The built-in font supports its own glyphs; other scripts, such as CJK, need a game-provided font,
+  and a fallback chain (`UI.font = [:latin, :cjk, :emoji]`) of at most four game faces, then the
+  built-in one, draws each letter with the first face that has it. Color emoji faces (bitmap or
+  color tables) are not drawn: only outline (monochrome) emoji faces. Each face caches at most 2048
+  codepoints; four named game fonts can be cached at once, with at most 32 MB per font file. The
+  faces of a chain are placed by the top of their line, not lined up on one baseline.
+  Glyphs no face of the chain has (or that a full face has no room for) show as the built-in
+  face's question mark.
 
 ### Gameplay API
 
@@ -463,6 +490,21 @@ not a promise of how it will be closed.
 
 ### Engineering
 
+- Rendering and scripts run on one thread. Physics does too unless game.json's `physics.threads`
+  asks for more: then Jolt's thread pool solves each step, and each frame's last fixed step runs on
+  a thread of its own while the frame is drawn (scripts never run during it). There is no separate
+  render thread yet: drawing a frame while the next one's scripts run is a later step, as is a
+  thread count chosen from the player's machine (the setting is the game's, fixed, not "auto").
+- With `physics.threads` above 1, the frame drawn is one physics step behind the world, and
+  contact callbacks and `Time.elapsed` reach scripts at the start of the next frame. Anything that
+  asks the world something between frames (the editor's physics view, a tool) waits for the step
+  under way. The equality of results with one thread and with several is tested on the CI's Linux
+  runners; it rests on Jolt's determinism, not on a promise of the engine's across platforms.
+- The profiler's Physics phase counts only the time a frame waits for its overlapped step, not the
+  step itself on the physics thread. Every scene gets a new thread pool, made when it loads.
+  A dedicated server's rooms ignore `physics.threads`.
+- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
+  most on phones.
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
 - Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
   Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.

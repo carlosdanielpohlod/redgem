@@ -77,6 +77,7 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::morph_vertices, shaders::kMorphVertices},
     {&LitUniforms::morph_texels, shaders::kMorphTexels},
     {&LitUniforms::wind, shaders::kWindAmount},
+    {&LitUniforms::foliage_translucency, shaders::kFoliageTranslucency},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
     {&LitUniforms::frame_texels, shaders::kFrameTexels},
     {&LitUniforms::reflection_map, shaders::kReflectionMap},

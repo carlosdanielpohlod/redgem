@@ -12,6 +12,7 @@
 #include "physics/body_config.hpp"
 #include "physics/body_limit.hpp"
 #include "physics/debug_geometry.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -235,8 +236,11 @@ class PhysicsWorld {
   virtual float hinge_angle(JointId joint) const = 0;
 };
 
-// A world of at most `max_bodies` bodies (physics/body_limit.hpp; kept within its bounds).
+// A world of at most `max_bodies` bodies (physics/body_limit.hpp; kept within its bounds), whose
+// steps `threads` solve (see config::kDefaultPhysicsThreads): every count gives the same world,
+// step after step; more only finish a step of a large one sooner.
 std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {},
-                                                        std::uint32_t max_bodies = kDefaultMaxBodies);
+                                                        std::uint32_t max_bodies = kDefaultMaxBodies,
+                                                        int threads = config::kDefaultPhysicsThreads);
 
 }  // namespace redgem

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/frame_budget.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
@@ -83,6 +84,9 @@ class Renderer {
   GpuTimings gpu_timings() const;
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
+  // What the game's camera changes of the scene's auto exposure (see Camera.auto_exposure in Ruby):
+  // what it leaves empty follows the scene's environment.
+  void set_auto_exposure(const AutoExposureOverrides& overrides);
   // Where the camera of the next frames is against the water: under it, they look underwater.
   void set_underwater(const UnderwaterView& view);
   // The most the scene's environment and its scattered copies get of what they ask for (the
