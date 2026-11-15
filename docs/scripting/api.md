@@ -59,6 +59,11 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. |
 | [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. |
 | [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. |
+| [`Quests`](#quests) | The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them. |
+| [`Quests::Quest`](#questsquest) | One quest and where the party is in it (Quests[name] gives one). |
+| [`Quests::Objective`](#questsobjective) | One thing the party does in a stage of a quest. |
+| [`Quests::Definition`](#questsdefinition) | A quest file as it was read. |
+| [`QuestTracker`](#questtracker) | A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. |
 | [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
@@ -937,7 +942,7 @@ Conversations written in dialogue files (dialogues/<name>.json): lines, choices,
 - `Dialogue.stop -> bool | nil`: ends the conversation this machine's player is in
 - `Dialogue.on(Symbol event) { (untyped, untyped, untyped) -> void } -> void`: :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
 - `Dialogue.load(String | Symbol name) -> Dialogue::Script`: the dialogue of that name, read from its file once (raises for one that is not there or not well made)
-- `Dialogue.quests -> untyped`: what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+- `Dialogue.quests -> untyped`: what reads and moves quest stages (Quests unless a game says)
 - `Dialogue.quests = untyped quests`: what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
 
 ## Dialogue::Conversation
@@ -997,6 +1002,83 @@ The values every player shares, which dialogue conditions read and effects chang
 A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. See [dialogue.md](dialogue.md).
 
 - `dialogue -> String | nil`: the name of its dialogue file
+
+## Quests
+
+The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them. See [quests.md](quests.md).
+
+- `Quests[String | Symbol name] -> Quests::Quest`: the quest of that name, started or not (raises for one with no file)
+- `Quests.load(String | Symbol name) -> Quests::Definition`: the quest file of that name, read once (raises for one that is not there or not well made)
+- `Quests.started -> Array[Quests::Quest]`: every quest that started, completed ones too
+- `Quests.active -> Array[Quests::Quest]`: every quest under way: started, and not complete
+- `Quests.completed -> Array[Quests::Quest]`: every quest that is complete
+- `Quests.stage(String | Symbol name) -> String | nil`: the stage a quest is at, or nil while it has not started
+- `Quests.start(String | Symbol name) -> bool`: starts a quest at its first stage (false when it had started); raises on a client
+- `Quests.set_stage(String | Symbol name, String | nil stage, Dialogue::Conversation | nil conversation = nil) -> String | nil`: moves a quest to a stage (nil: not started), its objectives from nothing; raises on a client and for a stage it has not
+- `Quests.reset(String | Symbol name) -> String | nil`: as if the quest never started
+- `Quests.collected(String | Symbol item, Integer count = 1) -> bool`: the players collected items: for the collect objectives (on a client, told to the host)
+- `Quests.delivered(String | Symbol item, to: GameObject | String, count: Integer = 1) -> bool`: the players delivered items to someone: for the deliver objectives
+- `Quests.defeated(GameObject | String who, Integer count = 1) -> bool`: the players defeated someone (an object, or its name): for the defeat objectives
+- `Quests.reached(GameObject | String place) -> bool`: a hero reached a place (an object, or its name): for the go_to objectives (a QuestTracker says it)
+- `Quests.check(String | Symbol name) { (Quests::Quest) -> bool } -> untyped`: a check of the game's own, for the objectives {"check": name}: |quest| true once it is passed (asked every frame on the host)
+- `Quests.on(Symbol event) { (untyped, untyped, untyped) -> void } -> void`: events: :start and :complete |quest|, :stage |quest, stage, from|, :objective |quest, objective|, :change |quest|
+- `Quests.to_h -> Hash[String, Hash[String, untyped]]`: the quests that started, for Save: {"bread" => {"stage" => "bring", "progress" => [2, 0]}}
+- `Quests.replace(Hash[String | Symbol, untyped] | nil saved) -> Hash[String, Hash[String, untyped]]`: puts these in the place of every quest's state (a save read back; a stage the file no longer has is left out); raises on a client
+- `Quests.save(Symbol | String key = :quests) -> untyped`: Save.set(key, Quests.to_h)
+- `Quests.restore(Symbol | String key = :quests) -> Hash[String, Hash[String, untyped]]`: Quests.replace(Save.get(key, {}))
+
+## Quests::Quest
+
+One quest and where the party is in it (Quests[name] gives one). See [quests.md#where-the-party-is](quests.md#where-the-party-is).
+
+- `name -> String`: its name: that of its file in quests/, without .json
+- `definition -> Quests::Definition | nil`: its file as read (nil for a quest with no file)
+- `stage -> String | nil`: the stage it is at, or nil while it has not started
+- `started? -> bool`: whether it started
+- `complete? -> bool`: whether it reached a stage that ends it
+- `active? -> bool`: started, and not complete
+- `title -> String | nil`: its title, in the language in use
+- `description -> String | nil`: its description, in the language in use, or nil
+- `stage_text -> String | nil`: the text of the stage it is at, or nil
+- `objectives -> Array[Quests::Objective]`: the objectives of the stage it is at
+- `next_stage -> String | nil`: the stage it goes to once its objectives are done, or nil
+
+## Quests::Objective
+
+One thing the party does in a stage of a quest. See [quests.md#objectives](quests.md#objectives).
+
+- `quest -> Quests::Quest`: the quest it is of
+- `index -> Integer`: its place among the stage's objectives
+- `kind -> Symbol`: :go_to, :talk_to, :deliver, :collect, :defeat or :check
+- `target -> String`: what it names: a place, someone, an item or a check
+- `count -> Integer`: how many it takes (1 unless the file says)
+- `progress -> Integer`: how many it has
+- `done? -> bool`: whether it has as many as it takes
+- `text -> String`: its text, in the language in use, with {progress} and {count} filled in
+- `radius -> Float | Integer`: a go_to's meters from its place (2 unless the file says)
+- `recipient -> String | nil`: a deliver's: who the items go to
+- `dialogue -> String | nil`: a talk_to's: the dialogue it must be, or nil
+- `node -> String | nil`: a talk_to's: the node it must reach, or nil
+- `data -> Hash[String, untyped]`: its line in the file
+
+## Quests::Definition
+
+A quest file as it was read. See [quests.md](quests.md).
+
+- `name -> String`: its name
+- `title_key -> String`: the I18n key of its title
+- `description_key -> String | nil`: the I18n key of its description, or nil
+- `start -> String`: the stage it starts at
+- `stage(String id) -> Hash[String, untyped] | nil`: the stage of that id (its line in the file), or nil
+- `stage?(String | nil id) -> bool`: whether it has a stage of that id
+- `stage_ids -> Array[String]`: the ids of its stages
+- `end?(String | nil id) -> bool`: whether reaching that stage completes the quest
+- `objectives(String | nil id) -> Array[Hash[String, untyped]]`: the objectives of a stage, as the file has them
+
+## QuestTracker
+
+A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. See [quests.md](quests.md).
+
 
 ## DialogueBox
 
