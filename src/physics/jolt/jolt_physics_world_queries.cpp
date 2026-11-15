@@ -28,8 +28,6 @@ namespace {
 // A ray with no direction or no length: it cannot hit anything.
 bool goes_nowhere(Vec3 direction, float max_distance) { return length(direction) <= kEpsilon || max_distance <= 0.0f; }
 
-// The bodies of the objects a query was told to ignore, and every moving one when it looks at
-// static bodies only.
 // Which bodies a query looks at: all, the static ones alone (the level), or those that move alone.
 enum class BodyKinds { All, Statics, Moving };
 
@@ -41,6 +39,7 @@ bool of_kinds(const JPH::Body& body, BodyKinds kinds) {
   return true;
 }
 
+// The bodies of the objects a query was told to ignore, and every one not of the kinds it looks at.
 class IgnoredBodies final : public JPH::BodyFilter {
  public:
   IgnoredBodies(std::vector<JPH::BodyID> bodies, BodyKinds kinds) : bodies_(std::move(bodies)), kinds_(kinds) {}

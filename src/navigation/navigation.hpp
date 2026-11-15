@@ -45,6 +45,9 @@ class Navigation {
   // The velocity a character walks at among others (see nav_steering.hpp), kept to walkable ground:
   // none takes it off the grid within nav::kSteeringLookahead seconds, unless it is off already.
   Vec3 steer(const SteeringAgent& agent, const std::vector<SteeringObstacle>& others) const;
+  // Whether walking from a point by an offset stays on walkable ground, checked a cell at a time
+  // (at most nav::kMostSteeringChecks times): no gap or wall is stepped over.
+  bool walks_on(Vec3 from, Vec3 offset) const;
   std::optional<Vec3> nearest(Vec3 point) const;
   // Whether a point is on walkable ground: over a walkable cell, up to a character's height above it.
   bool walkable(Vec3 point) const;

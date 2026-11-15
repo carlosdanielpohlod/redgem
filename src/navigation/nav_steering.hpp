@@ -31,6 +31,8 @@ inline constexpr float kAvoidanceWeight = 2.0f;
 inline constexpr float kPassingSideBias = 0.05f;
 // How far ahead a velocity is checked to keep to walkable ground, in seconds.
 inline constexpr float kSteeringLookahead = 0.5f;
+// The most points along that way that are checked.
+inline constexpr int kMostSteeringChecks = 16;
 // Two that overlap already are avoided as if their reach were this share of how far apart they
 // are: moving apart costs nothing, coming nearer does.
 inline constexpr float kOverlapShare = 0.9f;

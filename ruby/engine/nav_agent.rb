@@ -26,8 +26,9 @@ class NavAgent < Behaviour
     return @crowd if @crowd_frame == Time.frame
 
     @crowd_frame = Time.frame
-    @objects = all.map(&:game_object)
-    @crowd = all.to_h { |agent| [agent, agent.__crowd_entry] }
+    agents = all
+    @objects = agents.map(&:game_object)
+    @crowd = agents.to_h { |agent| [agent, agent.__crowd_entry] }
   end
 
   # Their objects, this frame.
@@ -125,7 +126,12 @@ class NavAgent < Behaviour
     @watched_from = transform.position
   end
 
-  def __stuck? = transform.position.distance_to(@watched_from) < speed * STUCK_SECONDS * STUCK_SHARE
+  def __stuck? = !__braking? && transform.position.distance_to(@watched_from) < __expected_progress
+
+  def __expected_progress = speed * STUCK_SECONDS * STUCK_SHARE
+
+  # Whether it is slowing down to stop on its goal (and goes slowly on purpose).
+  def __braking? = waypoints.size == 1 && __reached?(waypoints.first, speed / BRAKING)
 
   # Another way to the goal, around what moves near it (other agents too).
   def __find_way_around

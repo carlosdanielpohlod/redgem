@@ -52,13 +52,29 @@ std::optional<Bounds> moving_bounds(const PhysicsWorld& world, ObjectId object) 
 // fast as it walks is within the horizon.
 float body_reach(const SteeringAgent& agent) { return agent.radius + nav::kSteeringHorizon * agent.max_speed * kTwo; }
 
+// Whether a body is in the way of a character whose middle is at `position` (as a character's
+// origin is): it reaches above the step the character climbs, and below its head. The floor it
+// stands on (a moving deck) and a body on the floor above are not.
+bool at_height(const Bounds& box, Vec3 position, const NavSettings& size) {
+  const float feet = position.y - size.agent_height * kHalf;
+  return box.max.y > feet + size.max_step && box.min.y < feet + size.agent_height;
+}
+
+// The box around a body that moves and is at a character's height, if it is.
+std::optional<Bounds> in_the_way(const PhysicsWorld& world, ObjectId object, Vec3 position, const NavSettings& size) {
+  const std::optional<Bounds> box = moving_bounds(world, object);
+  if (!box) return std::nullopt;
+  if (!at_height(*box, position, size)) return std::nullopt;
+  return box;
+}
+
 std::vector<SteeringObstacle> bodies_near(const PhysicsWorld& world, const SteeringAgent& agent,
-                                          const QueryFilter& filter) {
+                                          const QueryFilter& filter, const NavSettings& size) {
   QueryShape sphere;
   sphere.radius = body_reach(agent);
   std::vector<SteeringObstacle> found;
   for (const RaycastHit& hit : world.overlap(sphere, agent.position, filter)) {
-    const std::optional<Bounds> box = moving_bounds(world, hit.object);
+    const std::optional<Bounds> box = in_the_way(world, hit.object, agent.position, size);
     if (box) found.push_back({box->center(), world.velocity(hit.object), disc_radius(*box), false});
   }
   return found;
@@ -103,10 +119,11 @@ mrb_value navigation_steer(mrb_state* mrb, mrb_value) {
                &args.ignore);
   const SteeringAgent agent = agent_of(mrb, args);
   std::vector<SteeringObstacle> others = crowd_arg(mrb, args.crowd);
+  const Navigation& navigation = baked_navigation(mrb);
   const std::vector<SteeringObstacle> bodies =
-      bodies_near(physics(mrb), agent, {kAllLayers, objects_arg(mrb, args.ignore), true});
+      bodies_near(physics(mrb), agent, {kAllLayers, objects_arg(mrb, args.ignore), true}, navigation.settings());
   others.insert(others.end(), bodies.begin(), bodies.end());
-  return vec3_value(mrb, baked_navigation(mrb).steer(agent, others));
+  return vec3_value(mrb, navigation.steer(agent, others));
 }
 
 }  // namespace

@@ -1,5 +1,7 @@
 #include "navigation/navigation.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include "core/stopwatch.hpp"
@@ -72,9 +74,18 @@ std::optional<std::vector<Vec3>> Navigation::path(Vec3 from, Vec3 to, const std:
 Vec3 Navigation::steer(const SteeringAgent& agent, const std::vector<SteeringObstacle>& others) const {
   if (!walkable(agent.position)) return redgem::steer(agent, others);  // off the grid: anywhere goes
   const VelocityCheck stays_on = [this, &agent](Vec3 velocity) {
-    return walkable(agent.position + velocity * nav::kSteeringLookahead);
+    return walks_on(agent.position, velocity * nav::kSteeringLookahead);
   };
   return redgem::steer(agent, others, stays_on);
+}
+
+bool Navigation::walks_on(Vec3 from, Vec3 offset) const {
+  const float cell = grid().shape().cell_size;
+  const int steps = std::min(nav::kMostSteeringChecks, static_cast<int>(std::ceil(length(offset) / cell)));
+  for (int step = 1; step <= steps; ++step) {
+    if (!walkable(from + offset * (static_cast<float>(step) / static_cast<float>(steps)))) return false;
+  }
+  return true;
 }
 
 std::optional<Vec3> Navigation::nearest(Vec3 point) const {
