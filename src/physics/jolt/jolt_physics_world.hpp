@@ -98,6 +98,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void step(float dt) override;
   std::optional<Transform> simulated_pose(ObjectId object) const override;
   std::vector<ContactEvent> drain_events() override;
+  std::optional<Bounds> body_bounds(ObjectId object) const override;
   Vec3 velocity(ObjectId object) const override;
   void set_velocity(ObjectId object, Vec3 velocity) override;
   void add_impulse(ObjectId object, Vec3 impulse) override;

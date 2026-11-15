@@ -11,6 +11,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/nav_agent.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
@@ -54,6 +55,13 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/interactable.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/interaction.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/interactor.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_variables.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_conversation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb
@@ -376,8 +384,10 @@ redgem_add_library(redgem_runtime
   navigation/nav_physics_probe.cpp
   navigation/nav_path.cpp
   navigation/nav_queries.cpp
+  navigation/nav_steering.cpp
   navigation/navigation.cpp
   audio/audio.cpp
+  audio/ducking.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp
@@ -420,6 +430,7 @@ redgem_add_library(redgem_runtime
   script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
+  script/dialogue_file.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -439,6 +450,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/navigation_crowd_bindings.cpp
   script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
@@ -460,6 +472,7 @@ redgem_add_library(redgem_runtime
   script/bindings/save_slot_bindings.cpp
   script/bindings/settings_bindings.cpp
   script/bindings/i18n_bindings.cpp
+  script/bindings/dialogue_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
@@ -819,6 +832,7 @@ if(NOT ANDROID)
     project/mcp_game_tools.cpp
     project/shot_command.cpp
     project/game_checks.cpp
+  project/dialogue_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
     project/api_types.cpp

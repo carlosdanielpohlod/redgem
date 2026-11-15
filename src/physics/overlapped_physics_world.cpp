@@ -46,6 +46,9 @@ std::optional<Transform> OverlappedPhysicsWorld::simulated_pose(ObjectId object)
   return settled().simulated_pose(object);
 }
 std::vector<ContactEvent> OverlappedPhysicsWorld::drain_events() { return settled().drain_events(); }
+std::optional<Bounds> OverlappedPhysicsWorld::body_bounds(ObjectId object) const {
+  return settled().body_bounds(object);
+}
 Vec3 OverlappedPhysicsWorld::velocity(ObjectId object) const { return settled().velocity(object); }
 void OverlappedPhysicsWorld::set_velocity(ObjectId object, Vec3 velocity) { settled().set_velocity(object, velocity); }
 void OverlappedPhysicsWorld::add_impulse(ObjectId object, Vec3 impulse) { settled().add_impulse(object, impulse); }

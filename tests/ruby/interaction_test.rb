@@ -268,3 +268,34 @@ class InteractionTest < RedGemTest::Case
     assert_equal "[F] door.open", interactor.prompt_label(target)
   end
 end
+
+# A conversation that the press of :interact ends must not also use what the hero faces that frame.
+class TalkingInteractionTest < InteractionTest
+  LINE = { "start" => "a", "nodes" => { "a" => { "text" => "t", "end" => true } } }.freeze
+
+  def setup
+    super
+    Dialogue.__scene_reset
+    @target = interactable("Baker", ahead(NEAR)).tap(&:start)
+    @interactor = new_interactor(prompt: false)
+    Dialogue.start(Dialogue::Script.new("hi", LINE), actor: @actor)
+  end
+
+  def focus = @interactor.tap { |looking| looking.update(FRAME) }.target
+
+  def test_nothing_is_in_focus_while_talking
+    assert_nil focus
+  end
+
+  def test_nothing_is_in_focus_on_the_frame_talking_ends
+    Dialogue.current.continue
+    assert_nil focus
+  end
+
+  def test_the_focus_comes_back_a_frame_later
+    Dialogue.current.continue
+    later = Time.frame + 1
+    Time.define_singleton_method(:frame) { later }
+    assert @target.equal?(focus)
+  end
+end

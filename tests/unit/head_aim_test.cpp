@@ -13,6 +13,7 @@ namespace {
 constexpr float kTolerance = 1e-3f;
 constexpr float kRightAngle = 90.0f;  // degrees
 constexpr float kSmallTurn = 30.0f;   // degrees: the most a test's head turns
+constexpr float kClipTurn = 20.0f;    // degrees a clip turns the head by itself: not what the aim wrote
 constexpr float kHeadHeight = 1.6f;   // meters above the character's origin
 constexpr float kFar = 10.0f;         // meters to what the head looks at
 constexpr float kFrame = 1.0f / 60.0f;
@@ -106,7 +107,7 @@ TEST_CASE("a pose a clip or a script sets is what the head turns from") {
   character.look_right(kSmallTurn);
   character.frames(kEaseFrames);
   // A clip turns the head to the right by itself; the aim's turn comes on top of that.
-  character.scene.at(kHead).local.rotation = quat_from_axis_angle(Vec3::up(), degrees_to_radians(-kSmallTurn));
+  character.scene.at(kHead).local.rotation = quat_from_axis_angle(Vec3::up(), degrees_to_radians(-kClipTurn));
   character.frames(1);
-  CHECK(degrees_off_forward(character.head_forward()) == doctest::Approx(2.0f * kSmallTurn).epsilon(kTolerance));
+  CHECK(degrees_off_forward(character.head_forward()) == doctest::Approx(kClipTurn + kSmallTurn).epsilon(kTolerance));
 }
