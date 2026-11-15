@@ -67,10 +67,12 @@ struct RaycastHit {
   float distance = 0.0f;
 };
 
-// What a query looks at: bodies on the layers of `layers`, but none of the objects in `ignore`.
+// What a query looks at: bodies on the layers of `layers`, but none of the objects in `ignore`
+// (and with `moving_only`, none of the static ones either: what moves, characters included).
 struct QueryFilter {
   LayerMask layers = kAllLayers;
   std::vector<ObjectId> ignore;
+  bool moving_only = false;
 };
 
 // The shape swept by a cast, or tested by an overlap.
@@ -140,6 +142,10 @@ class PhysicsWorld {
   virtual std::optional<Transform> simulated_pose(ObjectId object) const = 0;
   // Contact and trigger enter/exit events produced by the last steps, in deterministic order.
   virtual std::vector<ContactEvent> drain_events() = 0;
+
+  // The box around an object's body (a character's too), in world space as its collider is now;
+  // none for an object without one.
+  virtual std::optional<Bounds> body_bounds(ObjectId object) const = 0;
 
   // Rigid bodies.
   virtual Vec3 velocity(ObjectId object) const = 0;
