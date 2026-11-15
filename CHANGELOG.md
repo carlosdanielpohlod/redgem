@@ -15,6 +15,14 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-15
+
+### Migrating
+
+Games made with 0.6.0 can keep their scenes and saves. If a positional sound should keep playing
+at full clarity behind walls, pass `occlusion: false` to `Audio.play_at`. If a game handles failed
+save writes, handle errors from `Save.delete` and `Save.clear` as well.
+
 ### Added
 
 - **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
@@ -33,6 +41,18 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
   listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
   fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
+
+### Changed
+
+- The first-game guide covers creating a project, testing it in the editor and exporting a build.
+
+### Fixed
+
+- A failed save deletion or clear can be retried without losing the in-memory data. Migration
+  hooks can no longer switch slots or change saved values outside the migration.
+- KTX2 decoding handles unaligned input, and glTF import rejects accessors with non-finite values.
+- The CI suite checks quest translations, and the release smoke test accepts Homebrew's
+  `gtimeout` on macOS.
 
 ## [0.6.0] - 2026-11-15
 
@@ -1033,7 +1053,8 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...v0.4.1

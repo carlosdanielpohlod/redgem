@@ -59,7 +59,7 @@ end
   events and root motion, navigation and crowds, saved progress (a game versions its save data
   and upgrades older saves).
 - **NPCs**: state machines with sight and hearing, daily schedules, head tracking, crowd
-  navigation, and voiced branching dialogue.
+  navigation, voiced branching dialogue and shared [quests](docs/scripting/quests.md).
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
   internet through a relay that ships with the engine, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors,
@@ -73,8 +73,8 @@ end
 - **Advanced graphics**: physically based materials, HDR with filmic tone mapping, sun shadows,
   reflections, ambient occlusion, bloom, fog, temporal anti-aliasing, water with refraction and
   shore foam, scattered vegetation, particles that cast shadows, skeletal animation.
-- **Audio**: 3D positional sound, music crossfades, sound priorities, and mix groups with
-  low-pass filters, reverb, and music ducking during dialogue.
+- **Audio**: 3D positional sound with occlusion, music crossfades, sound priorities, and mix
+  groups with low-pass filters, reverb, and music ducking during dialogue.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
 - **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
   own (`redgem-test`): the game your players get has no test code in it, and no editor either.

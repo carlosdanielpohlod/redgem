@@ -71,7 +71,7 @@ Both answer one JSON document:
 
 ```json
 {
-  "engine_version": "0.6.0",
+  "engine_version": "0.6.1",
   "uptime_seconds": 3600.5,
   "rooms": {"open": 2, "limit": 8, "list": [
     {"players": 3, "frame_ms": {"average": 0.84, "worst": 2.1}},
