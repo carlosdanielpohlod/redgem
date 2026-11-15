@@ -357,6 +357,7 @@ class SceneDocument {
   int append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
                                const std::string& name, int parent);
   void append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets);
+  void append_model_animation(const SceneDesc& model, const model_import::DescOffsets& offsets);
   int append_node(NodeDesc node);
   void remember_ids();
   std::string fresh_id();
