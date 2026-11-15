@@ -14,6 +14,7 @@
 #include "net/http/http_client.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
+#include "scene/animation/animation_event.hpp"
 #include "script/engine_constants.hpp"
 #include "script/game_locales.hpp"
 #include "script/ruby_vm.hpp"
@@ -56,12 +57,16 @@ class ScriptHost {
   void fixed_update(float dt);
   void update(float dt);
   void draw_loading(float unscaled_delta);
+  // A frame of the network game's level change, while the world is held for it (Network.__level_tick).
+  void wait_for_level(float unscaled_delta);
   void begin_loading_screen() { loading_screen_failed_ = false; }
   void dispatch(const ContactEvent& event);
   // Hands something that happened on the network to the scripts listening for it (Network.on...).
   void dispatch(const net::NetworkEvent& event);
   // Hands the answer of a web request to the block waiting for it (HTTP).
   void dispatch(const net::HttpResult& result);
+  // Hands a moment a character's clip went past to the block waiting for it (Animator#on).
+  void dispatch(const AnimationEvent& event);
   // Hands the key or button a capture caught to the block waiting for it (Input.capture_next).
   void dispatch(const CapturedBinding& caught);
   // Tells Ruby's own bookkeeping (Network handlers, the blocks of HTTP requests) that the scene's

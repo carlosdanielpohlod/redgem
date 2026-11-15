@@ -1,5 +1,6 @@
 # Whether one thing can see another: a ray from a point to a target hits nothing but the target
-# (or what is under it) first. An Interactor uses it to reach what it uses, a Perception to see.
+# (what is under it, or what carries it) first. An Interactor uses it to reach what it uses, a
+# Perception to see.
 #
 #   LineOfSight.clear?(eyes, player.transform.position, player, ignore: LineOfSight.carried(game_object))
 module LineOfSight
@@ -30,7 +31,11 @@ module LineOfSight
     private
 
     def unblocked?(hit, target, length)
-      hit.nil? || hit[:distance] >= length - TOLERANCE || part_of?(hit[:object], target)
+      hit.nil? || hit[:distance] >= length - TOLERANCE || related?(hit[:object], target)
     end
+
+    # Whether what a ray hit is the target, is under it (a character's collider on a child), or
+    # carries it (a door, for its handle).
+    def related?(hit, target) = part_of?(hit, target) || part_of?(target, hit)
   end
 end

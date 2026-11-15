@@ -133,3 +133,11 @@ TEST_CASE("water always uses the see-through pass without the nearly opaque alph
   material.dithered = true;
   CHECK(drawn_see_through(material));
 }
+
+TEST_CASE("sunlight comes through foliage lit from behind, and through nothing else") {
+  constexpr float kTranslucency = 0.7f;
+  CHECK(translucency_of(material(AlphaMode::Mask, true), kTranslucency) == doctest::Approx(kTranslucency));
+  CHECK(translucency_of(material(AlphaMode::Blend, true), kTranslucency) == doctest::Approx(kTranslucency));
+  CHECK(translucency_of(material(AlphaMode::Mask, false), kTranslucency) == kNoTranslucency);  // a fence of color
+  CHECK(translucency_of(material(AlphaMode::Opaque, true), kTranslucency) == kNoTranslucency);
+}

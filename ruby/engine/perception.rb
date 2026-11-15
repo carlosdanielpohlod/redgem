@@ -32,7 +32,16 @@ class Perception < Behaviour
   FULL_TURN = 360.0
 
   # A noise someone heard: where it was made, how loud, who made it (or nil), and meters away.
-  Noise = Struct.new(:position, :loudness, :source, :distance)
+  class Noise
+    attr_reader :position, :loudness, :source, :distance
+
+    def initialize(position, loudness, source, distance)
+      @position = position
+      @loudness = loudness
+      @source = source
+      @distance = distance
+    end
+  end
 
   class << self
     # Every Perception of the scene whose object is still there.

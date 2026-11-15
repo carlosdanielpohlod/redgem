@@ -169,4 +169,9 @@ TEST_CASE("a message as the log shows it hides the credentials a join carries") 
   CHECK(shown.find("(hidden)") != std::string::npos);
   const nlohmann::json plain = {{wire::kKind, wire::kHello}};
   CHECK(wire::log_text(plain) == plain.dump());
+  // ... and the token that gets a place back after a drop, going either way.
+  const nlohmann::json resuming = wire::resume_hello("secret-resume-token");
+  CHECK(wire::log_text(resuming).find("secret-resume-token") == std::string::npos);
+  const nlohmann::json welcome = {{wire::kKind, wire::kWelcome}, {wire::kResume, "next-secret-token"}};
+  CHECK(wire::log_text(welcome).find("next-secret-token") == std::string::npos);
 }

@@ -15,13 +15,16 @@ struct HudItem {
   enum class Kind { Text, Rect, Image, Clip, Unclip };
   Kind kind = Kind::Text;
   std::string text;  // the text, or the image's name (a file in the game's images/ folder)
-  std::string font;  // UI text face in fonts/; empty selects the built-in face
+  std::string font;  // UI text face in fonts/, or a chain of them (font_chain.hpp); empty: the built-in face
   int x = 0;
   int y = 0;
   int width = 0;  // rectangles, images and clips
   int height = 0;
   int size = 0;         // text height
   float radius = 0.0f;  // rounded corners of a rectangle, in pixels
+  // Pixels an image drawn at its own size (width and height 0) takes for each of its own: the
+  // interface's scale (UI.scale).
+  float scale = 1.0f;
   Color color;
 };
 

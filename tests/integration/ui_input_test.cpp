@@ -3,6 +3,8 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <optional>
+
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "test_support.hpp"
@@ -52,7 +54,11 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, Presenter* presenter 
   options.presenter = presenter;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
-  return std::move(std::get<std::unique_ptr<Engine>>(created));
+  auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
+  // A unit of the interface is a pixel here, whatever the screen: these tests are about the input and what is queued
+  // (tests/integration/ui_scale_test.cpp is about the interface's units).
+  engine->script_context().ui_reference = UiReference{};
+  return engine;
 }
 
 void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
@@ -190,6 +196,40 @@ TEST_CASE("scripts set the camera's field of view and the picture's speed streak
   CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
 }
 
+TEST_CASE("scripts change the scene's auto exposure for the game's camera, and give it back with nil") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  const AutoExposureOverrides& set = engine->script_context().auto_exposure;
+  CHECK(ruby(*engine, "Camera.auto_exposure.inspect") == "nil");  // the scene's own
+  ruby(*engine, "Camera.auto_exposure = true");
+  CHECK(set.enabled == std::optional<bool>(true));
+  CHECK(ruby(*engine, "Camera.auto_exposure") == "true");
+  CHECK_FALSE(engine->scripts().eval("Camera.auto_exposure = 1", "bad_switch.rb").ok);  // true, false or nil
+
+  ruby(*engine, "Camera.exposure_compensation = -1.5");
+  CHECK(ruby(*engine, "Camera.exposure_compensation") == "-1.5");
+  CHECK_FALSE(engine->scripts().eval("Camera.exposure_compensation = 99", "bad_ev.rb").ok);
+  CHECK(*set.compensation == doctest::Approx(-1.5f));
+
+  ruby(*engine, "Camera.exposure_range = [-2, 3]");
+  CHECK(ruby(*engine, "Camera.exposure_range.inspect") == "[-2.0, 3.0]");
+  CHECK_FALSE(engine->scripts().eval("Camera.exposure_range = [3, -2]", "bad_range.rb").ok);  // upside down
+  CHECK_FALSE(engine->scripts().eval("Camera.exposure_range = 3", "bad_range.rb").ok);
+  CHECK(*set.max_ev == doctest::Approx(3.0f));
+
+  ruby(*engine, "Camera.exposure_speed = [4, 0.5]");
+  CHECK(*set.speed_down == doctest::Approx(0.5f));
+  CHECK_FALSE(engine->scripts().eval("Camera.exposure_speed = [-1, 1]", "bad_speed.rb").ok);
+
+  ruby(*engine,
+       "Camera.auto_exposure = nil; Camera.exposure_compensation = nil; Camera.exposure_range = nil; "
+       "Camera.exposure_speed = nil");
+  CHECK_FALSE(set.enabled.has_value());
+  CHECK_FALSE(set.compensation.has_value());
+  CHECK_FALSE(set.min_ev.has_value());
+  CHECK_FALSE(set.speed_up.has_value());
+}
+
 TEST_CASE("UI font selection is captured per text and can return to the built-in face") {
   const SceneDesc scene = small_scene();
   auto engine = engine_for(scene);
@@ -203,6 +243,23 @@ TEST_CASE("UI font selection is captured per text and can return to the built-in
   CHECK(hud[1].font.empty());
   CHECK_FALSE(engine->scripts().eval("UI.font = '../outside'", "invalid_font.rb").ok);
   CHECK_FALSE(engine->scripts().eval("UI.font = '/outside'", "invalid_font.rb").ok);
+  CHECK(engine->script_context().ui_font.empty());
+}
+
+TEST_CASE("UI.font takes a fallback chain of faces, tried in order for each letter") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  CHECK(ruby(*engine, "UI.font = [:latin, 'cjk', :emoji]; UI.font.inspect") == "[\"latin\", \"cjk\", \"emoji\"]");
+  ruby(*engine, "UI.text('Hi 日本', x: 10, y: 10)");
+  REQUIRE(engine->script_context().hud.size() == 1);
+  CHECK(engine->script_context().hud[0].font == "latin:cjk:emoji");
+  CHECK(ruby(*engine, "UI.font = [:solo]; UI.font") == "solo");
+  CHECK(ruby(*engine, "UI.font = []; UI.font.nil?") == "true");
+  CHECK(ruby(*engine, "UI.font = ''; UI.font.nil?") == "true");
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:a, :b, :c, :d, :e]", "long_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:latin, '../outside']", "unsafe_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = [:latin, '']", "empty_chain.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = 'a:b'", "joined_chain.rb").ok);
   CHECK(engine->script_context().ui_font.empty());
 }
 

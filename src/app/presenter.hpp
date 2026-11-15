@@ -1,13 +1,17 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#include "core/frame_budget.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/window.hpp"
 #include "scene/particles.hpp"
+#include "scene/water_geometry.hpp"
 #include "scene/water_ripples.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -32,6 +36,8 @@ struct FrameView {
   const std::vector<HudItem>& hud;
   const ParticleSystem& particles;
   float motion_blur = 0.0f;  // Camera.motion_blur: 0 (none) to 1
+  // What the game's camera changes of the scene's auto exposure (Camera.auto_exposure and the others).
+  AutoExposureOverrides auto_exposure;
   // A touch screen's stick and buttons; none elsewhere.
   // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const std::vector<ControlCircle>& controls;
@@ -42,6 +48,8 @@ struct FrameView {
   const WaterRippleSnapshot* water_ripples = nullptr;  // transient simulation state; drawing never ages it
   bool statistics_overlay = false;                     // replaces the developer window's basic FPS counter
   const DebugDrawBuffer* debug_draw = nullptr;         // frame-local world primitives, never scene objects
+  // The scene's water as the simulation last found it: the camera under it looks underwater.
+  const std::vector<WaterSurface>* water_surfaces = nullptr;
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine
@@ -73,6 +81,19 @@ class Presenter {
   // How long the graphics card took over the passes of a frame lately, measured while the
   // statistics overlay is shown; nothing measured by a presenter that does not draw, or cannot time.
   virtual GpuTimings gpu_timings() const { return {}; }
+  // Readies what the scene the game is about to show under `generation` is drawn with (its
+  // textures and meshes), a share a call, while the scene before it is still shown: about
+  // `bytes` a call, within `budget`, at least one asset. True once it is all ready. One that does
+  // not draw, or readies nothing ahead, is ready at once: the scene is uploaded when first shown.
+  virtual bool prepare_scene(const SceneDesc& /*desc*/, int /*generation*/, std::size_t /*bytes*/,
+                             const FrameBudget& /*budget*/) {
+    return true;
+  }
+  // Drops what prepare_scene readied, for a scene that will not be shown after all.
+  virtual void drop_prepared_scene() {}
+  // Whether it draws the scene's pictures: the pictures of a scene read in the background are
+  // decoded there for it, and prepare_scene has them on the graphics card once it says ready.
+  virtual bool draws_pictures() const { return false; }
   // The player's display settings (Settings in Ruby): the presenter takes what it can of them. One
   // that shows the game in no window of its own (nobody, the editor's view) takes none.
   virtual void apply_display(const DisplaySettings& /*display*/) {}

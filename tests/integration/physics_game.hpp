@@ -13,10 +13,13 @@
 
 #include <mruby.h>
 #include <mruby/string.h>
+#include <nlohmann/json.hpp>
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
+#include "script/script_config.hpp"
+#include "test_support.hpp"
 
 namespace redgem::test::physics_game {
 
@@ -32,6 +35,13 @@ inline constexpr const char* kShooterGame = R"({
     "collides": {"bullet": ["enemy", "default"]}
   }
 })";
+
+// The shooter game, its scripts given the time to save on a slow disk (see kSlowDiskScriptBudgetMs).
+inline std::string shooter_game_saving_slowly() {
+  nlohmann::json game = nlohmann::json::parse(kShooterGame);
+  game[config::kScriptBudgetKey] = kSlowDiskScriptBudgetMs;
+  return game.dump();
+}
 
 // A game folder of the test's own holding only a game.json, removed when the test ends.
 struct TempGame {

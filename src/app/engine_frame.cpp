@@ -38,7 +38,11 @@ void Engine::prepare_frame() {
   context_.hud.clear();
   debug_draw_.clear();
   scripts_->vm().set_sampling(profiler_.enabled());
-  if (!is_loading_scene()) scripts_->start_pending();
+  start_scripts();
+}
+
+void Engine::start_scripts() {
+  if (!frozen()) scripts_->start_pending();
 }
 
 void Engine::read_input() {
@@ -70,6 +74,8 @@ void Engine::poll_network() {
   const float seconds = std::min(lap, config::kMaxFrameSeconds);
   network_.forgive_stall(lap - seconds);  // (what the others sent while this one stood still)
   for (const net::NetworkEvent& event : network_.poll(seconds)) scripts_->dispatch(event);
+  // Out of the game, nobody is waited for: the world is never left held (whatever the scripts did).
+  if (network_.state() == net::NetworkSession::State::Offline) context_.level_held = false;
   // A game hosted on this machine's own port answers the neighbours looking for one.
   if (!found_by_neighbours()) discovery_.stop_announcing();
   discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
@@ -83,7 +89,7 @@ void Engine::answer_requests() {
 
 bool Engine::found_by_neighbours() const { return network_.hosting() && network_.room().empty(); }
 
-bool Engine::captures_cursor() const { return context_.mouse_locked && !is_loading_scene(); }
+bool Engine::captures_cursor() const { return context_.mouse_locked && !frozen(); }
 
 void Engine::read_surface_sizes() {
   const SurfaceSize size = presenter_->surface_size();
@@ -103,13 +109,37 @@ void Engine::advance_game(float frame_seconds) {
   // Time.scale slows or stops the simulation (0 pauses it); behaviours still get their update,
   // with a shorter delta, so menus work while the game is paused.
   const float scale = context_.time.scale;
-  const int steps = fixed_steps_due(frame_seconds, scale);
-  for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
+  settle_physics();  // (where the step would have run in place: after the frame's start and its callbacks)
+  run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
       options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
+  begin_prepared_step();  // (drawn meanwhile: see frame())
+}
+
+void Engine::run_fixed_steps(int steps) {
+  const int in_place = overlaps_physics() ? std::max(steps - 1, 0) : steps;
+  for (int i = 0; i < in_place; ++i) fixed_step(config::kFixedDeltaSeconds);
+  if (in_place == steps) return;
+  prepare_fixed_step(config::kFixedDeltaSeconds);
+  step_prepared_ = true;
+}
+
+void Engine::begin_prepared_step() {
+  if (!step_prepared_) return;
+  overlapped_->begin_step(config::kFixedDeltaSeconds);
+  step_prepared_ = false;
+  step_in_flight_ = true;
+}
+
+void Engine::settle_physics() {
+  if (!step_in_flight_) return;
+  const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
+  step_in_flight_ = false;
+  overlapped_->finish_step();
+  finish_fixed_step(config::kFixedDeltaSeconds);
 }
 
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
@@ -125,10 +155,42 @@ void Engine::update_frame(float delta) {
   // Every animation of the scene plays in a loop unless a script said otherwise (Animation);
   // scripts run after and may override poses.
   animations_.advance(delta, scene_);
+  apply_root_motion();
   particles_.update(delta);
+  // (Animation events are part of the scripts' update: they come first in it.)
+  hand_on_animation_events();
   scripts_->update(delta);
   process_destroyed();
   if (context_.renders_particles) particle_emitters_.advance(delta, scene_, particles_);
+}
+
+void Engine::apply_root_motion() {
+  for (const RootMotion& motion : animations_.take_root_motion()) {
+    const ObjectId object = scene_.resolve(motion.character);
+    if (object != kNoObject) move_by(object, motion);
+  }
+}
+
+namespace {
+
+// Bodies the physics drives on its own, which root motion leaves to it.
+bool simulated_on_its_own(BodyType type) { return type == BodyType::Dynamic || type == BodyType::Vehicle; }
+
+}  // namespace
+
+void Engine::move_by(ObjectId object, const RootMotion& motion) {
+  if (simulated_on_its_own(physics_->body_type(object))) return;
+  const Transform world = scene_.world_transform(object);
+  scene_.set_world_rotation(object, normalize(quat_from_axis_angle(Vec3::up(), motion.yaw) * world.rotation));
+  if (physics_->body_type(object) == BodyType::Character) {
+    physics_->add_character_displacement(object, motion.translation);
+  } else {
+    scene_.set_world_position(object, world.position + motion.translation);
+  }
+}
+
+void Engine::hand_on_animation_events() {
+  for (const AnimationEvent& event : animations_.take_events()) scripts_->dispatch(event);
 }
 
 bool Engine::both_alive(const ContactEvent& event) const {
@@ -136,13 +198,22 @@ bool Engine::both_alive(const ContactEvent& event) const {
 }
 
 void Engine::fixed_step(float dt) {
+  prepare_fixed_step(dt);
+  const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
+  physics_->step(dt);
+  finish_fixed_step(dt);
+}
+
+void Engine::prepare_fixed_step(float dt) {
   const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
-  bodies::push_poses(scene_, *physics_);
-  physics_->step(dt);
+  push_poses_and_float();
+}
+
+void Engine::finish_fixed_step(float dt) {
+  context_.time.delta = dt;  // (the contacts' callbacks read the step's)
   bodies::pull_poses(scene_, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
   for (const ContactEvent& event : physics_->drain_events()) {
@@ -152,6 +223,14 @@ void Engine::fixed_step(float dt) {
   context_.time.elapsed += dt;
 }
 
+void Engine::push_poses_and_float() {
+  find_water();  // primes newly spawned or teleported bodies
+  bodies::push_poses(scene_, *physics_);
+  apply_scene_buoyancy(water_, scene_, scene_desc_, *physics_);
+}
+
+void Engine::find_water() { update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f); }
+
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
   append_debug_labels(context_, debug_draw_);
@@ -159,8 +238,9 @@ void Engine::present() {
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
-                       controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
-                       shows_profile_stats(context_), &debug_draw_});
+                       context_.auto_exposure, controls_, images_dir_, context_.stop_recording_requested,
+                       &water_.snapshot(), shows_profile_stats(context_), &debug_draw_, &water_.surfaces()});
+  forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
 }
 
 int Engine::run() {

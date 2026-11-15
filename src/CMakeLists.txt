@@ -12,6 +12,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
@@ -42,7 +44,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_levels.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_movement.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
@@ -189,16 +191,22 @@ redgem_add_library(redgem_core
   core/game_files.cpp
   core/image_header.cpp
   core/webp_image.cpp
+  core/ktx2_header.cpp
+  core/ktx2_image.cpp
+  core/gpu_texture_formats.cpp
   core/float_image.cpp
   core/radiance_header.cpp
   core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
+  core/frame_budget.cpp
   core/frame_profiler.cpp
   core/stopwatch.cpp
   core/clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
+# (The Basis Universal transcoder: KTX2 textures, see core/ktx2_image.hpp.)
+target_link_libraries(redgem_core PRIVATE basisu_transcoder)
 # (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)
 target_link_libraries(redgem_core PRIVATE redgem_zlib)
 redgem_embed_texts(redgem_core core)
@@ -240,6 +248,9 @@ redgem_add_library(redgem_net
   net/network_session_approval.cpp
   net/network_session_room_approval.cpp
   net/network_session_poses.cpp
+  net/network_session_held.cpp
+  net/network_session_reconnect.cpp
+  net/resume_token.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp
@@ -318,21 +329,30 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/animation/animation_player_graph.cpp
+  scene/animation/animation_player_events.cpp
+  scene/animation/animation_player_root_motion.cpp
+  scene/animation/animation_markers.cpp
   scene/camera_ray.cpp
   scene/particle_emitters.cpp
   scene/particles.cpp
   scene/particle_look.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
+  scene/water_volume.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/joint_config.cpp
   physics/body_limit.cpp
+  physics/buoyancy.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
+  physics/physics_threads.cpp
+  physics/step_worker.cpp
+  physics/overlapped_physics_world.cpp
   physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
   physics/jolt/jolt_vehicle.cpp
@@ -393,6 +413,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
   script/bindings/bindings.cpp
@@ -405,6 +426,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scene_bindings.cpp
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
+  script/bindings/exposure_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/physics_args.cpp
   script/bindings/physics_query_bindings.cpp
@@ -413,6 +435,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -457,6 +480,7 @@ redgem_add_library(redgem_runtime
   render/gpu_timers.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
+  render/compressed_textures.cpp
   render/texture_loading.cpp
   render/debug_draw.cpp
   render/renderer_debug.cpp
@@ -472,6 +496,7 @@ redgem_add_library(redgem_runtime
   render/renderer_see_through.cpp
   render/renderer_water.cpp
   render/water_ripple_packet.cpp
+  render/underwater.cpp
   render/renderer_water_ripples.cpp
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
@@ -496,14 +521,18 @@ redgem_add_library(redgem_runtime
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
+  render/auto_exposure.cpp
   render/scene_lights.cpp
   render/local_shadows.cpp
   render/renderer_local_shadows.cpp
   render/gpu_select.cpp
   render/window.cpp
   render/display_settings.cpp
+  render/ui_scale.cpp
   render/quality.cpp
   render/font_rasterizer.cpp
+  render/font_chain.cpp
+  render/bidi_text.cpp
   render/game_fonts.cpp
   render/ui_font.cpp
   render/culling.cpp
@@ -534,7 +563,9 @@ redgem_add_library(redgem_runtime
   app/engine_prefabs.cpp
   app/engine_loading.cpp
   app/scene_loader.cpp
+  app/scene_activation.cpp
   app/scene_bodies.cpp
+  app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
   app/touch_circles.cpp
@@ -548,7 +579,8 @@ redgem_embed_texts(redgem_runtime game)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
   "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
-target_link_libraries(redgem_runtime PRIVATE freetype)
+target_link_libraries(redgem_runtime PRIVATE freetype redgem_sheenbidi)
+target_link_libraries(redgem_runtime PRIVATE ${CMAKE_DL_LIBS})  # render/window.cpp keeps the OpenGL libraries loaded
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
   target_link_libraries(redgem_runtime PUBLIC ws2_32)
@@ -626,6 +658,7 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
+    editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp
@@ -633,6 +666,7 @@ if(NOT ANDROID)
     editor/gizmo.cpp
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
+    editor/joint_gizmo.cpp
     editor/scene_overlays_physics.cpp
     editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
@@ -673,6 +707,7 @@ if(NOT ANDROID)
     editor/ui/inspector_terrain.cpp
     editor/ui/inspector_scripts.cpp
     editor/ui/inspector_physics.cpp
+    editor/ui/inspector_joint.cpp
     editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
     editor/ui/agent_panel.cpp
@@ -761,6 +796,9 @@ if(NOT ANDROID)
     project/closest_words.cpp
     project/scene_text.cpp
     project/scene_diff.cpp
+    project/scene_revision.cpp
+    project/asset_search.cpp
+    project/search_command.cpp
     project/scene_snapshot.cpp
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp
@@ -778,7 +816,10 @@ if(NOT ANDROID)
     project/game_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
+    project/api_types.cpp
     project/api_reference.cpp
+    project/api_reference_read.cpp
+    project/api_rbs.cpp
     project/api_command.cpp
     project/crash_symbols.cpp
     project/symbolize_command.cpp
@@ -791,6 +832,11 @@ if(NOT ANDROID)
   # What `redgem --version` says: the version in project() at the top of the build.
   target_compile_definitions(redgem_project PRIVATE REDGEM_VERSION="${redgem_VERSION}")
   target_link_libraries(redgem_project PUBLIC redgem_editor)
+  # (Public: what includes project/ruby_eval.hpp sees the same choice as what was built.)
+  if(REDGEM_RUBY_EVAL)
+    target_sources(redgem_project PRIVATE project/ruby_eval.cpp)
+    target_compile_definitions(redgem_project PUBLIC REDGEM_RUBY_EVAL)
+  endif()
   if(WIN32)
     target_link_libraries(redgem_project PRIVATE shell32 ole32 uuid)
   endif()

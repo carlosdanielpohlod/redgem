@@ -3,6 +3,7 @@
 #include <string>
 
 #include "core/math.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/quality.hpp"
 #include "scene/property.hpp"
 #include "scene/scene.hpp"
@@ -47,6 +48,11 @@ struct Environment {
   // The brightest that glowing particles together make a pixel, in linear light: many of them over
   // each other come near it instead of washing out to white (0 = no limit).
   float glow_limit = 0.0f;
+  // The exposure adapting to the scene's brightness, as eyes do (off unless said).
+  AutoExposure auto_exposure;
+  // How much sunlight comes through leaves lit from behind (textured cut-out and blended
+  // materials: see material_alpha.hpp), 0 (none) to 1.
+  float foliage_translucency = 0.0f;
 };
 
 // A clear day: what scenes without an environment object get.
@@ -61,7 +67,16 @@ Environment default_environment();
 //   shadow_softness (degrees across the sun: the real one is about half a degree),
 //   local_shadows (0 to 4 point and spot lights casting shadows at once),
 //   antialias ("temporal": with the frames before)
+//   auto_exposure (true or false), exposure_min_ev, exposure_max_ev, exposure_compensation (EV,
+//   within kWidestExposureEv either way), exposure_speed_up, exposure_speed_down (per second),
+//   foliage_translucency (0 to 1)
 Environment environment_from_props(const PropertyMap& props);
+
+// The auto exposure properties of the list above.
+void read_auto_exposure(const PropertyMap& props, AutoExposure& settings);
+
+// Writes auto exposure's settings as the properties of the list above: read back, they are the same.
+void write_auto_exposure(const AutoExposure& settings, PropertyMap& props);
 
 // The sky picture and quality properties of the list above.
 void read_sky_and_quality(const PropertyMap& props, Environment& env);

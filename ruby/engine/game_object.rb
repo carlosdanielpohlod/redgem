@@ -81,6 +81,9 @@ class GameObject
 
   def __serial = @serial
 
+  # It and everything it carries (its children, theirs...).
+  def __with_children = [self] + children.flat_map(&:__with_children)
+
   def inspect = "#<GameObject #{name.inspect} id=#{@id}>"
   alias to_s inspect
 

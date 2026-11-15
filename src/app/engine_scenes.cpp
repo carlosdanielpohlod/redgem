@@ -3,9 +3,12 @@
 
 #include "app/engine.hpp"
 
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "app/scene_bodies.hpp"
+#include "app/scene_joints.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
@@ -15,13 +18,34 @@ namespace redgem {
 
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
+std::unique_ptr<PhysicsWorld> Engine::new_physics_world() const {
+  std::unique_ptr<PhysicsWorld> world =
+      create_jolt_physics_world(gravity(), collision_layers_, max_bodies_, physics_threads_);
+  if (!config::solves_in_parallel(physics_threads_)) return world;
+  return std::make_unique<OverlappedPhysicsWorld>(std::move(world));
+}
+
+void Engine::adopt_physics(std::unique_ptr<PhysicsWorld> world) {
+  // (A step still under way was the old world's: it ends with it, and is never finished.)
+  step_prepared_ = false;
+  step_in_flight_ = false;
+  physics_ = std::move(world);
+  overlapped_ = dynamic_cast<OverlappedPhysicsWorld*>(physics_.get());
+}
+
 void Engine::make_bodies() {
-  physics_.reset();  // (the old world's memory goes first: a large world is never held twice)
-  physics_ = create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
+  adopt_physics(nullptr);  // (the old world goes first, threads and all: a large world is never held twice)
+  adopt_physics(new_physics_world());
   bodies::create_all({scene_, scene_desc_}, *physics_);
-  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
+  settle_world();
+}
+
+void Engine::settle_world() {
+  joints::create_all({scene_, scene_desc_}, *physics_, context_.scene_joints);
+  find_water();
   navigation_.forget();  // the grid was the old scene's
   if (navigation_.settings().bake_on_load) bake_navigation();
+  context_.physics = physics_.get();
 }
 
 void Engine::bake_navigation() {
@@ -48,28 +72,35 @@ void Engine::switch_scene_if_asked() {
 }
 
 void Engine::switch_to(const std::string& name, SceneDesc desc) {
+  SceneActivation incoming(name, std::move(desc), new_physics_world(), reserve_generation());
+  incoming.make_all_bodies();
+  switch_to(incoming);
+}
+
+void Engine::switch_to(SceneActivation& incoming) {
   // The Ruby VM survives (globals, loaded classes); the objects, bodies and behaviours do not.
   scripts_->reset_scene();
   scripts_->scene_was_reset();
-  replace_world(std::move(desc));
-  context_.scene_name = name;
-  ++scene_generation_;
+  install_world(incoming);
+  context_.scene_name = incoming.name();
+  scene_generation_ = incoming.generation();
   animations_.reset(scene_desc_.animations, scene_);
   particles_.clear();
   particle_emitters_.clear();
+  // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
-  scripts_->run_scene_script(name);
+  scripts_->run_scene_script(incoming.name());
   network_watch_.restart();  // the time the scene took to load is not the network's
 }
 
-void Engine::replace_world(SceneDesc desc) {
+void Engine::install_world(SceneActivation& incoming) {
   runtime_prefabs_.clear();
   runtime_prefab_bytes_ = 0;
-  scene_desc_ = std::move(desc);
-  scene_ = Scene::from_desc(scene_desc_);
+  scene_desc_ = std::move(incoming.desc());
+  scene_ = std::move(incoming.scene());
+  adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
-  make_bodies();
-  context_.physics = physics_.get();
+  settle_world();
 }
 
 void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {
@@ -88,17 +119,19 @@ void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
 
 ObjectId Engine::spawn(const SpawnRequest& request) {
   if (!scene_.is_alive(request.source)) return kNoObject;
-  return finish_spawn(scene_.clone(request.source), request);
+  return finish_spawn(scene_.clone_pairs(request.source), request);
 }
 
-ObjectId Engine::finish_spawn(const std::vector<ObjectId>& created, const SpawnRequest& request) {
-  shape_spawned(created.front(), request);
+ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request) {
+  shape_spawned(copies.front().second, request);
   if (request.physics) {
-    for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
+    for (const auto& [original, id] : copies) bodies::create({scene_, scene_desc_}, *physics_, id);
+    // (Once every body of the copy is there: a joint may hold two of its parts.)
+    joints::create_copies({scene_, scene_desc_}, *physics_, copies, context_.scene_joints);
   }
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
-  for (const ObjectId id : created) scripts_->attach_object(id);
-  return created.front();
+  for (const auto& [original, id] : copies) scripts_->attach_object(id);
+  return copies.front().second;
 }
 
 void Engine::process_destroyed() {
@@ -111,6 +144,7 @@ void Engine::process_destroyed() {
     for (const ObjectId id : pending) scripts_->detach(id);
     // Children first, so each parent is torn down with nothing left under it.
     for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
+      joints::forget(context_.scene_joints, scene_.handle(*id));
       physics_->remove_object(*id);
       scene_.finalize_destroy(*id);
     }

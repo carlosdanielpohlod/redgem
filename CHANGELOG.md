@@ -21,6 +21,44 @@ until 1.0, a release may change what games rely on (see
   the `:see`, `:lose_sight`, `:hear` and `:interact` events. Over the network only the host thinks
   and perceives. `LineOfSight` is the ray check Interactors and Perceptions share, and
   `Interactor.all` lists the heroes. See the manual's NPCs page.
+- **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
+  physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
+  of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
+  scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
+- **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
+  letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
+  text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
+  Hebrew are drawn in their order on screen by the Unicode Bidirectional Algorithm (SheenBidi 2.9,
+  Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
+  vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
+  not joined yet (no shaping).
+
+- **Changing level together in a network game**: on the host (a player's or a dedicated server's
+  room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
+  connection that stays up. Each machine loads it in the background and waits, frozen, until all
+  have it; a machine still loading after `Network.level_timeout` seconds (30) is let go. The
+  objects of the old level, spawned ones included, are gone everywhere, and nothing said about
+  them on the way reaches the new level. `Network.on_level_loading` and `Network.on_level_ready`
+  tell every machine, and `Network.changing_level?` says a change is going on. A machine that joins
+  loads the level the game plays. Only the host changes the level: elsewhere `Game.load_scene`
+  returns `false`. A room's opener on a relay can now have the relay let a machine go.
+
 - **Interaction**: an `Interactable` behaviour makes an object something the player can use or talk
   to (an I18n prompt, a range, a priority, an enabled flag and an optional facing angle), and an
   `Interactor` on the hero picks the best one in reach every frame (in range, in front, in line of
@@ -30,6 +68,106 @@ until 1.0, a release may change what games rely on (see
   `on_blur(actor)`, and the game `Interaction.on(:interact) { |actor, target| }`. Over the network
   a client's use is asked of the host, which checks range and line of sight again and runs it there.
   See the manual's Interaction page.
+- **Loading a level without a freeze**: after `Game.load_scene_async` reads a level, the engine
+  makes it ready over the next frames while the loading screen keeps drawing: pictures are
+  decoded on the background reader, physics bodies are made in batches of about 4 ms a frame,
+  and textures and meshes go to the graphics card about 8 MiB a frame. The swap happens once all
+  of it is ready, and every script of the new level starts in that frame, so each sees the whole
+  level on its first update. Offline fixed-step runs (`--record`, `redgem run`) still make the
+  level ready all at once, in the same frame as before.
+
+- **Joints set up in the editor**: Add Component > Joint gives an object a fixed, hinge, slider,
+  point or distance joint to another object (picked by name) or to the world, with its anchor,
+  axis, limits, motor, lengths, spring and break force, saved in the scene as the object's `joint`
+  properties (Blender can set them too). The joint is made as the scene loads, like one from
+  `Physics.joint`, and `GameObject#joint` returns it. The Scene view draws its anchor, its axis and
+  its limits as an arc. Undo, copy and paste, duplication, prefabs and `Scene.spawn` keep it, a
+  copy made with its other end holding to that end's copy.
+- **An interface that scales with the screen**: every size, position, margin and font size `UI`
+  takes is in units of a reference screen the game names in `game.json`
+  (`"ui": {"reference": [1920, 1080], "match": "height"}`, or `"width"` or `"fit"`; the game's own
+  window, its height matched, when it names none). `UI.scale` says how many pixels a unit takes,
+  so a HUD keeps its share of the screen at 720p, at 4K and in a small window, and texts are
+  drawn sharp from letters made near the pixels they take (a few raster sizes per face) instead of
+  being stretched. `UI.width` and `UI.height` are in units; `UI.pixel_width`, `UI.pixel_height`,
+  `UI.reference`, `UI.mouse_x` and `UI.mouse_y` are new, clicks and taps land on what is drawn at
+  any size, and `Camera.world_to_screen` and `Camera.screen_ray` are in units too. Players make
+  the interface bigger or smaller with `Settings.ui_scale` (0.5 to 2, the settings screen's
+  "Interface size"), kept with the other settings. `GameMenu` uses the same scale instead of its
+  own, so it now grows on large screens; it already takes the screen's height, so a larger
+  interface size grows a game's HUD, and the menu shrinks to fit a short or narrow screen.
+- **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
+  model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
+  or folder has every word, best match first (a name that is the word, then one that starts with
+  it, holds it, a subfolder tag of that name, and the rest of the path); `redgem templates
+  [words]` does the same for the templates new games start from. MCP has both as the read-only
+  tools `asset_search` and `template_search`.
+- **Scene diff against Git**: `redgem scene diff <game> --against <revision>` (or `--revision`;
+  `HEAD`, `HEAD~1`, `main`, a commit hash) compares the scene with the one that commit saved,
+  read through `git show`; MCP's `scene_diff` takes the same as `revision`, and a connected editor compares
+  its open, unsaved document with it. A missing revision, or a game in no Git repository, is an
+  error that says so.
+- **Reconnecting after a drop**: `Network.reconnect_window = seconds` on the machine hosting
+  (directly, or a dedicated server's room) holds the place and id of a player whose connection
+  drops. That player stays in the game (`Network.reconnecting?`) and calls back every second with
+  a secret token from its welcome, single use, getting the same id back; a token that holds no
+  place, an old one, or one past the window is turned away. New events: `on_reconnecting`,
+  `on_reconnected` (on the host and on the machine that dropped) and `on_lost` (it could not get
+  back in time). The others hear the player left only once the window is over, and on its return
+  the host shows it the spawned objects as they are now. A player who leaves, and a host that
+  leaves, now say goodbye, so no place is held for them. Not in rooms on a relay, and there is
+  no host migration (see KNOWN_LIMITATIONS.md).
+- **A second key or button per action on the controls page**: each row of the menu's controls
+  page has two cells of keys and two of gamepad buttons, so a player binds W and Up both to
+  "Move up". A key caught for the second cell is added beside the first, one caught for the first
+  keeps the second in its place, Delete, Backspace or a gamepad's Y clears the focused cell, and a
+  key the row already has changes nothing. Both are kept for the next runs.
+- **`Input.rumble(pad, strength, seconds)` and `Input.rumble?`**: a hook for gamepad vibration
+  that does nothing yet (raylib 5.5 has none on desktops or Android) and says so: `rumble?` is
+  false and `rumble` returns false, checking its arguments all the same.
+- **Save versions and migrations**: `Save.version = N` says which version of its saved data a
+  game writes, and `Save.migrate(from: n) { |data| ... }` how a slot of version n becomes n + 1.
+  An older slot goes through its hooks in order on its first use and is written back at once
+  (one file write, or one database transaction), so each hook runs once; a slot from a newer game,
+  or one a hook raised on, is refused and left as it was.
+- **Spawned objects in the save**: `persist :field, ...` in a behaviour has `Save.checkpoint` keep
+  the spawned objects that carry it (template, name, pose, look and those fields), and
+  `Save.restore_checkpoint` spawn them again with their fields, before they start.
+- **Compressed textures (KTX2)**: a scene's textures may be KTX2 pictures of Basis Universal data
+  (`KHR_texture_basisu`, ETC1S or UASTC). They are transcoded as the scene loads into the best
+  format the graphics card takes, read from its OpenGL extensions: BC1/BC3 on desktop cards,
+  ASTC 4x4 or ETC1/ETC2 on OpenGL ES (phones), RGBA8 otherwise, and uploaded compressed with the
+  file's own mipmaps. The official Basis Universal transcoder (Apache 2.0) is built in, without its
+  encoder. A new fuzz target, `ktx2`, feeds made-up files to the header checks and the transcoder.
+
+- **Floating in water**: dynamic bodies and vehicles float in water surfaces with no script. Each
+  body's collider box is sampled as a 2 × 2 grid of columns that water pushes up by what they
+  displace and drags as they move, so bodies bob, settle and flat ones right themselves. The new
+  `density` custom property (kilograms per cubic meter, 500 unless said) sets how deep a body
+  floats; denser than water's 1000, it sinks.
+- **Underwater camera**: under a water surface the picture fades with distance into the water's
+  color and wobbles slightly, fading in as the camera goes under the waves so crossing the surface
+  never flickers.
+- **`Water` in scripts**: `Water.height_at(x, z)`, `Water.depth_at(point)` and
+  `Water.under?(point)` say where the scene's water is.
+- **Ruby eval in the playing game, for development builds**: `redgem <game> --ruby-eval` starts the
+  editor with its local bridge and prints a random token; the MCP tool `game_eval` then evaluates a
+  Ruby snippet in the game the editor plays, given that token, and answers with the result's
+  `inspect` or the exception and its backtrace. It runs on the game's script budget (at most 0.4
+  seconds) and takes at most 16 KiB of code. Release builds leave it
+  out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
+  `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
+- **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
+  block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
+  passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
+  custom property on the Blender action, exported as the animation's extras). Each moment fires
+  once on every pass: across loop wraps, several in order on a long frame, backwards, on clips
+  played once; in blends from the clip with the most weight, and from a new graph state from its
+  first frame. Blocks run in the scripts' update, before the behaviours'. `animation.off` stops one.
+- **Root motion**: `animation.root_motion = true`, or `animation.play(:Lunge, root_motion: true)`
+  for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
+  across blends) and keeps the root over it; a `CharacterController` goes there through the
+  physics, so walls stop it.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
@@ -127,6 +265,21 @@ until 1.0, a release may change what games rely on (see
   sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
   `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
   (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+- **A typed scripting API, and type signatures for editors**: every method of
+  `docs/scripting/api.json` gives each parameter a type (with whether it is a keyword, optional,
+  its default, a rest or a block) and the type it returns, in a small closed language (`Integer`,
+  `Float`, `Numeric`, `String`, `Symbol`, `bool`, `nil`, `Color`, the API's classes, `Array[T]`,
+  `Hash[K, V]`, `Range[T]`, tuples, unions and blocks); the file is refused when it holds a type
+  not in it or a parameter out of place. `redgem api <Class>`, its search, the MCP `api` tool and
+  the [API reference](docs/scripting/api.md) show the types (`Input.axis(Symbol name, pad: Integer
+  = 0) -> Float`). `redgem api --rbs` writes them as Ruby type signatures (RBS), which new games
+  get as `sig/redgem.rbs` (kept out of builds), so editors with a Ruby language server (Steep,
+  Solargraph and the like) complete and type-check game scripts. The tests now also check that
+  each class is the class or module the engine has, and that the methods written in Ruby take the
+  parameters the reference says. `Behaviour::Timer`, what `after`, `every` and `tween` return, is
+  in the reference (`cancel`, `cancelled?`), and so are the keywords some methods took without
+  saying: `pad:` of `Input.axis`, `action?`, `action_pressed?` and the gamepad's, `alpha:` of
+  `UI.image`, the colors, `size:`, `focused:` and `confirm:` of `UI.button`, and more.
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
@@ -267,6 +420,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
+- In a network game, a machine that is not the host can no longer load a level on its own
+  (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
+  objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
 - **The site and the manual moved to https://www.redgem-engine.org**: the README, the manual's
   links and `llms.txt`, the `AGENTS.md` of new games and the downloads' READMEs point there.
 - **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
@@ -322,9 +480,26 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Web requests end with their game**: their threads used to be detached, so one still running
+  at exit could outlive the program's static objects. A game that ends (or an editor play session
+  that stops) now gives every request on its way up, hangs up its connection so its wait ends at
+  once, and joins its thread, 2 seconds at most; only a request still busy past that (looking
+  its server's name up, most likely) is left behind, with a warning.
+- **A program on Linux opens as many windows, one after another, as it likes**: closing a window
+  unloaded the OpenGL library and Mesa's driver, and glibc does not take back the thread-local
+  storage of a library loaded again, so after about a hundred windows in one process the driver
+  no longer loaded and the next window crashed. The libraries opening a window loads now stay
+  loaded until the program ends. A system test opens, draws in and closes 300 windows in one
+  process.
 - **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
   removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
   the file or console line runs, or at the end of the frame for a change made inside a method).
+- **A slow disk no longer stops the script that saves**: reading and writing the save with `Save`
+  and its slots, and `Settings.save`, are the engine's time, not the call's, like spawning
+  (forgiven up to four budgets in one call); the block of `Save.update` still counts as the call's.
+  A save that took more than a second (another program scanning the file, a slow CI
+  machine) ended the call with a `ScriptTimeout`. The scripts' budget can be timed on a test's
+  clock (`ScriptBudget::set_clock`), and its tests no longer depend on how fast the machine is.
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock

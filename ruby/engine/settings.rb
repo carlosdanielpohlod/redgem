@@ -2,12 +2,13 @@
 # pace of its frames, how much the renderer does, the volumes. A change takes effect at once;
 # Settings.save keeps what is in use for the game's next runs. Until the player chooses, everything
 # is what the game's game.json says (window_width, window_height, fullscreen, vsync, fps_cap,
-# render_scale, quality).
+# render_scale, quality), and the interface is as big as the game made it (ui_scale 1).
 #
 #   Settings.fullscreen = true
 #   Settings.resolution = [1920, 1080]      # one of Settings.resolutions
 #   Settings.render_scale = 0.75            # the world drawn at 75% of the window's size
 #   Settings.quality = :medium              # :low, :medium, :high, :ultra or :custom
+#   Settings.ui_scale = 1.25                # the interface a quarter bigger than the game made it
 #   Settings.save
 module Settings
   WINDOW_MODES = %i[windowed fullscreen borderless].freeze
@@ -15,6 +16,7 @@ module Settings
   # What the engine's settings screen offers (anything in between can be set from a script).
   RENDER_SCALES = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].freeze
   FPS_CAPS = [0, 30, 60, 120, 144].freeze  # 0: no cap
+  UI_SCALES = [0.75, 1.0, 1.25, 1.5, 2.0].freeze
   NO_CAP = 0
   # What a custom quality may say (see Settings.quality_details).
   QUALITY_DETAILS = %i[msaa antialias shadow_cascades shadow_distance local_shadows scatter_density
@@ -51,6 +53,14 @@ module Settings
 
   def self.render_scale=(scale)
     write("render_scale" => scale.to_f)
+  end
+
+  # How much bigger than the game made it the interface (UI) is drawn, 0.5 to 2: for a player
+  # who reads it better larger. UI.scale is the game's own scale to the screen times this.
+  def self.ui_scale = read("ui_scale")
+
+  def self.ui_scale=(scale)
+    write("ui_scale" => scale.to_f)
   end
 
   def self.vsync = read("vsync")

@@ -13,6 +13,8 @@ inline constexpr const char* kCollider = "collider";
 inline constexpr const char* kTrigger = "trigger";
 inline constexpr const char* kTag = "tag";
 inline constexpr const char* kMass = "mass";
+// Kilograms per cubic meter, as a whole: a body less dense than water (1000) floats in it.
+inline constexpr const char* kDensity = "density";
 // The collision layer of its body, one of game.json's physics layers (physics/collision_layers.hpp).
 inline constexpr const char* kLayer = "layer";
 inline constexpr const char* kVisible = "visible";
@@ -67,6 +69,45 @@ inline constexpr const char* kColliderMesh = "mesh";
 // Every collider, as lists show them. The first is what a body without a collider gets.
 inline constexpr const char* kColliders[] = {kColliderBox, kColliderSphere, kColliderCapsule, kColliderMesh};
 
+// --- Joints: what holds an object to another one, or to the world (the editor's Joint card) ---
+// Its kind, one of kJointKinds (in the order of physics' JointKind).
+inline constexpr const char* kJoint = "joint";
+inline constexpr const char* kJointFixed = "fixed";
+inline constexpr const char* kJointHinge = "hinge";
+inline constexpr const char* kJointSlider = "slider";
+inline constexpr const char* kJointPoint = "point";
+inline constexpr const char* kJointDistance = "distance";
+inline constexpr const char* kJointKinds[] = {kJointFixed, kJointHinge, kJointSlider, kJointPoint, kJointDistance};
+// The stable id of the object at its other end; none: the world.
+inline constexpr const char* kJointTo = "joint_to";
+// Points in the object's own space (its scale stretches them): where it turns or is held, and for
+// a distance joint the point it is kept from, in the other object's space (for the world, meters
+// from the object along the world's axes). The axis a hinge turns around or a slider slides along,
+// in the object's own space.
+inline constexpr const char* kJointAnchor[] = {"joint_anchor_x", "joint_anchor_y", "joint_anchor_z"};
+inline constexpr const char* kJointOtherAnchor[] = {"joint_other_anchor_x", "joint_other_anchor_y",
+                                                    "joint_other_anchor_z"};
+inline constexpr const char* kJointAxis[] = {"joint_axis_x", "joint_axis_y", "joint_axis_z"};
+// Hinges, degrees from where it starts (low -180..0, high 0..180); sliders, meters. Both or none.
+inline constexpr const char* kJointLow = "joint_low";
+inline constexpr const char* kJointHigh = "joint_high";
+// Hinges: degrees per second, and newton meters at most (0: no motor).
+inline constexpr const char* kJointMotorSpeed = "joint_motor_speed";
+inline constexpr const char* kJointMotorTorque = "joint_motor_torque";
+// Distance joints: meters (max unsaid or 0: as far apart as the ends start), and a spring (hertz) with
+// its damping (0 bounces on, 1 settles at once).
+inline constexpr const char* kJointMin = "joint_min";
+inline constexpr const char* kJointMax = "joint_max";
+inline constexpr const char* kJointSpring = "joint_spring";
+inline constexpr const char* kJointDamping = "joint_damping";
+// Newtons (or newton meters) it takes to break it; 0: it never breaks.
+inline constexpr const char* kJointBreakForce = "joint_break_force";
+// Every property of a joint but its vectors' numbers, which kJointAnchor, kJointOtherAnchor and
+// kJointAxis list.
+inline constexpr const char* kJointScalars[] = {kJoint,           kJointTo,          kJointLow,       kJointHigh,
+                                                kJointMotorSpeed, kJointMotorTorque, kJointMin,       kJointMax,
+                                                kJointSpring,     kJointDamping,     kJointBreakForce};
+
 // --- Environment: the look of a scene beyond its objects ---------------------------
 // True on the object whose other properties describe the environment (see render/environment.hpp).
 inline constexpr const char* kEnvironment = "environment";
@@ -107,6 +148,17 @@ inline constexpr const char* kTemporalAntialias =
     "temporal";  // with the frames before (Environment::temporal_antialias)
 // The brightest glowing particles together make a pixel (see Environment::glow_limit).
 inline constexpr const char* kGlowLimit = "glow_limit";
+// Auto exposure (see render/auto_exposure.hpp): whether it is on, the darkest and brightest scene
+// brightness it adapts to (EV), how fast per second when the scene got brighter and darker, and
+// the EV the adapted picture is brightened by.
+inline constexpr const char* kAutoExposure = "auto_exposure";
+inline constexpr const char* kExposureMinEv = "exposure_min_ev";
+inline constexpr const char* kExposureMaxEv = "exposure_max_ev";
+inline constexpr const char* kExposureSpeedUp = "exposure_speed_up";
+inline constexpr const char* kExposureSpeedDown = "exposure_speed_down";
+inline constexpr const char* kExposureCompensation = "exposure_compensation";
+// How much sunlight comes through leaves lit from behind (foliage materials), 0 to 1.
+inline constexpr const char* kFoliageTranslucency = "foliage_translucency";
 }  // namespace environment
 
 }  // namespace redgem::props

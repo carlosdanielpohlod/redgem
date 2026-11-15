@@ -2,10 +2,12 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "app/game_settings.hpp"
 #include "app/app_config.hpp"
+#include "physics/physics_config.hpp"
 
 using namespace redgem;
 
@@ -22,6 +24,12 @@ std::filesystem::path game_saying(const std::string& json) {
   std::filesystem::create_directories(dir);
   if (!json.empty()) std::ofstream(dir / kGameSettingsFile) << json;
   return dir;
+}
+
+// The game.json written in the folder, read whole and closed again (Windows removes no open file).
+std::string saved_text(const std::filesystem::path& game) {
+  std::ifstream file(game / kGameSettingsFile);
+  return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
 
 }  // namespace
@@ -166,4 +174,102 @@ TEST_CASE("game.json says how the game is shown until its player chooses otherwi
   const GameSettings odd = read_game_settings(game_saying(R"({"fullscreen": "yes", "render_scale": 9})"));
   CHECK(odd.display.mode == WindowMode::Windowed);
   CHECK(odd.display.render_scale == kLargestRenderScale);
+}
+
+TEST_CASE("game.json says how many threads solve the game's physics, and one is what a game that does not say gets") {
+  constexpr int kFourThreads = 4;
+  CHECK(read_game_manifest(game_saying("")).settings.physics_threads == config::kDefaultPhysicsThreads);
+  CHECK(read_game_manifest(game_saying(R"({"physics": {"layers": ["default"]}})")).settings.physics_threads ==
+        config::kDefaultPhysicsThreads);
+  const GameManifest manifest = read_game_manifest(game_saying(R"({"physics": {"threads": 4}})"));
+  CHECK(manifest.settings.physics_threads == kFourThreads);
+  CHECK(manifest.physics_warnings.empty());
+}
+
+TEST_CASE("threads game.json cannot give the physics are said, and the physics is solved on one") {
+  for (const char* json : {R"({"physics": {"threads": 0}})", R"({"physics": {"threads": 33}})",
+                           R"({"physics": {"threads": "many"}})", R"({"physics": {"threads": 2.5}})"}) {
+    const GameManifest manifest = read_game_manifest(game_saying(json));
+    CHECK(manifest.settings.physics_threads == config::kDefaultPhysicsThreads);
+    REQUIRE(manifest.physics_warnings.size() == 1);
+    CHECK(manifest.physics_warnings.front().find("\"threads\" must be a whole number from 1 to 32") !=
+          std::string::npos);
+  }
+}
+
+TEST_CASE("the physics' threads go into game.json and come back, and the default takes them out") {
+  constexpr int kEightThreads = 8;
+  const std::filesystem::path game = game_saying(R"({"physics": {"layers": ["default", "player"], "threads": 2}})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kEightThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  const GameManifest saved = read_game_manifest(game);
+  CHECK(saved.settings.physics_threads == kEightThreads);
+  CHECK(saved.settings.collision_layers.count() == 2);  // (the rest of the section stays)
+
+  settings.physics_threads = config::kDefaultPhysicsThreads;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  const std::string text = saved_text(game);
+  CHECK(text.find("threads") == std::string::npos);
+  CHECK(read_game_settings(game).physics_threads == config::kDefaultPhysicsThreads);
+  CHECK(read_game_settings(game).collision_layers.count() == 2);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("a game that never said how many threads solve its physics is saved without saying it") {
+  const std::filesystem::path game = game_saying(R"({"title": "Plain"})");
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, read_game_settings(game), error), error);
+  const std::string text = saved_text(game);
+  CHECK(text.find("physics") == std::string::npos);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("a physics section that is no object is left as it is when the threads are saved") {
+  constexpr int kFourThreads = 4;
+  const std::filesystem::path game = game_saying(R"({"physics": ["default", "player"]})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kFourThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  const std::string text = saved_text(game);
+  CHECK(text.find("player") != std::string::npos);
+  CHECK(text.find("threads") == std::string::npos);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("threads below the fewest are saved as the default, and threads above the most as the most") {
+  constexpr int kNoThreads = 0;
+  const std::filesystem::path game = game_saying(R"({"physics": {"threads": 2}})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kNoThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(saved_text(game).find("threads") == std::string::npos);
+  settings.physics_threads = config::kMaxPhysicsThreads + 1;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).physics_threads == config::kMaxPhysicsThreads);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("the interface is laid out for the game's own window, its height matched, unless game.json says") {
+  const GameSettings nothing = read_game_settings(game_saying(""));
+  CHECK(nothing.ui.size == SurfaceSize{config::kWindowWidth, config::kWindowHeight});
+  CHECK(nothing.ui.match == UiMatch::Height);
+  const GameSettings windowed = read_game_settings(game_saying(R"({"window_width": 800, "window_height": 450})"));
+  CHECK(windowed.ui.size == SurfaceSize{kWidth, kHeight});
+  const GameManifest said = read_game_manifest(game_saying(R"({"ui": {"reference": [1920, 1080], "match": "fit"}})"));
+  CHECK(said.settings.ui.size == SurfaceSize{1920, 1080});
+  CHECK(said.settings.ui.match == UiMatch::Fit);
+  CHECK(said.ui_warnings.empty());
+}
+
+TEST_CASE("an interface reference or match that cannot be used is said, and keeps its default") {
+  const GameManifest odd = read_game_manifest(game_saying(R"({"ui": {"reference": [1920], "match": "stretch"}})"));
+  CHECK(odd.settings.ui.size == SurfaceSize{config::kWindowWidth, config::kWindowHeight});
+  CHECK(odd.settings.ui.match == UiMatch::Height);
+  CHECK(odd.ui_warnings.size() == 2);
+  CHECK(read_game_manifest(game_saying(R"({"ui": {"reference": [10, 1080]}})")).ui_warnings.size() == 1);
+  CHECK(read_game_manifest(game_saying(R"({"ui": "big"})")).ui_warnings.size() == 1);
 }

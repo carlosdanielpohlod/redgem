@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,11 +13,14 @@
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
+#include "render/auto_exposure.hpp"
 #include "render/display_settings.hpp"
 #include "render/hud.hpp"
+#include "render/ui_scale.hpp"
 #include "script/script_config.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/water_geometry.hpp"
 
 namespace redgem {
 
@@ -58,6 +62,14 @@ struct TimeInfo {
   float unscaled_delta = 0.0f;
 };
 
+// A joint an object of the scene came with (its Joint component), as GameObject#joint finds it.
+struct SceneJoint {
+  JointId id = kNoJoint;
+  JointKind kind = JointKind::Fixed;
+  ObjectHandle other;  // kNoHandle: the world
+};
+using SceneJoints = std::map<ObjectHandle, SceneJoint>;  // by the object it holds
+
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.
 class FrameProfiler;
 class DebugDrawBuffer;
@@ -72,6 +84,7 @@ struct ScriptContext {
   std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;
+  SceneJoints scene_joints;  // made with the scene's bodies, and with those of what is spawned
   InputState* input = nullptr;
   TimeInfo time;
   std::vector<HudItem> hud;  // cleared by the engine every rendered frame
@@ -82,9 +95,12 @@ struct ScriptContext {
   // (see Presenter::picture_size); 0 when it is the screen's own.
   int picture_width = 0;
   int picture_height = 0;
+  // The screen the game's interface is laid out for (game.json's "ui"): UI's sizes are given for it
+  // (see ui_scale_of). None outside a running game: a unit of the interface is a pixel.
+  UiReference ui_reference;
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
-  std::string ui_font;  // selected game face; empty uses the built-in font
+  std::string ui_font;  // selected game face or chain (render/font_chain.hpp); empty uses the built-in font
   // Called when a player's bindings changed (Input.bind, unbind, reset_bindings), so that they are
   // kept for the next run; null when nobody keeps them.
   std::function<void()> on_bindings_changed;
@@ -99,6 +115,8 @@ struct ScriptContext {
   bool keyboard_visible = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // Camera.auto_exposure and the others: what the game changes of the scene's auto exposure.
+  AutoExposureOverrides auto_exposure;
   // How the player chose the game to be shown and heard (Settings): what is in use now.
   DisplaySettings display;
   // What puts a change of `display` into effect (the window, the renderer's quality, the volume),
@@ -120,6 +138,9 @@ struct ScriptContext {
   // grid now. Null outside a running engine.
   Navigation* navigation = nullptr;
   std::function<void()> bake_navigation;
+  // The running scene's water surfaces, as the simulation last found them (Water). Null outside a
+  // running engine.
+  const std::vector<WaterSurface>* water = nullptr;
   bool renders_particles = false;  // emitters are local presentation, never simulated by a headless room
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;
@@ -148,8 +169,16 @@ struct ScriptContext {
   bool cancel_scene_load = false;
   std::string loading_scene;  // nonempty while the current world is frozen for a background read
   std::string loading_error;  // last failed read, retained until the next request
+  // The world is frozen as while loading, until every machine of a network game has the level it
+  // changes to (Game.__hold, from Network's level change).
+  bool level_held = false;
   std::function<bool(const std::string&)> scene_exists;
 };
+
+// Pixels a unit of the interface (UI) takes on the screen now, the player's scale included.
+inline float ui_scale_of(const ScriptContext& ctx) {
+  return ui_scale({ctx.screen_width, ctx.screen_height}, ctx.ui_reference, ctx.display.ui_scale);
+}
 
 // How wide a text of that size is taken to be when there is no font to measure it with.
 inline int estimated_text_width(const std::string& text, int size) {
