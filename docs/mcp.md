@@ -137,7 +137,7 @@ The `editor` tool takes these actions:
 
 | Action | Result |
 |--------|--------|
-| `status` | Scene, play state, dirty flag, selection, undo/redo, external-conflict state, and whether the editor offers to recover an earlier session's unsaved edits (`recovery_pending`). |
+| `status` | Scene, play state, dirty flag, selection, undo/redo, external-conflict state, and whether a copy of an earlier session's unsaved edits waits for an answer (`recovery_pending`: the editor offers it when no other dialog is open). |
 | `select` | Select the requested `object`. |
 | `frame` | Point the editor camera at `object` (selecting it), or at the selection. |
 | `undo`, `redo`, `save` | Apply the corresponding editor command. Saving is explicit. |

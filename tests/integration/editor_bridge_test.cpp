@@ -337,6 +337,9 @@ TEST_CASE("a recovery offered at start is in the status and named as the reason 
   const Json edit = invoke_editor(*game.session, "scene_edit", set({"position=7,8,9"}), kDialogOpen);
   CHECK_FALSE(ok(edit));
   CHECK(text_of(edit).find("recover unsaved edits") != std::string::npos);
+  const auto window = [](const std::string&, const Json&) { return Json(); };
+  const Json play = invoke_editor(*game.session, "editor", {{"action", "play"}}, kDialogOpen, window);
+  CHECK(text_of(play).find("recover unsaved edits") != std::string::npos);
 }
 
 TEST_CASE("live MCP rejects mutation actions in read-only mode before connecting") {

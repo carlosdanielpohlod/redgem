@@ -659,7 +659,8 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
-  session's edits (`recovery_pending`), and changes wait until someone answers it in the editor.
+  session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
+  again once someone answered it in the editor).
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
