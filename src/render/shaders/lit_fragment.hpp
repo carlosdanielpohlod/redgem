@@ -2,7 +2,8 @@
 
 // The fragment shader every surface of a scene is lit by. It is one GLSL program, kept in parts
 // that share its uniforms and constants: this head (what it takes, how light meets a surface),
-// the shadows of the sun and of point and spot lights (lit_shadows.hpp), the light from all around (lit_sky.hpp) and
+// the shadows of the sun and of point and spot lights (lit_shadows.hpp), leaves lit from behind
+// (lit_foliage.hpp), the light from all around (lit_sky.hpp) and
 // its main (lit_main.hpp). lit_fragment() puts them together in that order, with copies fading by distance
 // (copy_fade.hpp) and which texels are drawn after the head.
 
@@ -10,6 +11,7 @@
 
 #include "render/shaders/copy_fade.hpp"
 #include "render/shaders/lit_clearcoat.hpp"
+#include "render/shaders/lit_foliage.hpp"
 #include "render/shaders/lit_main.hpp"
 #include "render/shaders/lit_water.hpp"
 #include "render/shaders/water_waves.hpp"
@@ -195,8 +197,8 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   if (features.soft_shadows) switches += kSoftShadowsSwitch;
   if (features.clearcoat) switches += kClearcoatSwitch;
   if (features.water) switches += kWaterSwitch;
-  std::string source =
-      std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitLocalShadows + kLitSky + kLitClearcoat;
+  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitLocalShadows + kLitFoliage +
+                       kLitSky + kLitClearcoat;
   if (features.water) source += std::string(kWaterWaves) + kWaterFilter + kLitWater;
   source += kLitMain;
   const std::size_t version = source.find(kVersionLine);

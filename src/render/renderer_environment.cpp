@@ -32,6 +32,7 @@ void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Ve
   send_sky_light(env);
   wind = env.wind;
   glow_limit = env.glow_limit;
+  foliage_translucency = env.foliage_translucency;
   sun_travel = sun_direction;
 }
 

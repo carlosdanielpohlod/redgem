@@ -5,7 +5,9 @@
 
 namespace redgem::shaders {
 
-// Keeps what is brighter than the threshold (drawn into a smaller target: the bloom source).
+// Keeps what is brighter than the threshold (drawn into a smaller target: the bloom source), as the
+// picture will be exposed (auto exposure's adaptedScale, which with_adapted_scale puts in): what
+// glows is what shows bright, however dark the scene the eye adapted to.
 inline constexpr const char* kBrightFragment = R"GLSL(
 #version 330
 in vec2 fragTexCoord;
@@ -18,9 +20,10 @@ void main() {
   vec3 color = texture(texture0, fragTexCoord).rgb;
   // A broken pixel (not a number) must not be smeared over the screen by the blur.
   if (any(isnan(color)) || any(isinf(color))) color = vec3(0.0);
-  color = min(color, vec3(MAX_BRIGHT));
-  float brightest = max(color.r, max(color.g, color.b));
-  finalColor = vec4(color * smoothstep(threshold, threshold + KNEE, brightest), 1.0);
+  float scale = adaptedScale();
+  vec3 exposed = min(color * scale, vec3(MAX_BRIGHT));
+  float brightest = max(exposed.r, max(exposed.g, exposed.b));
+  finalColor = vec4(exposed / scale * smoothstep(threshold, threshold + KNEE, brightest), 1.0);
 }
 )GLSL";
 

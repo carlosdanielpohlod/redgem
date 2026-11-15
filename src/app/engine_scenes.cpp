@@ -19,12 +19,23 @@ namespace redgem {
 Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
 std::unique_ptr<PhysicsWorld> Engine::new_physics_world() const {
-  return create_jolt_physics_world(gravity(), collision_layers_, max_bodies_);
+  std::unique_ptr<PhysicsWorld> world =
+      create_jolt_physics_world(gravity(), collision_layers_, max_bodies_, physics_threads_);
+  if (!config::solves_in_parallel(physics_threads_)) return world;
+  return std::make_unique<OverlappedPhysicsWorld>(std::move(world));
+}
+
+void Engine::adopt_physics(std::unique_ptr<PhysicsWorld> world) {
+  // (A step still under way was the old world's: it ends with it, and is never finished.)
+  step_prepared_ = false;
+  step_in_flight_ = false;
+  physics_ = std::move(world);
+  overlapped_ = dynamic_cast<OverlappedPhysicsWorld*>(physics_.get());
 }
 
 void Engine::make_bodies() {
-  physics_.reset();  // (the old world's memory goes first: a large world is never held twice)
-  physics_ = new_physics_world();
+  adopt_physics(nullptr);  // (the old world goes first, threads and all: a large world is never held twice)
+  adopt_physics(new_physics_world());
   bodies::create_all({scene_, scene_desc_}, *physics_);
   settle_world();
 }
@@ -87,7 +98,7 @@ void Engine::install_world(SceneActivation& incoming) {
   runtime_prefab_bytes_ = 0;
   scene_desc_ = std::move(incoming.desc());
   scene_ = std::move(incoming.scene());
-  physics_ = incoming.take_physics();
+  adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
   settle_world();
 }

@@ -5,6 +5,7 @@
 #include "render/shaders/ambient_occlusion.hpp"
 #include "render/shaders/antialias.hpp"
 #include "render/shaders/bloom.hpp"
+#include "render/shaders/exposure.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shaders/lit_vertex.hpp"
 #include "render/shaders/motion.hpp"
@@ -64,13 +65,22 @@ void Renderer::Impl::compile_shaders() {
   sharpen_shader = compile_shader(nullptr, shaders::kSharpenFragment, "sharpening");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::particle_fragment().c_str(), "particles");
-  glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
-  bright_shader = compile_shader(nullptr, shaders::kBrightFragment, "bloom threshold");
-  blur_shader = compile_shader(nullptr, shaders::kBlurFragment, "blur");
-  composite_shader = compile_shader(nullptr, shaders::kCompositeFragment, "tone mapping");
   antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
   panorama_shader = compile_shader(nullptr, shaders::kPanoramaFragment, "reflection panorama");
   occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
+  compile_post_shaders();
+}
+
+// The passes that work on the lit picture: bloom, tone mapping and the exposure.
+void Renderer::Impl::compile_post_shaders() {
+  glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
+  bright_shader =
+      compile_shader(nullptr, shaders::with_adapted_scale(shaders::kBrightFragment).c_str(), "bloom threshold");
+  blur_shader = compile_shader(nullptr, shaders::kBlurFragment, "blur");
+  composite_shader =
+      compile_shader(nullptr, shaders::with_adapted_scale(shaders::kCompositeFragment).c_str(), "tone mapping");
+  luminance_shader = compile_shader(nullptr, shaders::kLuminanceFragment, "brightness measure");
+  adapt_shader = compile_shader(nullptr, shaders::kAdaptFragment, "exposure adaptation");
 }
 
 void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
@@ -125,9 +135,10 @@ void Renderer::Impl::release_sky() {
 }
 
 void Renderer::Impl::release_shaders() {
-  for (Shader* program : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader,
-                          &glow_limit_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader,
-                          &motion_shader, &temporal_shader, &sharpen_shader, &particle_shadow_shader}) {
+  for (Shader* program :
+       {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader, &glow_limit_shader,
+        &bright_shader, &blur_shader, &composite_shader, &antialias_shader, &motion_shader, &temporal_shader,
+        &sharpen_shader, &particle_shadow_shader, &luminance_shader, &adapt_shader}) {
     if (loaded(*program)) UnloadShader(*program);
     *program = Shader{};
   }

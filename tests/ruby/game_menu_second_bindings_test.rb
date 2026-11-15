@@ -183,7 +183,7 @@ class GameMenuSecondBindingsTest < RedGemTest::Case
     clear_on(opened, Input::FIRST_PAD)
     assert_equal ["pad:a"], Input.bindings(:jump, pad: SECOND_PAD)
     clear_on(opened, SECOND_PAD)
-    assert_empty Input.bindings(:jump, pad: SECOND_PAD)
+    assert_equal [], Input.bindings(:jump, pad: SECOND_PAD)
   end
 
   # Presses what clears a cell, its gamepad buttons on gamepad `pad`.
