@@ -30,11 +30,11 @@ module Network
     # with it have none of them any more).
     def __despawn_mine
       mine = keys_spawned_by(id)
-      __deliver(DESPAWN, mine, :all) if despawns?(mine)
+      __deliver(DESPAWN, mine, :all) if __despawns?(mine)
     end
 
     # Whether there are others to tell that these keys are gone.
-    def despawns?(keys) = online? && keys.any?
+    def __despawns?(keys) = online? && keys.any?
 
     private
 
