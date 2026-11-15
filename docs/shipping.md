@@ -28,8 +28,8 @@ player for the current platform beside the `redgem` executable. It looks under
 
 ## The game's files
 
-A build from the current source packs the game files that ship (scenes, scripts, pictures, sounds, music,
-fonts, `game.json` and `locales/`) into one archive, `game.rgpak`, beside the executable. A file
+Starting in RedGem 0.6.0, builds pack scenes, scripts, images, audio, fonts, `game.json` and
+`locales/` into `game.rgpak`. On Linux and Windows, the archive is beside the executable. A file
 that compresses is compressed (the scripts, the JSON, most models); one that does not (a PNG, an
 OGG) is stored as it is. The player reads project data directly from the archive. Builds skip
 hidden files and folders such as `.git` and `.env`, editor backups, symlinks, signing keys,
