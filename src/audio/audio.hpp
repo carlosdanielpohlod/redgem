@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "audio/ducking.hpp"
 #include "audio/mix_group_tree.hpp"
@@ -52,6 +53,11 @@ class AudioSystem {
   virtual bool set_group_effects(MixGroup group, const GroupEffects& effects) {
     return groups_.set_effects(group, effects);
   }
+  // How a positional sound behind a wall is heard (Audio.occlusion); false for settings that are
+  // not valid.
+  virtual bool set_occlusion(const OcclusionSettings&) { return false; }
+  // What says whether a wall stands between the listener and a sound; none, and no sound is muffled.
+  virtual void set_occlusion_query(const OcclusionQuery&) {}
   // The game's groups and every group's effects go (the game ended); its sounds went before.
   virtual void forget_game_groups() { groups_.forget_game_groups(); }
   // How the music group goes down while a voice plays (Audio.ducking); false for ducking that is
@@ -132,6 +138,8 @@ class MixedAudio : public AudioSystem {
   std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) override;
   bool set_group_effects(MixGroup group, const GroupEffects& effects) override;
   void forget_game_groups() override;
+  bool set_occlusion(const OcclusionSettings& settings) override { return sounds_.set_occlusion(settings); }
+  void set_occlusion_query(const OcclusionQuery& query) override { sounds_.set_occlusion_query(query); }
   bool set_music_ducking(const MusicDucking& ducking) override;
   void reset_music_ducking() override;
   bool play_music(const std::string& name, const MusicRequest& request) override;

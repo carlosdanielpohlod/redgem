@@ -15,6 +15,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Added
+
+- **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
+  (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
+  listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
+  fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
+
 ## [0.6.0] - 2026-11-15
 
 ### Migrating

@@ -34,6 +34,22 @@ MixGroup mix_group(mrb_state* mrb, mrb_value name) {
                "unknown mix group :%s (music, effects, voice, or one Audio.group made)", group);
 }
 
+// Audio.__occlusion(volume, low_pass, fade): how a sound behind a wall is heard; low_pass nil for
+// no filter.
+mrb_value audio_occlusion(mrb_state* mrb, mrb_value) {
+  mrb_value low_pass;
+  mrb_float volume = 0.0, fade = 0.0;
+  mrb_get_args(mrb, "fof", &volume, &low_pass, &fade);
+  OcclusionSettings settings;
+  settings.volume = static_cast<float>(from_to(mrb, volume, kSilent, kFullVolume, "Audio.occlusion's volume"));
+  settings.low_pass_hz = std::nullopt;
+  if (!mrb_nil_p(low_pass))
+    settings.low_pass_hz = static_cast<float>(
+        from_to(mrb, mrb_as_float(mrb, low_pass), kLowestCutoff, kHighestCutoff, "Audio.occlusion's low_pass"));
+  settings.fade_seconds = static_cast<float>(at_least(mrb, fade, kNoFade, "Audio.occlusion's fade"));
+  return mrb_bool_value(audio(mrb).set_occlusion(settings));
+}
+
 // Audio.group's volume, none when nil.
 std::optional<float> group_volume(mrb_state* mrb, mrb_value volume) {
   if (mrb_nil_p(volume)) return std::nullopt;
@@ -143,7 +159,17 @@ mrb_value audio_ducking(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).set_music_ducking(ducking));
 }
 
-enum SpatialOption { Volume, Pitch, ReferenceDistance, MaxDistance, Loop, Group, Priority, SpatialOptionCount };
+enum SpatialOption {
+  Volume,
+  Pitch,
+  ReferenceDistance,
+  MaxDistance,
+  Loop,
+  Group,
+  Priority,
+  Occlusion,
+  SpatialOptionCount
+};
 constexpr mrb_int kMaximumSourceId = std::numeric_limits<std::int32_t>::max();
 struct SpatialArguments {
   mrb_value name{};
@@ -151,9 +177,10 @@ struct SpatialArguments {
   std::array<mrb_value, SpatialOptionCount> options{};
 };
 std::array<mrb_sym, SpatialOptionCount> spatial_option_names(mrb_state* mrb) {
-  return {mrb_intern_lit(mrb, "volume"),       mrb_intern_lit(mrb, "pitch"), mrb_intern_lit(mrb, "reference_distance"),
-          mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),  mrb_intern_lit(mrb, "group"),
-          mrb_intern_lit(mrb, "priority")};
+  return {
+      mrb_intern_lit(mrb, "volume"),       mrb_intern_lit(mrb, "pitch"),    mrb_intern_lit(mrb, "reference_distance"),
+      mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),     mrb_intern_lit(mrb, "group"),
+      mrb_intern_lit(mrb, "priority"),     mrb_intern_lit(mrb, "occlusion")};
 }
 SpatialArguments spatial_arguments(mrb_state* mrb) {
   SpatialArguments arguments;
@@ -166,11 +193,12 @@ float spatial_number(mrb_state* mrb, mrb_value value, float fallback) {
   if (mrb_undef_p(value)) return fallback;
   return static_cast<float>(finite(mrb, mrb_as_float(mrb, value)));
 }
-bool spatial_loop(mrb_state* mrb, mrb_value value) {
-  if (mrb_undef_p(value)) return false;
+// A true or false option of play_at; `fallback` when it is not given.
+bool spatial_flag(mrb_state* mrb, mrb_value value, bool fallback, const char* refusal) {
+  if (mrb_undef_p(value)) return fallback;
   if (mrb_true_p(value)) return true;
   if (mrb_false_p(value)) return false;
-  mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.play_at's loop must be true or false");
+  mrb_raise(mrb, E_ARGUMENT_ERROR, refusal);
   return false;
 }
 MixGroup spatial_group(mrb_state* mrb, mrb_value value) {
@@ -179,6 +207,13 @@ MixGroup spatial_group(mrb_state* mrb, mrb_value value) {
 int spatial_priority(mrb_state* mrb, mrb_value value) {
   return mrb_undef_p(value) ? kDefaultSoundPriority : sound_priority(mrb, value, "Audio.play_at's priority");
 }
+
+void check_spatial_sound(mrb_state* mrb, const SpatialSound& sound) {
+  if (valid_spatial_sound(sound)) return;
+  mrb_raise(mrb, E_ARGUMENT_ERROR,
+            "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+}
+
 SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   SpatialSound sound;
   sound.position = to_vec3(mrb, arguments.position);
@@ -187,11 +222,11 @@ SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   sound.group = spatial_group(mrb, arguments.options[Group]);
   sound.reference_distance = spatial_number(mrb, arguments.options[ReferenceDistance], sound.reference_distance);
   sound.max_distance = spatial_number(mrb, arguments.options[MaxDistance], sound.max_distance);
-  sound.loop = spatial_loop(mrb, arguments.options[Loop]);
+  sound.loop = spatial_flag(mrb, arguments.options[Loop], false, "Audio.play_at's loop must be true or false");
+  sound.occludable =
+      spatial_flag(mrb, arguments.options[Occlusion], true, "Audio.play_at's occlusion must be true or false");
   sound.priority = spatial_priority(mrb, arguments.options[Priority]);
-  if (!valid_spatial_sound(sound))
-    mrb_raise(mrb, E_ARGUMENT_ERROR,
-              "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+  check_spatial_sound(mrb, sound);
   return sound;
 }
 mrb_value audio_play_at(mrb_state* mrb, mrb_value) {
@@ -273,6 +308,7 @@ void install_audio_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "__ducking", audio_ducking, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, audio_module, "__group", audio_group, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, audio_module, "__occlusion", audio_occlusion, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, audio_module, "__effects", audio_effects, MRB_ARGS_REQ(3));
 }
 

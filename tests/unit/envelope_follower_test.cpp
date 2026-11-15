@@ -131,7 +131,7 @@ TEST_CASE("a voice that ended or was stopped is silent") {
   CHECK(sounds.stop(stopped));
   CHECK(sounds.loudness(stopped) == doctest::Approx(kSilence));
   driver.playing_ones[ended] = false;
-  sounds.update();  // (it lets go of the sounds that ended)
+  sounds.update(kLongWhile);  // (it lets go of the sounds that ended)
   CHECK(sounds.loudness(ended) == doctest::Approx(kSilence));
   CHECK(sounds.loudness(kNoSoundSource) == doctest::Approx(kSilence));
 }

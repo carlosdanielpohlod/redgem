@@ -26,6 +26,12 @@ module Audio
   DUCK_RELEASE = 0.6
   NO_DUCKING = 1.0
   NO_REVERB = 0.0
+  # A sound played with play_at behind one of the level's static bodies (a wall, a floor) is heard
+  # at OCCLUDED_VOLUME of its volume, through a low-pass at OCCLUDED_LOW_PASS Hz, after a fade of
+  # OCCLUSION_FADE seconds.
+  OCCLUDED_VOLUME = 0.4
+  OCCLUDED_LOW_PASS = 1000.0
+  OCCLUSION_FADE = 0.2
 
   # A sound with no place in the world. Returns its handle (for stop, playing? and set), or nil
   # when the sound file does not exist or 128 sounds of a higher priority already play.
@@ -65,6 +71,12 @@ module Audio
   # again replaces them; Audio.effects(:cave) takes them off.
   def self.effects(group, low_pass: nil, reverb: NO_REVERB)
     __effects(group, low_pass&.to_f, reverb.to_f)
+  end
+
+  # How a sound behind a wall is heard: volume: 1 and low_pass: nil turn it off. The game's
+  # occlusion ends with it. A sound plays where no wall muffles it with play_at's occlusion: false.
+  def self.occlusion(volume: OCCLUDED_VOLUME, low_pass: OCCLUDED_LOW_PASS, fade: OCCLUSION_FADE)
+    __occlusion(volume.to_f, low_pass&.to_f, fade.to_f)
   end
 
   def self.stop_music(fade: NO_FADE)

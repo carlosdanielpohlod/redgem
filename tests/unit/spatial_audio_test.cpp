@@ -179,7 +179,7 @@ TEST_CASE("spatial voice completion and clear release resources without reusing 
   SoundPool sounds(driver);
   const auto finished = sounds.play("impact", {});
   driver.voices.at(finished).active = false;
-  sounds.update();
+  sounds.update(0.0f);
   CHECK(driver.voices.empty());
   CHECK_FALSE(sounds.stop(finished));
   const auto next = sounds.play("impact", {});

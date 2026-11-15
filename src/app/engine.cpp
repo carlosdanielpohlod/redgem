@@ -13,6 +13,7 @@
 #include "app/game_data_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
+#include "app/sound_walls.hpp"
 #include "app/scene_files.hpp"
 #include "app/splash_screen.hpp"
 #include "core/config.hpp"
@@ -24,6 +25,12 @@
 
 namespace redgem {
 namespace {
+
+// What muffles the game's sounds, while it has a world.
+bool walls_between(const PhysicsWorld* physics, Vec3 from, Vec3 to) {
+  if (physics == nullptr) return false;
+  return static_body_between(*physics, from, to);
+}
 
 // Logs each warning.
 void warn_of_all(const std::vector<std::string>& warnings) {
@@ -186,6 +193,8 @@ void Engine::release_audio() {
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
   audio().reset_music_ducking();
   audio().forget_game_groups();
+  audio().set_occlusion(OcclusionSettings{});
+  audio().set_occlusion_query(nullptr);  // (the world goes after it)
 }
 
 void Engine::connect_display() {
@@ -274,6 +283,7 @@ void Engine::fill_context(const GameSettings& settings) {
   context_.http = &http_;
   describe_game(context_, settings);
   context_.audio = &audio();
+  audio().set_occlusion_query([this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), from, to); });
   connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
