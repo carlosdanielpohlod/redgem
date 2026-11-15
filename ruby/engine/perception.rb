@@ -71,7 +71,7 @@ class Perception < Behaviour
     end
 
     # Only the host perceives (or the only machine), as only its Brains think.
-    def perceives_here? = !Network.online? || Network.host?
+    def perceives_here? = Brain.thinks_here?
   end
 
   def start
@@ -87,7 +87,11 @@ class Perception < Behaviour
     return unless Perception.perceives_here?
     return if dt.zero?  # paused: it notices nothing new until the game goes on
 
+    @eye_point = eye_point
+    @ignored = game_object.__with_children
     look(watched.select { |object| sees?(object) })
+  ensure
+    @eye_point = @ignored = nil
   end
 
   # What it sees now (as of its last update).
@@ -103,10 +107,10 @@ class Perception < Behaviour
     object.alive? && object != game_object && within_sight?(object) && in_cone?(object) && visible?(object)
   end
 
-  # Degrees between where it looks and where an object is.
+  # Degrees between where it looks and where an object is, across the ground.
   def angle_to(object)
-    toward = target_point(object) - eye_point
-    facing = transform.forward
+    toward = (target_point(object) - eyes_now).flat
+    facing = transform.forward.flat
     return 0.0 if [toward, facing].any? { |direction| direction.length < LineOfSight::NEAR }
 
     cosine = facing.dot(toward) / (facing.length * toward.length)
@@ -148,19 +152,22 @@ class Perception < Behaviour
     (seen - @in_sight).each { |object| game_object.__notify(:on_see, object) }
     @in_sight = seen
     seen.each { |object| @last_seen[object] = object.transform.position }
+    @last_seen.select! { |object, _where| object.alive? }  # a destroyed object is forgotten
   end
 
-  def lost(object)
-    game_object.__notify(:on_lose_sight, object) if object.alive?
-  end
+  # Out of sight, or destroyed.
+  def lost(object) = game_object.__notify(:on_lose_sight, object)
 
-  def within_sight?(object) = eye_point.distance_to(target_point(object)) <= sight
+  def within_sight?(object) = eyes_now.distance_to(target_point(object)) <= sight
 
   def in_cone?(object) = angle_to(object) <= fov * HALF
 
   def visible?(object)
-    LineOfSight.clear?(eye_point, target_point(object), object, ignore: LineOfSight.carried(game_object))
+    LineOfSight.clear?(eyes_now, target_point(object), object, ignore: @ignored || game_object.__with_children)
   end
 
   def target_point(object) = object.transform.position + Vector3.up * aim
+
+  # Where it looks from: worked out once an update, or now when asked between them.
+  def eyes_now = @eye_point || eye_point
 end

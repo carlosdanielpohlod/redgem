@@ -116,7 +116,7 @@ module Interaction
     # carries (the objects under it) does not hide anything.
     def in_sight?(actor, target)
       LineOfSight.clear?(actor.transform.position, target.transform.position, target.game_object,
-                         ignore: LineOfSight.carried(actor))
+                         ignore: actor.__with_children)
     end
 
     def interactable_of(target)

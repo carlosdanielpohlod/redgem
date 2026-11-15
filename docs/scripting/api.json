@@ -5272,15 +5272,6 @@
           "about": "whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first"
         },
         {
-          "name": "carried",
-          "static": true,
-          "params": [
-            {"name": "object", "type": "GameObject"}
-          ],
-          "returns": {"type": "Array[GameObject]"},
-          "about": "an object and everything under it"
-        },
-        {
           "name": "part_of?",
           "static": true,
           "params": [
@@ -5357,7 +5348,7 @@
             {"name": "object", "type": "GameObject"}
           ],
           "returns": {"type": "Float"},
-          "about": "degrees between where it looks and where an object is"
+          "about": "degrees between where it looks and where an object is, across the ground"
         },
         {
           "name": "eye_point",
@@ -5538,6 +5529,7 @@
         "on_interact",
         "on_lose_sight",
         "on_see",
+        "thinks_here?",
         "update"
       ],
       "guide": "npcs.md#brain"

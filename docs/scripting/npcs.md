@@ -99,15 +99,18 @@ A `Perception` gives an NPC its senses.
 **Sight** is a cone in front of its eyes. It sees an object that is:
 
 1. no further than `sight` meters;
-2. inside the cone: no more than half of `fov` degrees off the way the NPC faces;
+2. inside the cone: no more than half of `fov` degrees off the way the NPC faces, measured across
+   the ground (so a hero right in front, or on another floor, is in it);
 3. in the line of sight: a ray from its eyes to the object hits nothing else first. What the NPC
    carries is seen through, and the object's own collider, or one under it, counts as reaching
    it. Triggers never block it.
 
 It looks from `eyes` meters above its origin, at `aim` meters above the watched object's origin.
 It looks for the players' heroes (the objects with an [Interactor](interaction.md)), or for the
-objects of one tag with `watch: "Enemy"`. As things come into sight and go out of it, the
-object's behaviours hear `on_see(object)` and `on_lose_sight(object)`. `in_sight` lists what it
+objects of one tag with `watch: "Enemy"`. In a game over the network, put an Interactor on every
+hero, the others' too: on a hero this machine does not play, it does nothing but be seen. As things
+come into sight and go out of it (or are destroyed), the object's behaviours hear
+`on_see(object)` and `on_lose_sight(object)`. `in_sight` lists what it
 sees, `sees?(object)` asks about one, and `last_seen(object)` is where it last saw it: where to
 search.
 

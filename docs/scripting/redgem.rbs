@@ -1313,8 +1313,6 @@ end
 module LineOfSight
   # whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
   def self.clear?: (Vector3 from, Vector3 to, GameObject target, ?ignore: Array[GameObject]) -> bool
-  # an object and everything under it
-  def self.carried: (GameObject object) -> Array[GameObject]
   # whether an object is the whole, or is under it
   def self.part_of?: (GameObject | nil object, GameObject whole) -> bool
 end
@@ -1335,7 +1333,7 @@ class Perception < Behaviour
   def last_seen: (GameObject object) -> (Vector3 | nil)
   # what it looks for: the objects of its watch tag, or the players' heroes
   def watched: () -> Array[GameObject]
-  # degrees between where it looks and where an object is
+  # degrees between where it looks and where an object is, across the ground
   def angle_to: (GameObject object) -> Float
   # where it looks from
   def eye_point: () -> Vector3

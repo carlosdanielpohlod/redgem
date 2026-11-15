@@ -69,6 +69,10 @@ class Brain < Behaviour
       Array(from).each { |source| transitions << transition_of(source, to, options) }
     end
 
+    # Only one machine decides what NPCs do: the host, or the only one (also while a client
+    # gets back into a game it dropped out of).
+    def thinks_here? = !Network.__in_game? || Network.host?
+
     def __copy_plan(states, transitions, initial)
       @states = states
       @transitions = transitions
@@ -91,15 +95,18 @@ class Brain < Behaviour
     end
   end
 
-  # The state it is in (nil before its first frame), the one before, and seconds in this one.
-  attr_reader :state, :previous_state, :time_in_state
+  # The state it is in (nil before its first frame), and the one before.
+  attr_reader :state, :previous_state
+
+  # Seconds of game time in the state it is in.
+  def time_in_state = @time_in_state || 0.0
 
   def update(dt)
     return unless thinks_here?
     return if dt.zero?  # paused: nothing happens, and no time goes by
 
     awaken if state.nil?
-    @time_in_state += dt
+    @time_in_state = time_in_state + dt
     take(due_transition)
     run_hook(:update, dt)
   end
@@ -117,7 +124,9 @@ class Brain < Behaviour
   def go(name)
     name = name.to_sym
     raise ArgumentError, "#{self.class} has no state #{name.inspect}" unless self.class.states.key?(name)
+    return false unless thinks_here?
 
+    check_plan
     leave
     enter(name)
     true
@@ -133,8 +142,7 @@ class Brain < Behaviour
 
   private
 
-  # Only one machine decides what an NPC does: the host, or the only one.
-  def thinks_here? = !Network.online? || Network.host?
+  def thinks_here? = Brain.thinks_here?
 
   def awaken
     first = self.class.initial
@@ -144,12 +152,21 @@ class Brain < Behaviour
     enter(first)
   end
 
-  # A transition that names a state nobody declared is a mistake, found as the brain starts.
+  # A transition or an initial state that names a state nobody declared is a mistake, found as
+  # the brain starts. :any is only where a transition may start from.
   def check_plan
+    return if @checked
+
     names = self.class.states.keys
-    wrong = self.class.transitions.flat_map { |each| [each.from, each.to] }.uniq - names - [ANY]
-    raise ArgumentError, "#{self.class} has transitions with unknown states #{wrong.inspect}" unless wrong.empty?
+    wrong = (sources - [ANY] + destinations + [self.class.initial]).uniq - names
+    raise ArgumentError, "#{self.class} has transitions or an initial state unknown: #{wrong.inspect}" unless
+      wrong.empty?
+
+    @checked = true
   end
+
+  def sources = self.class.transitions.map(&:from)
+  def destinations = self.class.transitions.map(&:to)
 
   def due_transition = transitions_on(nil).find { |transition| allowed?(transition, nil) }
 

@@ -905,7 +905,6 @@ Who uses what: the choice of a target, uses, and the game's handlers; over the n
 Whether one thing can see another: a ray to it hits nothing else first. See [npcs.md#perception](npcs.md#perception).
 
 - `LineOfSight.clear?(Vector3 from, Vector3 to, GameObject target, ignore: Array[GameObject] = []) -> bool`: whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
-- `LineOfSight.carried(GameObject object) -> Array[GameObject]`: an object and everything under it
 - `LineOfSight.part_of?(GameObject | nil object, GameObject whole) -> bool`: whether an object is the whole, or is under it
 
 ## Perception
@@ -919,7 +918,7 @@ A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); it
 - `sees_any? -> bool`: whether it sees anything it watches
 - `last_seen(GameObject object) -> Vector3 | nil`: where it last saw an object, or nil
 - `watched -> Array[GameObject]`: what it looks for: the objects of its watch tag, or the players' heroes
-- `angle_to(GameObject object) -> Float`: degrees between where it looks and where an object is
+- `angle_to(GameObject object) -> Float`: degrees between where it looks and where an object is, across the ground
 - `eye_point -> Vector3`: where it looks from
 - `sight -> Float`: meters it sees (15 unless said)
 - `fov -> Float`: degrees of the whole cone (120 unless said)
