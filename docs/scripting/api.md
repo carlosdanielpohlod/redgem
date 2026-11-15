@@ -20,6 +20,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
@@ -330,14 +331,33 @@ Points and axes are in world space; `anchor:` defaults to the object's position,
 
 Where the characters a game moves can walk, and the way from one place to another. See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
 
-- `Navigation.path(Vector3 from, Vector3 to) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+- `Navigation.path(Vector3 from, Vector3 to, avoid: Array[GameObject] | GameObject = []) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
+- `Navigation.steer(Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, crowd: Array[[Vector3, Vector3, Numeric]] = [], ignore: Array[GameObject] | GameObject = []) -> Vector3`: the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
 - `Navigation.nearest(Vector3 point) -> Vector3 | nil`: the walkable point nearest a point (within 8 m of it), or nil
 - `Navigation.walkable?(Vector3 point) -> bool`: whether a point is on walkable ground, up to a character's height above it
 - `Navigation.draw(Vector3 around, Numeric radius = 10, color: Color = :blue, alpha: Integer = 255) -> Integer`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
 - `Navigation.bake -> Hash[Symbol, Numeric | bool]`: bakes the scene's grid again now (a level a script changed); returns what stats does
 - `Navigation.stats -> Hash[Symbol, Numeric | bool]`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
 
-The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## NavAgent
+
+A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. See [gameplay.md#crowds-agents-that-walk-among-others](gameplay.md#crowds-agents-that-walk-among-others).
+
+- `go_to(Vector3 point) -> bool`: sends it to a point; false when there is no way there
+- `stop -> void`: stops it where it is
+- `arrived? -> bool`: whether it got where it was sent
+- `walking? -> bool`: whether it is on its way somewhere
+- `destination -> Vector3 | nil`: where it was sent last, or nil
+- `waypoints -> Array[Vector3]`: the points it still walks through, the next first
+- `velocity -> Vector3`: the velocity it walks at, as it steered this frame
+- `speed -> Float`: meters per second at most (setting `speed`, 3)
+- `radius -> Float`: how wide it is kept from others, in meters (setting `radius`, 0.4)
+- `arrive_distance -> Float`: how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+- `NavAgent.all -> Array[NavAgent]`: the agents of the running scene
+
+Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too).
 
 ## Water
 

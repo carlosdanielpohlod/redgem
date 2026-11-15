@@ -64,7 +64,9 @@ std::vector<SteeringObstacle> bodies_near(const PhysicsWorld& world, const Steer
   return found;
 }
 
-bool crowd_entry_shaped(mrb_value entry) { return mrb_array_p(entry) && RARRAY_LEN(entry) == kEntrySize; }
+bool is_list(mrb_value value) { return mrb_array_p(value); }
+
+bool crowd_entry_shaped(mrb_value entry) { return is_list(entry) && RARRAY_LEN(entry) == kEntrySize; }
 
 // [position, velocity, radius]: a character that steers too.
 SteeringObstacle crowd_entry(mrb_state* mrb, mrb_value entry) {
@@ -75,7 +77,7 @@ SteeringObstacle crowd_entry(mrb_state* mrb, mrb_value entry) {
 }
 
 std::vector<SteeringObstacle> crowd_arg(mrb_state* mrb, mrb_value crowd) {
-  if (!mrb_array_p(crowd)) mrb_raise(mrb, E_TYPE_ERROR, "the crowd must be a list");
+  if (!is_list(crowd)) mrb_raise(mrb, E_TYPE_ERROR, "the crowd must be a list");
   std::vector<SteeringObstacle> others;
   others.reserve(static_cast<std::size_t>(RARRAY_LEN(crowd)));
   for (mrb_int i = 0; i < RARRAY_LEN(crowd); ++i) others.push_back(crowd_entry(mrb, mrb_ary_ref(mrb, crowd, i)));
