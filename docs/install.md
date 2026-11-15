@@ -33,8 +33,8 @@ Unpack it anywhere and run `bin/redgem` (Linux), `redgem.exe` (Windows) or open 
   there is none (a container), add `--appimage-extract-and-run`. Its demos are inside it, read
   only: `./redgem-linux-x86_64.AppImage --appimage-extract` unpacks everything into
   `squashfs-root/`, demos included (or take them from the tarball).
-- **Windows** is compiled from Linux and has only been tried under Wine, not on a real Windows
-  machine yet. It builds games for Windows.
+- **Windows** builds games for Windows. The engine's automated tests run on Windows, and the
+  release checks open the packaged editor and player under Wine.
 - **macOS** needs macOS 11 or newer. It is built and tested on GitHub's Mac machines (macOS 14 on
   Apple Silicon, macOS 15 on Intel), which are virtual machines with no graphics card OpenGL can
   use: there the editor opens, edits, plays and saves a game drawn by Apple's software renderer.
