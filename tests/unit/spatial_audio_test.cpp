@@ -365,7 +365,7 @@ TEST_CASE("the quietest as heard is the one taken: a sound far away gives its pl
 TEST_CASE("Ruby sounds past the limit take the place of a lower priority, and a weaker one gets nil") {
   testing::RecordingAudio audio;
   auto engine = spatial_engine(audio);
-  spatial_ruby(*engine, "$bird = Audio.play(:beep, loop: true, priority: 0)");
+  spatial_ruby(*engine, "$bird = Audio.play(:beep, loop: true, priority: 1)");
   spatial_ruby(*engine, std::to_string(kMaxSounds - 1) + ".times { Audio.play_at(:beep, [0, 0, 0], loop: true) }");
   CHECK(audio.voices().size() == kMaxSounds);
   CHECK(spatial_ruby(*engine, "Audio.play(:beep, priority: 0).nil?") == "true");

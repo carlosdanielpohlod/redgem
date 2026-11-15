@@ -117,11 +117,11 @@ void Renderer::Impl::send_adaptation(const AutoExposure& settings) {
   SetShaderValueTexture(adapt_shader, GetShaderLocation(adapt_shader, shaders::kLuminanceTexture), luminance.texture);
   send(adapt_shader, shaders::kLuminanceSide, render_math::kLuminanceSide);
   const bool anew = render_math::starts_anew(exposure_history, temporal.viewer, scene_uploads);
-  const float seconds = render_math::adapt_seconds(exposure_history, seconds());
+  const float elapsed = render_math::adapt_seconds(exposure_history, seconds());
   const std::pair<const char*, float> values[] = {
       {shaders::kMinEv, settings.min_ev},     {shaders::kMaxEv, settings.max_ev},
       {shaders::kSpeedUp, settings.speed_up}, {shaders::kSpeedDown, settings.speed_down},
-      {shaders::kAdaptSeconds, seconds},      {shaders::kStartAnew, anew ? kOn : kOff}};
+      {shaders::kAdaptSeconds, elapsed},      {shaders::kStartAnew, anew ? kOn : kOff}};
   for (const auto& [name, value] : values) send(adapt_shader, name, value);
 }
 

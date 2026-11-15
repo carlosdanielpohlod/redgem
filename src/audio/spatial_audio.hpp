@@ -116,8 +116,9 @@ class SoundPool {
   // A gain the engine puts over a group, apart from the player's volume: the music ducked under a
   // voice.
   void set_group_gain(MixGroup group, float gain);
-  // Whether any sound of the group, or of a group under it, still plays.
-  bool group_playing(MixGroup group) const;
+  // Whether any sound of the group, or of a group under it, still plays and is heard (not at
+  // volume 0, out of reach or in a group the player muted).
+  bool group_heard(MixGroup group) const;
   // Every sound mixed again, and given its effects again: after the groups changed.
   void refresh();
   void refresh_effects();
@@ -128,9 +129,12 @@ class SoundPool {
 
  private:
   std::optional<SpatialMix> mix_of(const SpatialSound& sound) const;
+  bool heard(SoundSourceId id, const SpatialSound& sound) const;
   // The sound that gives its place to `sound` when the pool is full: nullopt when there is room,
   // and kNoSoundSource when every sound playing is stronger.
   std::optional<SoundSourceId> place_for(const SpatialSound& sound) const;
+  SoundSourceId start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                            std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
   void reap();  // lets go of the sounds that ended
   SoundDriver& driver_;

@@ -117,8 +117,13 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   reap();  // (a sound that ended gives its place back)
   const auto place = place_for(sound);
   if (place == kNoSoundSource) return kNoSoundSource;
+  return start_sound(name, sound, *mix, place);
+}
+
+SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                                     std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
-  if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
+  if (!driver_.start(id, name, sound, mix)) return kNoSoundSource;  // the old sound keeps playing on failure
   driver_.effects(id, groups_.effects_of(sound.group));
   if (place) stop(*place);
   sounds_.emplace(id, sound);
@@ -175,12 +180,18 @@ void SoundPool::set_group_volume(MixGroup group, float volume) {
 void SoundPool::set_group_gain(MixGroup group, float gain) {
   if (groups_.set_gain(group, gain)) refresh();
 }
-bool SoundPool::group_playing(MixGroup group) const {
+bool SoundPool::group_heard(MixGroup group) const {
   for (const auto& [id, sound] : sounds_) {
     if (!groups_.within(sound.group, group)) continue;
-    if (driver_.playing(id)) return true;
+    if (heard(id, sound)) return true;
   }
   return false;
+}
+bool SoundPool::heard(SoundSourceId id, const SpatialSound& sound) const {
+  const auto mix = mix_of(sound);
+  if (!mix) return false;
+  if (mix->volume <= 0.0f) return false;
+  return driver_.playing(id);
 }
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
 bool SoundPool::stop(SoundSourceId id) {

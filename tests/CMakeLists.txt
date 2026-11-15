@@ -24,6 +24,7 @@ add_executable(redgem_tests
   unit/names_test.cpp
   unit/folder_names_test.cpp
   unit/texts_test.cpp
+  unit/dialogue_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -188,6 +189,7 @@ add_executable(redgem_tests
   unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/head_aim_test.cpp
   unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp
@@ -236,6 +238,7 @@ add_executable(redgem_tests
   integration/save_migration_api_test.cpp
   integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
@@ -713,6 +716,9 @@ add_test(NAME tools.release_downloads
 # starts its programs.
 add_test(NAME tools.release_linux
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_linux_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# What opens a download's windows before a release is published, on stand-ins for its programs.
+add_test(NAME tools.release_smoke
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_smoke_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
