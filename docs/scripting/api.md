@@ -20,6 +20,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
@@ -58,6 +59,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. |
 | [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. |
 | [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. |
+| [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
 | [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
@@ -340,14 +342,33 @@ Points and axes are in world space; `anchor:` defaults to the object's position,
 
 Where the characters a game moves can walk, and the way from one place to another. See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
 
-- `Navigation.path(Vector3 from, Vector3 to) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+- `Navigation.path(Vector3 from, Vector3 to, avoid: Array[GameObject] | GameObject = []) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
+- `Navigation.steer(Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, crowd: Array[[Vector3, Vector3, Numeric]] = [], ignore: Array[GameObject] | GameObject = []) -> Vector3`: the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
 - `Navigation.nearest(Vector3 point) -> Vector3 | nil`: the walkable point nearest a point (within 8 m of it), or nil
 - `Navigation.walkable?(Vector3 point) -> bool`: whether a point is on walkable ground, up to a character's height above it
 - `Navigation.draw(Vector3 around, Numeric radius = 10, color: Color = :blue, alpha: Integer = 255) -> Integer`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
 - `Navigation.bake -> Hash[Symbol, Numeric | bool]`: bakes the scene's grid again now (a level a script changed); returns what stats does
 - `Navigation.stats -> Hash[Symbol, Numeric | bool]`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
 
-The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## NavAgent
+
+A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. See [gameplay.md#crowds-agents-that-walk-among-others](gameplay.md#crowds-agents-that-walk-among-others).
+
+- `go_to(Vector3 point) -> bool`: sends it to a point; false when there is no way there
+- `stop -> void`: stops it where it is
+- `arrived? -> bool`: whether it got where it was sent
+- `walking? -> bool`: whether it is on its way somewhere
+- `destination -> Vector3 | nil`: where it was sent last, or nil
+- `waypoints -> Array[Vector3]`: the points it still walks through, the next first
+- `velocity -> Vector3`: the velocity it walks at, as it steered this frame
+- `speed -> Float`: meters per second at most (setting `speed`, 3)
+- `radius -> Float`: how wide it is kept from others, in meters (setting `radius`, 0.4)
+- `arrive_distance -> Float`: how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+- `NavAgent.all -> Array[NavAgent]`: the agents of the running scene
+
+Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too).
 
 ## Water
 
@@ -578,7 +599,7 @@ A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left
 Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. See [gameplay.md](gameplay.md).
 
 - `UI::Focus.new -> UI::Focus`: a focus on the first widget
-- `update(Integer count) -> void`: moves it among count widgets, as up or down was pressed this frame
+- `update(Integer count, pad: Integer = 0) -> void`: moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
 - `at?(Integer index) -> bool`: whether the widget of that index has it: pass it as focused:
 - `move_to(Integer index) -> void`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index -> Integer`: the widget that has it
@@ -942,6 +963,7 @@ One player's way through a dialogue: the line it is at, the choices offered, and
 - `over? -> bool`: whether it ended
 - `node -> Hash[String, untyped] | nil`: the node it is at, or nil once it is over
 - `node_id -> String | nil`: the id of the node it is at, or nil
+- `steps -> Integer`: how many lines it has shown (a line it comes back to counts again)
 - `script -> Dialogue::Script`: its dialogue
 - `actor -> GameObject | nil`: the hero of the player in it
 - `speaker -> GameObject | nil`: who talks to that player, or nil
@@ -981,6 +1003,15 @@ The values every player shares, which dialogue conditions read and effects chang
 A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. See [dialogue.md](dialogue.md).
 
 - `dialogue -> String | nil`: the name of its dialogue file
+
+## DialogueBox
+
+A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
+
+- `DialogueBox.letters_shown(Integer letters, Float seconds, Float speed) -> Integer`: how many of a line's letters show after that many seconds at that speed (0: all)
+- `whole? -> bool`: whether the line it shows has all of its letters out (true while it shows none)
+- `pad -> Integer`: the player whose gamepad works it (0 unless said)
+- `letters_per_second -> Float`: how fast a line appears (45 unless said; 0: at once)
 
 ## Interaction
 

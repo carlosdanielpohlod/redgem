@@ -184,7 +184,7 @@ void Engine::release_audio() {
   if (!audio_open()) return;  // (the engine failed to start before it had any)
   audio().stop_sounds();
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
-  audio().set_music_ducking(MusicDucking{});
+  audio().reset_music_ducking();
 }
 
 void Engine::connect_display() {
