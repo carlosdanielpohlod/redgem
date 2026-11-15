@@ -1,5 +1,5 @@
 ---
-description: "From an empty folder to a playable game in about fifteen minutes."
+description: "Create a platformer, edit its level, add a Ruby behaviour, and export a playable build."
 ---
 
 # Your first game
@@ -8,15 +8,14 @@ You will create a game from a template, change it, write a behaviour in Ruby and
 
 ## 1. Create the game
 
-Start RedGem with no arguments. In the project hub, pick the **Platformer** template, type a name
-and create it. The same from a terminal:
+Open RedGem. In the project hub, choose **New game**, select **Platformer**, and name the project.
+If you prefer the terminal, use the executable for your [installation](install.md). These
+commands assume `redgem` is on your PATH.
 
 ```bash
-./build/src/redgem new ~/RedGemGames/my_game --template platformer
-./build/src/redgem ~/RedGemGames/my_game
+redgem new my_game --template platformer
+redgem my_game
 ```
-
-With Docker, write `tools/docker/editor.sh` wherever this manual says `./build/src/redgem`.
 
 The other templates start other kinds of game: `third-person` (a hero seen from behind),
 `top-down` (a hero seen from above, that walks where you click), `menu-only` (title, settings and
@@ -49,7 +48,8 @@ Ctrl+Z undoes any of this.
 
 ## 4. Write a behaviour
 
-Make the hero's coins worth collecting: a platform that moves up and down.
+Add a platform that moves up and down. The script sets its position every frame, and a
+kinematic body lets the player stand on it.
 
 1. In the menu, **GameObject > 3D Object > Cube**. Scale and place it as a platform.
 2. In the Inspector, **Add Component > Script**, type `bob` and press **New**.
@@ -73,17 +73,18 @@ end
 ```
 
 4. Press Ctrl+S. The tab shows *Syntax OK*, or the line of the mistake.
-5. With the cube selected, find the **Physics** card in the Inspector and set *Body* to
-   *kinematic*, so the hero can stand on it while it moves.
-6. Press Play.
+5. Select the cube and choose **Add Component > Physics body**. Pick the kinematic body option.
+   If the cube already has a **Physics** card, change its body type there.
+6. Save the scene and press **Play** to try the platform.
 
 If a script fails while the game runs, the game keeps going: that behaviour is switched off and
 the error, with its line, appears in the Console.
 
 ## 5. Share it
 
-**Build** in the toolbar (or `redgem build <game> <folder>`) makes a folder with your game's
-executable and its files packed into one, `game.rgpak`, for Linux, Windows or (from a Mac) macOS. Zip it and send it. See [Building and sharing](shipping.md).
+Choose **Build** in the toolbar and select a target. For a desktop build, zip the whole output
+folder or the macOS app bundle. Android builds produce an APK by default. See
+[Building and sharing](shipping.md) for target requirements and terminal commands.
 
 ## Next
 

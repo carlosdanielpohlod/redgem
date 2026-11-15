@@ -26,6 +26,7 @@ module Save
   def self.version = @version
 
   def self.version=(number)
+    __outside_migration
     __require_version(number, "Save.version")
     @version = number
     __recheck
@@ -35,6 +36,7 @@ module Save
   # values (a Hash with String keys) and returns the new ones. Versions that changed nothing need none.
   # Declaring `from` again replaces its hook (a script reloaded while the game runs does).
   def self.migrate(from:, &hook)
+    __outside_migration
     raise ArgumentError, "Save.migrate needs a block making the new values" unless hook
 
     __require_version(from, "Save.migrate from:")
@@ -73,6 +75,7 @@ module Save
 
   # (Also what makes a refused slot usable again: it starts from nothing, at the current version.)
   def self.clear
+    __outside_migration
     __clear
     @checked = !@version.nil?
     @refusal = nil
@@ -86,13 +89,18 @@ module Save
 
   # Selects a slot and checks it; a refused one leaves the selection where it was, and raises.
   def self.slot=(name)
+    __outside_migration
+    __select_checked(name)
+  end
+
+  def self.__select_checked(name)
     previous = slot
     __select(name)
     __recheck
     __ready
-  rescue RuntimeError
+  rescue RuntimeError => error
     __back_to(previous)
-    raise
+    raise error
   end
 
   def self.__back_to(previous)
@@ -116,6 +124,7 @@ module Save
   end
 
   def self.__ready
+    __outside_migration
     __check unless @checked
     raise @refusal if @refusal
   end
@@ -183,10 +192,23 @@ module Save
     hook = @migrations[from]
     return values unless hook
 
-    made = hook.call(values)
+    made = __run_migration(hook, values)
     raise TypeError, "Save.migrate(from: #{from}) must return the new values as a Hash" unless made.is_a?(Hash)
 
     made.transform_keys(&:to_s)
+  end
+
+  def self.__run_migration(hook, values)
+    @running_migration = true
+    hook.call(values)
+  ensure
+    @running_migration = false
+  end
+
+  def self.__outside_migration
+    return unless @running_migration
+
+    raise "Save.migrate hooks must use the values Hash instead of accessing a save slot"
   end
 
   def self.__refuse(why)

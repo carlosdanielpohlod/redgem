@@ -135,7 +135,6 @@ std::vector<ObjectId> carried_by(const Scene& scene, PhysicsWorld& physics, Obje
   return riders;
 }
 
-
 }  // namespace
 
 void create_all(const Source& source, PhysicsWorld& physics) {

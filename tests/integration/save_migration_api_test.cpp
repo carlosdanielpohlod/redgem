@@ -122,6 +122,31 @@ TEST_CASE("a hook must give the new values back as a Hash") {
   CHECK(patched.ruby("begin; Save.migrate(from: 0) { |d| d }; rescue ArgumentError; 'bad'; end") == "bad");
 }
 
+TEST_CASE("a migration hook cannot switch slots or change saved values directly") {
+  MigrationData data;
+  MigrationGame(data.file).ruby("Save[:gold] = 5");
+  {
+    MigrationGame patched(data.file);
+    patched.ruby("Save.version = 2");
+    SUBCASE("slot selection") {
+      patched.ruby("Save.migrate(from: 1) { |data| Save.slot = 'other'; data }");
+    }
+    SUBCASE("clearing saved values") {
+      patched.ruby("Save.migrate(from: 1) { |data| Save.clear; data }");
+    }
+    SUBCASE("nested update") {
+      patched.ruby("Save.migrate(from: 1) { |data| Save.update(:gold) { 0 }; data }");
+    }
+    CHECK(contains(patched.ruby(kRefused), "must use the values Hash"));
+    CHECK(patched.ruby("Save.slot") == "default");
+    CHECK(patched.ruby("Save.slots == ['default']") == "true");
+    CHECK(patched.ruby("Save.slot = 'other'; Save.keys.empty?") == "true");
+  }
+  MigrationGame unchanged(data.file);
+  CHECK(unchanged.ruby("Save[:gold]") == "5");
+  CHECK(unchanged.ruby("Save.__get(:__save_version).nil?") == "true");
+}
+
 TEST_CASE("a server's database slot is migrated in one transaction") {
   MigrationData data;
   std::string error;

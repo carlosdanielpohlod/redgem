@@ -43,6 +43,7 @@ nav:
       - Behaviours: scripting/behaviours.md
       - Live script reload: scripting/live_reload.md
       - Gameplay recipes: scripting/gameplay.md
+      - Animation graphs: scripting/animation.md
       - Interaction: scripting/interaction.md
       - Dialogue: scripting/dialogue.md
       - Quests: scripting/quests.md

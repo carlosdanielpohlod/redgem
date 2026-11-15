@@ -4,34 +4,36 @@ description: "Building a standalone game for Linux, Windows, macOS and Android, 
 
 # Building and sharing
 
-**Build** in the editor's toolbar, or from a terminal:
+Choose **Build** in the editor's toolbar and select a target, or build for the current platform
+from a terminal:
 
 ```bash
 ./build/src/redgem build my_game dist/my_game
 ```
 
-This makes a folder with an executable named after your game (`dist/my_game/my_game`) and
-`game.rgpak`, one file that holds all of the game's files (see [The game's files](#the-games-files)
-below). Whoever receives the folder runs the executable: they do not need RedGem, Ruby or Blender
-installed.
+Share the complete build for your target. Players can open it without installing RedGem, Ruby,
+or Blender.
 
-That executable is the **player**: a copy of `redgem-player`, a small program that plays the game
-packed in `game.rgpak` beside it and does nothing else. The editor, the project hub and the other
-tools you make the game with are not in it. A build looks for the player beside the `redgem`
-program that builds: `redgem-player` in the same folder for the system you are on, and
-`runtimes/<system>/` in that folder for the others (`runtimes/windows/redgem-player.exe`,
-`runtimes/android/<abi>/libredgem.so`). When one is missing the build says which file it looked
-for.
+| Target | What to share |
+|--------|---------------|
+| [Linux](#for-linux) | The output folder, including the executable and game data |
+| [Windows](#for-windows) | The output folder, including the `.exe` and game data |
+| [macOS](#for-macos) | The `.app` bundle |
+| [Android](#for-android) | The `.apk` for direct installation or the `.aab` for Google Play |
+
+The desktop executable is a copy of the **player**, `redgem-player`. A build looks for the
+player for the current platform beside the `redgem` executable. It looks under
+`runtimes/<target>/` for a different platform, for example
+`runtimes/windows/redgem-player.exe` or `runtimes/android/<abi>/libredgem.so`.
 
 ## The game's files
 
-A build packs every file of the game that ships (its scenes, scripts, pictures, sounds, music,
-fonts, `game.json` and `locales/`) into one archive, `game.rgpak`, beside the executable. A file
+Starting in RedGem 0.6.0, builds pack scenes, scripts, images, audio, fonts, `game.json` and
+`locales/` into `game.rgpak`. On Linux and Windows, the archive is beside the executable. A file
 that compresses is compressed (the scripts, the JSON, most models); one that does not (a PNG, an
-OGG) is stored as it is. The player reads everything out of it: loose files are easy to change by
-mistake or on purpose, look unfinished, and stores prefer few files. What ships is the same as
-before: no hidden files and folders (`.git`, `.env`), no editors' backups, no files a link points
-at, no signing keys, no `AGENTS.md` / `CLAUDE.md` at the top of the game.
+OGG) is stored as it is. The player reads project data directly from the archive. Builds skip
+hidden files and folders such as `.git` and `.env`, editor backups, symlinks, signing keys,
+and project instruction files. RedGem 0.5.0 and earlier use a loose `game/` folder by default.
 
 `--loose` keeps the files as they are instead, in a `game/` folder beside the executable, to look
 into a build while you debug it:
@@ -40,13 +42,10 @@ into a build while you debug it:
 ./build/src/redgem build my_game dist/my_game --loose
 ```
 
-The player plays whichever of the two it finds (a packed build takes away the `game/` folder an
-earlier loose build left in the same place, and a loose build the archive). A build that fails
-leaves the earlier one as it was: the archive is written as `game.rgpak.partial` and renamed
-over the old one, and a loose build copies into `game.staged` before swapping it in for `game/`
-(the old folder set aside as `game.replaced` meanwhile). The editor's Play,
-`redgem <game> --play`, `redgem run` and the other tools always read the project folder itself:
-the archive is only made by a build.
+When rebuilding into the same output folder, a packed build removes the previous loose
+`game/` folder. A loose build removes the previous archive. The player prefers the archive if
+both are present. The editor's Play button and commands such as `redgem <game> --play` and
+`redgem run` read the project folder. The build is the step that creates the archive.
 
 The archive is read-only. Saves, settings, bindings and crash reports are kept in the players'
 own folder (see [Notes](#notes)), never in it. A player refuses an archive whose header or table
