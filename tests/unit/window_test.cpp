@@ -123,3 +123,13 @@ TEST_CASE("a game's window gives the game the pointer and shows no frame counter
   CHECK_FALSE(options.show_fps);
   CHECK(options.screen_aspect == doctest::Approx(0.0f));
 }
+
+TEST_CASE("a window closes itself after the frames its environment variable says, when it says a number above zero") {
+  CHECK(frames_before_closing("120") == 120);
+  CHECK(frames_before_closing("1") == 1);
+  CHECK_FALSE(frames_before_closing("").has_value());
+  CHECK_FALSE(frames_before_closing("0").has_value());
+  CHECK_FALSE(frames_before_closing("-5").has_value());
+  CHECK_FALSE(frames_before_closing("12 frames").has_value());
+  CHECK_FALSE(frames_before_closing("lots").has_value());
+}

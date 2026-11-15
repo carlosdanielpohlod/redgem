@@ -18,6 +18,16 @@ class Interactor < Behaviour
   # The Interactable in focus, or nil.
   attr_reader :target
 
+  # Every Interactor of the scene whose object is still there: the players' heroes.
+  def self.all = Interactor.registered.select { |interactor| interactor.game_object.alive? }
+
+  def self.registered = @registered ||= []
+
+  # The scene is gone, and its Interactors with it.
+  def self.__forget_all = @registered = []
+
+  def start = Interactor.registered << self
+
   def update(dt)
     return refocus(nil) unless played?
     return if dt.zero?  # a menu is open: the focus waits for it to close
@@ -29,7 +39,10 @@ class Interactor < Behaviour
   # Uses what is in focus now (see Interaction.interact). False when nothing is.
   def use = @target ? Interaction.interact(game_object, @target) : false
 
-  def on_destroy = refocus(nil)
+  def on_destroy
+    refocus(nil)
+    Interactor.registered.delete(self)
+  end
 
   def pad = prop(:pad, Input::FIRST_PAD)
 

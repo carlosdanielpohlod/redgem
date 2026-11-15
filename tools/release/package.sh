@@ -6,7 +6,8 @@
 #                                       # dist/release/redgem-windows-x86_64.zip
 #                                       # dist/release/redgem-symbols-{linux,windows,android}.zip
 # Build first: cmake --build build, tools/windows/build_runtime.sh, tools/android/build_runtime.sh
-# and, for the Windows download, cmake --build build-windows --target redgem redgem_relay redgem_server.
+# and, for the Windows download, cmake --build build-windows --target redgem redgem_relay redgem_server
+# redgem_test_tool.
 # On a Mac it makes the Mac's download instead (package_macos.sh).
 set -euo pipefail
 

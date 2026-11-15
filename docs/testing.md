@@ -83,6 +83,17 @@ The events go through the same input a player's devices feed, so `Input.mouse_x`
 them. See [The command line](command-line.md) and
 [Repeating a headless session](assistants.md#repeating-a-headless-session) for every field.
 
+## Opening a window and closing it again
+
+To check that a built game or the editor starts on a machine, in a window, with nobody there to
+close it, set `REDGEM_CLOSE_AFTER_FRAMES`: every window of the engine closes itself once it has
+shown that many frames, as its close button would, and the program ends as it does then.
+
+```bash
+REDGEM_CLOSE_AFTER_FRAMES=120 ./my_game_build/my_game   # a built game: exits with 0 if all went well
+REDGEM_CLOSE_AFTER_FRAMES=120 redgem my_game            # the editor
+```
+
 ## Testing Ruby code by itself
 
 Code that needs no running game (a formula, a helper class) can be tested without one. A file of

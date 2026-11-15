@@ -164,7 +164,7 @@ class ScriptHost {
   // The class a top-level constant names, or nullptr when there is none or the constant is not a
   // class (a script may set `Player = 5`): asking mruby for it then raises where nothing catches it.
   RClass* class_named(const std::string& name);
-  // The engine's module of that name (Network, HTTP), or nil when a script set the name to
+  // The engine's module or class of that name (Network, Perception), or nil when a script set the name to
   // something else: calling a method on nil is then an error the call reports, not an abort.
   mrb_value module_named(const char* name);
   // Whether a Ruby class is Behaviour or inherits from it.

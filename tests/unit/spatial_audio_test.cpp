@@ -195,9 +195,11 @@ TEST_CASE("spatial voice resources are bounded and failed starts do not leave ha
   CHECK(sounds.play("missing", {}) == kNoSoundSource);
   CHECK(driver.voices.empty());
   driver.accept = true;
-  for (std::size_t count = 0; count < kMaxSpatialSounds; ++count) REQUIRE(sounds.play("ambient", {}) != kNoSoundSource);
-  CHECK(sounds.play("overflow", {}) == kNoSoundSource);
-  CHECK(driver.voices.size() == kMaxSpatialSounds);
+  for (std::size_t count = 0; count < kMaxSounds; ++count) REQUIRE(sounds.play("ambient", {}) != kNoSoundSource);
+  SpatialSound minor;
+  minor.priority = kLowestSoundPriority;
+  CHECK(sounds.play("overflow", minor) == kNoSoundSource);
+  CHECK(driver.voices.size() == kMaxSounds);
   CHECK(sounds.stop(driver.voices.begin()->first));
   CHECK(sounds.play("replacement", {}) != kNoSoundSource);
 }
@@ -285,4 +287,101 @@ TEST_CASE("Ruby spatial sources report playback failures and stop with the flat 
   spatial_ruby(*engine, "Audio.stop_sources");
   CHECK(audio.voices().empty());
   CHECK(spatial_ruby(*engine, "Audio.move(1, [0, 0, 0])") == "false");
+}
+
+namespace {
+
+constexpr int kMinorPriority = kDefaultSoundPriority - 1;
+constexpr int kMajorPriority = kDefaultSoundPriority + 1;
+
+SpatialSound with_priority(int priority, float volume = 1.0f) {
+  SpatialSound sound;
+  sound.positional = false;
+  sound.volume = volume;
+  sound.priority = priority;
+  return sound;
+}
+
+// Fills the pool with sounds of the default priority; returns the first one's id.
+SoundSourceId fill(SoundPool& sounds) {
+  const SoundSourceId first = sounds.play("crowd", with_priority(kDefaultSoundPriority));
+  for (std::size_t count = 1; count < kMaxSounds; ++count) sounds.play("crowd", with_priority(kDefaultSoundPriority));
+  return first;
+}
+
+}  // namespace
+
+TEST_CASE("a full pool lets a new sound take the place of the oldest of the weakest ones") {
+  SpatialTestDriver driver;
+  SoundPool sounds(driver);
+  const SoundSourceId oldest = fill(sounds);
+  const SoundSourceId shot = sounds.play("shot", with_priority(kDefaultSoundPriority));
+  REQUIRE(shot != kNoSoundSource);
+  CHECK_FALSE(sounds.playing(oldest));
+  CHECK(driver.voices.count(oldest) == 0);
+  CHECK(driver.voices.size() == kMaxSounds);
+  CHECK(sounds.playing(oldest + 1));
+}
+
+TEST_CASE("a lower priority is taken before a quieter sound, and the quietest before the oldest") {
+  SpatialTestDriver driver;
+  SoundPool sounds(driver);
+  const SoundSourceId oldest = fill(sounds);
+  REQUIRE(sounds.stop(oldest + 2));
+  REQUIRE(sounds.stop(oldest + 3));
+  const SoundSourceId quiet = sounds.play("whisper", with_priority(kDefaultSoundPriority, kSpatialHalf));
+  const SoundSourceId minor = sounds.play("bird", with_priority(kMinorPriority));
+  CHECK(sounds.play("shot", with_priority(kMajorPriority)) != kNoSoundSource);
+  CHECK_FALSE(sounds.playing(minor));
+  CHECK(sounds.playing(quiet));
+  CHECK(sounds.play("shot", with_priority(kMajorPriority)) != kNoSoundSource);
+  CHECK_FALSE(sounds.playing(quiet));
+  CHECK(sounds.playing(oldest));
+}
+
+TEST_CASE("a sound weaker than every one playing does not play, and a failed start steals nothing") {
+  SpatialTestDriver driver;
+  SoundPool sounds(driver);
+  const SoundSourceId oldest = fill(sounds);
+  CHECK(sounds.play("bird", with_priority(kMinorPriority)) == kNoSoundSource);
+  driver.accept = false;
+  CHECK(sounds.play("missing", with_priority(kHighestSoundPriority)) == kNoSoundSource);
+  CHECK(sounds.playing(oldest));
+  CHECK(driver.voices.size() == kMaxSounds);
+}
+
+TEST_CASE("the quietest as heard is the one taken: a sound far away gives its place first") {
+  SpatialTestDriver driver;
+  SoundPool sounds(driver);
+  const SoundSourceId oldest = fill(sounds);
+  REQUIRE(sounds.stop(oldest + 1));
+  SpatialSound far = spatial_at({kSpatialFar * kSpatialHalf, 0, 0});
+  const SoundSourceId distant = sounds.play("river", far);
+  CHECK(sounds.play("shot", with_priority(kDefaultSoundPriority)) != kNoSoundSource);
+  CHECK_FALSE(sounds.playing(distant));
+  CHECK(sounds.playing(oldest));
+}
+
+TEST_CASE("Ruby sounds past the limit take the place of a lower priority, and a weaker one gets nil") {
+  testing::RecordingAudio audio;
+  auto engine = spatial_engine(audio);
+  spatial_ruby(*engine, "$bird = Audio.play(:beep, loop: true, priority: 1)");
+  spatial_ruby(*engine, std::to_string(kMaxSounds - 1) + ".times { Audio.play_at(:beep, [0, 0, 0], loop: true) }");
+  CHECK(audio.voices().size() == kMaxSounds);
+  CHECK(spatial_ruby(*engine, "Audio.play(:beep, priority: 0).nil?") == "true");
+  CHECK(spatial_ruby(*engine, "Audio.play_at(:beep, [0, 0, 0], priority: 255).nil?") == "false");
+  CHECK(spatial_ruby(*engine, "Audio.playing?($bird)") == "false");
+  CHECK(audio.voices().size() == kMaxSounds);
+}
+
+TEST_CASE("Ruby refuses a priority that is not a whole number from 0 to 255") {
+  testing::RecordingAudio audio;
+  auto engine = spatial_engine(audio);
+  for (const char* code :
+       {"Audio.play(:beep, priority: 256)", "Audio.play(:beep, priority: -1)", "Audio.play(:beep, priority: 1.5)",
+        "Audio.play_at(:beep, [0, 0, 0], priority: 300)", "Audio.play_at(:beep, [0, 0, 0], priority: :high)"}) {
+    INFO(code);
+    CHECK_FALSE(engine->scripts().eval(code, "invalid_priority.rb").ok);
+  }
+  CHECK(audio.voices().empty());
 }

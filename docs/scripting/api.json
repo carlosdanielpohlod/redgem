@@ -4,6 +4,7 @@
   "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp`, then `.ktx2`, last), at most 8192 pixels a side; animated WebP is not read. Images may also be KTX2 (Basis Universal): decoded to RGBA8, except a scene's textures (glTF's `KHR_texture_basisu`), kept compressed on the graphics card. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "internal_classes": [
     "Behaviour::Tween",
+    "Brain::Transition",
     "Camera::Cut",
     "Camera::Follow",
     "Camera::Rig",
@@ -116,6 +117,38 @@
           ],
           "returns": {"type": "void"},
           "about": "it stopped being what that prompt is for"
+        },
+        {
+          "name": "on_see",
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Perception on the object saw something come into sight"
+        },
+        {
+          "name": "on_lose_sight",
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
+          "about": "... and saw it go out of sight"
+        },
+        {
+          "name": "on_hear",
+          "params": [
+            {"name": "noise", "type": "Perception::Noise"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Perception on the object heard a noise"
+        },
+        {
+          "name": "on_schedule",
+          "params": [
+            {"name": "activity", "type": "Symbol"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Schedule on the object came to the hour of another activity"
         },
         {
           "name": "persist",
@@ -2778,6 +2811,58 @@
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether all its clips move the object"
+        },
+        {
+          "name": "look_at",
+          "params": [
+            {"name": "target", "type": "Vector3 | GameObject"},
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""},
+            {"name": "max_angle", "type": "Numeric", "keyword": true, "optional": true, "default": "60.0"}
+          ],
+          "returns": {"type": "void"},
+          "about": "turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away"
+        },
+        {
+          "name": "look_away",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "void"},
+          "about": "the bone goes back to its clips' pose, easing out"
+        },
+        {
+          "name": "looking?",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a bone is turned toward something, or on its way back"
+        },
+        {
+          "name": "bone",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the object under the character with that name (or that name after a rig's prefix:), or nil"
+        },
+        {
+          "name": "bone!",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
+          "about": "bone that raises when the character has none of that name"
+        },
+        {
+          "name": "bone_named?",
+          "static": true,
+          "params": [
+            {"name": "part", "type": "String"},
+            {"name": "name", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a part's name is that bone's: the name, or the name after a prefix:"
         }
       ],
       "guide": "animation.md"
@@ -2894,7 +2979,8 @@
             {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
           "about": "plays a sound; returns its id (for stop, playing? and set), or nil",
@@ -2971,7 +3057,8 @@
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "reference_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "max_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "50.0"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
           "about": "plays a sound at a place in the world; returns its id, or nil"
@@ -3023,7 +3110,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
@@ -5222,6 +5309,13 @@
       "about": "A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.",
       "methods": [
         {
+          "name": "all",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[Interactor]"},
+          "about": "every Interactor of the scene: the players' heroes"
+        },
+        {
           "name": "target",
           "params": [],
           "returns": {"type": "Interactable | nil"},
@@ -5250,6 +5344,8 @@
       ],
       "internal": [
         "on_destroy",
+        "registered",
+        "start",
         "update"
       ],
       "guide": "interaction.md"
@@ -5323,6 +5419,493 @@
         }
       ],
       "guide": "interaction.md"
+    },
+    {
+      "name": "LineOfSight",
+      "kind": "module",
+      "about": "Whether one thing can see another: a ray to it hits nothing else first.",
+      "methods": [
+        {
+          "name": "clear?",
+          "static": true,
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"},
+            {"name": "target", "type": "GameObject"},
+            {"name": "ignore", "type": "Array[GameObject]", "keyword": true, "optional": true, "default": "[]"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first"
+        },
+        {
+          "name": "part_of?",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject | nil"},
+            {"name": "whole", "type": "GameObject"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether an object is the whole, or is under it"
+        }
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Perception",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear.",
+      "methods": [
+        {
+          "name": "noise",
+          "static": true,
+          "params": [
+            {"name": "at", "type": "Vector3", "keyword": true},
+            {"name": "loudness", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "source", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Array[GameObject]"},
+          "about": "a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it"
+        },
+        {
+          "name": "all",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[Perception]"},
+          "about": "every Perception of the scene"
+        },
+        {
+          "name": "sees?",
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether an object is in sight now: in range, in the cone, not hidden"
+        },
+        {
+          "name": "in_sight",
+          "params": [],
+          "returns": {"type": "Array[GameObject]"},
+          "about": "what it sees, as of its last update"
+        },
+        {
+          "name": "sees_any?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it sees anything it watches"
+        },
+        {
+          "name": "last_seen",
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "Vector3 | nil"},
+          "about": "where it last saw an object, or nil"
+        },
+        {
+          "name": "watched",
+          "params": [],
+          "returns": {"type": "Array[GameObject]"},
+          "about": "what it looks for: the objects of its watch tag, or the players' heroes"
+        },
+        {
+          "name": "angle_to",
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "Float"},
+          "about": "degrees between where it looks and where an object is, across the ground"
+        },
+        {
+          "name": "eye_point",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "where it looks from"
+        },
+        {
+          "name": "sight",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters it sees (15 unless said)"
+        },
+        {
+          "name": "fov",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "degrees of the whole cone (120 unless said)"
+        },
+        {
+          "name": "eyes",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters above its origin it looks from (1.6 unless said)"
+        },
+        {
+          "name": "aim",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters above a watched object's origin it looks at (1 unless said)"
+        },
+        {
+          "name": "hearing",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters a noise of loudness 1 is heard from (10 unless said)"
+        }
+      ],
+      "internal": [
+        "number",
+        "on_destroy",
+        "perceives_here?",
+        "registered",
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Perception::Noise",
+      "kind": "class",
+      "about": "A noise someone heard (on_hear).",
+      "methods": [
+        {
+          "name": "position",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "where it was made"
+        },
+        {
+          "name": "loudness",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how loud: 1 is heard as far as a listener's hearing"
+        },
+        {
+          "name": "source",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the object that made it, or nil"
+        },
+        {
+          "name": "distance",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters from the listener"
+        }
+      ],
+      "guide": "npcs.md#perception"
+    },
+    {
+      "name": "Brain",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: an NPC's state machine, with states, transitions, guards, timers and events.",
+      "methods": [
+        {
+          "name": "state",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"},
+            {"name": "hooks", "type": "Symbol | Proc", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "declares a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)"
+        },
+        {
+          "name": "initial",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String | nil", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the state it starts in (the first declared unless said); with a name, sets it"
+        },
+        {
+          "name": "transition",
+          "static": true,
+          "params": [
+            {"name": "from", "type": "Symbol | Array[Symbol]", "keyword": true},
+            {"name": "to", "type": "Symbol", "keyword": true},
+            {"name": "options", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "declares a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards"
+        },
+        {
+          "name": "states",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Hash[Symbol, Symbol | Proc]]"},
+          "about": "its states, by name"
+        },
+        {
+          "name": "transitions",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[untyped]"},
+          "about": "its transitions, in the order they were declared"
+        },
+        {
+          "name": "state",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the state it is in (nil before its first frame)"
+        },
+        {
+          "name": "previous_state",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the state it was in before"
+        },
+        {
+          "name": "time_in_state",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds of game time in this state"
+        },
+        {
+          "name": "in?",
+          "params": [
+            {"name": "names", "type": "Symbol | String", "rest": true}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether it is in one of these states"
+        },
+        {
+          "name": "fire",
+          "params": [
+            {"name": "event", "type": "Symbol | String"},
+            {"name": "payload", "type": "untyped", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "an event: the first transition waiting for it that may be taken is; true when the state changed"
+        },
+        {
+          "name": "go",
+          "params": [
+            {"name": "name", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "goes to a state now, whatever the transitions say"
+        }
+      ],
+      "internal": [
+        "inherited",
+        "on_hear",
+        "on_interact",
+        "on_lose_sight",
+        "on_schedule",
+        "on_see",
+        "thinks_here?",
+        "update"
+      ],
+      "guide": "npcs.md#brain"
+    },
+    {
+      "name": "GameClock",
+      "kind": "module",
+      "about": "The time of day in the game's world, on game time: what schedules follow.",
+      "methods": [
+        {
+          "name": "hour",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "the hour of the day, its minutes as a fraction: 0 up to 24"
+        },
+        {
+          "name": "minute",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the minute of the hour"
+        },
+        {
+          "name": "minute_of_day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "whole minutes since midnight: 0 up to 1439"
+        },
+        {
+          "name": "day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the day it is, from 1"
+        },
+        {
+          "name": "to_s",
+          "static": true,
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the time as \"HH:MM\""
+        },
+        {
+          "name": "set",
+          "static": true,
+          "params": [
+            {"name": "hour", "type": "Integer", "keyword": true},
+            {"name": "minute", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "day", "type": "Integer", "keyword": true, "optional": true, "default": "GameClock.day"}
+          ],
+          "returns": {"type": "void"},
+          "about": "sets the time of day in whole hours and minutes (and the day, from 1)"
+        },
+        {
+          "name": "speed",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "game seconds for each second of game time (60 unless said)"
+        },
+        {
+          "name": "speed=",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "changes it (0 stops the clock)"
+        },
+        {
+          "name": "state",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Float]"},
+          "about": "what to save: { seconds:, speed: }"
+        },
+        {
+          "name": "restore",
+          "static": true,
+          "params": [
+            {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
+          ],
+          "returns": {"type": "void"},
+          "about": "back to a saved state; nil (nothing saved yet) leaves the clock as it is"
+        },
+        {
+          "name": "seconds",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds of the world's time since the first day began"
+        }
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "Schedule",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).",
+      "methods": [
+        {
+          "name": "current",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the activity it is time for, or nil"
+        },
+        {
+          "name": "plan",
+          "params": [],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "[[minute of the day, activity], ...] in the order of the day"
+        },
+        {
+          "name": "plan=",
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Hash[String, Symbol | String] | String"},
+          "about": "changes the plan: { \"06:00\" => :work } or \"06:00 work, ...\""
+        },
+        {
+          "name": "parse",
+          "static": true,
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "a plan as given, in the order of the day"
+        },
+        {
+          "name": "activity_at",
+          "static": true,
+          "params": [
+            {"name": "plan", "type": "Array[[Integer, Symbol]]"},
+            {"name": "minute_of_day", "type": "Integer"}
+          ],
+          "returns": {"type": "Symbol | nil"},
+          "about": "what a plan says for a minute of the day"
+        },
+        {
+          "name": "minute_of",
+          "static": true,
+          "params": [
+            {"name": "time", "type": "String"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "\"06:30\" as minutes of the day (390)"
+        }
+      ],
+      "internal": [
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "HeadLook",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.",
+      "methods": [
+        {
+          "name": "target",
+          "params": [],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "what it looks at instead of the heroes, or nil"
+        },
+        {
+          "name": "target=",
+          "params": [
+            {"name": "target", "type": "GameObject | Vector3 | nil"}
+          ],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "sets it (nil: the heroes)"
+        },
+        {
+          "name": "nearest_hero",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the nearest hero in range and in front of it, or nil"
+        },
+        {
+          "name": "bone",
+          "params": [],
+          "returns": {"type": "GameObject"},
+          "about": "the head's bone"
+        },
+        {
+          "name": "range",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters to a hero (4 unless said)"
+        },
+        {
+          "name": "angle",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "degrees off its forward a hero may be at, and the most the head turns (70 unless said)"
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#head-look-at"
     }
   ]
 }

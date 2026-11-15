@@ -55,6 +55,9 @@ void OverlappedPhysicsWorld::add_impulse(ObjectId object, Vec3 impulse) { settle
 void OverlappedPhysicsWorld::set_character_move(ObjectId object, Vec3 horizontal_velocity) {
   settled().set_character_move(object, horizontal_velocity);
 }
+void OverlappedPhysicsWorld::add_character_displacement(ObjectId object, Vec3 offset) {
+  settled().add_character_displacement(object, offset);
+}
 void OverlappedPhysicsWorld::character_jump(ObjectId object, float speed) { settled().character_jump(object, speed); }
 bool OverlappedPhysicsWorld::character_grounded(ObjectId object) const { return settled().character_grounded(object); }
 void OverlappedPhysicsWorld::set_vehicle_input(ObjectId object, const VehicleInput& input) {
