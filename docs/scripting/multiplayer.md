@@ -453,7 +453,9 @@ The platformer demo plays together this way: Esc > Multiplayer hosts or joins a 
 What a player uses (a door, a lever, someone to talk to, through an `Interactor`) is the one
 exception: the host decides it. A client's use is asked of the host, which checks the hero's
 range and line of sight again before `on_interact` runs there (see
-[Interaction](interaction.md#over-the-network)).
+[Interaction](interaction.md#over-the-network)). Conversations follow it: each player has their
+own, the host follows it, and its effects on `GameVariables` happen there (see
+[Dialogue](dialogue.md#over-the-network)).
 
 ## Testing it
 

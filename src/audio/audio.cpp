@@ -117,8 +117,13 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   reap();  // (a sound that ended gives its place back)
   const auto place = place_for(sound);
   if (place == kNoSoundSource) return kNoSoundSource;
+  return start_sound(name, sound, *mix, place);
+}
+
+SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                                     std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
-  if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
+  if (!driver_.start(id, name, sound, mix)) return kNoSoundSource;  // the old sound keeps playing on failure
   if (place) stop(*place);
   sounds_.emplace(id, sound);
   ++next_;
@@ -171,6 +176,25 @@ void SoundPool::set_group_volume(MixGroup group, float volume) {
   group_volumes_[mix_group_index(group)] = volume;
   refresh();
 }
+void SoundPool::set_group_gain(MixGroup group, float gain) {
+  float& current = group_gains_[mix_group_index(group)];
+  if (current == gain) return;
+  current = gain;
+  refresh();
+}
+bool SoundPool::group_heard(MixGroup group) const {
+  for (const auto& [id, sound] : sounds_) {
+    if (sound.group != group) continue;
+    if (heard(id, sound)) return true;
+  }
+  return false;
+}
+bool SoundPool::heard(SoundSourceId id, const SpatialSound& sound) const {
+  const auto mix = mix_of(sound);
+  if (!mix) return false;
+  if (mix->volume <= 0.0f) return false;
+  return driver_.playing(id);
+}
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
 bool SoundPool::stop(SoundSourceId id) {
   const auto found = sounds_.find(id);
@@ -182,10 +206,11 @@ bool SoundPool::stop(SoundSourceId id) {
 void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
 }
-// A sound's mix, its group's volume applied.
+// A sound's mix, its group's volume and gain applied.
 std::optional<SpatialMix> SoundPool::mix_of(const SpatialSound& sound) const {
   auto mix = spatial_sound_mix(listener_, sound);
-  if (mix) mix->volume *= group_volumes_[mix_group_index(sound.group)];
+  const std::size_t group = mix_group_index(sound.group);
+  if (mix) mix->volume *= group_volumes_[group] * group_gains_[group];
   return mix;
 }
 void SoundPool::refresh() {

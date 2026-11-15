@@ -775,6 +775,8 @@ module Audio
   def self.music_volume=: (Numeric volume) -> Numeric
   # the volume of everything
   def self.volume=: (Numeric volume) -> Numeric
+  # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
+  def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
   # changes the volume or pitch of a sound that plays; false once it stopped
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
@@ -1333,6 +1335,124 @@ class Interactor < Behaviour
   def pad: () -> Integer
   # what the prompt says for a target: "[E] Open"
   def prompt_label: (Interactable target) -> String
+end
+
+# Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.
+module Dialogue
+  # starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client
+  def self.start: (String | Symbol | Dialogue::Script name, actor: GameObject, ?speaker: GameObject | nil) -> (Dialogue::Conversation | bool)
+  # the conversation this machine's player is in, or nil
+  def self.current: () -> (Dialogue::Conversation | nil)
+  # whether this machine's player is in a conversation, or left one this frame
+  def self.busy?: () -> bool
+  # ends the conversation this machine's player is in
+  def self.stop: () -> (bool | nil)
+  # :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
+  def self.on: (Symbol event) { (untyped, untyped, untyped) -> void } -> void
+  # the dialogue of that name, read from its file once (raises for one that is not there or not well made)
+  def self.load: (String | Symbol name) -> Dialogue::Script
+  # what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+  def self.quests: () -> untyped
+  # what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
+  def self.quests=: (untyped quests) -> untyped
+end
+
+# One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.
+class Dialogue::Conversation
+  # the line, in the language in use (nil once it is over)
+  def text: () -> (String | nil)
+  # the I18n key of the line
+  def text_key: () -> (String | nil)
+  # who says it, in the language in use (nil when the node names nobody)
+  def speaker_name: () -> (String | nil)
+  # the I18n key of who says it, or nil
+  def speaker_key: () -> (String | nil)
+  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  def voice: () -> (String | nil)
+  # the choices offered now: those whose conditions hold
+  def choices: () -> Array[Dialogue::Conversation::Choice]
+  # whether the player answers this line by choosing
+  def choosing?: () -> bool
+  # on from a line with no choices: to what follows, or the end; false when it waits for a choice
+  def continue: () -> bool
+  # takes a choice: its effects happen, and it goes where the choice leads; false for one not offered
+  def choose: (Dialogue::Conversation::Choice | Integer choice) -> bool
+  # ends it where it is (quietly: without telling the host)
+  def stop: (?quietly: bool) -> bool
+  # whether it ended
+  def over?: () -> bool
+  # the node it is at, or nil once it is over
+  def node: () -> (Hash[String, untyped] | nil)
+  # the id of the node it is at, or nil
+  def node_id: () -> (String | nil)
+  # how many lines it has shown (a line it comes back to counts again)
+  def steps: () -> Integer
+  # its dialogue
+  def script: () -> Dialogue::Script
+  # the hero of the player in it
+  def actor: () -> (GameObject | nil)
+  # who talks to that player, or nil
+  def speaker: () -> (GameObject | nil)
+  # whether its effects happen on this machine (offline, and on the host)
+  def deciding?: () -> bool
+end
+
+# An answer the player may give.
+class Dialogue::Conversation::Choice
+  # its place among the node's choices (what choose takes)
+  def index: () -> Integer
+  # the I18n key of its text
+  def key: () -> String
+  # its text, in the language in use
+  def text: () -> String
+end
+
+# A dialogue file as it was read.
+class Dialogue::Script
+  # its name: that of its file in dialogues/, without .json
+  def name: () -> String
+  # where it starts: a node's id, or branches
+  def start: () -> (String | Array[Hash[String, untyped]])
+  # the node of that id, or nil
+  def node: (String id) -> (Hash[String, untyped] | nil)
+  # whether it has a node of that id
+  def node?: (String id) -> bool
+end
+
+# The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.
+module GameVariables
+  # the value of a variable, or nil when it was never set
+  def self.[]: (String | Symbol name) -> untyped
+  # sets a variable (nil, true, false, a number or a text); raises on a client
+  def self.[]=: (String | Symbol name, untyped value) -> untyped
+  # every variable that was set, by name (what to save)
+  def self.to_h: () -> Hash[String, untyped]
+  # puts these in the place of every variable (a save read back)
+  def self.replace: (Hash[String | Symbol, untyped] values) -> Hash[String, untyped]
+  # |name, value| on every change
+  def self.on_change: () { (String, untyped) -> void } -> void
+  # whether a variable can hold a value
+  def self.value?: (untyped value) -> bool
+  # whether a variable can be called so
+  def self.name?: (untyped name) -> bool
+end
+
+# A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue.
+class Talkable < Behaviour
+  # the name of its dialogue file
+  def dialogue: () -> (String | nil)
+end
+
+# A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.
+class DialogueBox < Behaviour
+  # how many of a line's letters show after that many seconds at that speed (0: all)
+  def self.letters_shown: (Integer letters, Float seconds, Float speed) -> Integer
+  # whether the line it shows has all of its letters out (true while it shows none)
+  def whole?: () -> bool
+  # the player whose gamepad works it (0 unless said)
+  def pad: () -> Integer
+  # how fast a line appears (45 unless said; 0: at once)
+  def letters_per_second: () -> Float
 end
 
 # Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.

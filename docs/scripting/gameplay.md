@@ -1019,6 +1019,14 @@ Audio.play(:line_042, group: :voice)
 Audio.play_at(:radio, position, loop: true, group: :music)
 ```
 
+While someone speaks (a sound of the `:voice` group plays), the music and the `:music` group go
+down, and come back once every voice is quiet. `Audio.ducking` says how far and how fast:
+
+```ruby
+Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0) # lower, slower to come back
+Audio.ducking(volume: Audio::NO_DUCKING)               # off
+```
+
 At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
 does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
 playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then

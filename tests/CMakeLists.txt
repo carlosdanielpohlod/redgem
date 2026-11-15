@@ -25,6 +25,7 @@ add_executable(redgem_tests
   unit/names_test.cpp
   unit/folder_names_test.cpp
   unit/texts_test.cpp
+  unit/dialogue_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -49,6 +50,7 @@ add_executable(redgem_tests
   unit/gltf_loader_safety_test.cpp
   unit/spatial_audio_test.cpp
   unit/music_player_test.cpp
+  unit/music_ducking_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp

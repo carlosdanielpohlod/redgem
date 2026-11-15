@@ -35,6 +35,13 @@ class AudioTest < RedGemTest::Case
     assert_raises(ArgumentError) { Audio.stop_music(fade: -1) }
   end
 
+  def test_a_ducking_out_of_range_is_refused
+    assert_raises(ArgumentError) { Audio.ducking(volume: 1.5) }
+    assert_raises(ArgumentError) { Audio.ducking(volume: -0.1) }
+    assert_raises(ArgumentError) { Audio.ducking(attack: -1) }
+    assert_raises(ArgumentError) { Audio.ducking(release: -1) }
+  end
+
   def test_a_priority_out_of_range_is_refused
     assert_raises(ArgumentError) { Audio.play(NOT_A_SOUND, priority: 256) }
     assert_raises(ArgumentError) { Audio.play_at(NOT_A_SOUND, [0, 0, 0], priority: -1) }
