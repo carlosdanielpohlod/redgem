@@ -306,7 +306,9 @@ not a promise of how it will be closed.
   (by priority, then loudness) stops for a new one, and there are no virtual voices that come
   back later. Positional sound provides
   stereo panning and distance falloff; games update source positions and the listener explicitly;
-  there is no HRTF or Doppler. Occlusion is one ray per sound and frame through the static bodies:
+  there is no HRTF (a light one for headphones did not fit the stereo mixer: it needs per-ear
+  delay and filtering of each sound, which a later backend can add). The Doppler effect needs
+  velocities from the game (nothing follows a body by itself). Occlusion is one ray per sound and frame through the static bodies:
   a wall is in the way or not (no thickness, no sound going round it), and moving bodies never
   muffle.
 - One music track at a time, two while they crossfade. A game adds at most 13 mix groups of its

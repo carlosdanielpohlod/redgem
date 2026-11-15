@@ -52,6 +52,7 @@ add_executable(redgem_tests
   unit/audio_effects_test.cpp
   unit/mix_group_tree_test.cpp
   unit/occlusion_test.cpp
+  unit/doppler_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp

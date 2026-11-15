@@ -11,7 +11,9 @@ SoundSourceId MixedAudio::play_spatial_sound(const std::string& name, const Spat
 }
 
 bool MixedAudio::set_listener(const AudioListener& listener) { return sounds_.set_listener(listener); }
-bool MixedAudio::move_sound(SoundSourceId id, Vec3 position) { return sounds_.move(id, position); }
+bool MixedAudio::move_sound(SoundSourceId id, Vec3 position, std::optional<Vec3> velocity) {
+  return sounds_.move(id, position, velocity);
+}
 bool MixedAudio::set_sound_levels(SoundSourceId id, const SoundLevels& levels) {
   return sounds_.set_levels(id, levels);
 }

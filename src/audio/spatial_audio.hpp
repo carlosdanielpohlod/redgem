@@ -8,6 +8,7 @@
 
 #include "audio/audio_effects.hpp"
 #include "audio/mix_group_tree.hpp"
+#include "audio/doppler.hpp"
 #include "audio/mix_groups.hpp"
 #include "audio/occlusion.hpp"
 #include "core/math.hpp"
@@ -33,6 +34,7 @@ struct AudioListener {
   Vec3 position{};
   Vec3 forward{0.0f, 0.0f, -1.0f};
   Vec3 up{0.0f, 1.0f, 0.0f};
+  Vec3 velocity{};  // m/s: how the ears move, for the Doppler effect
 };
 
 struct SpatialSound {
@@ -51,6 +53,9 @@ struct SpatialSound {
   bool occludable = true;
   // How far behind a wall it is, from kOpen to kBehindWall: the pool keeps it.
   float occlusion = kOpen;
+  Vec3 velocity{};  // m/s: how it moves, for the Doppler effect
+  // What its pitch is heard at, times, from the Doppler effect: the pool keeps it.
+  float doppler = kNoShift;
 };
 
 // A sound with no place in the world (Audio.play): a looping hum, an alarm, a voice line.
@@ -112,7 +117,10 @@ class SoundPool {
   // one's: that one stops and its handle goes. Otherwise it does not play.
   SoundSourceId play(const std::string& name, const SpatialSound& sound);
   bool set_listener(const AudioListener& listener);
-  bool move(SoundSourceId id, Vec3 position);
+  // A new velocity too, when given.
+  bool move(SoundSourceId id, Vec3 position, std::optional<Vec3> velocity = std::nullopt);
+  // How strong the Doppler effect is: 0 off, 1 real, up to kMostDoppler; false out of that range.
+  bool set_doppler(float scale);
   // False for a sound that no longer plays, or levels a sound cannot have (it keeps its own).
   bool set_levels(SoundSourceId id, const SoundLevels& levels);
   // The player's volume of one of the engine's groups: every sound of it and under it is heard at
@@ -146,6 +154,8 @@ class SoundPool {
   VoiceEffects effects_of(const SpatialSound& sound) const;
   bool blocked(const SpatialSound& sound) const;
   bool looks_for_walls() const;
+  float shift_of(const SpatialSound& sound) const;
+  void follow_doppler(SoundSourceId id, SpatialSound& sound);
   void occlude(float seconds);
   void reap();  // lets go of the sounds that ended
   SoundDriver& driver_;
@@ -154,6 +164,7 @@ class SoundPool {
   AudioListener listener_;
   OcclusionSettings occlusion_;
   OcclusionQuery walls_;
+  float doppler_scale_ = kRealDoppler;
   std::map<SoundSourceId, SpatialSound> sounds_;
   std::uint64_t next_ = 1;  // never reuse handles, including across game changes
 };

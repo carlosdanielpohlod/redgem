@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Doppler effect**: `Audio.play_at(..., velocity:)`, `Audio.move(id, position, velocity)` and
+  `Audio.listener(position, forward, up, velocity)` give the sounds and the ears a velocity, and a
+  positional sound plays higher coming nearer and lower going away. `Audio.doppler = scale` makes
+  it stronger or turns it off (0 to 10, 1 by default).
 - **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
   (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
   listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,

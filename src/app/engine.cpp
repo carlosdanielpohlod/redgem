@@ -187,6 +187,7 @@ void Engine::release_audio() {
   audio().set_music_ducking(MusicDucking{});
   audio().forget_game_groups();
   audio().set_occlusion(OcclusionSettings{});
+  audio().set_doppler(kRealDoppler);
   audio().set_occlusion_query(nullptr);  // (the world goes after it)
 }
 

@@ -2770,6 +2770,15 @@
           "about": "the volume of everything"
         },
         {
+          "name": "doppler=",
+          "static": true,
+          "params": [
+            {"name": "scale", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "how strong the Doppler effect is: 0 off, 1 real (the default), up to 10"
+        },
+        {
           "name": "ducking",
           "static": true,
           "params": [
@@ -2837,7 +2846,8 @@
             {"name": "max_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "50.0"},
             {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
             {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"},
-            {"name": "occlusion", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+            {"name": "occlusion", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "velocity", "type": "Vector3", "keyword": true, "optional": true, "default": "[0, 0, 0]"}
           ],
           "returns": {"type": "Integer | nil"},
           "about": "plays a sound at a place in the world; returns its id, or nil"
@@ -2848,7 +2858,8 @@
           "params": [
             {"name": "position", "type": "Vector3"},
             {"name": "forward", "type": "Vector3"},
-            {"name": "up", "type": "Vector3"}
+            {"name": "up", "type": "Vector3"},
+            {"name": "velocity", "type": "Vector3", "optional": true, "default": "[0, 0, 0]"}
           ],
           "returns": {"type": "void"},
           "about": "where the ears are (move it with the camera)"
@@ -2858,10 +2869,11 @@
           "static": true,
           "params": [
             {"name": "id", "type": "Integer"},
-            {"name": "position", "type": "Vector3"}
+            {"name": "position", "type": "Vector3"},
+            {"name": "velocity", "type": "Vector3", "optional": true, "default": "nil"}
           ],
-          "returns": {"type": "void"},
-          "about": "moves a sound played with play_at"
+          "returns": {"type": "bool"},
+          "about": "moves a sound played with play_at, and gives it a new velocity when one is given"
         },
         {
           "name": "playing?",
@@ -2889,7 +2901,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A game makes groups of its own with `Audio.group(:cave, parent: :effects, volume: 0.8)`, 13 at most, and plays sounds in them by name; a group is heard at its volume times the volumes of the groups over it, and the game's groups end with it. `Audio.effects(group, low_pass:, reverb:)` puts effects on the sounds of a group and of the groups under it: `low_pass` (20 to 20000 Hz) muffles them, and the lowest cutoff over a sound is the one it gets; `reverb` (0 to 1) sends that much of each sound to the reverb of the nearest group that has one. Effects are on sounds, not on the music's tracks. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. Every frame a ray from the listener to each `play_at` sound in reach looks for the level's static bodies (walls, floors; moving bodies and characters do not count): a sound behind one fades, over `fade` seconds, to `Audio.occlusion`'s `volume` and through its `low_pass`; `occlusion: false` on `play_at` keeps a sound out of it. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A game makes groups of its own with `Audio.group(:cave, parent: :effects, volume: 0.8)`, 13 at most, and plays sounds in them by name; a group is heard at its volume times the volumes of the groups over it, and the game's groups end with it. `Audio.effects(group, low_pass:, reverb:)` puts effects on the sounds of a group and of the groups under it: `low_pass` (20 to 20000 Hz) muffles them, and the lowest cutoff over a sound is the one it gets; `reverb` (0 to 1) sends that much of each sound to the reverb of the nearest group that has one. Effects are on sounds, not on the music's tracks. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. Every frame a ray from the listener to each `play_at` sound in reach looks for the level's static bodies (walls, floors; moving bodies and characters do not count): a sound behind one fades, over `fade` seconds, to `Audio.occlusion`'s `volume` and through its `low_pass`; `occlusion: false` on `play_at` keeps a sound out of it. A `play_at` sound with a `velocity:` (or one `Audio.move` gives it), heard by a listener with a velocity of its own (`Audio.listener`'s fourth argument), plays higher coming nearer and lower going away: the Doppler effect, at 343 m/s for sound and each speed kept below half of it; `Audio.doppler` scales it. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
