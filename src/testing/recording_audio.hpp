@@ -33,7 +33,7 @@ class RecordingSoundDriver final : public SoundDriver {
   explicit RecordingSoundDriver(const std::filesystem::path& dir) : dir_(dir) {}
   bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
     if (!find_sound_file(dir_, name)) return false;
-    voices.emplace(id, RecordedVoice{name, sound, mix});
+    voices.emplace(id, RecordedVoice{name, sound, mix, true, VoiceEffects{}});
     started.push_back(name);
     return true;
   }

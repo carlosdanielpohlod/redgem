@@ -41,7 +41,8 @@ class MixGroupTree {
   bool within(MixGroup group, MixGroup over) const;
   bool known(MixGroup group) const { return mix_group_index(group) < groups_.size(); }
 
- private:
+ public:
+  // One group as the tree keeps it.
   struct Group {
     std::string name;
     std::optional<MixGroup> parent;  // none for the engine's
@@ -49,6 +50,8 @@ class MixGroupTree {
     float gain = kFullVolume;
     GroupEffects effects;
   };
+
+ private:
   Group& at(MixGroup group) { return groups_[mix_group_index(group)]; }
   const Group& at(MixGroup group) const { return groups_[mix_group_index(group)]; }
   bool may_define(const std::string& name, MixGroup parent) const;

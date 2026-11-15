@@ -15,7 +15,7 @@ using namespace redgem;
 namespace {
 
 constexpr float kLowCutoff = 200.0f;
-constexpr float kHalf = 0.5f;
+constexpr float kHalfShare = 0.5f;
 constexpr std::size_t kFrames = 4800;       // a tenth of a second
 constexpr std::size_t kTailFrames = 48000;  // a second
 constexpr float kSettledShare = 0.99f;
@@ -52,9 +52,9 @@ float energy(const std::vector<float>& frames, std::size_t from, std::size_t to)
 TEST_CASE("a low-pass lets a steady level through and takes the highest frequencies out") {
   LowPass filter;
   filter.set_cutoff(kLowCutoff);
-  auto steady = frames_of(kFrames, kHalf);
+  auto steady = frames_of(kFrames, kHalfShare);
   filter.process(steady.data(), kFrames);
-  CHECK(steady.back() == doctest::Approx(kHalf).epsilon(1.0f - kSettledShare));
+  CHECK(steady.back() == doctest::Approx(kHalfShare).epsilon(1.0f - kSettledShare));
   filter.reset();
   auto high = alternating(kFrames);
   filter.process(high.data(), kFrames);
@@ -94,19 +94,19 @@ TEST_CASE("the reverb of silence is silence, and a click rings on after it and d
 
 TEST_CASE("the reverb adds to what is in the mix already") {
   Reverb room;
-  const auto steady = frames_of(kFrames, kHalf);
-  auto mix = frames_of(kFrames, kHalf);
+  const auto steady = frames_of(kFrames, kHalfShare);
+  auto mix = frames_of(kFrames, kHalfShare);
   room.process(steady.data(), mix.data(), kFrames);
-  CHECK(mix.front() == doctest::Approx(kHalf));  // (nothing came back from the lines yet)
-  CHECK(mix.back() != doctest::Approx(kHalf));
+  CHECK(mix.front() == doctest::Approx(kHalfShare));  // (nothing came back from the lines yet)
+  CHECK(mix.back() != doctest::Approx(kHalfShare));
 }
 
 TEST_CASE("group effects are valid within their ranges only") {
   CHECK(valid_group_effects(GroupEffects{}));
   CHECK(valid_group_effects(GroupEffects{kLowestCutoff, kFullReverb}));
-  CHECK_FALSE(valid_group_effects(GroupEffects{kLowestCutoff / 2, kNoReverb}));
+  CHECK_FALSE(valid_group_effects(GroupEffects{kLowestCutoff * kHalfShare, kNoReverb}));
   CHECK_FALSE(valid_group_effects(GroupEffects{kHighestCutoff + kLowCutoff, kNoReverb}));
-  CHECK_FALSE(valid_group_effects(GroupEffects{std::nullopt, kFullReverb + kHalf}));
+  CHECK_FALSE(valid_group_effects(GroupEffects{std::nullopt, kFullReverb + kHalfShare}));
   CHECK_FALSE(valid_group_effects(GroupEffects{std::numeric_limits<float>::quiet_NaN(), kNoReverb}));
 }
 
@@ -134,7 +134,7 @@ TEST_CASE("a sound's send reaches its group's reverb in the mix, at the sound's 
   auto mix = frames_of(kFrames, 0.0f);
   rack.process_mix(mix.data(), kFrames);  // (no sound sent yet: the bus is silent)
   CHECK(loudest(mix) == 0.0f);
-  auto sound = frames_of(kFrames, kHalf);
+  auto sound = frames_of(kFrames, kHalfShare);
   rack.process_voice(*slot, sound.data(), kFrames);
   rack.process_mix(mix.data(), kFrames);
   const float loud = energy(mix, 0, mix.size());

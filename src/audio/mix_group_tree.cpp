@@ -11,6 +11,12 @@ bool takes_reverb(const GroupEffects& own, const VoiceEffects& found) {
   return own.reverb > kNoReverb;
 }
 
+MixGroupTree::Group named(const std::string& name) {
+  MixGroupTree::Group group;
+  group.name = name;
+  return group;
+}
+
 bool lower_cutoff(std::optional<float> candidate, std::optional<float> current) {
   if (!candidate) return false;
   return !current || *candidate < *current;
@@ -19,14 +25,14 @@ bool lower_cutoff(std::optional<float> candidate, std::optional<float> current) 
 }  // namespace
 
 MixGroupTree::MixGroupTree() {
-  for (const MixGroup group : kMixGroups) groups_.push_back(Group{mix_group_name(group)});
+  for (const MixGroup group : kMixGroups) groups_.push_back(named(mix_group_name(group)));
 }
 
 std::optional<MixGroup> MixGroupTree::define(const std::string& name, MixGroup parent, float volume) {
   if (!may_define(name, parent)) return std::nullopt;
   const auto existing = find(name);
   const MixGroup group = existing.value_or(static_cast<MixGroup>(groups_.size()));
-  if (!existing) groups_.push_back(Group{name});
+  if (!existing) groups_.push_back(named(name));
   at(group).parent = parent;
   at(group).volume = volume;
   return group;
