@@ -503,21 +503,21 @@ What the block of an animation event is given (animation.on). See [animation.md#
 
 Sounds and music from the game's sounds/ folder.
 
-- `Audio.play(String | Symbol name, volume: Numeric = 1.0, pitch: Numeric = 1.0, loop: bool = false, group: Symbol = :effects) -> Integer | nil`: plays a sound; returns its id (for stop, playing? and set), or nil
+- `Audio.play(String | Symbol name, volume: Numeric = 1.0, pitch: Numeric = 1.0, loop: bool = false, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound; returns its id (for stop, playing? and set), or nil
 - `Audio.music(String | Symbol name, loop: bool = true, volume: Numeric = 0.7, fade: Numeric = 0.0) -> void`: plays music, crossfading over fade seconds from the track playing
 - `Audio.stop_music(fade: Numeric = 0.0) -> void`: stops the music, fading it out over fade seconds
 - `Audio.music_pitch = Numeric pitch`: changes the music's pitch
 - `Audio.music_volume = Numeric volume`: changes the music's volume
 - `Audio.volume = Numeric volume`: the volume of everything
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped
-- `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
+- `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up) -> void`: where the ears are (move it with the camera)
 - `Audio.move(Integer id, Vector3 position) -> void`: moves a sound played with play_at
 - `Audio.playing?(Integer id) -> bool`: whether that sound still plays
 - `Audio.stop(Integer id) -> void`: stops that sound
 - `Audio.stop_sources -> void`: stops every sound played with play or play_at
 
-Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused.
+Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
 
 ## UI
 
