@@ -134,15 +134,16 @@ and the line, which appears letter by letter, and the choices under it.
 
 | What | Keyboard | Gamepad | Touch or mouse |
 |---|---|---|---|
-| Show the whole line, then go on | Enter, Space or E | A or Y | tap the box |
+| Show the whole line, then go on | Enter or E | Y | tap the box |
 | Move among the choices | Up and Down | D-pad | |
-| Take a choice | Enter, Space or E | A or Y | tap it |
+| Take a choice | Enter or E | Y | tap it |
 | Leave the conversation | Backspace | B | the Skip button |
 
 It takes `pad` (whose gamepad works it: 0 unless said) and `letters_per_second` (45 unless said;
 0 shows each line at once). While a menu is open the box shows but takes no input, and while the
 player talks the Interactor has nothing in focus: the press that ends a conversation uses nothing
-else. The box does not stop the hero; a game that wants it still checks `Dialogue.busy?`.
+else. Space and a gamepad's A do not go on, since they jump. The box does not stop the hero; a
+game that wants it still checks `Dialogue.busy?`.
 
 A game with a look of its own draws the conversation itself. `Dialogue.current` is the
 conversation this machine's player is in, or `nil`:

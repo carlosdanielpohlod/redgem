@@ -17,4 +17,8 @@ class DialogueBoxTest < RedGemTest::Case
   def test_no_speed_shows_it_all_at_once
     assert_equal LETTERS, DialogueBox.letters_shown(LETTERS, 0.0, 0.0)
   end
+
+  def test_before_any_conversation_there_is_no_line_left_to_show
+    assert DialogueBox.new.whole?
+  end
 end

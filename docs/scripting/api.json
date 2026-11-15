@@ -5315,6 +5315,12 @@
           "about": "the id of the node it is at, or nil"
         },
         {
+          "name": "steps",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "how many lines it has shown (a line it comes back to counts again)"
+        },
+        {
           "name": "script",
           "params": [],
           "returns": {"type": "Dialogue::Script"},
@@ -5520,7 +5526,7 @@
           "name": "whole?",
           "params": [],
           "returns": {"type": "bool"},
-          "about": "whether the line it shows has all of its letters out"
+          "about": "whether the line it shows has all of its letters out (true while it shows none)"
         },
         {
           "name": "pad",

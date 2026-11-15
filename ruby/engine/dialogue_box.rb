@@ -3,8 +3,8 @@
 #
 #   find("Player").add_component(DialogueBox)
 #
-# The player goes on with Enter or Space, the :interact action (E, a gamepad's Y), a gamepad's A,
-# or a tap or click on the box: the first press shows the whole line at once, the next goes on.
+# The player goes on with Enter, the :interact action (E, a gamepad's Y), or a tap or click on the
+# box (not Space or a gamepad's A, which also jump): the first press shows the whole line at once, the next goes on.
 # Up and down (arrows, D-pad) move among the choices; confirming takes the one in focus, and a tap
 # or click takes the one under it. Backspace, a gamepad's B or the box's Skip button leaves the
 # conversation. While a menu is open (Time.scale = 0) the box shows but takes no input.
@@ -28,7 +28,7 @@ class DialogueBox < Behaviour
   SKIP_HEIGHT = 40
   SKIP_LABEL = "game.dialogue.skip".freeze
   # [keys, gamepad buttons] that go on, and that leave.
-  GO_ON = [%i[enter space], %i[a]].freeze
+  GO_ON = [%i[enter], []].freeze
   LEAVE = [%i[backspace], %i[b]].freeze
   NO_CONFIRM = [[], []].freeze   # (a choice in focus is taken by listen, not by its button)
 
@@ -45,13 +45,14 @@ class DialogueBox < Behaviour
 
     follow(conversation)
     @seconds += dt
+    @focus.update(choices_count(conversation), pad: pad) if listening?(dt)
     draw(conversation)
-    listen(conversation) unless dt.zero? || @fresh
+    listen(conversation) if listening?(dt)
     @fresh = false
   end
 
-  # Whether the line it shows has all of its letters out.
-  def whole? = @whole || shown_letters >= UI.letters(@line.to_s)
+  # Whether the line it shows has all of its letters out (true while it shows none).
+  def whole? = @conversation.nil? || @whole || shown_letters >= UI.letters(line)
 
   def pad = prop(:pad, Input::FIRST_PAD)
 
@@ -61,36 +62,41 @@ class DialogueBox < Behaviour
 
   def forget
     @conversation = nil
-    @node = nil
+    @steps = nil
   end
 
-  # A new conversation, or a new line of it: the line starts to appear, and what was pressed on
-  # the frame it came does not count for it.
+  # A new conversation, or a new line of it (also the same line again): the line starts to appear,
+  # and what was pressed on the frame it came does not count for it.
   def follow(conversation)
     return if same_line?(conversation)
 
     @fresh = true
     @conversation = conversation
-    @node = conversation.node_id
-    @line = conversation.text
+    @steps = conversation.steps
     @seconds = 0.0
     @whole = false
     @focus = UI::Focus.new
   end
 
-  def same_line?(conversation) = conversation.equal?(@conversation) && conversation.node_id == @node
+  def same_line?(conversation) = conversation.equal?(@conversation) && conversation.steps == @steps
 
-  def shown_letters = DialogueBox.letters_shown(UI.letters(@line.to_s), @seconds, letters_per_second)
+  # The player's presses count: the game runs (not paused) and the line did not just come.
+  def listening?(dt) = !dt.zero? && !@fresh
+
+  # The line in the language shown now.
+  def line = @conversation.text.to_s
+
+  def shown_letters = DialogueBox.letters_shown(UI.letters(line), @seconds, letters_per_second)
 
   # The line as far as it has appeared.
-  def shown_text = whole? ? @line.to_s : UI.letters_of(@line.to_s).first(shown_letters).join
+  def shown_text = whole? ? line : UI.letters_of(line).first(shown_letters).join
 
   def draw(conversation)
     box = line_box(conversation)
     UI.rect(**box, color: BOX_COLOR, alpha: BOX_ALPHA, radius: UI::BUTTON_RADIUS)
     draw_speaker(conversation, box)
     UI.text(shown_text, x: box[:x] + PADDING, y: line_top(conversation, box), size: LINE_SIZE,
-                        width: box[:width] - 2 * PADDING)
+                        width: line_width(box))
     @skipped = draw_skip(box)
     @chosen = choices_shown?(conversation) ? draw_choices(conversation, box) : nil
     @tapped = UI.clicked?(UI.mouse_over?(**box))
@@ -106,6 +112,9 @@ class DialogueBox < Behaviour
     conversation.speaker_name ? top + UI.line_height(SPEAKER_SIZE) : top
   end
 
+  # The line keeps clear of the Skip button at the box's top right.
+  def line_width(box) = box[:width] - 3 * PADDING - SKIP_WIDTH
+
   def draw_skip(box)
     UI.button(I18n.t(SKIP_LABEL), x: box[:x] + box[:width] - SKIP_WIDTH - PADDING, y: box[:y] + PADDING,
                                   width: SKIP_WIDTH, height: SKIP_HEIGHT, confirm: NO_CONFIRM)
@@ -113,20 +122,19 @@ class DialogueBox < Behaviour
 
   # The box of the line, at the bottom of the screen, above where its choices go.
   def line_box(conversation)
-    y = UI.height - MARGIN - HEIGHT - choices_height(conversation)
+    y = UI.height - MARGIN - HEIGHT - choices_count(conversation) * (CHOICE_HEIGHT + CHOICE_GAP)
     { x: MARGIN, y: y, width: UI.width - 2 * MARGIN, height: HEIGHT }
   end
 
-  def choices_height(conversation)
-    count = conversation.choosing? ? conversation.choices.size : 0
-    count * (CHOICE_HEIGHT + CHOICE_GAP)
-  end
+  def choices_count(conversation) = choices_shown?(conversation) ? conversation.choices.size : 0
 
   # The choices, one under the other, below the line. The one clicked or tapped, or nil.
   def draw_choices(conversation, box)
-    choices = conversation.choices
-    clicked = choices.each_index.select { |row| draw_choice(choices[row], row, box) }
-    clicked.empty? ? nil : choices[clicked.first]
+    clicked = nil
+    conversation.choices.each_with_index do |choice, row|
+      clicked ||= choice if draw_choice(choice, row, box)
+    end
+    clicked
   end
 
   def draw_choice(choice, row, box)
@@ -141,7 +149,7 @@ class DialogueBox < Behaviour
     return conversation.stop if left?
     return choose(conversation) if choices_shown?(conversation)
 
-    go_on(conversation) if going_on? || @tapped
+    go_on(conversation) if asked_on?
   end
 
   def choices_shown?(conversation) = whole? && conversation.choosing?
@@ -154,13 +162,17 @@ class DialogueBox < Behaviour
   end
 
   def choose(conversation)
-    choices = conversation.choices
-    @focus.update(choices.size)
-    chosen = @chosen || (going_on? && choices[@focus.index])
+    chosen = @chosen || focused_choice(conversation)
     conversation.choose(chosen) if chosen
   end
 
-  def left? = @skipped || UI.pressed_any?(LEAVE)
+  # The choice in focus, when the player confirmed it this frame.
+  def focused_choice(conversation) = going_on? ? conversation.choices[@focus.index] : nil
 
-  def going_on? = UI.pressed_any?(GO_ON) || Input.action_pressed?(Interaction::ACTION, pad: pad)
+  def left? = @skipped || UI.pressed_any?(LEAVE, pad: pad)
+
+  # Went on by a press, or by a tap or click on the box.
+  def asked_on? = going_on? || @tapped
+
+  def going_on? = UI.pressed_any?(GO_ON, pad: pad) || Input.action_pressed?(Interaction::ACTION, pad: pad)
 end
