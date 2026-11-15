@@ -6,6 +6,7 @@
 #include <string>
 
 #include "audio/ducking.hpp"
+#include "audio/mix_group_tree.hpp"
 #include "audio/mix_groups.hpp"
 #include "audio/music_player.hpp"
 #include "audio/spatial_audio.hpp"
@@ -32,9 +33,24 @@ class AudioSystem {
   virtual bool stop_sound(SoundSourceId) { return false; }
   // Releases every sound with a handle; the music keeps playing.
   virtual void stop_sounds() {}
-  // The player's volume of a group (Settings.music_volume...): what each sound of it is heard at,
-  // times its own.
-  virtual void set_group_volume(MixGroup, float) {}
+  // The player's volume of one of the engine's groups (Settings.music_volume...): what each sound
+  // of it and of the groups under it is heard at, times its own.
+  virtual void set_group_volume(MixGroup group, float volume) { groups_.set_player_volume(group, volume); }
+  // A game's own group under `parent` (Audio.group), at its volume (full when none); the same
+  // name again moves it, and keeps its volume when none is given. nullopt for an engine group's
+  // name, a parent under it, or no room left (kMaxMixGroups).
+  virtual std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) {
+    return groups_.define(name, parent, volume);
+  }
+  // A group by its name, the engine's or the game's.
+  std::optional<MixGroup> find_group(const std::string& name) const { return groups_.find(name); }
+  // The effects of a group's sounds and of the groups under it (Audio.effects); false for effects
+  // that are not valid.
+  virtual bool set_group_effects(MixGroup group, const GroupEffects& effects) {
+    return groups_.set_effects(group, effects);
+  }
+  // The game's groups and every group's effects go (the game ended); its sounds went before.
+  virtual void forget_game_groups() { groups_.forget_game_groups(); }
   // How the music group goes down while a voice plays (Audio.ducking); false for ducking that is
   // not valid, which changes nothing.
   virtual bool set_music_ducking(const MusicDucking& ducking) { return valid_music_ducking(ducking); }
@@ -65,12 +81,15 @@ class AudioSystem {
  protected:
   // What a master volume the game sets is heard at: it times the player's (kept, for when the
   // player's changes).
+  MixGroupTree& groups() { return groups_; }
+  const MixGroupTree& groups() const { return groups_; }
   float heard_volume(float game_volume) {
     game_volume_ = game_volume;
     return game_volume * player_volume_;
   }
 
  private:
+  MixGroupTree groups_;
   float game_volume_ = kFullVolume;
   float player_volume_ = kFullVolume;
 };
@@ -95,7 +114,7 @@ class NullAudio final : public AudioSystem {
 // one, so they outlive the pool and the player, which stop through them as they go.
 class MixedAudio : public AudioSystem {
  public:
-  MixedAudio(SoundDriver& sounds, MusicDriver& music) : sounds_(sounds), music_(music) {}
+  MixedAudio(SoundDriver& sounds, MusicDriver& music) : sounds_(sounds, groups()), music_(music) {}
 
   SoundSourceId play_sound(const std::string& name, const FlatSound& sound) override;
   SoundSourceId play_spatial_sound(const std::string& name, const SpatialSound& sound) override;
@@ -106,6 +125,9 @@ class MixedAudio : public AudioSystem {
   bool stop_sound(SoundSourceId id) override;
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
+  std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) override;
+  bool set_group_effects(MixGroup group, const GroupEffects& effects) override;
+  void forget_game_groups() override;
   bool set_music_ducking(const MusicDucking& ducking) override;
   void reset_music_ducking() override;
   bool play_music(const std::string& name, const MusicRequest& request) override;

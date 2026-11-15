@@ -3410,6 +3410,30 @@
           "about": "how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off"
         },
         {
+          "name": "group",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "parent", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "volume", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given"
+        },
+        {
+          "name": "effects",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "group", "type": "Symbol"},
+            {"name": "low_pass", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "reverb", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off"
+        },
+        {
           "name": "set",
           "stability": "experimental",
           "static": true,
@@ -3491,7 +3515,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A game makes groups of its own with `Audio.group(:cave, parent: :effects, volume: 0.8)`, 13 at most, and plays sounds in them by name; a group is heard at its volume times the volumes of the groups over it, and the game's groups end with it. `Audio.effects(group, low_pass:, reverb:)` puts effects on the sounds of a group and of the groups under it: `low_pass` (20 to 20000 Hz) muffles them, and the lowest cutoff over a sound is the one it gets; `reverb` (0 to 1) sends that much of each sound to the reverb of the nearest group that has one. Effects are on sounds, not on the music's tracks. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",

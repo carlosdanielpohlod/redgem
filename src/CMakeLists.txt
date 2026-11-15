@@ -388,6 +388,9 @@ redgem_add_library(redgem_runtime
   navigation/navigation.cpp
   audio/audio.cpp
   audio/ducking.cpp
+  audio/audio_effects.cpp
+  audio/effect_rack.cpp
+  audio/mix_group_tree.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp

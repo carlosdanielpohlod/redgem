@@ -35,6 +35,11 @@ From a game made with 0.5.0:
 
 ### Added
 
+- **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
+  adds a group under another (13 at most, ending with the game), and sounds play in it by name.
+  `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
+  it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
+  game's group of `:voice` ducks the music too.
 - **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
   `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
   that move, and finding another way when something stands in its way for a second. Steering is a
