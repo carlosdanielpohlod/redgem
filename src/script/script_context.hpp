@@ -31,6 +31,7 @@ class LanDiscovery;
 class HttpClient;
 }  // namespace net
 class AnimationPlayer;
+class HeadAims;
 class ParticleSystem;
 class ParticleEmitters;
 class Navigation;
@@ -132,6 +133,7 @@ struct ScriptContext {
   std::function<std::vector<std::string>()> list_save_slots;
   // The scene's animation clips (Animation) and the particles flying around (Particles).
   AnimationPlayer* animations = nullptr;
+  HeadAims* head_aims = nullptr;  // bones turned toward points (Animator#look_at)
   ParticleSystem* particles = nullptr;
   ParticleEmitters* particle_emitters = nullptr;
   // Where the characters a game moves can walk (Navigation), and what bakes the running scene's

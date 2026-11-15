@@ -53,6 +53,13 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Interactable`](#interactable) | A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor). |
 | [`Interactor`](#interactor) | A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
+| [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
+| [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
+| [`Perception::Noise`](#perceptionnoise) | A noise someone heard (on_hear). |
+| [`Brain`](#brain) | A behaviour: an NPC's state machine, with states, transitions, guards, timers and events. |
+| [`GameClock`](#gameclock) | The time of day in the game's world, on game time: what schedules follow. |
+| [`Schedule`](#schedule) | A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). |
+| [`HeadLook`](#headlook) | A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target. |
 
 ## Behaviour
 
@@ -69,6 +76,10 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_interact(GameObject actor) -> void`: an actor used this object (it has an Interactable; on the host in a game over the network)
 - `on_focus(GameObject actor) -> void`: this object became what an actor's interaction prompt is for
 - `on_blur(GameObject actor) -> void`: it stopped being what that prompt is for
+- `on_see(GameObject object) -> void`: a Perception on the object saw something come into sight
+- `on_lose_sight(GameObject object) -> void`: ... and saw it go out of sight
+- `on_hear(Perception::Noise noise) -> void`: a Perception on the object heard a noise
+- `on_schedule(Symbol activity) -> void`: a Schedule on the object came to the hour of another activity
 - `Behaviour.persist(*Symbol | String fields) -> Array[Symbol]`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
 - `Behaviour.persisted_fields -> Array[Symbol]`: what persist named, in this class and those above it
 - `game_object -> GameObject`: the object this behaviour is attached to
@@ -472,6 +483,12 @@ game_object.animation (animation in a behaviour): an object's own clips. See [an
 - `off(Integer listener) -> nil`: stops calling a block that on or on_marker returned
 - `root_motion = bool on`: whether all its clips move the object by their root's horizontal motion and turning
 - `root_motion? -> bool`: whether all its clips move the object
+- `look_at(Vector3 | GameObject target, bone: String | Symbol | GameObject = "Head", max_angle: Numeric = 60.0) -> void`: turns a bone (the head unless said) toward a point or an object, at most max_angle degrees off its clips' pose, easing in; call it every frame to follow
+- `look_away(bone: String | Symbol | GameObject = "Head") -> void`: the bone goes back to its clips' pose, easing out
+- `looking?(bone: String | Symbol | GameObject = "Head") -> bool`: whether a bone is turned toward something, or on its way back
+- `bone(String | Symbol name) -> GameObject | nil`: the object under the character with that name (or that name after a rig's prefix:), or nil
+- `bone!(String | Symbol name) -> GameObject`: bone that raises when the character has none of that name
+- `Animator.bone_named?(String part, String name) -> bool`: whether a part's name is that bone's: the name, or the name after a prefix:
 
 ## Animation::Graph
 
@@ -876,6 +893,7 @@ A behaviour: something the player can use or talk to; its behaviours hear on_int
 
 A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. See [interaction.md](interaction.md).
 
+- `Interactor.all -> Array[Interactor]`: every Interactor of the scene: the players' heroes
 - `target -> Interactable | nil`: the Interactable in focus, or nil
 - `use -> bool`: uses what is in focus now; false when nothing is
 - `pad -> Integer`: the player whose :interact it reads (0 unless said)
@@ -891,6 +909,95 @@ Who uses what: the choice of a target, uses, and the game's handlers; over the n
 - `Interaction.reachable?(GameObject actor, Interactable target, lenient: bool = false) -> bool`: whether an actor can use a target now: enabled, in range, in front, in sight
 - `Interaction.distance(GameObject actor, GameObject | Interactable target) -> Float`: meters from an actor to a target
 - `Interaction.angle_to(GameObject actor, GameObject | Interactable target) -> Float`: degrees between where the actor faces and where the target is, across the ground
+
+## LineOfSight
+
+Whether one thing can see another: a ray to it hits nothing else first. See [npcs.md#perception](npcs.md#perception).
+
+- `LineOfSight.clear?(Vector3 from, Vector3 to, GameObject target, ignore: Array[GameObject] = []) -> bool`: whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
+- `LineOfSight.carried(GameObject object) -> Array[GameObject]`: an object and everything under it
+- `LineOfSight.part_of?(GameObject | nil object, GameObject whole) -> bool`: whether an object is the whole, or is under it
+
+## Perception
+
+A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. See [npcs.md#perception](npcs.md#perception).
+
+- `Perception.noise(at: Vector3, loudness: Numeric = 1.0, source: GameObject | nil = nil) -> Array[GameObject]`: a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it
+- `Perception.all -> Array[Perception]`: every Perception of the scene
+- `sees?(GameObject object) -> bool`: whether an object is in sight now: in range, in the cone, not hidden
+- `in_sight -> Array[GameObject]`: what it sees, as of its last update
+- `sees_any? -> bool`: whether it sees anything it watches
+- `last_seen(GameObject object) -> Vector3 | nil`: where it last saw an object, or nil
+- `watched -> Array[GameObject]`: what it looks for: the objects of its watch tag, or the players' heroes
+- `angle_to(GameObject object) -> Float`: degrees between where it looks and where an object is
+- `eye_point -> Vector3`: where it looks from
+- `sight -> Float`: meters it sees (15 unless said)
+- `fov -> Float`: degrees of the whole cone (120 unless said)
+- `eyes -> Float`: meters above its origin it looks from (1.6 unless said)
+- `aim -> Float`: meters above a watched object's origin it looks at (1 unless said)
+- `hearing -> Float`: meters a noise of loudness 1 is heard from (10 unless said)
+
+## Perception::Noise
+
+A noise someone heard (on_hear). See [npcs.md#perception](npcs.md#perception).
+
+- `position -> Vector3`: where it was made
+- `loudness -> Float`: how loud: 1 is heard as far as a listener's hearing
+- `source -> GameObject | nil`: the object that made it, or nil
+- `distance -> Float`: meters from the listener
+
+## Brain
+
+A behaviour: an NPC's state machine, with states, transitions, guards, timers and events. See [npcs.md#brain](npcs.md#brain).
+
+- `Brain.state(Symbol | String name, **Symbol | Proc hooks) -> void`: declares a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)
+- `Brain.initial(Symbol | String | nil name = nil) -> Symbol | nil`: the state it starts in (the first declared unless said); with a name, sets it
+- `Brain.transition(from: Symbol | Array[Symbol], to: Symbol, **untyped options) -> void`: declares a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards
+- `Brain.states -> Hash[Symbol, Hash[Symbol, Symbol | Proc]]`: its states, by name
+- `Brain.transitions -> Array[untyped]`: its transitions, in the order they were declared
+- `state -> Symbol | nil`: the state it is in (nil before its first frame)
+- `previous_state -> Symbol | nil`: the state it was in before
+- `time_in_state -> Float`: seconds of game time in this state
+- `in?(*Symbol | String names) -> bool`: whether it is in one of these states
+- `fire(Symbol | String event, untyped payload = nil) -> bool`: an event: the first transition waiting for it that may be taken is; true when the state changed
+- `go(Symbol | String name) -> bool`: goes to a state now, whatever the transitions say
+
+## GameClock
+
+The time of day in the game's world, on game time: what schedules follow. See [npcs.md#daily-schedules](npcs.md#daily-schedules).
+
+- `GameClock.hour -> Float`: the hour of the day, its minutes as a fraction: 0 up to 24
+- `GameClock.minute -> Integer`: the minute of the hour
+- `GameClock.day -> Integer`: the day it is, from 1
+- `GameClock.to_s -> String`: the time as "HH:MM"
+- `GameClock.set(hour: Numeric, minute: Numeric = 0, day: Integer = GameClock.day) -> void`: sets the time of day (and the day)
+- `GameClock.speed -> Float`: game seconds for each second of game time (60 unless said)
+- `GameClock.speed = Numeric value`: changes it (0 stops the clock)
+- `GameClock.state -> Hash[Symbol, Float]`: what to save: { seconds:, speed: }
+- `GameClock.restore(Hash[Symbol | String, Numeric] saved) -> void`: back to a saved state
+- `GameClock.seconds -> Float`: seconds of the world's time since the first day began
+
+## Schedule
+
+A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). See [npcs.md#daily-schedules](npcs.md#daily-schedules).
+
+- `current -> Symbol | nil`: the activity it is time for, or nil
+- `plan -> Array[[Float, Symbol]]`: [[hour, activity], ...] in the order of the day
+- `plan = Hash[String, Symbol | String] | String given`: changes the plan: { "06:00" => :work } or "06:00 work, ..."
+- `Schedule.parse(Hash[String, Symbol | String] | String given) -> Array[[Float, Symbol]]`: a plan as given, in the order of the day
+- `Schedule.activity_at(Array[[Float, Symbol]] plan, Numeric hour) -> Symbol | nil`: what a plan says for an hour of the day
+- `Schedule.hour_of(String | Numeric time) -> Float`: "06:30" (or 6.5) as hours
+
+## HeadLook
+
+A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target. See [npcs.md#head-look-at](npcs.md#head-look-at).
+
+- `target -> GameObject | Vector3 | nil`: what it looks at instead of the heroes, or nil
+- `target = GameObject | Vector3 | nil target`: sets it (nil: the heroes)
+- `nearest_hero -> GameObject | nil`: the nearest hero in range and in front of it, or nil
+- `bone -> GameObject`: the head's bone
+- `range -> Float`: meters to a hero (4 unless said)
+- `angle -> Float`: degrees off its forward a hero may be at, and the most the head turns (70 unless said)
 
 ## Notes
 

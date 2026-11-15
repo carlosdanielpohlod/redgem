@@ -140,3 +140,44 @@ class GameObject
     animation.__fire(listener, Animation::Event.new(self, clip, name, at))
   end
 end
+
+# A character's head turned toward something, on top of what its clips do (the engine's bone aim).
+class Animator
+  HEAD = "Head".freeze     # the bone look_at turns unless told
+  LOOK_ANGLE = 60.0        # degrees: the most the bone turns off its pose
+  PREFIX_SEPARATOR = ":".freeze   # "mixamorig:Head" is a "Head"
+
+  # Turns a bone (a name, or the object; the head unless said) toward a point or an object, at
+  # most max_angle degrees off the pose its clips give it, easing in. Call it every frame to follow
+  # something that moves. The bone's forward is the way the character faces when it starts.
+  def look_at(target, bone: HEAD, max_angle: LOOK_ANGLE)
+    point = target.is_a?(Vector3) ? target : target.transform.position
+    @game_object.__look_at(bone_of(bone), point, Float(max_angle))
+  end
+
+  # The bone goes back to its pose, easing out.
+  def look_away(bone: HEAD) = @game_object.__look_away(bone_of(bone))
+
+  # Whether a bone is turned toward something (or on its way back).
+  def looking?(bone: HEAD) = @game_object.__looking(bone_of(bone))
+
+  # The object under the character with that name (or that name after a rig's "prefix:"), or nil.
+  def bone(name)
+    name = name.to_s
+    parts = @game_object.children.dup
+    until parts.empty?
+      part = parts.shift
+      return part if Animator.bone_named?(part.name, name)
+
+      parts.concat(part.children)
+    end
+  end
+
+  def bone!(name) = bone(name) || raise(ArgumentError, "#{@game_object.name} has no bone named #{name}")
+
+  def self.bone_named?(part, name) = part == name || part.end_with?("#{PREFIX_SEPARATOR}#{name}")
+
+  private
+
+  def bone_of(given) = given.is_a?(GameObject) ? given : bone!(given)
+end

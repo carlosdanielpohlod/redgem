@@ -15,6 +15,7 @@
 #     def on_see(object); end        # with a Perception (see perception.rb)
 #     def on_lose_sight(object); end
 #     def on_hear(noise); end
+#     def on_schedule(activity); end # with a Schedule (see schedule.rb)
 #   end
 class Behaviour
   attr_reader :game_object
@@ -33,6 +34,7 @@ class Behaviour
   def on_see(_object); end
   def on_lose_sight(_object); end
   def on_hear(_noise); end
+  def on_schedule(_activity); end
 
   def transform = game_object.transform
   def character = game_object.character

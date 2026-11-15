@@ -185,6 +185,7 @@ add_executable(redgem_tests
   unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/head_aim_test.cpp
   unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp

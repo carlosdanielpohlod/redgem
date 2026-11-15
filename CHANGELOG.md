@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
+  time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
+  `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
+  its object hears `on_schedule(activity)`, its Brain the `:schedule` event, and a transition
+  `to: :scheduled` goes to the state of the activity it is time for. `animation.look_at(target)`
+  turns a character's head bone toward a point or an object in engine C++, on top of its clips'
+  pose, within a largest angle and easing in and out (`look_away`, `looking?`, `bone`). A
+  `HeadLook` behaviour looks at the nearest hero in range and in front, or at a target.
 - **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
   states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
   transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
