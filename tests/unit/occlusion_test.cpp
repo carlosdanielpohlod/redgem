@@ -23,7 +23,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kHalf = 0.5f;
+constexpr float kHalfWay = 0.5f;
 constexpr float kQuarter = 0.25f;
 constexpr float kThreeQuarters = 0.75f;
 constexpr float kQuarterFade = kDefaultOcclusionFade * kQuarter;
@@ -83,7 +83,7 @@ TEST_CASE("a sound's occlusion moves toward what was found over the fade, and no
   CHECK(occlusion_step(kOpen, true, kQuarterFade, settings) == doctest::Approx(kQuarter));
   CHECK(occlusion_step(kOpen, true, kLongFrame, settings) == doctest::Approx(kBehindWall));
   CHECK(occlusion_step(kBehindWall, false, kQuarterFade, settings) == doctest::Approx(kThreeQuarters));
-  CHECK(occlusion_step(kHalf, false, kLongFrame, settings) == doctest::Approx(kOpen));
+  CHECK(occlusion_step(kHalfWay, false, kLongFrame, settings) == doctest::Approx(kOpen));
   OcclusionSettings at_once = settings;
   at_once.fade_seconds = kNoTime;
   CHECK(occlusion_step(kOpen, true, kNoTime, at_once) == doctest::Approx(kBehindWall));
@@ -93,10 +93,10 @@ TEST_CASE("an occluded sound is quieter and muffled, the more the further behind
   const OcclusionSettings settings;
   CHECK(occluded_volume(kOpen, settings) == doctest::Approx(kFullVolume));
   CHECK(occluded_volume(kBehindWall, settings) == doctest::Approx(kDefaultOccludedVolume));
-  CHECK(occluded_volume(kHalf, settings) == doctest::Approx((kFullVolume + kDefaultOccludedVolume) * kHalf));
+  CHECK(occluded_volume(kHalfWay, settings) == doctest::Approx((kFullVolume + kDefaultOccludedVolume) * kHalfWay));
   CHECK_FALSE(occluded_effects(VoiceEffects{}, kOpen, settings).low_pass_hz.has_value());
   CHECK(occluded_effects(VoiceEffects{}, kBehindWall, settings).low_pass_hz == doctest::Approx(kDefaultOccludedCutoff));
-  const float halfway = *occluded_effects(VoiceEffects{}, kHalf, settings).low_pass_hz;
+  const float halfway = *occluded_effects(VoiceEffects{}, kHalfWay, settings).low_pass_hz;
   CHECK(halfway == doctest::Approx(std::sqrt(kHighestCutoff * kDefaultOccludedCutoff)));  // (halfway in octaves)
   VoiceEffects lower;
   lower.low_pass_hz = kLowestCutoff;
@@ -111,13 +111,13 @@ TEST_CASE("occlusion settings are valid within their ranges, and full volume wit
   settings.low_pass_hz = std::nullopt;
   CHECK(valid_occlusion(settings));
   CHECK_FALSE(occludes(settings));
-  settings.volume = kFullVolume + kHalf;
+  settings.volume = kFullVolume + kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
-  settings.volume = kHalf;
-  settings.low_pass_hz = kLowestCutoff * kHalf;
+  settings.volume = kHalfWay;
+  settings.low_pass_hz = kLowestCutoff * kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
   settings.low_pass_hz = std::nullopt;
-  settings.fade_seconds = -kHalf;
+  settings.fade_seconds = -kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
 }
 
@@ -160,7 +160,7 @@ TEST_CASE("a static body between two points muffles; a moving one, or one aside,
   CHECK(static_body_between(*world, kListener, kBehind));
   CHECK_FALSE(static_body_between(*world, kListener, kBeside));
   CHECK_FALSE(static_body_between(*world, kListener, kListener));
-  REQUIRE_FALSE(world->add_object(box(kCrate, {{"body", std::string("dynamic")}}, kBeside * kHalf, kCrateHalf)));
+  REQUIRE_FALSE(world->add_object(box(kCrate, {{"body", std::string("dynamic")}}, kBeside * kHalfWay, kCrateHalf)));
   CHECK_FALSE(static_body_between(*world, kListener, kBeside));
 }
 
