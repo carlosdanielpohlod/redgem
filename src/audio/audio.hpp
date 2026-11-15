@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 
+#include "audio/ducking.hpp"
 #include "audio/mix_groups.hpp"
 #include "audio/music_player.hpp"
 #include "audio/spatial_audio.hpp"
@@ -34,6 +35,11 @@ class AudioSystem {
   // The player's volume of a group (Settings.music_volume...): what each sound of it is heard at,
   // times its own.
   virtual void set_group_volume(MixGroup, float) {}
+  // How the music group goes down while a voice plays (Audio.ducking); false for ducking that is
+  // not valid, which changes nothing.
+  virtual bool set_music_ducking(const MusicDucking& ducking) { return valid_music_ducking(ducking); }
+  // The default ducking, and the music back at full volume at once: the game ended.
+  virtual void reset_music_ducking() {}
 
   // A new track fades in over `request.fade_seconds` while the one playing fades out.
   virtual bool play_music(const std::string& name, const MusicRequest& request) = 0;
@@ -100,6 +106,8 @@ class MixedAudio : public AudioSystem {
   bool stop_sound(SoundSourceId id) override;
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
+  bool set_music_ducking(const MusicDucking& ducking) override;
+  void reset_music_ducking() override;
   bool play_music(const std::string& name, const MusicRequest& request) override;
   void fade_out_music(float seconds) override;
   void set_music_pitch(float pitch) override;
@@ -108,10 +116,14 @@ class MixedAudio : public AudioSystem {
 
  protected:
   const MusicPlayer& music_player() const { return music_; }
+  float music_ducked() const { return ducker_.gain(); }
 
  private:
+  void duck(float seconds);
+
   SoundPool sounds_;
   MusicPlayer music_;
+  MusicDucker ducker_;
 };
 
 // Plays through raylib. Falls back to silence when no audio device is available.

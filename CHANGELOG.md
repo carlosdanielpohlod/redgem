@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
