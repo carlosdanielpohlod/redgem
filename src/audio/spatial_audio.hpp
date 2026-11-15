@@ -13,7 +13,13 @@ namespace redgem {
 
 using SoundSourceId = std::uint32_t;
 inline constexpr SoundSourceId kNoSoundSource = 0;
-inline constexpr std::size_t kMaxSpatialSounds = 64;  // bound simultaneous stream/decoder resources
+// Sounds with ids at once, flat and positional together: it bounds the streams and decoders. Past
+// it, a new sound takes the place of the weakest one playing (see SoundPool::play).
+inline constexpr std::size_t kMaxSounds = 128;
+// Which sound keeps its place when there is no room: the higher priority.
+inline constexpr int kLowestSoundPriority = 0;
+inline constexpr int kHighestSoundPriority = 255;
+inline constexpr int kDefaultSoundPriority = 128;
 
 // Bound the resampling rate before it reaches the audio backend.
 inline constexpr float kMinSpatialPitch = 0.01f;
@@ -37,6 +43,7 @@ struct SpatialSound {
   // position and distances are then not used.
   bool positional = true;
   MixGroup group = MixGroup::Effects;
+  int priority = kDefaultSoundPriority;
 };
 
 // A sound with no place in the world (Audio.play): a looping hum, an alarm, a voice line.
@@ -45,6 +52,7 @@ struct FlatSound {
   float pitch = kAsRecorded;
   bool loop = false;
   MixGroup group = MixGroup::Effects;
+  int priority = kDefaultSoundPriority;
 };
 SpatialSound flat_sound(const FlatSound& sound);
 
@@ -87,6 +95,9 @@ class SoundPool {
   SoundPool(const SoundPool&) = delete;
   SoundPool& operator=(const SoundPool&) = delete;
 
+  // With kMaxSounds playing, the new sound takes the place of the weakest one (the lowest
+  // priority, then the quietest as heard, then the oldest) when its priority is at least that
+  // one's: that one stops and its handle goes. Otherwise it does not play.
   SoundSourceId play(const std::string& name, const SpatialSound& sound);
   bool set_listener(const AudioListener& listener);
   bool move(SoundSourceId id, Vec3 position);
@@ -106,6 +117,10 @@ class SoundPool {
 
  private:
   std::optional<SpatialMix> mix_of(const SpatialSound& sound) const;
+  // The sound that gives its place to `sound` when the pool is full: nullopt when there is room,
+  // and kNoSoundSource when every sound playing is stronger.
+  std::optional<SoundSourceId> place_for(const SpatialSound& sound) const;
+  SoundSourceId weakest() const;
   void refresh();
   void reap();  // lets go of the sounds that ended
   SoundDriver& driver_;

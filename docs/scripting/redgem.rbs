@@ -716,7 +716,7 @@ end
 # Sounds and music from the game's sounds/ folder.
 module Audio
   # plays a sound; returns its id (for stop, playing? and set), or nil
-  def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol) -> (Integer | nil)
+  def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # plays music, crossfading over fade seconds from the track playing
   def self.music: (String | Symbol name, ?loop: bool, ?volume: Numeric, ?fade: Numeric) -> void
   # stops the music, fading it out over fade seconds
@@ -730,7 +730,7 @@ module Audio
   # changes the volume or pitch of a sound that plays; false once it stopped
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
-  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol) -> (Integer | nil)
+  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # where the ears are (move it with the camera)
   def self.listener: (Vector3 position, Vector3 forward, Vector3 up) -> void
   # moves a sound played with play_at

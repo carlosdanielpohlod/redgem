@@ -42,6 +42,12 @@ class AudioTest < RedGemTest::Case
     assert_raises(ArgumentError) { Audio.ducking(release: -1) }
   end
 
+  def test_a_priority_out_of_range_is_refused
+    assert_raises(ArgumentError) { Audio.play(NOT_A_SOUND, priority: 256) }
+    assert_raises(ArgumentError) { Audio.play_at(NOT_A_SOUND, [0, 0, 0], priority: -1) }
+    assert_nil Audio.play(NOT_A_SOUND, priority: Audio::DEFAULT_PRIORITY)
+  end
+
   def test_music_without_a_file_does_not_play_and_stopping_no_music_is_harmless
     refute Audio.music(NOT_A_SOUND, fade: 1)
     assert_nil Audio.stop_music(fade: 1)

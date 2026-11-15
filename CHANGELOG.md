@@ -14,6 +14,11 @@ until 1.0, a release may change what games rely on (see
   `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
   plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
   with the game.
+- **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
+  that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
+  quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
+  stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
+  default).
 - **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
   physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
   of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the

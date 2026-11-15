@@ -113,10 +113,12 @@ TEST_CASE("a sound's levels change while it plays, and levels it cannot have lea
 TEST_CASE("a sound that ended gives its place back to the next one played") {
   HandleTestDriver driver;
   SoundPool sounds(driver);
-  for (std::size_t count = 0; count < kMaxSpatialSounds; ++count) REQUIRE(sounds.play("step", flat_at(kHalfLevel)));
-  CHECK(sounds.play("step", flat_at(kHalfLevel)) == kNoSoundSource);
+  for (std::size_t count = 0; count < kMaxSounds; ++count) REQUIRE(sounds.play("step", flat_at(kHalfLevel)));
+  SpatialSound minor = flat_at(kHalfLevel);
+  minor.priority = kLowestSoundPriority;
+  CHECK(sounds.play("step", minor) == kNoSoundSource);
   driver.voices.begin()->second.playing = false;
-  CHECK(sounds.play("step", flat_at(kHalfLevel)) != kNoSoundSource);
+  CHECK(sounds.play("step", minor) != kNoSoundSource);
 }
 
 TEST_CASE("a group's volume is over every sound of that group, those playing and those to come") {
