@@ -3,6 +3,7 @@
 #include <set>
 #include <string>
 
+#include "audio/audio.hpp"
 #include "core/config.hpp"
 #include "core/game_files.hpp"
 #include "core/language_names.hpp"
@@ -73,6 +74,16 @@ void check_quests(const DialogueChecks& checks, const std::string& file, const d
   }
 }
 
+// A line whose voice has no sound file plays with no voice: a warning.
+void check_voices(const DialogueChecks& checks, const std::string& file, const dialogue::DialogueFile& dialogue) {
+  const fs::path sounds = checks.game_dir / config::kSoundsDirName;
+  for (const dialogue::NameUse& voice : dialogue.voices) {
+    if (find_sound_file(sounds, voice.name)) continue;
+    checks.report.warnings.push_back(
+        tr("project.check.missing_voice", {{"file", file}, {"where", voice.where}, {"voice", voice.name}}));
+  }
+}
+
 void add_lines(std::vector<std::string>& to, const std::string& file, const std::vector<std::string>& lines) {
   for (const std::string& line : lines) to.push_back(file + ": " + printable(line));
 }
@@ -91,6 +102,7 @@ void check_dialogue(const DialogueChecks& checks, const std::string& name) {
   add_lines(checks.report.warnings, file, read.warnings);
   check_texts(checks, file, read);
   check_quests(checks, file, read);
+  check_voices(checks, file, read);
 }
 
 }  // namespace

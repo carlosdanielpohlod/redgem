@@ -1,10 +1,13 @@
 #pragma once
 
 // The groups a game's sounds are mixed in, each with a volume of its own: a settings screen turns
-// the music down without the footsteps. The master volume is over all of them.
+// the music down without the footsteps. The master volume is over all of them. Three groups are
+// the engine's (music, effects, voice: the player's settings turn them); a game adds its own under
+// them (Audio.group(:cave, parent: :effects)), each with its volume and its effects.
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -15,11 +18,14 @@ namespace redgem {
 inline constexpr float kFullVolume = 1.0f;
 inline constexpr float kAsRecorded = 1.0f;
 
-enum class MixGroup { Music, Effects, Voice };
-inline constexpr std::size_t kMixGroupCount = 3;
+// The engine's groups by name; a game's groups follow them, numbered from kMixGroupCount.
+enum class MixGroup : std::uint8_t { Music, Effects, Voice };
+inline constexpr std::size_t kMixGroupCount = 3;  // the engine's
 inline constexpr std::array<MixGroup, kMixGroupCount> kMixGroups = {MixGroup::Music, MixGroup::Effects,
                                                                     MixGroup::Voice};
-// A volume for each group, in kMixGroups' order.
+// Every group at once, the engine's and a game's: a game has 13 of its own at most.
+inline constexpr std::size_t kMaxMixGroups = 16;
+// A volume for each of the engine's groups, in kMixGroups' order.
 using GroupVolumes = std::array<float, kMixGroupCount>;
 inline constexpr GroupVolumes kFullGroupVolumes = {kFullVolume, kFullVolume, kFullVolume};
 

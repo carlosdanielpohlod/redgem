@@ -1,6 +1,8 @@
 # The scripting API of RedGem games as Ruby type signatures (RBS), for the language servers of
 # editors and type checkers (Steep, Solargraph and the like). Made from docs/scripting/api.json
-# by `redgem api --rbs`: change that file, not this one.
+# by `redgem api --rbs`: change that file, not this one. Each class and method is annotated
+# %a{redgem:stable} (no breaking change within a 1.x minor release) or %a{redgem:experimental}
+# (it may change in any release): see docs/scripting/stability.md.
 
 module RedGem
   # A color: its name (:orange), or [r, g, b] from 0 to 255.
@@ -8,1601 +10,2396 @@ module RedGem
 end
 
 # A Ruby class attached to an object: the engine calls its methods as the game runs.
+%a{redgem:stable}
 class Behaviour
   # called once, before the first update
+  %a{redgem:stable}
   def start: () -> void
   # called every frame; dt is the seconds since the last one
+  %a{redgem:stable}
   def update: (Float dt) -> void
   # called 60 times a second, with the physics
+  %a{redgem:stable}
   def fixed_update: (Float dt) -> void
   # something entered this object's trigger, or it entered one
+  %a{redgem:stable}
   def on_trigger_enter: (GameObject other) -> void
   # something left this object's trigger
+  %a{redgem:stable}
   def on_trigger_exit: (GameObject other) -> void
   # this object's body touched another
+  %a{redgem:stable}
   def on_collision_enter: (GameObject other) -> void
   # this object's body stopped touching another
+  %a{redgem:stable}
   def on_collision_exit: (GameObject other) -> void
   # the object is being destroyed
+  %a{redgem:stable}
   def on_destroy: () -> void
   # an actor used this object (it has an Interactable; on the host in a game over the network)
+  %a{redgem:experimental}
   def on_interact: (GameObject actor) -> void
   # this object became what an actor's interaction prompt is for
+  %a{redgem:experimental}
   def on_focus: (GameObject actor) -> void
   # it stopped being what that prompt is for
+  %a{redgem:experimental}
   def on_blur: (GameObject actor) -> void
   # a Perception on the object saw something come into sight
+  %a{redgem:experimental}
   def on_see: (GameObject object) -> void
   # ... and saw it go out of sight
+  %a{redgem:experimental}
   def on_lose_sight: (GameObject object) -> void
   # a Perception on the object heard a noise
+  %a{redgem:experimental}
   def on_hear: (Perception::Noise noise) -> void
   # a Schedule on the object came to the hour of another activity
+  %a{redgem:experimental}
   def on_schedule: (Symbol activity) -> void
   # fields Save.checkpoint keeps for a spawned copy, given back before it starts
+  %a{redgem:experimental}
   def self.persist: (*Symbol | String fields) -> Array[Symbol]
   # what persist named, in this class and those above it
+  %a{redgem:experimental}
   def self.persisted_fields: () -> Array[Symbol]
   # the object this behaviour is attached to
+  %a{redgem:stable}
   def game_object: () -> GameObject
   # the object's name
+  %a{redgem:stable}
   def name: () -> String
   # the object's Transform
+  %a{redgem:stable}
   def transform: () -> Transform
   # the object's CharacterController, or nil
+  %a{redgem:stable}
   def character: () -> (CharacterController | nil)
   # the object's Rigidbody, or nil
+  %a{redgem:stable}
   def rigidbody: () -> (Rigidbody | nil)
   # the object's Vehicle, or nil
+  %a{redgem:stable}
   def vehicle: () -> (Vehicle | nil)
   # the object's own Animator
+  %a{redgem:stable}
   def animation: () -> Animator
   # the object's custom properties, as a Hash
+  %a{redgem:stable}
   def props: () -> Hash[String, untyped]
   # a setting: what add_component was given, else the object's property, else the default
+  %a{redgem:stable}
   def prop: (Symbol | String key, ?untyped default) -> untyped
   # the object called name, or nil
+  %a{redgem:stable}
   def find: (String | Symbol name) -> (GameObject | nil)
   # find that stops with a clear error when the object is missing
+  %a{redgem:stable}
   def find!: (String | Symbol name) -> GameObject
   # every object with that tag
+  %a{redgem:stable}
   def find_all: (String | Symbol tag) -> Array[GameObject]
   # removes an object (this one unless said) at the end of the step
+  %a{redgem:stable}
   def destroy: (?GameObject target) -> void
   # another behaviour of this object, or nil
+  %a{redgem:stable}
   def get_component: (Class klass) -> (Behaviour | nil)
   # runs the block once, that many seconds from now
+  %a{redgem:stable}
   def after: (Numeric seconds) { () -> void } -> Behaviour::Timer
   # runs the block every that many seconds
+  %a{redgem:stable}
   def every: (Numeric seconds) { () -> void } -> Behaviour::Timer
   # calls the block with t from 0 to 1 over that many seconds
+  %a{redgem:stable}
   def tween: (Numeric seconds, ?ease: Symbol) { (Float) -> void } -> Behaviour::Timer
   # stops every after, every and tween of this behaviour
+  %a{redgem:stable}
   def cancel_timers: () -> void
 end
 
 # What after, every and tween return: something waiting to happen, which can be called off.
+%a{redgem:stable}
 class Behaviour::Timer
   # calls it off (also from inside its own block)
+  %a{redgem:stable}
   def cancel: () -> void
   # whether it was called off
+  %a{redgem:stable}
   def cancelled?: () -> bool
 end
 
 # An object of the scene, as scripts see it.
+%a{redgem:stable}
 class GameObject
   # its name
+  %a{redgem:stable}
   def name: () -> String
   # its number in the running game
+  %a{redgem:stable}
   def id: () -> Integer
   # its persistent scene-file identity as a String; nil for runtime copies
+  %a{redgem:experimental}
   def stable_id: () -> (String | nil)
   # a versioned checkpoint of local pose, tint and visibility, suitable for Save
+  %a{redgem:experimental}
   def capture_state: () -> Hash[Symbol, untyped]
   # validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self
+  %a{redgem:experimental}
   def restore_state: (Hash[Symbol, untyped] state) -> self
   # its tag property
+  %a{redgem:stable}
   def tag: () -> (String | nil)
   # whether its tag is value
+  %a{redgem:stable}
   def tag?: (String | Symbol value) -> bool
   # its custom properties
+  %a{redgem:stable}
   def props: () -> Hash[String, untyped]
   # the Joint it came with in the scene (its Joint component, set up in the editor), or nil
+  %a{redgem:experimental}
   def joint: () -> (Joint | nil)
   # false once it was destroyed
+  %a{redgem:stable}
   def alive?: () -> bool
   # removes it at the end of the step
+  %a{redgem:stable}
   def destroy: () -> void
   # whether it is drawn
+  %a{redgem:stable}
   def visible: () -> bool
   # shows or hides it
+  %a{redgem:stable}
   def visible=: (bool value) -> bool
   # its behaviours
+  %a{redgem:stable}
   def behaviours: () -> Array[Behaviour]
   # the object it is under, or nil
+  %a{redgem:stable}
   def parent: () -> (GameObject | nil)
   # puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries
+  %a{redgem:experimental}
   def parent=: (GameObject | nil object) -> (GameObject | nil)
   # like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent
+  %a{redgem:experimental}
   def set_parent: (GameObject | nil object, ?keep_world: bool) -> (GameObject | nil)
   # the objects under it
+  %a{redgem:stable}
   def children: () -> Array[GameObject]
   # its Transform
+  %a{redgem:stable}
   def transform: () -> Transform
   # its CharacterController, or nil
+  %a{redgem:stable}
   def character: () -> (CharacterController | nil)
   # its Rigidbody, or nil
+  %a{redgem:stable}
   def rigidbody: () -> (Rigidbody | nil)
   # its Vehicle, or nil
+  %a{redgem:stable}
   def vehicle: () -> (Vehicle | nil)
   # the Light it shines with, or nil
+  %a{redgem:stable}
   def light: () -> (Light | nil)
   # its Animator
+  %a{redgem:stable}
   def animation: () -> Animator
   # seconds its animations run ahead of the original's (a spawned copy)
+  %a{redgem:stable}
   def animation_offset: () -> Float
   # sets that offset
+  %a{redgem:stable}
   def animation_offset=: (Numeric seconds) -> Numeric
   # one of its behaviours, or nil
+  %a{redgem:stable}
   def get_component: (Class klass) -> (Behaviour | nil)
   # attaches a behaviour; settings are what its prop reads
+  %a{redgem:stable}
   def add_component: (Class klass, **untyped settings) -> (Behaviour | nil)
   # the color its colors are multiplied by
+  %a{redgem:stable}
   def tint: () -> Vector3
   # multiplies its colors: [1.0, 0.5, 0.5]
+  %a{redgem:stable}
   def tint=: (Vector3 | Array[Numeric] color) -> (Vector3 | Array[Numeric])
   # the weight of a shape key (morph target) of its mesh and the meshes under it, or sets it: morph(:Smile, 0.7); nil when no part has the key, ArgumentError when setting one none has
+  %a{redgem:experimental}
   def morph: (String | Symbol name, ?Numeric | nil weight) -> (Numeric | nil)
   # the names of the shape keys of its mesh and the meshes under it, as symbols
+  %a{redgem:experimental}
   def morph_names: () -> Array[Symbol]
 end
 
 # Where an object is, how it is turned and how big it is.
+%a{redgem:stable}
 class Transform
   # its position in the world (Vector3)
+  %a{redgem:stable}
   def position: () -> Vector3
   # moves it; a physics object is teleported
+  %a{redgem:stable}
   def position=: (Vector3 vector) -> Vector3
   # its position relative to its parent
+  %a{redgem:stable}
   def local_position: () -> Vector3
   # moves it relative to its parent
+  %a{redgem:stable}
   def local_position=: (Vector3 vector) -> Vector3
   # its rotation, Euler degrees (Vector3)
+  %a{redgem:stable}
   def rotation: () -> Vector3
   # turns it to those Euler degrees
+  %a{redgem:stable}
   def rotation=: (Vector3 degrees) -> Vector3
+  # its rotation relative to its parent, Euler degrees (Vector3)
+  %a{redgem:experimental}
+  def local_rotation: () -> Vector3
+  # turns it to those Euler degrees relative to its parent
+  %a{redgem:experimental}
+  def local_rotation=: (Vector3 degrees) -> Vector3
   # turns it by those Euler degrees
+  %a{redgem:stable}
   def rotate: (Vector3 degrees) -> void
   # turns it to face a point
+  %a{redgem:stable}
   def look_at: (Vector3 | GameObject target, ?Vector3 up) -> void
   # moves it by an offset
+  %a{redgem:stable}
   def translate: (Vector3 offset) -> void
   # its scale (Vector3)
+  %a{redgem:stable}
   def scale: () -> Vector3
   # resizes it
+  %a{redgem:stable}
   def scale=: (Vector3 vector) -> Vector3
   # the direction it faces (-Z)
+  %a{redgem:stable}
   def forward: () -> Vector3
   # its right (+X)
+  %a{redgem:stable}
   def right: () -> Vector3
   # its up (+Y)
+  %a{redgem:stable}
   def up: () -> Vector3
 end
 
 # A point or a direction in meters: x, y, z.
+%a{redgem:stable}
 class Vector3
   # a vector
+  %a{redgem:stable}
   def initialize: (Numeric x, Numeric y, Numeric z) -> void
   # the same as new
+  %a{redgem:stable}
   def self.[]: (Numeric x, Numeric y, Numeric z) -> Vector3
   # (0, 0, 0)
+  %a{redgem:stable}
   def self.zero: () -> Vector3
   # (1, 1, 1)
+  %a{redgem:stable}
   def self.one: () -> Vector3
   # (0, 1, 0)
+  %a{redgem:stable}
   def self.up: () -> Vector3
   # (0, -1, 0)
+  %a{redgem:stable}
   def self.down: () -> Vector3
   # (-1, 0, 0)
+  %a{redgem:stable}
   def self.left: () -> Vector3
   # (1, 0, 0)
+  %a{redgem:stable}
   def self.right: () -> Vector3
   # (0, 0, -1)
+  %a{redgem:stable}
   def self.forward: () -> Vector3
   # (0, 0, 1)
+  %a{redgem:stable}
   def self.back: () -> Vector3
   # a vector given in Blender's axes (Z up)
+  %a{redgem:stable}
   def self.blender: (Numeric x, Numeric y, Numeric z) -> Vector3
   # its x
+  %a{redgem:stable}
   def x: () -> Float
   # its y
+  %a{redgem:stable}
   def y: () -> Float
   # its z
+  %a{redgem:stable}
   def z: () -> Float
   # sum
+  %a{redgem:stable}
   def +: (Vector3 other) -> Vector3
   # difference
+  %a{redgem:stable}
   def -: (Vector3 other) -> Vector3
   # the opposite vector
+  %a{redgem:stable}
   def -@: () -> Vector3
   # scaled
+  %a{redgem:stable}
   def *: (Numeric number) -> Vector3
   # divided
+  %a{redgem:stable}
   def /: (Numeric number) -> Vector3
   # whether the numbers are exactly the same
+  %a{redgem:stable}
   def ==: (untyped other) -> bool
   # dot product
+  %a{redgem:stable}
   def dot: (Vector3 other) -> Float
   # cross product
+  %a{redgem:stable}
   def cross: (Vector3 other) -> Vector3
   # its length
+  %a{redgem:stable}
   def length: () -> Float
   # its length squared (faster)
+  %a{redgem:stable}
   def length_squared: () -> Float
   # the same direction, length 1
+  %a{redgem:stable}
   def normalized: () -> Vector3
   # the same direction, no longer than max_length
+  %a{redgem:stable}
   def clamped: (?Numeric max_length) -> Vector3
   # the point t of the way to other
+  %a{redgem:stable}
   def lerp: (Vector3 other, Numeric t) -> Vector3
   # the same with y = 0
+  %a{redgem:stable}
   def flat: () -> Vector3
   # a copy with some parts changed: v.with(y: 0)
+  %a{redgem:stable}
   def with: (x: Numeric, y: Numeric, z: Numeric) -> Vector3
   # the distance to another point
+  %a{redgem:stable}
   def distance_to: (Vector3 other) -> Float
   # whether two vectors are about the same
+  %a{redgem:stable}
   def approx?: (Vector3 other, ?Numeric tolerance) -> bool
   # [x, y, z]
+  %a{redgem:stable}
   def to_a: () -> [Float, Float, Float]
   # changes it in place
+  %a{redgem:stable}
   def set: (Numeric x, Numeric y, Numeric z) -> self
   # adds in place
+  %a{redgem:stable}
   def add!: (Vector3 other) -> self
   # subtracts in place
+  %a{redgem:stable}
   def sub!: (Vector3 other) -> self
   # scales in place
+  %a{redgem:stable}
   def scale!: (Numeric number) -> self
   # normalizes in place
+  %a{redgem:stable}
   def normalize!: () -> self
 end
 
 # The objects of the running scene.
+%a{redgem:stable}
 module Scene
   # the object called name, or nil
+  %a{redgem:stable}
   def self.find: (String | Symbol name) -> (GameObject | nil)
   # the current scene object with that persistent String/Symbol identity, or nil
+  %a{redgem:experimental}
   def self.find_by_id: (String | Symbol identity) -> (GameObject | nil)
   # find that stops with a clear error when the object is missing
+  %a{redgem:stable}
   def self.find!: (String | Symbol name, ?wanted_by: Class | nil) -> GameObject
   # every object with that tag
+  %a{redgem:stable}
   def self.find_all: (String | Symbol tag) -> Array[GameObject]
   # every object
+  %a{redgem:stable}
   def self.objects: () -> Array[GameObject]
   # copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+  %a{redgem:stable}
   def self.spawn: (String | GameObject template, ?position: Vector3 | nil, ?rotation: Vector3 | nil, ?physics: bool, ?name: String | nil, ?parent: GameObject | nil) -> (GameObject | nil)
   # instantiates a rigid GLB hierarchy from prefabs/ at the given world placement; returns its root
+  %a{redgem:experimental}
   def self.spawn_prefab: (String file, ?position: Vector3 | nil, ?rotation: Vector3 | nil, ?physics: bool, ?name: String | nil, ?parent: GameObject | nil) -> (GameObject | nil)
 end
 
 # Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.
+%a{redgem:stable}
 class SceneScript
   # runs when the level loads, before any behaviour starts
+  %a{redgem:stable}
   def setup: () -> void
   # the object called name, or nil
+  %a{redgem:stable}
   def find: (String | Symbol name) -> (GameObject | nil)
   # find that stops with a clear error when the object is missing
+  %a{redgem:stable}
   def find!: (String | Symbol name) -> GameObject
   # every object with that tag
+  %a{redgem:stable}
   def find_all: (String | Symbol tag) -> Array[GameObject]
 end
 
 # Keyboard, mouse, gamepad and touch, read every frame.
+%a{redgem:stable}
 module Input
   # :horizontal or :vertical, from -1 to 1 (keys, stick)
+  %a{redgem:stable}
   def self.axis: (Symbol name, ?pad: Integer) -> Float
   # whether a key is held
+  %a{redgem:stable}
   def self.down?: (Symbol key) -> bool
   # whether a key went down this frame
+  %a{redgem:stable}
   def self.pressed?: (Symbol key) -> bool
   # whether a key went up this frame
+  %a{redgem:stable}
   def self.released?: (Symbol key) -> bool
   # whether a named action (game settings) is held
+  %a{redgem:stable}
   def self.action?: (Symbol name, ?pad: Integer) -> bool
   # whether a named action started this frame
+  %a{redgem:stable}
   def self.action_pressed?: (Symbol name, ?pad: Integer) -> bool
   # whether a named action ended this frame
+  %a{redgem:stable}
   def self.action_released?: (Symbol name, ?pad: Integer) -> bool
   # adds an action of the game's own (besides game.json's input section)
+  %a{redgem:stable}
   def self.define_action: (Symbol name, *String bindings, ?keys: Array[Symbol], ?buttons: Array[Symbol], ?mouse: Array[Symbol]) -> void
   # adds an axis of the game's own: define_axis(:steer, negative: ["key:a"], positive: ["key:d"])
+  %a{redgem:stable}
   def self.define_axis: (Symbol name, ?negative: Array[String], ?positive: Array[String], ?pad_axis: Symbol | nil, ?invert: bool) -> void
   # the names of the actions
+  %a{redgem:stable}
   def self.actions: () -> Array[Symbol]
   # the names of the axes
+  %a{redgem:stable}
   def self.axes: () -> Array[Symbol]
   # the stick that moves an axis (:left_x), the game's for every player; nil when none does
+  %a{redgem:stable}
   def self.axis_stick: (Symbol name) -> (Symbol | nil)
   # what a player bound to an action: ["key:space", "mouse:left", "pad:a"]
+  %a{redgem:stable}
   def self.bindings: (Symbol name, ?pad: Integer) -> Array[String]
   # a count that goes up whenever actions, axes or bindings may have changed
+  %a{redgem:stable}
   def self.bindings_changes: () -> Integer
   # binds a key, a mouse button (mouse: :left, :wheel_up) or a gamepad button to an action; kept between runs
+  %a{redgem:stable}
   def self.bind: (Symbol name, ?String | nil binding, ?key: Symbol | nil, ?button: Symbol | nil, ?mouse: Symbol | nil, ?side: Symbol | nil, ?pad: Integer) -> void
   # takes a binding off an action
+  %a{redgem:stable}
   def self.unbind: (Symbol name, ?String | nil binding, ?key: Symbol | nil, ?button: Symbol | nil, ?mouse: Symbol | nil, ?side: Symbol | nil, ?pad: Integer) -> void
   # back to the game's own bindings (of one action, or all; of one pad, or all)
+  %a{redgem:stable}
   def self.reset_bindings: (?Symbol | nil name, ?pad: Integer | nil) -> void
   # the next key, mouse button, wheel turn or gamepad button pressed, to the block: |binding, pad| (nil: called off); mouse: false leaves the mouse out
+  %a{redgem:stable}
   def self.capture_next: (?cancel: Array[String], ?mouse: bool) { (String | nil, Integer | nil) -> void } -> void
   # whether a capture waits for a key
+  %a{redgem:stable}
   def self.capturing?: () -> bool
   # whether a capture still waits to call that block (not once another took its place)
+  %a{redgem:stable}
   def self.capturing_for?: (Proc block) -> bool
   # calls a capture off
+  %a{redgem:stable}
   def self.cancel_capture: () -> void
   # the pointer's x, in pixels
+  %a{redgem:stable}
   def self.mouse_x: () -> Float
   # the pointer's y, in pixels
+  %a{redgem:stable}
   def self.mouse_y: () -> Float
   # how far the mouse moved this frame, across
+  %a{redgem:stable}
   def self.mouse_dx: () -> Float
   # how far the mouse moved this frame, up and down
+  %a{redgem:stable}
   def self.mouse_dy: () -> Float
   # how far the wheel turned this frame
+  %a{redgem:stable}
   def self.mouse_wheel: () -> Float
   # whether a mouse button (:left, :right, :middle, :side, :extra) is held
+  %a{redgem:stable}
   def self.mouse_down?: (Symbol button) -> bool
   # whether a mouse button went down this frame
+  %a{redgem:stable}
   def self.mouse_pressed?: (Symbol button) -> bool
   # whether a mouse button went up this frame
+  %a{redgem:stable}
   def self.mouse_released?: (Symbol button) -> bool
   # hides the pointer and keeps it in the window (first-person cameras)
+  %a{redgem:stable}
   def self.mouse_locked=: (bool locked) -> bool
   # whether the pointer is locked
+  %a{redgem:stable}
   def self.mouse_locked?: () -> bool
   # the numbers of the gamepads plugged in
+  %a{redgem:stable}
   def self.pads: () -> Array[Integer]
   # whether a gamepad is connected
+  %a{redgem:stable}
   def self.gamepad?: (?pad: Integer) -> bool
   # :left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger
+  %a{redgem:stable}
   def self.gamepad_axis: (Symbol axis, ?pad: Integer) -> Float
   # whether a gamepad button (:a, :b, :x, :y...) is held
+  %a{redgem:stable}
   def self.gamepad_down?: (Symbol button, ?pad: Integer) -> bool
   # whether a gamepad button went down this frame
+  %a{redgem:stable}
   def self.gamepad_pressed?: (Symbol button, ?pad: Integer) -> bool
   # whether a gamepad button went up this frame
+  %a{redgem:stable}
   def self.gamepad_released?: (Symbol button, ?pad: Integer) -> bool
   # whether gamepads can rumble here: never yet (the window library has no vibration on desktops nor Android)
+  %a{redgem:experimental}
   def self.rumble?: () -> bool
   # rumbles a player's gamepad (strength 0 to 1); a hook that does nothing yet and returns false (see rumble?)
+  %a{redgem:experimental}
   def self.rumble: (Integer pad, Numeric strength, Numeric seconds) -> bool
   # what was typed this frame
+  %a{redgem:stable}
   def self.text: () -> String
   # shows the on-screen stick and buttons of a phone
+  %a{redgem:stable}
   def self.touch_controls=: (bool on) -> bool
   # whether they are shown
+  %a{redgem:stable}
   def self.touch_controls?: () -> bool
 end
 
 # The game's clock (added to Ruby's Time).
+%a{redgem:stable}
 class Time
   # seconds since the last frame
+  %a{redgem:stable}
   def self.delta: () -> Float
   # seconds since the last frame, whatever Time.scale (also while paused)
+  %a{redgem:experimental}
   def self.unscaled_delta: () -> Float
   # seconds of a physics step (1/60)
+  %a{redgem:stable}
   def self.fixed_delta: () -> Float
   # seconds since the game started
+  %a{redgem:stable}
   def self.elapsed: () -> Float
   # how many frames have run
+  %a{redgem:stable}
   def self.frame: () -> Integer
   # how fast game time runs (1 is normal)
+  %a{redgem:stable}
   def self.scale: () -> Float
   # slows or speeds the game; 0 pauses it
+  %a{redgem:stable}
   def self.scale=: (Numeric value) -> Numeric
 end
 
 # Questions to the physics world: rays, moving shapes and shapes in place.
+%a{redgem:stable}
 module Physics
   # the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)
+  %a{redgem:stable}
   def self.raycast: (Vector3 origin, Vector3 direction, ?Numeric max_distance, ?GameObject | nil skip, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
   # everything a ray hits, nearest first
+  %a{redgem:experimental}
   def self.raycast_all: (Vector3 origin, Vector3 direction, ?Numeric max_distance, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
   # the first thing a ball moving from `from` to `to` touches, or nil
+  %a{redgem:experimental}
   def self.sphere_cast: (Vector3 from, Vector3 to, Numeric radius, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
   # the same for a box (its whole size; rotation in degrees)
+  %a{redgem:experimental}
   def self.box_cast: (Vector3 from, Vector3 to, Vector3 size, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
   # the same for an upright capsule (height end to end)
+  %a{redgem:experimental}
   def self.capsule_cast: (Vector3 from, Vector3 to, Numeric radius, Numeric height, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
   # the hits of everything inside a ball, nearest first
+  %a{redgem:experimental}
   def self.overlap_sphere: (Vector3 center, Numeric radius, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
   # the same inside a box
+  %a{redgem:experimental}
   def self.overlap_box: (Vector3 center, Vector3 size, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
   # the same inside a capsule
+  %a{redgem:experimental}
   def self.overlap_capsule: (Vector3 center, Numeric radius, Numeric height, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
   # the game's collision layers, as Symbols (game.json's physics layers)
+  %a{redgem:experimental}
   def self.layers: () -> Array[Symbol]
   # joins two objects, or one to the world (other nil): :fixed, :hinge, :slider, :point or :distance
+  %a{redgem:experimental}
   def self.joint: (Symbol kind, GameObject object, ?GameObject | nil other, ?anchor: Vector3 | nil, ?other_anchor: Vector3 | nil, ?axis: Vector3 | nil, ?limits: Array[Numeric] | nil, ?motor_speed: Numeric | nil, ?motor_torque: Numeric | nil, ?min: Numeric | nil, ?max: Numeric | nil, ?spring: Numeric | nil, ?damping: Numeric | nil, ?break_force: Numeric | nil) -> Joint
 end
 
 # What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint).
+%a{redgem:experimental}
 class Joint
   # :fixed, :hinge, :slider, :point or :distance
+  %a{redgem:experimental}
   def kind: () -> Symbol
   # the object it holds
+  %a{redgem:experimental}
   def object: () -> GameObject
   # the other object it holds, or nil for the world
+  %a{redgem:experimental}
   def other: () -> (GameObject | nil)
   # whether it still holds them
+  %a{redgem:experimental}
   def alive?: () -> bool
   # whether it was pulled past its break force
+  %a{redgem:experimental}
   def broken?: () -> bool
   # lets go
+  %a{redgem:experimental}
   def remove: () -> void
   # whether it holds right now
+  %a{redgem:experimental}
   def enabled?: () -> bool
   # lets go for a while, or holds again
+  %a{redgem:experimental}
   def enabled=: (bool flag) -> bool
   # the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks
+  %a{redgem:experimental}
   def break_force: () -> Float
   # sets the pull it breaks at
+  %a{redgem:experimental}
   def break_force=: (Numeric newtons) -> Numeric
   # a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go
+  %a{redgem:experimental}
   def motor: (Numeric speed, Numeric torque) -> void
   # how far a hinge turned from where it started, in degrees
+  %a{redgem:experimental}
   def angle: () -> Float
 end
 
 # Where the characters a game moves can walk, and the way from one place to another.
+%a{redgem:experimental}
 module Navigation
   # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
+  %a{redgem:experimental}
   def self.path: (Vector3 from, Vector3 to, ?avoid: Array[GameObject] | GameObject) -> (Array[Vector3] | nil)
   # the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
+  %a{redgem:experimental}
   def self.steer: (Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, ?crowd: Array[[Vector3, Vector3, Numeric]], ?ignore: Array[GameObject] | GameObject) -> Vector3
   # the walkable point nearest a point (within 8 m of it), or nil
+  %a{redgem:experimental}
   def self.nearest: (Vector3 point) -> (Vector3 | nil)
   # whether a point is on walkable ground, up to a character's height above it
+  %a{redgem:experimental}
   def self.walkable?: (Vector3 point) -> bool
   # shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
+  %a{redgem:experimental}
   def self.draw: (Vector3 around, ?Numeric radius, ?color: RedGem::color, ?alpha: Integer) -> Integer
   # bakes the scene's grid again now (a level a script changed); returns what stats does
+  %a{redgem:experimental}
   def self.bake: () -> Hash[Symbol, Numeric | bool]
   # how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
+  %a{redgem:experimental}
   def self.stats: () -> Hash[Symbol, Numeric | bool]
 end
 
 # A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.
+%a{redgem:experimental}
 class NavAgent < Behaviour
   # sends it to a point; false when there is no way there
+  %a{redgem:experimental}
   def go_to: (Vector3 point) -> bool
   # stops it where it is
+  %a{redgem:experimental}
   def stop: () -> void
   # whether it got where it was sent
+  %a{redgem:experimental}
   def arrived?: () -> bool
   # whether it is on its way somewhere
+  %a{redgem:experimental}
   def walking?: () -> bool
   # where it was sent last, or nil
+  %a{redgem:experimental}
   def destination: () -> (Vector3 | nil)
   # the points it still walks through, the next first
+  %a{redgem:experimental}
   def waypoints: () -> Array[Vector3]
   # the velocity it walks at, as it steered this frame
+  %a{redgem:experimental}
   def velocity: () -> Vector3
   # meters per second at most (setting `speed`, 3)
+  %a{redgem:experimental}
   def speed: () -> Float
   # how wide it is kept from others, in meters (setting `radius`, 0.4)
+  %a{redgem:experimental}
   def radius: () -> Float
   # how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+  %a{redgem:experimental}
   def arrive_distance: () -> Float
   # the agents of the running scene
+  %a{redgem:experimental}
   def self.all: () -> Array[NavAgent]
 end
 
 # Where the scene's water is: the height of its surface, and how deep a point is under it.
+%a{redgem:experimental}
 module Water
   # the height of the water surface over that point of the ground, or nil where there is no water
+  %a{redgem:experimental}
   def self.height_at: (Numeric x, Numeric z) -> (Float | nil)
   # how far below the water surface a point is in meters (negative above it), or nil where there is no water
+  %a{redgem:experimental}
   def self.depth_at: (Vector3 point) -> (Float | nil)
   # whether a point is below the water surface
+  %a{redgem:experimental}
   def self.under?: (Vector3 point) -> bool
 end
 
 # The body of an object with body = "character": walks, jumps, climbs steps.
+%a{redgem:stable}
 class CharacterController
   # walks with that velocity (m/s) this frame
+  %a{redgem:stable}
   def move: (Vector3 velocity) -> void
   # jumps up at that speed
+  %a{redgem:stable}
   def jump: (Numeric speed) -> void
   # whether it stands on something
+  %a{redgem:stable}
   def grounded?: () -> bool
   # its velocity
+  %a{redgem:stable}
   def velocity: () -> Vector3
   # its collision layer, a Symbol
+  %a{redgem:experimental}
   def layer: () -> Symbol
   # moves it to another collision layer
+  %a{redgem:experimental}
   def layer=: (Symbol name) -> Symbol
 end
 
 # The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis).
+%a{redgem:stable}
 class Rigidbody
   # its velocity
+  %a{redgem:stable}
   def velocity: () -> Vector3
   # sets its velocity
+  %a{redgem:stable}
   def velocity=: (Vector3 vector) -> Vector3
   # pushes it
+  %a{redgem:stable}
   def add_impulse: (Vector3 vector) -> void
   # pushes it during the next step (newtons); at a point (world space), it also turns it
+  %a{redgem:experimental}
   def add_force: (Vector3 force, ?at: Vector3 | nil) -> void
   # turns it during the next step (newton meters)
+  %a{redgem:experimental}
   def add_torque: (Vector3 torque) -> void
   # how fast it spins, degrees per second around each axis
+  %a{redgem:experimental}
   def angular_velocity: () -> Vector3
   # sets how fast it spins
+  %a{redgem:experimental}
   def angular_velocity=: (Vector3 vector) -> Vector3
   # its mass in kilograms
+  %a{redgem:experimental}
   def mass: () -> Float
   # changes its mass (more than 0)
+  %a{redgem:experimental}
   def mass=: (Numeric kilograms) -> Numeric
   # whether scripts move it (instead of forces)
+  %a{redgem:experimental}
   def kinematic?: () -> bool
   # turns a dynamic body kinematic, or back
+  %a{redgem:experimental}
   def kinematic=: (bool flag) -> bool
   # whether forces move it
+  %a{redgem:experimental}
   def dynamic?: () -> bool
   # turns a kinematic body dynamic, or back
+  %a{redgem:experimental}
   def dynamic=: (bool flag) -> bool
   # how much gravity pulls it (1 is normal)
+  %a{redgem:experimental}
   def gravity_scale: () -> Float
   # 0 floats, 2 falls twice as hard
+  %a{redgem:experimental}
   def gravity_scale=: (Numeric scale) -> Numeric
   # stops simulating it until something touches it
+  %a{redgem:experimental}
   def sleep: () -> void
   # simulates it again
+  %a{redgem:experimental}
   def wake: () -> void
   # whether it sleeps
+  %a{redgem:experimental}
   def sleeping?: () -> bool
   # its collision layer, a Symbol
+  %a{redgem:experimental}
   def layer: () -> Symbol
   # moves it to another collision layer
+  %a{redgem:experimental}
   def layer=: (Symbol name) -> Symbol
 end
 
 # The body of an object with body = "vehicle" and wheels.
+%a{redgem:stable}
 class Vehicle
   # drives it this frame (each from -1 or 0 to 1)
+  %a{redgem:stable}
   def drive: (?throttle: Numeric, ?steering: Numeric, ?brake: Numeric, ?handbrake: Numeric) -> void
   # brakes fully
+  %a{redgem:stable}
   def stop: () -> void
   # its speed in m/s, signed
+  %a{redgem:stable}
   def speed: () -> Float
   # its velocity
+  %a{redgem:stable}
   def velocity: () -> Vector3
 end
 
 # The camera the game is seen through, and what it does on its own: follow, orbit, shake.
+%a{redgem:stable}
 module Camera
   # the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first
+  %a{redgem:stable}
   def self.main: () -> (GameObject | nil)
   # sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
+  %a{redgem:experimental}
   def self.main=: (GameObject | nil camera) -> (GameObject | nil)
   # cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
+  %a{redgem:experimental}
   def self.cut_to: (GameObject camera, ?fade: Numeric) -> GameObject
   # whether a cut with a fade is still playing
+  %a{redgem:experimental}
   def self.cutting?: () -> bool
   # [origin, direction] through a point of the screen, in the interface's units (UI.mouse_x, UI.mouse_y)
+  %a{redgem:stable}
   def self.screen_ray: (Numeric x, Numeric y) -> ([Vector3, Vector3] | nil)
   # [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera
+  %a{redgem:experimental}
   def self.world_to_screen: (Vector3 | GameObject point) -> ([Float, Float] | nil)
   # its vertical field of view, in degrees
+  %a{redgem:stable}
   def self.fov: () -> (Float | nil)
   # sets the field of view
+  %a{redgem:stable}
   def self.fov=: (Numeric degrees) -> Numeric
   # how much the picture streaks with speed, 0 to 1
+  %a{redgem:stable}
   def self.motion_blur: () -> Float
   # sets it
+  %a{redgem:stable}
   def self.motion_blur=: (Numeric amount) -> Numeric
   # whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides
+  %a{redgem:experimental}
   def self.auto_exposure: () -> (bool | nil)
   # turns auto exposure on (true) or off (false) for the game's camera; nil gives it back to the scene
+  %a{redgem:experimental}
   def self.auto_exposure=: (bool | nil on) -> (bool | nil)
   # EV the adapted picture is brightened by (negative: darkened), or nil when the scene decides
+  %a{redgem:experimental}
   def self.exposure_compensation: () -> (Float | nil)
   # sets it, -16 to 16; nil gives it back to the scene
+  %a{redgem:experimental}
   def self.exposure_compensation=: (Numeric | nil ev) -> (Numeric | nil)
   # [darkest, brightest]: the scene brightness auto exposure adapts within, in EV (0 is a scene whose average is middle grey), or nil when the scene decides
+  %a{redgem:experimental}
   def self.exposure_range: () -> ([Float, Float] | nil)
   # sets it, each end -16 to 16, the brightest not below the darkest; nil gives it back to the scene
+  %a{redgem:experimental}
   def self.exposure_range=: ([Numeric, Numeric] | nil range) -> ([Numeric, Numeric] | nil)
   # [up, down]: how fast auto exposure adapts, per second, when the scene got brighter and darker, or nil when the scene decides
+  %a{redgem:experimental}
   def self.exposure_speed: () -> ([Float, Float] | nil)
   # sets it, each 0 to 100 (0 never adapts); nil gives it back to the scene
+  %a{redgem:experimental}
   def self.exposure_speed=: ([Numeric, Numeric] | nil speeds) -> ([Numeric, Numeric] | nil)
   # follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
+  %a{redgem:experimental}
   def self.follow: (GameObject target, ?offset: Vector3 | Array[Numeric], ?relative: bool, ?smoothing: Numeric, ?look_at: bool, ?look_height: Numeric, ?avoid_walls: bool, ?dead_zone: Numeric, ?snap: bool) -> void
   # orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
+  %a{redgem:experimental}
   def self.orbit: (GameObject | Vector3 target, ?distance: Numeric, ?yaw: Numeric, ?pitch: Numeric, ?distances: Range[Numeric], ?pitches: Range[Numeric], ?smoothing: Numeric, ?input: bool, ?height: Numeric, ?avoid_walls: bool) -> Camera::Orbit
   # stops following or orbiting; the camera stays where it is
+  %a{redgem:experimental}
   def self.stop_following: () -> void
   # whether it follows or orbits something (an object destroyed is let go)
+  %a{redgem:experimental}
   def self.following?: () -> bool
   # shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds
+  %a{redgem:experimental}
   def self.shake: (Numeric strength, ?duration: Numeric) -> Float
   # how much it shakes now, 0 to 1
+  %a{redgem:experimental}
   def self.trauma: () -> Float
   # stops the shake at once
+  %a{redgem:experimental}
   def self.stop_shaking: () -> void
 end
 
 # What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.
+%a{redgem:experimental}
 class Camera::Orbit
   # degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right
+  %a{redgem:experimental}
   def yaw: () -> Float
   # degrees above it
+  %a{redgem:experimental}
   def pitch: () -> Float
   # meters from it
+  %a{redgem:experimental}
   def distance: () -> Float
   # the object or point it orbits
+  %a{redgem:experimental}
   def target: () -> (GameObject | Vector3)
   # turns by degrees (the yaw wraps round, eased the short way), the pitch kept within its range
+  %a{redgem:experimental}
   def turn: (Numeric yaw, Numeric pitch) -> void
   # comes nearer (negative) or goes further, within its range
+  %a{redgem:experimental}
   def zoom: (Numeric meters) -> void
 end
 
 # game_object.light: the light an object shines with.
+%a{redgem:stable}
 class Light
   # watts for a point or spot light, lux for the sun
+  %a{redgem:stable}
   def intensity: () -> Float
   # sets it; shows from the next frame
+  %a{redgem:stable}
   def intensity=: (Numeric value) -> Numeric
   # its color [r, g, b], 0 to 255
+  %a{redgem:stable}
   def color: () -> [Integer, Integer, Integer]
   # :orange or [r, g, b] from 0 to 255
+  %a{redgem:stable}
   def color=: (RedGem::color color) -> RedGem::color
   # [inner, outer] in degrees for a spot light, or nil for other lights
+  %a{redgem:experimental}
   def cone_angles: () -> ([Float, Float] | nil)
   # sets both spot angles between 0 and 90 degrees, at least 0.1 degrees apart
+  %a{redgem:experimental}
   def set_cone: (inner: Numeric, outer: Numeric) -> nil
 end
 
 # The scene's own animations (exported from Blender), by name.
+%a{redgem:stable}
 module Animation
   # the names of the scene's animations
+  %a{redgem:stable}
   def self.names: () -> Array[String]
   # plays one
+  %a{redgem:stable}
   def self.play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?restart: bool) -> void
   # pauses one
+  %a{redgem:stable}
   def self.pause: (String | Symbol name) -> void
   # stops one
+  %a{redgem:stable}
   def self.stop: (String | Symbol name) -> void
   # whether it plays
+  %a{redgem:stable}
   def self.playing?: (String | Symbol name) -> bool
   # where it is, in seconds
+  %a{redgem:stable}
   def self.time: (String | Symbol name) -> Float
   # how long it is, in seconds
+  %a{redgem:stable}
   def self.duration: (String | Symbol name) -> Float
   # jumps to a moment
+  %a{redgem:stable}
   def self.seek: (String | Symbol name, Numeric seconds) -> void
 end
 
 # game_object.animation (animation in a behaviour): an object's own clips.
+%a{redgem:stable}
 class Animator
   # plays a clip, fading from the last one; root_motion: true lets the clip move the object
+  %a{redgem:stable}
   def play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?fade: Numeric, ?restart: bool, ?root_motion: bool | nil) -> void
   # plays a clip over the one playing
+  %a{redgem:stable}
   def mix: (String | Symbol name, ?weight: Numeric, ?loop: bool, ?speed: Numeric) -> void
   # stops the clip mixed over
+  %a{redgem:stable}
   def unmix: () -> void
   # pauses its clips
+  %a{redgem:stable}
   def pause: () -> void
   # goes back to the scene's animations
+  %a{redgem:stable}
   def follow_scene: (?fade: Numeric) -> void
   # the clip playing
+  %a{redgem:stable}
   def clip: () -> (String | nil)
   # whether a clip plays
+  %a{redgem:stable}
   def playing?: () -> bool
   # where the clip is, in seconds
+  %a{redgem:stable}
   def time: () -> Float
   # installs an Animation::Graph
+  %a{redgem:stable}
   def use: (Animation::Graph graph) -> void
   # sets a parameter of the graph
+  %a{redgem:stable}
   def set: (Symbol parameter, untyped value) -> void
   # the graph's state, or nil
+  %a{redgem:stable}
   def state: () -> (Symbol | nil)
   # calls the block with an Animation::Event each time the clip passes a moment (at: 0 to 1, or seconds:); returns what off takes
+  %a{redgem:experimental}
   def on: (String | Symbol clip, ?at: Numeric | nil, ?seconds: Numeric | nil) { (Animation::Event) -> void } -> Integer
   # calls the block each time a clip passes a marker of that name authored in Blender
+  %a{redgem:experimental}
   def on_marker: (String | Symbol name) { (Animation::Event) -> void } -> Integer
   # stops calling a block that on or on_marker returned
+  %a{redgem:experimental}
   def off: (Integer listener) -> nil
   # whether all its clips move the object by their root's horizontal motion and turning
+  %a{redgem:experimental}
   def root_motion=: (bool on) -> bool
   # whether all its clips move the object
+  %a{redgem:experimental}
   def root_motion?: () -> bool
   # turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away
+  %a{redgem:experimental}
   def look_at: (Vector3 | GameObject target, ?bone: String | Symbol | GameObject, ?max_angle: Numeric) -> void
   # the bone goes back to its clips' pose, easing out
+  %a{redgem:experimental}
   def look_away: (?bone: String | Symbol | GameObject) -> void
   # whether a bone is turned toward something, or on its way back
+  %a{redgem:experimental}
   def looking?: (?bone: String | Symbol | GameObject) -> bool
   # the object under the character with that name (or that name after a rig's prefix:), or nil
+  %a{redgem:experimental}
   def bone: (String | Symbol name) -> (GameObject | nil)
   # bone that raises when the character has none of that name
+  %a{redgem:experimental}
   def bone!: (String | Symbol name) -> GameObject
   # whether a part's name is that bone's: the name, or the name after a prefix:
+  %a{redgem:experimental}
   def self.bone_named?: (String part, String name) -> bool
 end
 
 # Named states and transitions for one character (animation.use(graph)).
+%a{redgem:stable}
 class Animation::Graph
   # a graph starting at a state, with its parameters and their defaults
+  %a{redgem:stable}
   def initialize: (initial: Symbol, ?parameters: Hash[Symbol, untyped]) -> void
   # a state that plays one clip
+  %a{redgem:stable}
   def clip: (Symbol name, String | Symbol clip, ?loop: bool, ?speed: Numeric) -> self
   # a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
+  %a{redgem:stable}
   def blend_1d: (Symbol name, parameter: Symbol, clips: Array[[Numeric, String | Symbol]], ?loop: bool, ?speed: Numeric) -> self
   # a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
+  %a{redgem:experimental}
   def blend_2d: (Symbol name, parameters: [Symbol, Symbol], clips: Array[[[Numeric, Numeric], String | Symbol]], ?loop: bool, ?speed: Numeric) -> self
   # goes from one state to another when a parameter says so
+  %a{redgem:stable}
   def transition: (Symbol from, Symbol to, parameter: Symbol, ?equals: untyped, ?above: Numeric | nil, ?below: Numeric | nil, ?fade: Numeric) -> self
 end
 
 # What the block of an animation event is given (animation.on).
+%a{redgem:experimental}
 class Animation::Event
   # the object that listened
+  %a{redgem:experimental}
   def game_object: () -> GameObject
   # the clip's name
+  %a{redgem:experimental}
   def clip: () -> String
   # the marker's name, or nil for a moment the script named
+  %a{redgem:experimental}
   def name: () -> (String | nil)
   # where in the clip, from 0 (its start) to 1 (its end)
+  %a{redgem:experimental}
   def at: () -> Float
 end
 
 # Sounds and music from the game's sounds/ folder.
+%a{redgem:stable}
 module Audio
   # plays a sound; returns its id (for stop, playing? and set), or nil
+  %a{redgem:stable}
   def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # plays music, crossfading over fade seconds from the track playing
+  %a{redgem:stable}
   def self.music: (String | Symbol name, ?loop: bool, ?volume: Numeric, ?fade: Numeric) -> void
   # stops the music, fading it out over fade seconds
+  %a{redgem:stable}
   def self.stop_music: (?fade: Numeric) -> void
   # changes the music's pitch
+  %a{redgem:stable}
   def self.music_pitch=: (Numeric pitch) -> Numeric
   # changes the music's volume
+  %a{redgem:stable}
   def self.music_volume=: (Numeric volume) -> Numeric
   # the volume of everything
+  %a{redgem:stable}
   def self.volume=: (Numeric volume) -> Numeric
   # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
+  %a{redgem:experimental}
   def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
+  # makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given
+  %a{redgem:experimental}
+  def self.group: (Symbol name, ?parent: Symbol, ?volume: Numeric | nil) -> nil
+  # muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off
+  %a{redgem:experimental}
+  def self.effects: (Symbol group, ?low_pass: Numeric | nil, ?reverb: Numeric) -> nil
   # changes the volume or pitch of a sound that plays; false once it stopped
+  %a{redgem:experimental}
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
+  %a{redgem:stable}
   def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol, ?priority: Integer) -> (Integer | nil)
   # where the ears are (move it with the camera)
+  %a{redgem:stable}
   def self.listener: (Vector3 position, Vector3 forward, Vector3 up) -> void
   # moves a sound played with play_at
+  %a{redgem:stable}
   def self.move: (Integer id, Vector3 position) -> void
   # whether that sound still plays
+  %a{redgem:stable}
   def self.playing?: (Integer id) -> bool
   # stops that sound
+  %a{redgem:stable}
   def self.stop: (Integer id) -> void
+  # how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended
+  %a{redgem:experimental}
+  def self.loudness: (Integer | nil id) -> Float
   # stops every sound played with play or play_at
+  %a{redgem:stable}
   def self.stop_sources: () -> void
 end
 
 # What a script draws over the game this frame: texts, rectangles, pictures, buttons.
+%a{redgem:stable}
 module UI
   # draws a text; width: wraps it at word boundaries
+  %a{redgem:stable}
   def self.text: (String str, x: Numeric, y: Numeric, ?size: Numeric, ?color: RedGem::color, ?alpha: Integer, ?align: Symbol, ?width: Numeric | nil, ?anchor: Symbol | nil) -> void
   # draws a rectangle
+  %a{redgem:stable}
   def self.rect: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?alpha: Integer, ?radius: Numeric, ?anchor: Symbol | nil) -> void
   # draws a picture of images/
+  %a{redgem:stable}
   def self.image: (String | Symbol name, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric, ?alpha: Integer, ?anchor: Symbol | nil) -> void
   # draws a button; true the frame it is clicked
+  %a{redgem:stable}
   def self.button: (String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?hover_color: RedGem::color, ?text_color: RedGem::color, ?size: Numeric | nil, ?focused: bool, ?confirm: Array[Array[Symbol]], ?anchor: Symbol | nil) -> bool
   # a field to type in; returns the new value
+  %a{redgem:stable}
   def self.text_field: (String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?max_length: Integer, ?color: RedGem::color, ?text_color: RedGem::color, ?secret: bool, ?anchor: Symbol | nil) -> String
   # whether a phone's on-screen keyboard covers the bottom of the screen
+  %a{redgem:experimental}
   def self.keyboard_visible?: () -> bool
   # the width of the screen, in the interface's units (UI.scale pixels each)
+  %a{redgem:stable}
   def self.width: () -> Integer
   # the height of the screen, in the interface's units: the reference's height when it is matched
+  %a{redgem:stable}
   def self.height: () -> Integer
   # the width of the screen, in pixels
+  %a{redgem:experimental}
   def self.pixel_width: () -> Integer
   # the height of the screen, in pixels
+  %a{redgem:experimental}
   def self.pixel_height: () -> Integer
   # the pixels a unit of the interface takes now: the reference screen's scale to this one (game.json "ui") times Settings.ui_scale
+  %a{redgem:experimental}
   def self.scale: () -> Float
   # [width, height] of the screen the interface is laid out for (game.json "ui": its "reference", or the game's window)
+  %a{redgem:experimental}
   def self.reference: () -> [Integer, Integer]
   # where the pointer is across the screen, in the interface's units
+  %a{redgem:experimental}
   def self.mouse_x: () -> Float
   # where the pointer is down the screen, in the interface's units
+  %a{redgem:experimental}
   def self.mouse_y: () -> Float
   # how wide a text is, in units (in the face selected, measured at the pixels it is drawn at)
+  %a{redgem:stable}
   def self.text_width: (String str, ?size: Numeric) -> Integer
   # the lines a text wraps to at word boundaries, none wider than width
+  %a{redgem:experimental}
   def self.wrap: (String str, width: Numeric, ?size: Numeric) -> Array[String]
   # how tall a text is drawn, in pixels (wrapped to width, when given)
+  %a{redgem:experimental}
   def self.text_height: (String str, ?size: Numeric, ?width: Numeric | nil) -> Integer
   # pixels from a line's top to the next one's at a text size
+  %a{redgem:experimental}
   def self.line_height: (Numeric size) -> Integer
   # the top-left [x, y] of a box placed at an anchor, x and y from it
+  %a{redgem:experimental}
   def self.anchored: (Symbol anchor, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric) -> [Integer, Integer]
   # draws what the block draws only inside a box
+  %a{redgem:experimental}
   def self.clip: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?anchor: Symbol | nil) { () -> void } -> void
   # an on/off row of a settings screen; returns whether it is on
+  %a{redgem:stable}
   def self.toggle: (String label, bool on, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> bool
   # a row that picks one of choices; returns the index chosen
+  %a{redgem:stable}
   def self.choice: (String label, Array[String] choices, Integer index, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Integer
   # a row with a slider; returns the value
+  %a{redgem:stable}
   def self.slider: (String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?min: Numeric, ?max: Numeric, ?step: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Float
   # the face texts are drawn with: a file name of fonts/, a list of them (a fallback chain; a list of one is its name), or nil for the built-in one
+  %a{redgem:stable}
   def self.font: () -> (String | Array[String] | nil)
   # draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
+  %a{redgem:stable}
   def self.font=: (String | Array[String] | nil name) -> (String | Array[String] | nil)
 end
 
 # Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
+%a{redgem:stable}
 class UI::Focus
   # a focus on the first widget
+  %a{redgem:stable}
   def initialize: () -> void
-  # moves it among count widgets, as up or down was pressed this frame
+  # moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
+  %a{redgem:stable}
   def update: (Integer count, ?pad: Integer) -> void
   # whether the widget of that index has it: pass it as focused:
+  %a{redgem:stable}
   def at?: (Integer index) -> bool
   # puts it on a widget (one clicked, or the one a screen comes back to)
+  %a{redgem:stable}
   def move_to: (Integer index) -> void
   # the widget that has it
+  %a{redgem:stable}
   def index: () -> Integer
   # back to the first widget
+  %a{redgem:stable}
   def reset: () -> void
 end
 
 # Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus.
+%a{redgem:experimental}
 class UI::ScrollList
   # a list scrolled to its first row
+  %a{redgem:experimental}
   def initialize: () -> void
   # draws count rows in the box, calling the block with each shown row's index and box
+  %a{redgem:experimental}
   def draw: (Integer count, x: Numeric, y: Numeric, width: Numeric, height: Numeric, row_height: Numeric, ?gap: Numeric, ?focus: UI::Focus | nil, ?first: Integer, ?anchor: Symbol | nil, ?input: bool) { (Integer, Hash[Symbol, Integer]) -> void } -> void
   # how far it is scrolled, in pixels from its first row's top
+  %a{redgem:experimental}
   def offset: () -> Numeric
   # scrolls it (kept within its rows when it is drawn)
+  %a{redgem:experimental}
   def offset=: (Numeric pixels) -> Numeric
   # the indexes of the rows that show, as a range
+  %a{redgem:experimental}
   def shown: () -> Range[Integer]
   # whether its rows are taller than its box
+  %a{redgem:experimental}
   def scrolls?: () -> bool
   # back to its first row
+  %a{redgem:experimental}
   def reset: () -> void
 end
 
 # Developer diagnostics: console messages, frame timings and immediate world drawing.
+%a{redgem:stable}
 module Debug
   # says something
+  %a{redgem:stable}
   def self.log: (untyped message) -> void
   # warns
+  %a{redgem:stable}
   def self.warn: (untyped message) -> void
   # reports an error
+  %a{redgem:stable}
   def self.error: (untyped message) -> void
   # whether foreground frame timings are being collected
+  %a{redgem:experimental}
   def self.profiling?: () -> bool
   # starts a fresh profile window when enabled; disabling retains the last summary
+  %a{redgem:experimental}
   def self.profiling=: (bool enabled) -> bool
   # whether the developer statistics overlay was requested
+  %a{redgem:experimental}
   def self.stats_visible?: () -> bool
   # shows frame timings and FPS; showing also enables profiling, hiding leaves collection running
+  %a{redgem:experimental}
   def self.stats_visible=: (bool visible) -> bool
   # a snapshot with samples, fps and latest/mean/peak timings in milliseconds
+  %a{redgem:experimental}
   def self.frame_stats: () -> Hash[Symbol, untyped]
   # clears statistics, the scripts' profile and any unfinished measurement
+  %a{redgem:experimental}
   def self.reset_frame_stats: () -> void
   # the scripts' methods the sampling profiler caught most often running their own code: hashes of name, self, total, self_percent and total_percent
+  %a{redgem:experimental}
   def self.script_profile: (?Integer count) -> Array[Hash[Symbol, String | Integer | Float]]
   # writes the whole scripts' profile as tab-separated columns to script_profile.tsv in the game's data folder; returns the file's path
+  %a{redgem:experimental}
   def self.export_script_profile: () -> String
   # draws a world-space line for this frame; returns whether it was accepted
+  %a{redgem:experimental}
   def self.line: (Vector3 from, Vector3 to, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
   # draws an axis-aligned wire box with full nonnegative size for this frame; returns whether it was accepted
+  %a{redgem:experimental}
   def self.box: (Vector3 center, Vector3 size, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
   # draws text centered where the main camera shows the world point `at` for this frame; returns whether it was accepted
+  %a{redgem:experimental}
   def self.label: (untyped text, at: Vector3, ?color: RedGem::color, ?alpha: Integer, ?size: Integer) -> bool
 end
 
 # The game itself.
+%a{redgem:stable}
 module Game
   # switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive. In a network game only the host may, and every machine changes level with it (false elsewhere)
+  %a{redgem:stable}
   def self.load_scene: (String | Symbol name) -> (bool | nil)
   # queues a background scene read; the old world survives failed reads and cancellation. In a network game, as load_scene (an unknown name raises)
+  %a{redgem:experimental}
   def self.load_scene_async: (String | Symbol name) -> (bool | nil)
   # a scene request is queued or being read
+  %a{redgem:experimental}
   def self.loading?: () -> bool
   # the requested scene name, or nil
+  %a{redgem:experimental}
   def self.loading_scene: () -> (String | nil)
   # the last asynchronous read error, or nil; cleared by the next load request
+  %a{redgem:experimental}
   def self.loading_error: () -> (String | nil)
   # cancels a pending asynchronous request; returns whether one was pending (false, cancelling nothing, during a change of level with the others)
+  %a{redgem:experimental}
   def self.cancel_scene_load: () -> bool
   # draws the loading screen each frame with unscaled delta; no block restores the default
+  %a{redgem:experimental}
   def self.on_loading: () ?{ (Float) -> void } -> void
   # the scene running
+  %a{redgem:stable}
   def self.scene_name: () -> String
   # the game's title
+  %a{redgem:stable}
   def self.title: () -> String
   # ends the game
+  %a{redgem:stable}
   def self.quit: () -> void
   # ends a video recorded with --record; the game goes on
+  %a{redgem:stable}
   def self.stop_recording: () -> void
   # the version in game.json ("1.2.0"), or nil
+  %a{redgem:stable}
   def self.version: () -> (String | nil)
 end
 
 # How the player chose the game to be shown and heard; a change takes effect at once.
+%a{redgem:stable}
 module Settings
   # :windowed, :fullscreen or :borderless
+  %a{redgem:stable}
   def self.window_mode: () -> Symbol
   # changes it
+  %a{redgem:stable}
   def self.window_mode=: (Symbol mode) -> Symbol
   # whether the game fills the screen
+  %a{redgem:stable}
   def self.fullscreen?: () -> bool
   # fullscreen, or back to a window
+  %a{redgem:stable}
   def self.fullscreen=: (bool on) -> bool
   # [width, height] of the window, in pixels
+  %a{redgem:stable}
   def self.resolution: () -> [Integer, Integer]
   # resizes the window: one of resolutions
+  %a{redgem:stable}
   def self.resolution=: ([Integer, Integer] size) -> [Integer, Integer]
   # the sizes the monitor offers: [[w, h], ...]
+  %a{redgem:stable}
   def self.resolutions: () -> Array[[Integer, Integer]]
   # the share of the window's size the world is drawn at (0.5 to 2)
+  %a{redgem:stable}
   def self.render_scale: () -> Float
   # changes it
+  %a{redgem:stable}
   def self.render_scale=: (Numeric scale) -> Numeric
   # how much bigger than the game made it the interface is drawn (0.5 to 2); UI.scale includes it
+  %a{redgem:experimental}
   def self.ui_scale: () -> Float
   # changes it
+  %a{redgem:experimental}
   def self.ui_scale=: (Numeric scale) -> Numeric
   # whether frames wait for the screen
+  %a{redgem:stable}
   def self.vsync: () -> bool
   # changes it
+  %a{redgem:stable}
   def self.vsync=: (bool on) -> bool
   # frames a second at most; nil for none
+  %a{redgem:stable}
   def self.fps_cap: () -> (Integer | nil)
   # changes it
+  %a{redgem:stable}
   def self.fps_cap=: (Integer | nil cap) -> (Integer | nil)
   # :low, :medium, :high, :ultra or :custom
+  %a{redgem:stable}
   def self.quality: () -> Symbol
   # the most a level's environment gets of what it asks for
+  %a{redgem:stable}
   def self.quality=: (Symbol quality) -> Symbol
   # what the custom quality allows: {msaa:, antialias:, shadow_cascades:, ...}
+  %a{redgem:stable}
   def self.quality_details: () -> Hash[Symbol, untyped]
   # changes some of them, and makes the quality :custom
+  %a{redgem:stable}
   def self.quality_details=: (Hash[Symbol, untyped] details) -> Hash[Symbol, untyped]
   # the player's volume, 0 to 1 (it multiplies Audio.volume)
+  %a{redgem:stable}
   def self.volume: () -> Float
   # changes it
+  %a{redgem:stable}
   def self.volume=: (Numeric volume) -> Numeric
   # the player's volume of the music group, 0 to 1
+  %a{redgem:experimental}
   def self.music_volume: () -> Float
   # changes it
+  %a{redgem:experimental}
   def self.music_volume=: (Numeric volume) -> Numeric
   # the player's volume of the effects group, 0 to 1
+  %a{redgem:experimental}
   def self.effects_volume: () -> Float
   # changes it
+  %a{redgem:experimental}
   def self.effects_volume=: (Numeric volume) -> Numeric
   # the player's volume of the voice group, 0 to 1
+  %a{redgem:experimental}
   def self.voice_volume: () -> Float
   # changes it
+  %a{redgem:experimental}
   def self.voice_volume=: (Numeric volume) -> Numeric
   # keeps them for the next runs; false where they last for the run only
+  %a{redgem:stable}
   def self.save: () -> bool
 end
 
 # A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.
+%a{redgem:stable}
 class GameMenu < Behaviour
   # the menu of the scene, or nil
+  %a{redgem:stable}
   def self.instance: () -> (GameMenu | nil)
   # opens a screen: :title, :pause, :over, :settings or one of the game's
+  %a{redgem:stable}
   def show: (Symbol screen) -> void
   # opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)
+  %a{redgem:stable}
   def show_settings: () -> void
   # closes the menu and goes on
+  %a{redgem:stable}
   def resume: () -> void
   # starts the scene again
+  %a{redgem:stable}
   def restart: () -> void
   # opens the end screen with a message
+  %a{redgem:stable}
   def finish: (String message) -> void
   # whether the menu is open
+  %a{redgem:stable}
   def open?: () -> bool
   # the screen open
+  %a{redgem:stable}
   def screen: () -> (Symbol | nil)
   # the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)
+  %a{redgem:stable}
   def screens: () -> Hash[Symbol, GameMenu::Screen]
   # where the menu's button of that index is: [x, y, width, height]
+  %a{redgem:stable}
   def button_box: (Integer index) -> [Integer, Integer, Integer, Integer]
 end
 
 # A screen of the GameMenu.
+%a{redgem:stable}
 class GameMenu::Screen
   # a screen with a heading and options: [[label, action], ...]
+  %a{redgem:stable}
   def initialize: (heading: String | Proc, options: Array[[String | Proc, Proc]], back: Symbol | nil) -> void
   # adds an option
+  %a{redgem:stable}
   def add_option: (String | Proc label, ?index: Integer) { () -> void } -> void
   # its heading
+  %a{redgem:stable}
   def heading: () -> String
   # changes its heading
+  %a{redgem:stable}
   def heading=: (String | Proc text) -> (String | Proc)
   # its options
+  %a{redgem:stable}
   def options: () -> Array[[String, Proc]]
   # the screen Esc goes back to
+  %a{redgem:stable}
   def back: () -> (Symbol | nil)
   # called when it is shown
+  %a{redgem:stable}
   def opened: () -> void
   # called when it is left
+  %a{redgem:stable}
   def closed: () -> void
   # draws what else it shows
+  %a{redgem:stable}
   def draw: ([Integer, Integer, Integer, Integer] first_button) -> void
   # pixels kept between its heading and its buttons
+  %a{redgem:stable}
   def space_above: () -> Integer
   # whether letters are typed into it
+  %a{redgem:stable}
   def typing?: () -> bool
   # how many widgets it draws above its buttons that take the focus
+  %a{redgem:stable}
   def rows: () -> Integer
   # where its first button sits, a share of the height (nil: the menu's)
+  %a{redgem:stable}
   def first_button_share: () -> (Float | nil)
   # its UI::Focus, which the menu gives it
+  %a{redgem:stable}
   def focus: () -> (UI::Focus | nil)
   # sets it
+  %a{redgem:stable}
   def focus=: (UI::Focus | nil focus) -> (UI::Focus | nil)
 end
 
 # Short-lived sparks, smoke and dust.
+%a{redgem:stable}
 module Particles
   # adds particles; returns how many (size, color and alpha may be lists over their life)
+  %a{redgem:stable}
   def self.burst: (Vector3 position, ?count: Integer, ?color: RedGem::color | Array[RedGem::color], ?alpha: Integer | Array[Integer], ?speed: Numeric, ?spread: Numeric, ?direction: Vector3, ?life: Numeric, ?size: Numeric | Array[Numeric], ?gravity: Numeric, ?glow: bool, ?lit: bool, ?cast_shadow: bool, ?soft: Numeric, ?image: String | Symbol | nil, ?frames: [Integer, Integer], ?fps: Numeric, ?spin: Numeric) -> Integer
   # starts a continuous local effect; returns a Particles::Emitter handle; uses burst settings except count
+  %a{redgem:experimental}
   def self.emitter: (GameObject object, ?rate: Numeric, ?offset: Vector3, **untyped settings) -> Particles::Emitter
   # how many are alive
+  %a{redgem:stable}
   def self.count: () -> Integer
   # removes all particles and stops every emitter
+  %a{redgem:stable}
   def self.clear: () -> void
 end
 
 # A continuous particle effect attached to an object, returned by Particles.emitter.
+%a{redgem:experimental}
 class Particles::Emitter
   # whether this emitter is still emitting from a live object
+  %a{redgem:experimental}
   def active?: () -> bool
   # stops new births; existing particles finish their lives
+  %a{redgem:experimental}
   def stop: () -> void
 end
 
 # Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
+%a{redgem:stable}
 class Scatter
   # places copies; returns a set (count, remove)
+  %a{redgem:stable}
   def self.place: (String | GameObject template, count: Integer, area: [Vector3, Vector3], ?ground: GameObject | nil, ?seed: Integer, ?scale: Numeric | Range[Numeric], ?align: bool, ?tints: Array[RedGem::color] | nil, ?tint_variation: Numeric, ?fade: Numeric, ?normals_up: Numeric, ?lods: Array[[String, Numeric]] | nil) -> Scatter
   # removes every set
+  %a{redgem:stable}
   def self.clear: () -> void
   # how many copies a set placed
+  %a{redgem:stable}
   def count: () -> Integer
   # removes a set
+  %a{redgem:stable}
   def remove: () -> void
 end
 
 # What the game keeps between runs.
+%a{redgem:stable}
 module Save
   # a value, or the default
+  %a{redgem:stable}
   def self.get: (String | Symbol key, ?untyped default) -> untyped
   # keeps a value (nil removes it)
+  %a{redgem:stable}
   def self.set: (String | Symbol key, untyped value) -> untyped
   # the same as get
+  %a{redgem:stable}
   def self.[]: (String | Symbol key) -> untyped
   # the same as set
+  %a{redgem:stable}
   def self.[]=: (String | Symbol key, untyped value) -> untyped
   # reads and writes a key with nothing in between
+  %a{redgem:stable}
   def self.update: (String | Symbol key, ?untyped default) { (untyped) -> untyped } -> untyped
   # removes a key
+  %a{redgem:stable}
   def self.delete: (String | Symbol key) -> void
   # removes everything
+  %a{redgem:stable}
   def self.clear: () -> void
   # every key
+  %a{redgem:stable}
   def self.keys: () -> Array[Symbol]
   # the selected save slot name; default keeps the existing save file
+  %a{redgem:experimental}
   def self.slot: () -> String
   # selects a named slot for this engine; default restores the original store
+  %a{redgem:experimental}
   def self.slot=: (String | Symbol name) -> (String | Symbol)
   # sorted names of persisted slots and slots opened in this run, including default
+  %a{redgem:experimental}
   def self.slots: () -> Array[String]
   # the version of the saved data this game writes, or nil
+  %a{redgem:experimental}
   def self.version: () -> (Integer | nil)
   # declares that version (1 or more): older slots are migrated, newer ones refused
+  %a{redgem:experimental}
   def self.version=: (Integer number) -> Integer
   # the hook turning a slot of version from into from + 1: gets the values Hash, returns the new one
+  %a{redgem:experimental}
   def self.migrate: (from: Integer) { (Hash[String, untyped]) -> Hash[String, untyped] } -> void
   # keeps this scene's spawned objects whose behaviours persist fields; returns how many
+  %a{redgem:experimental}
   def self.checkpoint: (?String | Symbol key) -> Integer
   # spawns them again in place of the current ones; returns the new copies
+  %a{redgem:experimental}
   def self.restore_checkpoint: (?String | Symbol key) -> Array[GameObject]
 end
 
 # Web requests; the answer comes to the block.
+%a{redgem:stable}
 module HTTP
   # GET
+  %a{redgem:stable}
   def self.get: (String url, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
   # POST
+  %a{redgem:stable}
   def self.post: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
   # PUT
+  %a{redgem:stable}
   def self.put: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
   # PATCH
+  %a{redgem:stable}
   def self.patch: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
   # DELETE
+  %a{redgem:stable}
   def self.delete: (String url, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
   # any verb
+  %a{redgem:stable}
   def self.request: (String | Symbol verb, String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
 end
 
 # What a web request's block is given.
+%a{redgem:stable}
 class HTTP::Response
   # whether it came back with a 2xx status
+  %a{redgem:stable}
   def ok?: () -> bool
   # its status
+  %a{redgem:stable}
   def status: () -> Integer
   # its headers
+  %a{redgem:stable}
   def headers: () -> Hash[String, String]
   # its body (decompressed when it came with gzip or deflate)
+  %a{redgem:stable}
   def body: () -> String
   # its body read as JSON
+  %a{redgem:stable}
   def json: () -> untyped
   # why there was no answer, or nil
+  %a{redgem:stable}
   def error: () -> (String | nil)
   # the address the answer came from, once redirects were followed
+  %a{redgem:experimental}
   def url: () -> (String | nil)
 end
 
 # The game's texts in several languages (locales/*.json).
+%a{redgem:stable}
 module I18n
   # the text of a key in the language in use, its {placeholders} filled
+  %a{redgem:stable}
   def self.t: (String | Symbol key, **untyped values) -> String
   # the language in use (:en)
+  %a{redgem:stable}
   def self.locale: () -> Symbol
   # changes the language
+  %a{redgem:stable}
   def self.locale=: (Symbol | String language) -> (Symbol | String)
   # the languages of the game's locales/ files
+  %a{redgem:stable}
   def self.available_locales: () -> Array[Symbol]
 end
 
 # Games played together: on a local network, through a relay or on a dedicated server.
+%a{redgem:stable}
 module Network
   # hosts a game, encrypted (fingerprint: is the relay's, with room: true)
+  %a{redgem:stable}
   def self.host: (?port: Integer, ?name: String | nil, ?visible: bool, ?room: bool, ?waiting_per_address: Integer, ?fingerprint: String | nil) -> bool
   # joins a game (an address, or a room code), encrypted; fingerprint: is who must answer
+  %a{redgem:stable}
   def self.join: (?String | nil address, ?port: Integer, ?room: String | nil, ?auth: untyped, ?fingerprint: String | nil) -> bool
   # the fingerprint of the game hosted here, or nil
+  %a{redgem:experimental}
   def self.fingerprint: () -> (String | nil)
   # the short code players who join the game hosted here check it with, or nil
+  %a{redgem:experimental}
   def self.host_code: () -> (String | nil)
   # leaves the game
+  %a{redgem:stable}
   def self.leave: () -> void
   # whether this machine is in a game
+  %a{redgem:stable}
   def self.online?: () -> bool
   # whether a join is on its way
+  %a{redgem:stable}
   def self.connecting?: () -> bool
   # whether this machine's connection dropped and it is getting back in
+  %a{redgem:experimental}
   def self.reconnecting?: () -> bool
   # seconds the game hosted here holds a dropped player's place (0: none)
+  %a{redgem:experimental}
   def self.reconnect_window: () -> Float
   # holds a dropped player's place and id that long, up to 300 (0 turns it off)
+  %a{redgem:experimental}
   def self.reconnect_window=: (Numeric seconds) -> Numeric
   # whether this machine hosts
+  %a{redgem:stable}
   def self.host?: () -> bool
   # whether this machine is a dedicated server
+  %a{redgem:stable}
   def self.server?: () -> bool
   # this machine's peer id
+  %a{redgem:stable}
   def self.id: () -> Integer
   # the peers of the game
+  %a{redgem:stable}
   def self.peers: () -> Array[Integer]
   # the peers without a dedicated server
+  %a{redgem:stable}
   def self.players: () -> Array[Integer]
   # on the host: corrects the others' objects that move faster or further than this (no limits: off)
+  %a{redgem:experimental}
   def self.validate_movement: (?max_speed: Numeric, ?teleport_distance: Numeric, ?tolerance: Numeric, ?kick_after: Integer, ?undo: bool) -> nil
   # the movement validation settings, as a hash
+  %a{redgem:experimental}
   def self.movement_rules: () -> Hash[Symbol, Numeric | bool]
   # how many moves of a machine the host did not believe in this game
+  %a{redgem:experimental}
   def self.movement_violations: (Integer peer) -> Integer
   # the port of the game
+  %a{redgem:stable}
   def self.port: () -> Integer
   # the room code, on a relay
+  %a{redgem:stable}
   def self.room: () -> (String | nil)
   # the relay's address
+  %a{redgem:stable}
   def self.relay: () -> (String | nil)
   # sets the relay's address
+  %a{redgem:stable}
   def self.relay=: (String | nil address) -> (String | nil)
   # looks for games on the local network
+  %a{redgem:stable}
   def self.search: () -> bool
   # whether it is looking
+  %a{redgem:stable}
   def self.searching?: () -> bool
   # stops looking
+  %a{redgem:stable}
   def self.stop_search: () -> void
   # the games found
+  %a{redgem:stable}
   def self.games: () -> Array[Hash[Symbol, untyped]]
   # the port games are looked for on
+  %a{redgem:stable}
   def self.discovery_port: () -> Integer
   # changes it
+  %a{redgem:stable}
   def self.discovery_port=: (Integer port) -> Integer
   # sends a message (:all, :host or a peer id)
+  %a{redgem:stable}
   def self.emit: (String | Symbol name, ?untyped data, ?to: Symbol | Integer) -> void
   # receives a message: |data, from|
+  %a{redgem:stable}
   def self.on: (String | Symbol name) { (untyped, Integer) -> void } -> void
   # this machine is in the game
+  %a{redgem:stable}
   def self.on_connect: () { () -> void } -> void
   # the game is gone
+  %a{redgem:stable}
   def self.on_disconnect: () { () -> void } -> void
   # someone arrived: |peer|
+  %a{redgem:stable}
   def self.on_join: () { (Integer) -> void } -> void
   # someone left: |peer|
+  %a{redgem:stable}
   def self.on_leave: () { (Integer) -> void } -> void
   # a join did not work out: |reason|
+  %a{redgem:stable}
   def self.on_fail: () { (String | nil) -> void } -> void
   # a connection dropped and its place is held: |peer|
+  %a{redgem:experimental}
   def self.on_reconnecting: () { (Integer) -> void } -> void
   # a dropped machine is back in its place: |peer|
+  %a{redgem:experimental}
   def self.on_reconnected: () { (Integer) -> void } -> void
   # this machine could not get back in time: |reason|
+  %a{redgem:experimental}
   def self.on_lost: () { (String | nil) -> void } -> void
   # decides who gets in: |peer, auth, decide|
+  %a{redgem:stable}
   def self.authenticate: () { (Integer, untyped, Network::Decision) -> void } -> void
   # who a peer was accepted as
+  %a{redgem:stable}
   def self.identity: (Integer peer) -> untyped
   # a peer's name
+  %a{redgem:stable}
   def self.player_name: (Integer peer) -> (String | nil)
   # the host started a change of level, on every machine: |name|; lasts across levels, replaced by the next call
+  %a{redgem:experimental}
   def self.on_level_loading: () { (String) -> void } -> void
   # every machine has the new level, which starts now: |name|; lasts across levels, replaced by the next call
+  %a{redgem:experimental}
   def self.on_level_ready: () { (String) -> void } -> void
   # the machines are between two levels: loading, or waiting for each other
+  %a{redgem:experimental}
   def self.changing_level?: () -> bool
   # seconds the host, once it has a new level, waits for the others to have it (30); later ones are let go
+  %a{redgem:experimental}
   def self.level_timeout: () -> Float
   # sets it
+  %a{redgem:experimental}
   def self.level_timeout=: (Numeric seconds) -> Float
   # spawns a copy on every machine
+  %a{redgem:stable}
   def self.spawn: (String template, ?owner: Integer, ?position: Vector3 | nil, ?rotation: Vector3 | nil) -> (GameObject | nil)
   # lets guests spawn those templates
+  %a{redgem:stable}
   def self.allow_spawn: (*String templates) -> void
 end
 
 # What an authenticate block decides with.
+%a{redgem:stable}
 class Network::Decision
   # lets the peer in
+  %a{redgem:stable}
   def accept: (identity: untyped, ?name: String | nil) -> void
   # keeps the peer out
+  %a{redgem:stable}
   def deny: (?String reason) -> void
 end
 
 # A behaviour: the same object in the same place on every machine.
+%a{redgem:stable}
 class NetworkSync < Behaviour
   # whether this machine owns it
+  %a{redgem:stable}
   def mine?: () -> bool
   # the peer that owns it
+  %a{redgem:stable}
   def owner: () -> Integer
   # gives it to a peer
+  %a{redgem:stable}
   def owner=: (Integer peer) -> Integer
   # the name it is known by on every machine
+  %a{redgem:stable}
   def key: () -> String
   # sets its owner and key
+  %a{redgem:stable}
   def assign: (owner: Integer, ?key: String) -> void
 end
 
 # A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).
+%a{redgem:experimental}
 class Interactable < Behaviour
   # every Interactable of the scene
+  %a{redgem:experimental}
   def self.all: () -> Array[Interactable]
   # the I18n key of its prompt, or nil for the engine's "Interact"
+  %a{redgem:experimental}
   def prompt: () -> (String | Symbol | nil)
   # changes the prompt
+  %a{redgem:experimental}
   def prompt=: (String | Symbol | nil key) -> (String | Symbol | nil)
   # the prompt in the language in use
+  %a{redgem:experimental}
   def prompt_text: () -> String
   # meters from the actor it can be used from (2 unless said)
+  %a{redgem:experimental}
   def range: () -> Float
   # changes the range
+  %a{redgem:experimental}
   def range=: (Numeric meters) -> Numeric
   # of those in reach, the highest wins (0 unless said)
+  %a{redgem:experimental}
   def priority: () -> Float
   # changes the priority
+  %a{redgem:experimental}
   def priority=: (Numeric value) -> Numeric
   # whether it can be picked
+  %a{redgem:experimental}
   def enabled?: () -> bool
   # false: never picked
+  %a{redgem:experimental}
   def enabled=: (bool flag) -> bool
   # degrees off the actor's forward it may be at; nil for any direction
+  %a{redgem:experimental}
   def angle: () -> (Float | nil)
   # changes the angle (nil: any direction)
+  %a{redgem:experimental}
   def angle=: (Numeric | nil degrees) -> (Numeric | nil)
 end
 
 # A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap.
+%a{redgem:experimental}
 class Interactor < Behaviour
   # every Interactor of the scene: the players' heroes
+  %a{redgem:experimental}
   def self.all: () -> Array[Interactor]
   # the Interactable in focus, or nil
+  %a{redgem:experimental}
   def target: () -> (Interactable | nil)
   # uses what is in focus now; false when nothing is
+  %a{redgem:experimental}
   def use: () -> bool
   # the player whose :interact it reads (0 unless said)
+  %a{redgem:experimental}
   def pad: () -> Integer
   # what the prompt says for a target: "[E] Open"
+  %a{redgem:experimental}
   def prompt_label: (Interactable target) -> String
 end
 
 # Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.
+%a{redgem:experimental}
 module Dialogue
   # starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client
+  %a{redgem:experimental}
   def self.start: (String | Symbol | Dialogue::Script name, actor: GameObject, ?speaker: GameObject | nil) -> (Dialogue::Conversation | bool)
   # the conversation this machine's player is in, or nil
+  %a{redgem:experimental}
   def self.current: () -> (Dialogue::Conversation | nil)
   # whether this machine's player is in a conversation, or left one this frame
+  %a{redgem:experimental}
   def self.busy?: () -> bool
   # ends the conversation this machine's player is in
+  %a{redgem:experimental}
   def self.stop: () -> (bool | nil)
   # :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
+  %a{redgem:experimental}
   def self.on: (Symbol event) { (untyped, untyped, untyped) -> void } -> void
   # the dialogue of that name, read from its file once (raises for one that is not there or not well made)
+  %a{redgem:experimental}
   def self.load: (String | Symbol name) -> Dialogue::Script
   # what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+  %a{redgem:experimental}
   def self.quests: () -> untyped
   # what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
+  %a{redgem:experimental}
   def self.quests=: (untyped quests) -> untyped
 end
 
 # One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.
+%a{redgem:experimental}
 class Dialogue::Conversation
   # the line, in the language in use (nil once it is over)
+  %a{redgem:experimental}
   def text: () -> (String | nil)
   # the I18n key of the line
+  %a{redgem:experimental}
   def text_key: () -> (String | nil)
   # who says it, in the language in use (nil when the node names nobody)
+  %a{redgem:experimental}
   def speaker_name: () -> (String | nil)
   # the I18n key of who says it, or nil
+  %a{redgem:experimental}
   def speaker_key: () -> (String | nil)
-  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  # the sound of the line's voice clip (in sounds/), or nil
+  %a{redgem:experimental}
   def voice: () -> (String | nil)
+  # whether the line's voice clip plays; a line with no choices goes on by itself as it ends
+  %a{redgem:experimental}
+  def speaking?: () -> bool
   # the choices offered now: those whose conditions hold
+  %a{redgem:experimental}
   def choices: () -> Array[Dialogue::Conversation::Choice]
   # whether the player answers this line by choosing
+  %a{redgem:experimental}
   def choosing?: () -> bool
   # on from a line with no choices: to what follows, or the end; false when it waits for a choice
+  %a{redgem:experimental}
   def continue: () -> bool
   # takes a choice: its effects happen, and it goes where the choice leads; false for one not offered
+  %a{redgem:experimental}
   def choose: (Dialogue::Conversation::Choice | Integer choice) -> bool
   # ends it where it is (quietly: without telling the host)
+  %a{redgem:experimental}
   def stop: (?quietly: bool) -> bool
   # whether it ended
+  %a{redgem:experimental}
   def over?: () -> bool
   # the node it is at, or nil once it is over
+  %a{redgem:experimental}
   def node: () -> (Hash[String, untyped] | nil)
   # the id of the node it is at, or nil
+  %a{redgem:experimental}
   def node_id: () -> (String | nil)
   # how many lines it has shown (a line it comes back to counts again)
+  %a{redgem:experimental}
   def steps: () -> Integer
   # its dialogue
+  %a{redgem:experimental}
   def script: () -> Dialogue::Script
   # the hero of the player in it
+  %a{redgem:experimental}
   def actor: () -> (GameObject | nil)
   # who talks to that player, or nil
+  %a{redgem:experimental}
   def speaker: () -> (GameObject | nil)
   # whether its effects happen on this machine (offline, and on the host)
+  %a{redgem:experimental}
   def deciding?: () -> bool
 end
 
 # An answer the player may give.
+%a{redgem:experimental}
 class Dialogue::Conversation::Choice
   # its place among the node's choices (what choose takes)
+  %a{redgem:experimental}
   def index: () -> Integer
   # the I18n key of its text
+  %a{redgem:experimental}
   def key: () -> String
   # its text, in the language in use
+  %a{redgem:experimental}
   def text: () -> String
 end
 
 # A dialogue file as it was read.
+%a{redgem:experimental}
 class Dialogue::Script
   # its name: that of its file in dialogues/, without .json
+  %a{redgem:experimental}
   def name: () -> String
   # where it starts: a node's id, or branches
+  %a{redgem:experimental}
   def start: () -> (String | Array[Hash[String, untyped]])
   # the node of that id, or nil
+  %a{redgem:experimental}
   def node: (String id) -> (Hash[String, untyped] | nil)
   # whether it has a node of that id
+  %a{redgem:experimental}
   def node?: (String id) -> bool
 end
 
 # The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.
+%a{redgem:experimental}
 module GameVariables
   # the value of a variable, or nil when it was never set
+  %a{redgem:experimental}
   def self.[]: (String | Symbol name) -> untyped
   # sets a variable (nil, true, false, a number or a text); raises on a client
+  %a{redgem:experimental}
   def self.[]=: (String | Symbol name, untyped value) -> untyped
   # every variable that was set, by name (what to save)
+  %a{redgem:experimental}
   def self.to_h: () -> Hash[String, untyped]
   # puts these in the place of every variable (a save read back)
+  %a{redgem:experimental}
   def self.replace: (Hash[String | Symbol, untyped] values) -> Hash[String, untyped]
   # |name, value| on every change
+  %a{redgem:experimental}
   def self.on_change: () { (String, untyped) -> void } -> void
   # whether a variable can hold a value
+  %a{redgem:experimental}
   def self.value?: (untyped value) -> bool
   # whether a variable can be called so
+  %a{redgem:experimental}
   def self.name?: (untyped name) -> bool
 end
 
 # A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue.
+%a{redgem:experimental}
 class Talkable < Behaviour
   # the name of its dialogue file
+  %a{redgem:experimental}
   def dialogue: () -> (String | nil)
 end
 
 # A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.
+%a{redgem:experimental}
 class DialogueBox < Behaviour
   # how many of a line's letters show after that many seconds at that speed (0: all)
+  %a{redgem:experimental}
   def self.letters_shown: (Integer letters, Float seconds, Float speed) -> Integer
   # whether the line it shows has all of its letters out (true while it shows none)
+  %a{redgem:experimental}
   def whole?: () -> bool
   # the player whose gamepad works it (0 unless said)
+  %a{redgem:experimental}
   def pad: () -> Integer
   # how fast a line appears (45 unless said; 0: at once)
+  %a{redgem:experimental}
   def letters_per_second: () -> Float
 end
 
 # Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.
+%a{redgem:experimental}
 module Interaction
   # |actor, target| on every use (:interact), and as the focus comes (:focus) and goes (:blur)
+  %a{redgem:experimental}
   def self.on: (Symbol event) { (GameObject, GameObject) -> void } -> void
   # the actor uses a target (an object or its Interactable) when it is in reach; asked of the host on a client
+  %a{redgem:experimental}
   def self.interact: (GameObject actor, GameObject | Interactable target) -> bool
   # the Interactable an actor would use now, or nil (lenient: as the host judges a client's hero)
+  %a{redgem:experimental}
   def self.best_for: (GameObject actor, ?Array[Interactable] candidates, ?lenient: bool) -> (Interactable | nil)
   # whether an actor can use a target now: enabled, in range, in front, in sight
+  %a{redgem:experimental}
   def self.reachable?: (GameObject actor, Interactable target, ?lenient: bool) -> bool
   # meters from an actor to a target
+  %a{redgem:experimental}
   def self.distance: (GameObject actor, GameObject | Interactable target) -> Float
   # degrees between where the actor faces and where the target is, across the ground
+  %a{redgem:experimental}
   def self.angle_to: (GameObject actor, GameObject | Interactable target) -> Float
 end
 
 # Whether one thing can see another: a ray to it hits nothing else first.
+%a{redgem:experimental}
 module LineOfSight
   # whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
+  %a{redgem:experimental}
   def self.clear?: (Vector3 from, Vector3 to, GameObject target, ?ignore: Array[GameObject]) -> bool
   # whether an object is the whole, or is under it
+  %a{redgem:experimental}
   def self.part_of?: (GameObject | nil object, GameObject whole) -> bool
 end
 
 # A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear.
+%a{redgem:experimental}
 class Perception < Behaviour
   # a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it
+  %a{redgem:experimental}
   def self.noise: (at: Vector3, ?loudness: Numeric, ?source: GameObject | nil) -> Array[GameObject]
   # every Perception of the scene
+  %a{redgem:experimental}
   def self.all: () -> Array[Perception]
   # whether an object is in sight now: in range, in the cone, not hidden
+  %a{redgem:experimental}
   def sees?: (GameObject object) -> bool
   # what it sees, as of its last update
+  %a{redgem:experimental}
   def in_sight: () -> Array[GameObject]
   # whether it sees anything it watches
+  %a{redgem:experimental}
   def sees_any?: () -> bool
   # where it last saw an object, or nil
+  %a{redgem:experimental}
   def last_seen: (GameObject object) -> (Vector3 | nil)
   # what it looks for: the objects of its watch tag, or the players' heroes
+  %a{redgem:experimental}
   def watched: () -> Array[GameObject]
   # degrees between where it looks and where an object is, across the ground
+  %a{redgem:experimental}
   def angle_to: (GameObject object) -> Float
   # where it looks from
+  %a{redgem:experimental}
   def eye_point: () -> Vector3
   # meters it sees (15 unless said)
+  %a{redgem:experimental}
   def sight: () -> Float
   # degrees of the whole cone (120 unless said)
+  %a{redgem:experimental}
   def fov: () -> Float
   # meters above its origin it looks from (1.6 unless said)
+  %a{redgem:experimental}
   def eyes: () -> Float
   # meters above a watched object's origin it looks at (1 unless said)
+  %a{redgem:experimental}
   def aim: () -> Float
   # meters a noise of loudness 1 is heard from (10 unless said)
+  %a{redgem:experimental}
   def hearing: () -> Float
 end
 
 # A noise someone heard (on_hear).
+%a{redgem:experimental}
 class Perception::Noise
   # where it was made
+  %a{redgem:experimental}
   def position: () -> Vector3
   # how loud: 1 is heard as far as a listener's hearing
+  %a{redgem:experimental}
   def loudness: () -> Float
   # the object that made it, or nil
+  %a{redgem:experimental}
   def source: () -> (GameObject | nil)
   # meters from the listener
+  %a{redgem:experimental}
   def distance: () -> Float
 end
 
 # A behaviour: an NPC's state machine, with states, transitions, guards, timers and events.
+%a{redgem:experimental}
 class Brain < Behaviour
   # declares a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)
+  %a{redgem:experimental}
   def self.state: (Symbol | String name, **Symbol | Proc hooks) -> void
   # the state it starts in (the first declared unless said); with a name, sets it
+  %a{redgem:experimental}
   def self.initial: (?Symbol | String | nil name) -> (Symbol | nil)
   # declares a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards
+  %a{redgem:experimental}
   def self.transition: (from: Symbol | Array[Symbol], to: Symbol, **untyped options) -> void
   # its states, by name
+  %a{redgem:experimental}
   def self.states: () -> Hash[Symbol, Hash[Symbol, Symbol | Proc]]
   # its transitions, in the order they were declared
+  %a{redgem:experimental}
   def self.transitions: () -> Array[untyped]
   # the state it is in (nil before its first frame)
+  %a{redgem:experimental}
   def state: () -> (Symbol | nil)
   # the state it was in before
+  %a{redgem:experimental}
   def previous_state: () -> (Symbol | nil)
   # seconds of game time in this state
+  %a{redgem:experimental}
   def time_in_state: () -> Float
   # whether it is in one of these states
+  %a{redgem:experimental}
   def in?: (*Symbol | String names) -> bool
   # an event: the first transition waiting for it that may be taken is; true when the state changed
+  %a{redgem:experimental}
   def fire: (Symbol | String event, ?untyped payload) -> bool
   # goes to a state now, whatever the transitions say
+  %a{redgem:experimental}
   def go: (Symbol | String name) -> bool
 end
 
 # The time of day in the game's world, on game time: what schedules follow.
+%a{redgem:experimental}
 module GameClock
   # the hour of the day, its minutes as a fraction: 0 up to 24
+  %a{redgem:experimental}
   def self.hour: () -> Float
   # the minute of the hour
+  %a{redgem:experimental}
   def self.minute: () -> Integer
   # whole minutes since midnight: 0 up to 1439
+  %a{redgem:experimental}
   def self.minute_of_day: () -> Integer
   # the day it is, from 1
+  %a{redgem:experimental}
   def self.day: () -> Integer
   # the time as "HH:MM"
+  %a{redgem:experimental}
   def self.to_s: () -> String
   # sets the time of day in whole hours and minutes (and the day, from 1)
+  %a{redgem:experimental}
   def self.set: (hour: Integer, ?minute: Integer, ?day: Integer) -> void
   # game seconds for each second of game time (60 unless said)
+  %a{redgem:experimental}
   def self.speed: () -> Float
   # changes it (0 stops the clock)
+  %a{redgem:experimental}
   def self.speed=: (Numeric value) -> Numeric
   # what to save: { seconds:, speed: }
+  %a{redgem:experimental}
   def self.state: () -> Hash[Symbol, Float]
   # back to a saved state; nil (nothing saved yet) leaves the clock as it is
+  %a{redgem:experimental}
   def self.restore: (Hash[Symbol | String, Numeric] | nil saved) -> void
   # seconds of the world's time since the first day began
+  %a{redgem:experimental}
   def self.seconds: () -> Float
 end
 
 # A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).
+%a{redgem:experimental}
 class Schedule < Behaviour
   # the activity it is time for, or nil
+  %a{redgem:experimental}
   def current: () -> (Symbol | nil)
   # [[minute of the day, activity], ...] in the order of the day
+  %a{redgem:experimental}
   def plan: () -> Array[[Integer, Symbol]]
   # changes the plan: { "06:00" => :work } or "06:00 work, ..."
+  %a{redgem:experimental}
   def plan=: (Hash[String, Symbol | String] | String given) -> (Hash[String, Symbol | String] | String)
   # a plan as given, in the order of the day
+  %a{redgem:experimental}
   def self.parse: (Hash[String, Symbol | String] | String given) -> Array[[Integer, Symbol]]
   # what a plan says for a minute of the day
+  %a{redgem:experimental}
   def self.activity_at: (Array[[Integer, Symbol]] plan, Integer minute_of_day) -> (Symbol | nil)
   # "06:30" as minutes of the day (390)
+  %a{redgem:experimental}
   def self.minute_of: (String time) -> Integer
 end
 
 # A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.
+%a{redgem:experimental}
 class HeadLook < Behaviour
   # what it looks at instead of the heroes, or nil
+  %a{redgem:experimental}
   def target: () -> (GameObject | Vector3 | nil)
   # sets it (nil: the heroes)
+  %a{redgem:experimental}
   def target=: (GameObject | Vector3 | nil target) -> (GameObject | Vector3 | nil)
   # the nearest hero in range and in front of it, or nil
+  %a{redgem:experimental}
   def nearest_hero: () -> (GameObject | nil)
   # the head's bone
+  %a{redgem:experimental}
   def bone: () -> GameObject
   # meters to a hero (4 unless said)
+  %a{redgem:experimental}
   def range: () -> Float
   # degrees off its forward a hero may be at, and the most the head turns (70 unless said)
+  %a{redgem:experimental}
   def angle: () -> Float
+end
+
+# A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:).
+%a{redgem:experimental}
+class VoiceMouth < Behaviour
+  # moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker
+  %a{redgem:experimental}
+  def follow: (Integer | nil handle) -> (Integer | nil)
+  # how open the mouth is now, 0 to 1
+  %a{redgem:experimental}
+  def openness: () -> Float
+  # how open a mouth is (0 to 1) for a voice of that loudness, all open from full
+  %a{redgem:experimental}
+  def self.openness_at: (Numeric loudness, Numeric full) -> Float
+end
+
+# The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown).
+%a{redgem:experimental}
+class Dialogue::Voice
+  # plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play
+  %a{redgem:experimental}
+  def self.play: (String | Symbol name, GameObject | nil speaker) -> (Dialogue::Voice | nil)
+  # the clip's sound handle
+  %a{redgem:experimental}
+  def handle: () -> (Integer | nil)
+  # whether the clip still plays
+  %a{redgem:experimental}
+  def playing?: () -> bool
+  # moves the clip to where the speaker's head is now
+  %a{redgem:experimental}
+  def follow: () -> void
+  # where the clip plays from: the speaker's head, or the speaker
+  %a{redgem:experimental}
+  def place: () -> Vector3
+  # stops the clip
+  %a{redgem:experimental}
+  def stop: () -> bool
 end

@@ -38,7 +38,7 @@ class PoolDriver final : public SoundDriver {
  public:
   std::map<SoundSourceId, float> volumes;
   std::map<SoundSourceId, bool> playing_ones;
-  bool start(SoundSourceId id, const std::string&, const SpatialSound&, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string&, const SpatialSound&, SpatialMix mix, const VoiceEffects&) override {
     volumes[id] = mix.volume;
     playing_ones[id] = true;
     return true;

@@ -12,6 +12,7 @@
 
 #include "core/files.hpp"
 #include "editor/editor_session.hpp"
+#include "editor/scene_recovery.hpp"
 #include "project/cli.hpp"
 #include "project/editor_bridge.hpp"
 #include "project/editor_bridge_wire.hpp"
@@ -319,6 +320,26 @@ TEST_CASE("an external change pending is named as the reason, not a busy editor,
   }
   const Json edit = invoke_editor(*game.session, "scene_edit", set({"position=7,8,9"}), kDialogOpen);
   CHECK(text_of(edit).find("resolve it in the editor") != std::string::npos);
+}
+
+TEST_CASE("a recovery offered at start is in the status and named as the reason edits wait") {
+  Game game;
+  REQUIRE(ok(invoke_editor(*game.session, "scene_edit", set({"position=1,2,3"}))));
+  game.session->autosave(SceneRecovery::kIntervalSeconds);
+  game.session.reset();  // (the editor closed without saving)
+  auto opened = EditorSession::open(game.path);
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorSession>>(opened));
+  game.session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  REQUIRE(game.session->recovery_pending());
+  const Json status = Json::parse(text_of(invoke_editor(*game.session, "editor", {{"action", "status"}})));
+  CHECK(status.at("recovery_pending").get<bool>());
+  constexpr bool kDialogOpen = true;  // (the editor's question makes it busy)
+  const Json edit = invoke_editor(*game.session, "scene_edit", set({"position=7,8,9"}), kDialogOpen);
+  CHECK_FALSE(ok(edit));
+  CHECK(text_of(edit).find("recover unsaved edits") != std::string::npos);
+  const auto window = [](const std::string&, const Json&) { return Json(); };
+  const Json play = invoke_editor(*game.session, "editor", {{"action", "play"}}, kDialogOpen, window);
+  CHECK(text_of(play).find("recover unsaved edits") != std::string::npos);
 }
 
 TEST_CASE("live MCP rejects mutation actions in read-only mode before connecting") {

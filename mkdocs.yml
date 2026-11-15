@@ -51,6 +51,7 @@ nav:
       - Online services: scripting/online-services.md
       - Texts in several languages: scripting/i18n.md
       - API reference: scripting/api.md
+      - API stability: scripting/stability.md
   - Finishing a game:
       - Testing your game: testing.md
       - Building and sharing: shipping.md
