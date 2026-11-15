@@ -504,6 +504,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Perception resets with each scene**: loading a scene logged "resetting the handlers of
+  Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
+  modules by name and Perception is a class. It now finds classes too, so a new scene starts with
+  no senses left from the one before.
 - **Web requests end with their game**: their threads used to be detached, so one still running
   at exit could outlive the program's static objects. A game that ends (or an editor play session
   that stops) now gives every request on its way up, hangs up its connection so its wait ends at

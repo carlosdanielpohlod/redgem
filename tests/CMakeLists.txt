@@ -234,6 +234,7 @@ add_executable(redgem_tests
   integration/save_migration_api_test.cpp
   integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
