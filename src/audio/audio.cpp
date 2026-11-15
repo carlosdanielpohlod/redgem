@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <tuple>
 #include <utility>
 
 #include "core/safe_path.hpp"
@@ -104,6 +105,7 @@ SpatialSound flat_sound(const FlatSound& sound) {
   flat.pitch = sound.pitch;
   flat.loop = sound.loop;
   flat.group = sound.group;
+  flat.priority = sound.priority;
   flat.positional = false;
   return flat;
 }
@@ -113,12 +115,29 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
   reap();  // (a sound that ended gives its place back)
-  if (sounds_.size() >= kMaxSpatialSounds) return kNoSoundSource;
+  const auto place = place_for(sound);
+  if (place == kNoSoundSource) return kNoSoundSource;
   const auto id = static_cast<SoundSourceId>(next_);
-  if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;
+  if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
+  if (place) stop(*place);
   sounds_.emplace(id, sound);
   ++next_;
   return id;
+}
+std::optional<SoundSourceId> SoundPool::place_for(const SpatialSound& sound) const {
+  if (sounds_.size() < kMaxSounds) return std::nullopt;
+  const SoundSourceId victim = weakest();
+  if (sound.priority < sounds_.at(victim).priority) return kNoSoundSource;
+  return victim;
+}
+SoundSourceId SoundPool::weakest() const {
+  const auto order = [this](const auto& entry) {
+    const auto mix = mix_of(entry.second);
+    return std::make_tuple(entry.second.priority, mix ? mix->volume : 0.0f, entry.first);
+  };
+  const auto found = std::min_element(sounds_.begin(), sounds_.end(),
+                                      [&](const auto& a, const auto& b) { return order(a) < order(b); });
+  return found->first;
 }
 bool SoundPool::set_listener(const AudioListener& listener) {
   if (!valid_audio_listener(listener)) return false;

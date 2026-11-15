@@ -25,6 +25,22 @@ until 1.0, a release may change what games rely on (see
   the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
   gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
   or the Skip button leaves.
+- **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
+  states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
+  transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
+  event, `after:` seconds in the state, and when its `if:` and `unless:` guards agree (a guard
+  block may take the event's payload). A `Perception` behaviour gives it senses: a sight cone out to
+  a range, checked by a line-of-sight ray, that watches the players' heroes (or a tag), and a
+  hearing radius that `Perception.noise(at:, loudness:)` reaches. Its object's behaviours hear
+  `on_see`, `on_lose_sight` and `on_hear`, and a Brain gets them, and a use of its Interactable, as
+  the `:see`, `:lose_sight`, `:hear` and `:interact` events. Over the network only the host thinks
+  and perceives. `LineOfSight` is the ray check Interactors and Perceptions share, and
+  `Interactor.all` lists the heroes. See the manual's NPCs page.
+- **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
+  that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
+  quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
+  stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
+  default).
 - **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
   physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
   of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
@@ -172,6 +188,17 @@ until 1.0, a release may change what games rely on (see
   for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
   across blends) and keeps the root over it; a `CharacterController` goes there through the
   physics, so walls stop it.
+- **A release opens its windows before it is published**: the release workflow unpacks the Linux
+  and Windows downloads and, with `tools/release/smoke.sh`, builds and plays a demo with the
+  download's player, runs a new game's tests (`redgem check --run-tests`), plays one system test
+  in a window and opens the editor on a demo, on Xvfb with Mesa's llvmpipe on Linux and with
+  Mesa's `opengl32.dll` on Windows. The draft release gets no download unless it passes. On a
+  machine with a graphics card, `tools/release/smoke.sh <download>` does the same by hand.
+- **`REDGEM_CLOSE_AFTER_FRAMES=<n>`**: every window of the engine (the editor, the project hub,
+  a game, a built game's player) closes itself once it has shown that many frames, as its close
+  button would.
+- **The Windows download has `redgem-test.exe`**, so `redgem check --run-tests` runs a game's tests
+  on Windows too.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the

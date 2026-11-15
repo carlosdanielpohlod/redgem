@@ -18,7 +18,8 @@ class AudioSystem {
   virtual ~AudioSystem() = default;
   // Every sound played gets a handle (flat or positional, one id space) that stops it, changes its
   // levels and says whether it still plays. Zero means no source: the file is missing, the backend
-  // plays nothing (silent and test backends without a pool), or kMaxSpatialSounds already play.
+  // plays nothing (silent and test backends without a pool), or kMaxSounds already play and
+  // none of them has a lower priority (or the same).
   virtual SoundSourceId play_sound(const std::string&, const FlatSound&) { return kNoSoundSource; }
   // Positional sources overlap independently, even when they use the same asset.
   // The game supplies world positions and listener orientation; update them when objects/cameras move.

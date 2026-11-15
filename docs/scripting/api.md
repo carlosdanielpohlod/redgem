@@ -53,6 +53,10 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Interactable`](#interactable) | A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor). |
 | [`Interactor`](#interactor) | A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
+| [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
+| [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
+| [`Perception::Noise`](#perceptionnoise) | A noise someone heard (on_hear). |
+| [`Brain`](#brain) | A behaviour: an NPC's state machine, with states, transitions, guards, timers and events. |
 
 ## Behaviour
 
@@ -69,6 +73,9 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `on_interact(GameObject actor) -> void`: an actor used this object (it has an Interactable; on the host in a game over the network)
 - `on_focus(GameObject actor) -> void`: this object became what an actor's interaction prompt is for
 - `on_blur(GameObject actor) -> void`: it stopped being what that prompt is for
+- `on_see(GameObject object) -> void`: a Perception on the object saw something come into sight
+- `on_lose_sight(GameObject object) -> void`: ... and saw it go out of sight
+- `on_hear(Perception::Noise noise) -> void`: a Perception on the object heard a noise
 - `Behaviour.persist(*Symbol | String fields) -> Array[Symbol]`: fields Save.checkpoint keeps for a spawned copy, given back before it starts
 - `Behaviour.persisted_fields -> Array[Symbol]`: what persist named, in this class and those above it
 - `game_object -> GameObject`: the object this behaviour is attached to
@@ -496,21 +503,21 @@ What the block of an animation event is given (animation.on). See [animation.md#
 
 Sounds and music from the game's sounds/ folder.
 
-- `Audio.play(String | Symbol name, volume: Numeric = 1.0, pitch: Numeric = 1.0, loop: bool = false, group: Symbol = :effects) -> Integer | nil`: plays a sound; returns its id (for stop, playing? and set), or nil
+- `Audio.play(String | Symbol name, volume: Numeric = 1.0, pitch: Numeric = 1.0, loop: bool = false, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound; returns its id (for stop, playing? and set), or nil
 - `Audio.music(String | Symbol name, loop: bool = true, volume: Numeric = 0.7, fade: Numeric = 0.0) -> void`: plays music, crossfading over fade seconds from the track playing
 - `Audio.stop_music(fade: Numeric = 0.0) -> void`: stops the music, fading it out over fade seconds
 - `Audio.music_pitch = Numeric pitch`: changes the music's pitch
 - `Audio.music_volume = Numeric volume`: changes the music's volume
 - `Audio.volume = Numeric volume`: the volume of everything
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped
-- `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
+- `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up) -> void`: where the ears are (move it with the camera)
 - `Audio.move(Integer id, Vector3 position) -> void`: moves a sound played with play_at
 - `Audio.playing?(Integer id) -> bool`: whether that sound still plays
 - `Audio.stop(Integer id) -> void`: stops that sound
 - `Audio.stop_sources -> void`: stops every sound played with play or play_at
 
-Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused.
+Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
 
 ## UI
 
@@ -876,6 +883,7 @@ A behaviour: something the player can use or talk to; its behaviours hear on_int
 
 A behaviour on the player's hero: picks the best Interactable in reach, shows its prompt and uses it with the :interact action or a tap. See [interaction.md](interaction.md).
 
+- `Interactor.all -> Array[Interactor]`: every Interactor of the scene: the players' heroes
 - `target -> Interactable | nil`: the Interactable in focus, or nil
 - `use -> bool`: uses what is in focus now; false when nothing is
 - `pad -> Integer`: the player whose :interact it reads (0 unless said)
@@ -891,6 +899,57 @@ Who uses what: the choice of a target, uses, and the game's handlers; over the n
 - `Interaction.reachable?(GameObject actor, Interactable target, lenient: bool = false) -> bool`: whether an actor can use a target now: enabled, in range, in front, in sight
 - `Interaction.distance(GameObject actor, GameObject | Interactable target) -> Float`: meters from an actor to a target
 - `Interaction.angle_to(GameObject actor, GameObject | Interactable target) -> Float`: degrees between where the actor faces and where the target is, across the ground
+
+## LineOfSight
+
+Whether one thing can see another: a ray to it hits nothing else first. See [npcs.md#perception](npcs.md#perception).
+
+- `LineOfSight.clear?(Vector3 from, Vector3 to, GameObject target, ignore: Array[GameObject] = []) -> bool`: whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first
+- `LineOfSight.part_of?(GameObject | nil object, GameObject whole) -> bool`: whether an object is the whole, or is under it
+
+## Perception
+
+A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. See [npcs.md#perception](npcs.md#perception).
+
+- `Perception.noise(at: Vector3, loudness: Numeric = 1.0, source: GameObject | nil = nil) -> Array[GameObject]`: a noise at a point, heard by every Perception near enough (loudness scales how far); the objects that heard it
+- `Perception.all -> Array[Perception]`: every Perception of the scene
+- `sees?(GameObject object) -> bool`: whether an object is in sight now: in range, in the cone, not hidden
+- `in_sight -> Array[GameObject]`: what it sees, as of its last update
+- `sees_any? -> bool`: whether it sees anything it watches
+- `last_seen(GameObject object) -> Vector3 | nil`: where it last saw an object, or nil
+- `watched -> Array[GameObject]`: what it looks for: the objects of its watch tag, or the players' heroes
+- `angle_to(GameObject object) -> Float`: degrees between where it looks and where an object is, across the ground
+- `eye_point -> Vector3`: where it looks from
+- `sight -> Float`: meters it sees (15 unless said)
+- `fov -> Float`: degrees of the whole cone (120 unless said)
+- `eyes -> Float`: meters above its origin it looks from (1.6 unless said)
+- `aim -> Float`: meters above a watched object's origin it looks at (1 unless said)
+- `hearing -> Float`: meters a noise of loudness 1 is heard from (10 unless said)
+
+## Perception::Noise
+
+A noise someone heard (on_hear). See [npcs.md#perception](npcs.md#perception).
+
+- `position -> Vector3`: where it was made
+- `loudness -> Float`: how loud: 1 is heard as far as a listener's hearing
+- `source -> GameObject | nil`: the object that made it, or nil
+- `distance -> Float`: meters from the listener
+
+## Brain
+
+A behaviour: an NPC's state machine, with states, transitions, guards, timers and events. See [npcs.md#brain](npcs.md#brain).
+
+- `Brain.state(Symbol | String name, **Symbol | Proc hooks) -> void`: declares a state, with its hooks (enter:, update:, exit:; enter_<name> and the like unless said)
+- `Brain.initial(Symbol | String | nil name = nil) -> Symbol | nil`: the state it starts in (the first declared unless said); with a name, sets it
+- `Brain.transition(from: Symbol | Array[Symbol], to: Symbol, **untyped options) -> void`: declares a way from a state (a list, or :any) to another: on: an event, after: seconds, if:/unless: guards
+- `Brain.states -> Hash[Symbol, Hash[Symbol, Symbol | Proc]]`: its states, by name
+- `Brain.transitions -> Array[untyped]`: its transitions, in the order they were declared
+- `state -> Symbol | nil`: the state it is in (nil before its first frame)
+- `previous_state -> Symbol | nil`: the state it was in before
+- `time_in_state -> Float`: seconds of game time in this state
+- `in?(*Symbol | String names) -> bool`: whether it is in one of these states
+- `fire(Symbol | String event, untyped payload = nil) -> bool`: an event: the first transition waiting for it that may be taken is; true when the state changed
+- `go(Symbol | String name) -> bool`: goes to a state now, whatever the transitions say
 
 ## Notes
 
