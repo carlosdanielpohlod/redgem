@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "core/game_files.hpp"
+#include "scene/gltf/gltf_accessors.hpp"
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
@@ -138,6 +139,14 @@ bool pictures_checked(const cgltf_data& data, const gltf_checks::NamedFiles& fil
 }  // namespace
 
 namespace {
+bool read_description(GltfReader& reader, const std::string& path, std::string& error) {
+  try {
+    return sound(reader.run(), path, error);
+  } catch (const gltf_accessors::NonFiniteAccessor& problem) {
+    return sound(problem.what(), path, error);
+  }
+}
+
 LoadResult read_scene(const CgltfPtr& data, const std::string& path, LoadResult result, std::uint64_t max_bytes) {
   if (data == nullptr) return result;
   // (Each file the scene names is found once, for every step below.)
@@ -145,7 +154,7 @@ LoadResult read_scene(const CgltfPtr& data, const std::string& path, LoadResult 
   if (!loaded_and_checked(*data, files, path, result.error, max_bytes)) return result;
   GltfReader reader(*data, files.images, result);
   // (Its pictures are decoded later, once shown: what that will take is known from their headers.)
-  result.ok = sound(reader.run(), path, result.error) && pictures_checked(*data, files, path, result, max_bytes);
+  result.ok = read_description(reader, path, result.error) && pictures_checked(*data, files, path, result, max_bytes);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
 }

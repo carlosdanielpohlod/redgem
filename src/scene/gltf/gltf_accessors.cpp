@@ -1,6 +1,7 @@
 #include "scene/gltf/gltf_accessors.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/scene_config.hpp"
@@ -34,6 +35,8 @@ std::vector<float> unpack_floats(const cgltf_accessor* accessor) {
   const cgltf_size components = cgltf_num_components(accessor->type);
   std::vector<float> out(accessor->count * components);
   cgltf_accessor_unpack_floats(accessor, out.data(), out.size());
+  const bool finite = std::all_of(out.begin(), out.end(), [](float value) { return std::isfinite(value); });
+  if (!finite) throw NonFiniteAccessor();
   return out;
 }
 
