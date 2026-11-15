@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+#include "script/method_symbols.hpp"
 #include "script/script_budget.hpp"
 #include "script/script_sampler.hpp"
 #include "script/ruby_reload.hpp"
@@ -73,6 +74,7 @@ class RubyVm {
   mrb_state* mrb_;
   ReloadHooks reload_hooks_{};
   std::unique_ptr<ReloadOwnership> reload_ownership_;
+  MethodSymbols symbols_;  // of the methods call() and call_with() name
 };
 
 }  // namespace redgem
