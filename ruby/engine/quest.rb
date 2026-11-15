@@ -79,6 +79,7 @@ module Quests
     def initialize(quest, index)
       @quest = quest
       @index = index
+      @stage = quest.stage
     end
 
     # :go_to, :talk_to, :deliver, :collect, :defeat or :check.
@@ -89,7 +90,7 @@ module Quests
 
     # How many it takes (a deliver, collect or defeat's "count"; 1 for the others), and how many it has.
     def count = data["count"] || 1
-    def progress = Quests.__progress(quest.name, index)
+    def progress = __current? ? Quests.__progress(quest.name, index) : 0
     def done? = progress >= count
 
     # Its text, with {progress} and {count} filled in.
@@ -101,7 +102,9 @@ module Quests
     def node = data["node"]             # ... and the node it must reach, or nil
 
     # The objective's line in the file (a Hash).
-    def data = quest.definition.objectives(quest.stage)[index]
+    def data = quest.definition.objectives(@stage)[index]
+
+    def __current? = quest.stage == @stage
 
     def inspect = "#<Quests::Objective #{quest.name} #{kind} #{target} #{progress}/#{count}>"
 

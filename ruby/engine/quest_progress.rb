@@ -56,6 +56,8 @@ module Quests
     def digits?(text) = !text.empty? && text.each_char.all? { |char| char.between?("0", "9") }
 
     def add(objective, count)
+      return unless objective.__current?
+
       reached = [objective.progress + count, objective.count].min
       GameVariables[progress_key(objective.quest.name, objective.index)] = reached
     end
@@ -92,7 +94,7 @@ module Quests
       settle(name)
     end
 
-    def passes?(objective) = objective.kind == :check && !objective.done? && passed?(objective)
+    def passes?(objective) = objective.__current? && objective.kind == :check && !objective.done? && passed?(objective)
 
     def passed?(objective)
       check = @checks[objective.target]

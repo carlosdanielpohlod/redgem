@@ -123,10 +123,13 @@ class QuestsTest < RedGemTest::Case
     define_quest("walk", WALK)
     Quests.start(:walk)
     Quests.collected(:flour)
+    arrival = Quests[:walk].objectives.first
     tracker = QuestTracker.allocate
     def tracker.near?(_objective) = true
     tracker.__send__(:look_around)
     assert Quests[:walk].complete?
+    assert_equal "Mill", arrival.target
+    assert_equal 0, arrival.progress
   end
 
   def test_a_copy_of_someone_counts_as_them
