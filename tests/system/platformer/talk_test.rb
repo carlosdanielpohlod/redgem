@@ -32,7 +32,11 @@ SystemTest.define do |t|
   t.assert("its effects happened") { GameVariables[:tree_watered] == true && GameVariables[:tree_waterings] == 1 }
   t.assert("the tree thanks the hero") { conversation.text == "Ahh, much better. I will remember this." }
   t.assert("its last line ends it") { conversation.continue && conversation.over? && Dialogue.current.nil? }
+  t.press(:e)
+  t.wait
+  t.assert("a press on the frame it ended uses nothing") { Dialogue.current.nil? }
 
+  t.wait
   t.press(:e)
   t.wait
   t.assert("a watered tree starts elsewhere") { Dialogue.current&.node_id == "again" }

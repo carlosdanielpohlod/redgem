@@ -313,7 +313,7 @@ class Reader {
 Json parsed(std::string_view text) {
   bool too_deep = false;
   const auto watch_depth = [&too_deep](int depth, Json::parse_event_t, Json&) {
-    too_deep = too_deep || depth > kMaxDepth;
+    too_deep = too_deep || depth >= kMaxDepth;  // (the outermost value is at depth 0)
     return !too_deep;
   };
   Json json = Json::parse(text, watch_depth, false);

@@ -178,6 +178,7 @@ TEST_CASE("a check lists a screenful of problems unless asked for all") {
 
 TEST_CASE("a check reads every dialogue: what it names, where it leads, and its texts") {
   GameCopy game("dialogues");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");  // (its texts go with the locales replaced here)
   game.write("locales/en.json", R"({"baker.hello": "Hello!", "baker.bye": "Bye"})");
   game.write("locales/pt.json", R"({"baker.hello": "Olá!"})");
   game.write("dialogues/baker.json", R"({"start": "hello", "nodes": {
@@ -200,6 +201,7 @@ TEST_CASE("a check reads every dialogue: what it names, where it leads, and its 
 
 TEST_CASE("a game without a quests folder may name any quest") {
   GameCopy game("dialogue_quests");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
   game.write("locales/en.json", R"({"sign.text": "Keep out"})");
   game.write("dialogues/sign.json", R"({"start": "a", "nodes": {"a": {"text": "sign.text", "end": true,
     "effects": [{"quest": "bread", "to": "started"}]}}})");

@@ -294,7 +294,8 @@ class TalkingInteractionTest < InteractionTest
 
   def test_the_focus_comes_back_a_frame_later
     Dialogue.current.continue
-    Time.define_singleton_method(:frame) { super() + 1 }
+    later = Time.frame + 1
+    Time.define_singleton_method(:frame) { later }
     assert @target.equal?(focus)
   end
 end
