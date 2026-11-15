@@ -401,6 +401,7 @@ TEST_CASE("Android staging creates a private cache beneath a trusted directory")
 TEST_CASE("Android staging resolves linked parents and rejects unsafe cache directories") {
   namespace fs = std::filesystem;
   const Scratch scratch;
+  fs::permissions(scratch.dir, fs::perms::owner_all);
   const auto home = fs::canonical(scratch.dir);
   const auto parent = home / "cache";
   REQUIRE(fs::create_directory(parent));
