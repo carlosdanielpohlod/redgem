@@ -29,6 +29,10 @@ until 1.0, a release may change what games rely on (see
   turns a character's head bone toward a point or an object in engine C++, on top of its clips'
   pose, within a largest angle and easing in and out (`look_away`, `looking?`, `bone`). A
   `HeadLook` behaviour looks at the nearest hero in range and in front, or at a target.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
   states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
   transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an

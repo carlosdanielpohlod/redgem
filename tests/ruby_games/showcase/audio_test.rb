@@ -9,6 +9,15 @@ class AudioTest < RedGemTest::Case
   def setup
     Audio.stop_sources
     Audio.stop_music
+    Audio.ducking
+  end
+
+  def test_the_music_ducking_changes_and_turns_off
+    assert Audio.music(SOUND)
+    line = Audio.play(SOUND, group: :voice)
+    assert Audio.ducking(volume: 0.25, attack: 0.1, release: 1.0)
+    assert Audio.ducking(volume: Audio::NO_DUCKING)
+    Audio.stop(line)
   end
 
   def test_a_looping_sound_has_a_handle_that_stops_it
