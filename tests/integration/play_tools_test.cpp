@@ -246,7 +246,7 @@ TEST_CASE("a check finds a dialogue that moves a quest to a stage it does not ha
 
 TEST_CASE("a check warns of a dialogue's voice that has no sound") {
   GameCopy game("dialogue_voices");
-  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.remove_tree();
   game.write("locales/en.json", R"({"baker.hello": "Hello!", "baker.bye": "Bye"})");
   game.write("sounds/baker/hello.ogg", "(a clip)");
   game.write("dialogues/baker.json", R"({"start": "hello", "nodes": {
