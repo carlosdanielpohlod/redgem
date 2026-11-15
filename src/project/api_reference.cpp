@@ -35,6 +35,12 @@ constexpr const char* kOptionalBlockMark = "?";
 constexpr const char* kBlockOpen = "{ ";
 constexpr const char* kBlockClose = " }";
 constexpr std::size_t kElementWriteArguments = 2;  // "[]=": the key and the value
+// How the manual's page marks what may change (a stable class and method go unmarked but for the
+// index's column), and where it says what the marks promise.
+constexpr const char* kExperimentalMark = " *Experimental.*";
+constexpr const char* kStabilityPage = "stability.md";
+constexpr const char* kStableTitle = "Stable";
+constexpr const char* kExperimentalTitle = "Experimental";
 
 bool holds(const std::string& text, const std::string& word) { return lowered(text).find(word) != std::string::npos; }
 
@@ -164,12 +170,27 @@ std::string guide_line(const ApiClass& owner) {
   return tr("project.api.guide", {{"page", kGuidesFolder + owner.guide}}) + "\n";
 }
 
+bool is_experimental(ApiStability stability) { return stability == ApiStability::Experimental; }
+
+// " *Experimental.*" after what may change; nothing after what is stable.
+std::string markdown_mark(ApiStability stability) { return is_experimental(stability) ? kExperimentalMark : ""; }
+
+// " (experimental)" after what may change, in the texts of `redgem api`.
+std::string text_mark(ApiStability stability) {
+  return is_experimental(stability) ? " (" + std::string(tr("project.api.experimental")) + ")" : std::string();
+}
+
+std::string stability_title(ApiStability stability) {
+  return "[" + std::string(is_experimental(stability) ? kExperimentalTitle : kStableTitle) + "](" + kStabilityPage +
+         ")";
+}
+
 std::string markdown_method(const ApiClass& owner, const ApiMethod& method) {
-  return "- `" + call_in_class(owner, method) + "`: " + method.about + "\n";
+  return "- `" + call_in_class(owner, method) + "`: " + method.about + markdown_mark(method.stability) + "\n";
 }
 
 std::string markdown_class(const ApiClass& owner) {
-  std::string text = "## " + owner.name + "\n\n" + owner.about;
+  std::string text = "## " + owner.name + "\n\n" + owner.about + markdown_mark(owner.stability);
   if (!owner.guide.empty()) text += " See [" + owner.guide + "](" + owner.guide + ").";
   text += "\n\n";
   for (const ApiMethod& method : owner.methods) text += markdown_method(owner, method);
@@ -197,7 +218,10 @@ nlohmann::json param_data(const ApiParam& param) {
 }
 
 nlohmann::json method_data(const ApiMethod& method) {
-  nlohmann::json data = {{kName, method.name}, {kAbout, method.about}, {kParams, nlohmann::json::array()}};
+  nlohmann::json data = {{kName, method.name},
+                         {kStability, stability_name(method.stability)},
+                         {kAbout, method.about},
+                         {kParams, nlohmann::json::array()}};
   for (const ApiParam& param : method.params) data[kParams].push_back(param_data(param));
   data[kReturns] = {{kType, method.returns}};
   if (method.on_class) data[kStatic] = true;
@@ -208,6 +232,7 @@ nlohmann::json method_data(const ApiMethod& method) {
 
 nlohmann::json class_data(const ApiClass& owner) {
   nlohmann::json data = {{kName, owner.name},
+                         {kStability, stability_name(owner.stability)},
                          {kKind, owner.is_module ? kModuleKind : kClassKind},
                          {kAbout, owner.about},
                          {kMethods, nlohmann::json::array()}};
@@ -253,6 +278,23 @@ std::string typed_signature(const ApiClass& owner, const ApiMethod& method) {
   return called_on(owner.name, method.on_class ? kClassCall : kInstanceCall, method, kTypedCall);
 }
 
+const char* stability_name(ApiStability stability) {
+  if (stability == ApiStability::Stable) return kStable;
+  return is_experimental(stability) ? kExperimental : "";
+}
+
+std::vector<std::string> unmarked_bindings(const ApiReference& reference) {
+  std::vector<std::string> unmarked;
+  for (const ApiClass& owner : reference.classes) {
+    if (owner.stability == ApiStability::Unmarked) unmarked.push_back(owner.name);
+    for (const ApiMethod& method : owner.methods) {
+      if (method.stability == ApiStability::Unmarked)
+        unmarked.push_back(owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name);
+    }
+  }
+  return unmarked;
+}
+
 const ApiClass* find_api_class(const ApiReference& reference, const std::string& name) {
   const auto found = std::find_if(reference.classes.begin(), reference.classes.end(),
                                   [&name](const ApiClass& owner) { return lowered(owner.name) == lowered(name); });
@@ -261,13 +303,15 @@ const ApiClass* find_api_class(const ApiReference& reference, const std::string&
 
 std::string api_index(const ApiReference& reference) {
   std::string text = tr("project.api.index_header", {{"count", std::to_string(reference.classes.size())}}) + "\n";
-  for (const ApiClass& owner : reference.classes) text += method_line(owner.name, owner.about);
+  for (const ApiClass& owner : reference.classes)
+    text += method_line(owner.name, owner.about + text_mark(owner.stability));
   return text;
 }
 
 std::string api_class_text(const ApiClass& owner) {
-  std::string text = owner.name + ": " + owner.about + "\n" + guide_line(owner);
-  for (const ApiMethod& method : owner.methods) text += method_line(call_in_class(owner, method), method.about);
+  std::string text = owner.name + text_mark(owner.stability) + ": " + owner.about + "\n" + guide_line(owner);
+  for (const ApiMethod& method : owner.methods)
+    text += method_line(call_in_class(owner, method), method.about + text_mark(method.stability));
   if (!owner.notes.empty()) text += owner.notes + "\n";
   return text;
 }
@@ -277,7 +321,8 @@ std::string api_search(const ApiReference& reference, const std::string& word, s
   if (found.empty()) return tr("project.api.nothing_found", {{"word", word}}) + "\n";
   std::string text;
   for (std::size_t call = 0; call < found.size() && call < most; ++call) {
-    text += method_line(typed_signature(*found[call].owner, *found[call].method), found[call].method->about);
+    const ApiMethod& method = *found[call].method;
+    text += method_line(typed_signature(*found[call].owner, method), method.about + text_mark(method.stability));
   }
   if (found.size() > most)
     text += tr("project.api.more_found", {{"count", std::to_string(found.size() - most)}}) + "\n";
@@ -318,9 +363,10 @@ std::string search_json(const ApiReference& reference, const std::string& word, 
 
 std::string api_markdown(const ApiReference& reference) {
   std::string text = "---\ndescription: " + quoted(reference.description) + "\n---\n\n# API reference\n\n" +
-                     reference.about + "\n\n| Class | What it is |\n|---|---|\n";
+                     reference.about + "\n\n| Class | What it is | Stability |\n|---|---|---|\n";
   for (const ApiClass& owner : reference.classes) {
-    text += "| [`" + owner.name + "`](#" + anchor(owner.name) + ") | " + owner.about + " |\n";
+    text += "| [`" + owner.name + "`](#" + anchor(owner.name) + ") | " + owner.about + " | " +
+            stability_title(owner.stability) + " |\n";
   }
   text += "\n";
   for (const ApiClass& owner : reference.classes) text += markdown_class(owner);

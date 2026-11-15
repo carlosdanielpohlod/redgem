@@ -19,8 +19,9 @@ using namespace api_keys;
 
 // The fields each part may have: any other is a mistake (or a field from before the types).
 constexpr const char* kReferenceFields[] = {kDescription, kAbout, kNotes, kInternalClasses, kClasses};
-constexpr const char* kClassFields[] = {kName, kKind, kSuperclass, kAbout, kGuide, kMethods, kNotes, kInternal};
-constexpr const char* kMethodFields[] = {kName, kStatic, kParams, kReturns, kAbout, kTop, kExample};
+constexpr const char* kClassFields[] = {kName,  kStability, kKind,  kSuperclass, kAbout,
+                                        kGuide, kMethods,   kNotes, kInternal};
+constexpr const char* kMethodFields[] = {kName, kStability, kStatic, kParams, kReturns, kAbout, kTop, kExample};
 constexpr const char* kReturnsFields[] = {kType};
 constexpr const char* kParamFields[] = {kName, kType, kKeyword, kRest, kBlock, kOptional, kDefault};
 constexpr const char* kTopPlace = "the reference";
@@ -44,6 +45,15 @@ void check_fields(const json& data, const char* const (&known)[Count], const std
 
 std::string text_of(const json& data, const char* key) { return data.value(key, std::string()); }
 bool flag_of(const json& data, const char* key) { return data.value(key, false); }
+
+// A class's or a method's stability; Unmarked when it has none (which the tests refuse).
+ApiStability stability_of(const json& data, const std::string& where) {
+  const std::string mark = text_of(data, kStability);
+  if (mark.empty()) return ApiStability::Unmarked;
+  if (mark == kStable) return ApiStability::Stable;
+  if (mark == kExperimental) return ApiStability::Experimental;
+  refuse(where, "its stability is stable or experimental, not " + mark);
+}
 
 ApiParam param_from(const json& data, const std::string& where) {
   check_fields(data, kParamFields, where);
@@ -75,6 +85,7 @@ ApiMethod method_from(const json& data, const std::string& owner) {
   method.on_class = flag_of(data, kStatic);
   method.top = data.value(kTop, 0);
   method.example = text_of(data, kExample);
+  method.stability = stability_of(data, where);
   return method;
 }
 
@@ -96,6 +107,7 @@ ApiClass class_from(const json& data) {
   owner.about = text_of(data, kAbout);
   owner.guide = text_of(data, kGuide);
   owner.notes = text_of(data, kNotes);
+  owner.stability = stability_of(data, name);
   for (const json& method : data.at(kMethods)) owner.methods.push_back(method_from(method, name));
   owner.internal = data.value(kInternal, std::vector<std::string>());
   return owner;
@@ -182,11 +194,17 @@ bool is_short_element_writer(const ApiMethod& method) {
   return method.name == kElementWriter && method.params.size() < kElementWriterParams;
 }
 
+// Whether a method promises more than its class: a stable one in an experimental class.
+bool is_stable_in_experimental(const ApiClass& owner, const ApiMethod& method) {
+  return owner.stability == ApiStability::Experimental && method.stability == ApiStability::Stable;
+}
+
 void check_method(const ApiClass& owner, const ApiMethod& method, const std::vector<std::string>& classes) {
   const std::string where = owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name;
   if (has_line_break(method.about)) refuse(where, "its about is one line");
   if (is_module_new(owner, method)) refuse(where, "a module has no new: call its maker otherwise");
   if (is_short_element_writer(method)) refuse(where, "[]= takes its keys, then the value");
+  if (is_stable_in_experimental(owner, method)) refuse(where, "stable, in an experimental class");
   for (const ApiParam& param : method.params) check_param(param, classes, where);
   check_order(method.params, where);
   check_type(method.returns, classes, TypePlace::Returned, where);

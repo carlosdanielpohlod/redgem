@@ -18,28 +18,30 @@ using namespace redgem::tools;
 
 namespace {
 
+// What the signatures mark a class's or a method's stability with: %a{redgem:stable}.
+constexpr const char* kStabilityAnnotation = "%a{redgem:";
 const std::vector<std::string> kClasses = {"Vector3", "GameObject", "Animation::Graph"};
 
-// A small reference with one of each kind of parameter.
+// A small reference with one of each kind of parameter, and of each stability (Runner has none).
 constexpr const char* kReference = R"json({
   "description": "d", "about": "a", "notes": "n",
   "classes": [
-    {"name": "Mover", "kind": "class", "about": "moves", "methods": [
-      {"name": "new", "static": true, "params": [
+    {"name": "Mover", "stability": "stable", "kind": "class", "about": "moves", "methods": [
+      {"name": "new", "stability": "stable", "static": true, "params": [
         {"name": "speed", "type": "Numeric", "optional": true, "default": "1.0"}
       ], "returns": {"type": "Mover"}, "about": "a mover"},
-      {"name": "move", "params": [
+      {"name": "move", "stability": "experimental", "params": [
         {"name": "to", "type": "Vector3 | nil"},
         {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
         {"name": "done", "type": "^(Float) -> void", "block": true, "optional": true}
       ], "returns": {"type": "self"}, "about": "moves it"},
-      {"name": "speed=", "params": [{"name": "value", "type": "Numeric"}], "returns": {"type": "Numeric"},
-       "about": "sets it"}
+      {"name": "speed=", "stability": "stable", "params": [{"name": "value", "type": "Numeric"}],
+       "returns": {"type": "Numeric"}, "about": "sets it"}
     ]},
-    {"name": "Vector3", "kind": "class", "about": "a point", "methods": []},
+    {"name": "Vector3", "stability": "stable", "kind": "class", "about": "a point", "methods": []},
     {"name": "Runner", "kind": "class", "superclass": "Mover", "about": "runs", "methods": []},
-    {"name": "Tools", "kind": "module", "about": "tools", "methods": [
-      {"name": "tint", "static": true, "params": [
+    {"name": "Tools", "stability": "experimental", "kind": "module", "about": "tools", "methods": [
+      {"name": "tint", "stability": "experimental", "static": true, "params": [
         {"name": "color", "type": "Color"},
         {"name": "names", "type": "String", "rest": true},
         {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
@@ -61,6 +63,12 @@ std::string refusal(const nlohmann::json& data) {
 }
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+
+std::size_t occurrences(const std::string& text, const std::string& part) {
+  std::size_t count = 0;
+  for (std::size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + 1)) ++count;
+  return count;
+}
 
 nlohmann::json& move_params(nlohmann::json& data) { return data["classes"][0]["methods"][1]["params"]; }
 
@@ -133,6 +141,46 @@ TEST_CASE("the reference reads typed parameters and returns") {
   CHECK(move.returns == "self");
   CHECK(reference.classes[2].superclass == "Mover");
   CHECK(reference.classes[3].is_module);
+  CHECK(reference.classes[0].stability == ApiStability::Stable);
+  CHECK(move.stability == ApiStability::Experimental);
+  CHECK(reference.classes[2].stability == ApiStability::Unmarked);
+  CHECK(reference.classes[3].stability == ApiStability::Experimental);
+}
+
+TEST_CASE("the classes and methods with no stability mark") {
+  nlohmann::json data = reference_data();
+  CHECK(unmarked_bindings(read_api_reference(data.dump())) == std::vector<std::string>{"Runner"});
+  data["classes"][0]["methods"][1].erase("stability");
+  data["classes"][3]["methods"][0].erase("stability");
+  CHECK(unmarked_bindings(read_api_reference(data.dump())) ==
+        std::vector<std::string>{"Mover#move", "Runner", "Tools.tint"});
+}
+
+TEST_CASE("stability marks: two words, and no stable method in an experimental class") {
+  nlohmann::json data = reference_data();
+  data["classes"][0]["methods"][1]["stability"] = "beta";
+  CHECK(has(refusal(data), "Mover#move: its stability is stable or experimental, not beta"));
+  data = reference_data();
+  data["classes"][3]["stability"] = "frozen";
+  CHECK(has(refusal(data), "Tools: its stability is stable or experimental, not frozen"));
+  data = reference_data();
+  data["classes"][3]["methods"][0]["stability"] = "stable";
+  CHECK(has(refusal(data), "Tools.tint: stable, in an experimental class"));
+}
+
+TEST_CASE("what may change is marked in the manual's page, the texts and the data of redgem api") {
+  const ApiReference reference = read_api_reference(kReference);
+  const std::string page = api_markdown(reference);
+  CHECK(has(page, "| [`Mover`](#mover) | moves | [Stable](stability.md) |\n"));
+  CHECK(has(page, "| [`Tools`](#tools) | tools | [Experimental](stability.md) |\n"));
+  CHECK(has(page, "## Tools\n\ntools *Experimental.*\n"));
+  CHECK(has(page, "-> self`: moves it *Experimental.*\n"));
+  CHECK(has(page, "- `speed = Numeric value`: sets it\n"));
+  CHECK(has(api_class_text(reference.classes[0]), "moves it (experimental)\n"));
+  CHECK(has(api_class_text(reference.classes[3]), "Tools (experimental): tools\n"));
+  CHECK(has(api_index(reference), "tools (experimental)\n"));
+  CHECK(has(class_json(reference.classes[0]), "\"stability\":\"stable\""));
+  CHECK(has(class_json(reference.classes[0]), "\"stability\":\"experimental\""));
 }
 
 TEST_CASE("the reference refuses what it may not hold, saying where") {
@@ -209,14 +257,15 @@ TEST_CASE("the type signatures (RBS) of a reference") {
             "module RedGem\n  # A color: its name (:orange), or [r, g, b] from 0 to 255.\n"
             "  type color = Symbol | Array[Numeric]\nend\n"));
   CHECK(has(rbs,
-            "\n# moves\nclass Mover\n"
-            "  # a mover\n  def initialize: (?Numeric speed) -> void\n"
-            "  # moves it\n  def move: (Vector3 | nil to, ?loop: bool) ?{ (Float) -> void } -> self\n"
-            "  # sets it\n  def speed=: (Numeric value) -> Numeric\nend\n"));
-  CHECK(has(rbs, "\n# a point\nclass Vector3\nend\n"));
-  CHECK(has(rbs, "\n# runs\nclass Runner < Mover\nend\n"));
+            "\n# moves\n%a{redgem:stable}\nclass Mover\n"
+            "  # a mover\n  %a{redgem:stable}\n  def initialize: (?Numeric speed) -> void\n"
+            "  # moves it\n  %a{redgem:experimental}\n"
+            "  def move: (Vector3 | nil to, ?loop: bool) ?{ (Float) -> void } -> self\n"
+            "  # sets it\n  %a{redgem:stable}\n  def speed=: (Numeric value) -> Numeric\nend\n"));
+  CHECK(has(rbs, "\n# a point\n%a{redgem:stable}\nclass Vector3\nend\n"));
+  CHECK(has(rbs, "\n# runs\nclass Runner < Mover\nend\n"));  // (no mark, no annotation)
   CHECK(has(rbs,
-            "\n# tools\nmodule Tools\n  # tints\n"
+            "\n# tools\n%a{redgem:experimental}\nmodule Tools\n  # tints\n  %a{redgem:experimental}\n"
             "  def self.tint: (RedGem::color color, *String names, **untyped settings) -> "
             "Array[[Integer, Integer]]\nend\n"));
 }
@@ -231,6 +280,9 @@ TEST_CASE("the engine's type signatures have every class and method of its refer
   std::size_t definitions = 0;
   for (std::size_t at = rbs.find("\n  def "); at != std::string::npos; at = rbs.find("\n  def ", at + 1)) ++definitions;
   CHECK(definitions == methods);
+  const std::size_t marks = occurrences(rbs, std::string("\n") + kStabilityAnnotation) +
+                            occurrences(rbs, std::string("\n  ") + kStabilityAnnotation);
+  CHECK(marks == methods + api_reference().classes.size());  // (every one is marked)
   CHECK(has(rbs, "  def self.axis: (Symbol name, ?pad: Integer) -> Float\n"));
   CHECK(has(rbs, "  def tween: (Numeric seconds, ?ease: Symbol) { (Float) -> void } -> Behaviour::Timer\n"));
   CHECK(has(rbs, "class GameMenu < Behaviour\n"));
