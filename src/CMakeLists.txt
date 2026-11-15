@@ -391,6 +391,9 @@ redgem_add_library(redgem_runtime
   audio/audio.cpp
   audio/ducking.cpp
   audio/envelope_follower.cpp
+  audio/audio_effects.cpp
+  audio/effect_rack.cpp
+  audio/mix_group_tree.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp
@@ -416,6 +419,7 @@ redgem_add_library(redgem_runtime
   storage/save_file_slots.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
+  script/symbol_cache.cpp
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp

@@ -25,6 +25,28 @@ void MixedAudio::set_group_volume(MixGroup group, float volume) {
   if (group == MixGroup::Music) music_.set_group_volume(volume);
 }
 
+std::optional<MixGroup> MixedAudio::define_group(const std::string& name, MixGroup parent,
+                                                 std::optional<float> volume) {
+  const auto group = AudioSystem::define_group(name, parent, volume);
+  if (!group) return group;
+  sounds_.refresh();  // (a group that moved is heard under its new parent, with its effects)
+  sounds_.refresh_effects();
+  return group;
+}
+
+bool MixedAudio::set_group_effects(MixGroup group, const GroupEffects& effects) {
+  if (!AudioSystem::set_group_effects(group, effects)) return false;
+  sounds_.refresh_effects();
+  return true;
+}
+
+void MixedAudio::forget_game_groups() {
+  AudioSystem::forget_game_groups();
+  sounds_.refresh();
+  sounds_.refresh_effects();
+  sounds_.close_reverbs();
+}
+
 bool MixedAudio::set_music_ducking(const MusicDucking& ducking) { return ducker_.set(ducking); }
 
 void MixedAudio::reset_music_ducking() {

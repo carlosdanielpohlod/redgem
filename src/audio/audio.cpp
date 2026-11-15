@@ -122,7 +122,8 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
 SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
                                      std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
-  if (!driver_.start(id, name, sound, mix)) return kNoSoundSource;  // the old sound keeps playing on failure
+  // (The old sound keeps playing on failure.)
+  if (!driver_.start(id, name, sound, mix, groups_.effects_of(sound.group))) return kNoSoundSource;
   if (place) stop(*place);
   keep(id, sound);
   ++next_;
@@ -130,7 +131,9 @@ SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound
 }
 void SoundPool::keep(SoundSourceId id, const SpatialSound& sound) {
   sounds_.emplace(id, sound);
-  if (sound.group == MixGroup::Voice) loudness_.emplace(id, EnvelopeFollower{});
+  if (!groups_.within(sound.group, MixGroup::Voice)) return;
+  loudness_.emplace(id, EnvelopeFollower{});
+  driver_.measure(id);
 }
 std::optional<SoundSourceId> SoundPool::place_for(const SpatialSound& sound) const {
   if (sounds_.size() < kMaxSounds) return std::nullopt;
@@ -176,18 +179,15 @@ bool SoundPool::set_levels(SoundSourceId id, const SoundLevels& levels) {
   return true;
 }
 void SoundPool::set_group_volume(MixGroup group, float volume) {
-  group_volumes_[mix_group_index(group)] = volume;
+  groups_.set_player_volume(group, volume);
   refresh();
 }
 void SoundPool::set_group_gain(MixGroup group, float gain) {
-  float& current = group_gains_[mix_group_index(group)];
-  if (current == gain) return;
-  current = gain;
-  refresh();
+  if (groups_.set_gain(group, gain)) refresh();
 }
 bool SoundPool::group_heard(MixGroup group) const {
   for (const auto& [id, sound] : sounds_) {
-    if (sound.group != group) continue;
+    if (!groups_.within(sound.group, group)) continue;
     if (heard(id, sound)) return true;
   }
   return false;
@@ -221,12 +221,14 @@ void SoundPool::forget(std::map<SoundSourceId, SpatialSound>::iterator sound) {
 void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
 }
-// A sound's mix, its group's volume and gain applied.
+// A sound's mix, the volumes and gains of its groups applied.
 std::optional<SpatialMix> SoundPool::mix_of(const SpatialSound& sound) const {
   auto mix = spatial_sound_mix(listener_, sound);
-  const std::size_t group = mix_group_index(sound.group);
-  if (mix) mix->volume *= group_volumes_[group] * group_gains_[group];
+  if (mix) mix->volume *= groups_.heard_volume(sound.group);
   return mix;
+}
+void SoundPool::refresh_effects() {
+  for (const auto& [id, sound] : sounds_) driver_.effects(id, groups_.effects_of(sound.group));
 }
 void SoundPool::refresh() {
   for (const auto& [id, sound] : sounds_) {

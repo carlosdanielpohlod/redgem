@@ -5,10 +5,12 @@
 
 #include <cmath>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "audio/envelope_follower.hpp"
+#include "audio/mix_group_tree.hpp"
 #include "audio/spatial_audio.hpp"
 
 using namespace redgem;
@@ -31,11 +33,13 @@ class LevelDriver final : public SoundDriver {
  public:
   std::map<SoundSourceId, float> levels;
   std::map<SoundSourceId, bool> playing_ones;
-  bool start(SoundSourceId id, const std::string&, const SpatialSound&, SpatialMix) override {
+  std::vector<SoundSourceId> measured;  // what the pool asked it to measure, in order
+  bool start(SoundSourceId id, const std::string&, const SpatialSound&, SpatialMix, const VoiceEffects&) override {
     levels[id] = kSilence;
     playing_ones[id] = true;
     return true;
   }
+  void measure(SoundSourceId id) override { measured.push_back(id); }
   void update(SoundSourceId) override {}
   bool playing(SoundSourceId id) const override { return playing_ones.at(id); }
   void mix(SoundSourceId, SpatialMix) override {}
@@ -46,6 +50,8 @@ class LevelDriver final : public SoundDriver {
   }
   float level(SoundSourceId id) const override { return levels.at(id); }
 };
+
+constexpr const char* kLinesGroup = "lines";
 
 SpatialSound in_group(MixGroup group) {
   FlatSound sound;
@@ -128,4 +134,20 @@ TEST_CASE("a voice that ended or was stopped is silent") {
   sounds.update();  // (it lets go of the sounds that ended)
   CHECK(sounds.loudness(ended) == doctest::Approx(kSilence));
   CHECK(sounds.loudness(kNoSoundSource) == doctest::Approx(kSilence));
+}
+
+TEST_CASE("the pool measures and follows the voices of a game's group under the voice group") {
+  LevelDriver driver;
+  MixGroupTree groups;
+  SoundPool sounds(driver, groups);
+  const auto lines = groups.define(kLinesGroup, MixGroup::Voice, std::nullopt);
+  REQUIRE(lines);
+  const SoundSourceId line = sounds.play("line", in_group(*lines));
+  const SoundSourceId effect = sounds.play("step", in_group(MixGroup::Effects));
+  CHECK(driver.measured == std::vector<SoundSourceId>{line});
+  driver.levels[line] = kHalfLevel;
+  driver.levels[effect] = kHalfLevel;
+  sounds.follow(kLongWhile);
+  CHECK(sounds.loudness(line) == doctest::Approx(kHalfLevel));
+  CHECK(sounds.loudness(effect) == doctest::Approx(kSilence));
 }
