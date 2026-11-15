@@ -3411,6 +3411,7 @@
         },
         {
           "name": "occlusion",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.4"},
