@@ -258,6 +258,13 @@ std::string quoted(const std::string& text) {
   return out + "\"";
 }
 
+void add_unmarked_methods(const ApiClass& owner, std::vector<std::string>& unmarked) {
+  for (const ApiMethod& method : owner.methods) {
+    if (method.stability == ApiStability::Unmarked)
+      unmarked.push_back(owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name);
+  }
+}
+
 }  // namespace
 
 const std::string& api_reference_json() {
@@ -292,10 +299,7 @@ std::vector<std::string> unmarked_bindings(const ApiReference& reference) {
   std::vector<std::string> unmarked;
   for (const ApiClass& owner : reference.classes) {
     if (owner.stability == ApiStability::Unmarked) unmarked.push_back(owner.name);
-    for (const ApiMethod& method : owner.methods) {
-      if (method.stability == ApiStability::Unmarked)
-        unmarked.push_back(owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name);
-    }
+    add_unmarked_methods(owner, unmarked);
   }
   return unmarked;
 }

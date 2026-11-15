@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 #include "scene/scene_config.hpp"
@@ -17,7 +18,12 @@ namespace redgem::gltf_accessors {
 // The highest joint index a vertex can name: the last joint a skeleton may have.
 inline constexpr cgltf_uint kMaxJointIndex = config::kMaxSkinJoints - 1;
 
-// Every component of every element, as floats.
+class NonFiniteAccessor : public std::runtime_error {
+ public:
+  NonFiniteAccessor() : std::runtime_error("a floating-point accessor contains a non-finite value") {}
+};
+
+// Every component of every element, as floats. Non-finite values invalidate the scene.
 std::vector<float> unpack_floats(const cgltf_accessor* accessor);
 
 // The joints each vertex follows, four to a vertex: an index past the last joint a skeleton may

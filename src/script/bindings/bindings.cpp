@@ -24,10 +24,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_water_bindings(mrb);
 }
 
-}  // namespace
-
-void install_bindings(mrb_state* mrb) {
-  install_world_bindings(mrb);
+void install_gameplay_bindings(mrb_state* mrb) {
   install_runtime_bindings(mrb);
   install_game_identity_bindings(mrb);  // after the runtime's: it adds to Game
   install_ui_bindings(mrb);
@@ -39,6 +36,13 @@ void install_bindings(mrb_state* mrb) {
   install_save_bindings(mrb);
   install_i18n_bindings(mrb);
   install_dialogue_bindings(mrb);
+}
+
+}  // namespace
+
+void install_bindings(mrb_state* mrb) {
+  install_world_bindings(mrb);
+  install_gameplay_bindings(mrb);
   install_network_bindings(mrb);
   install_http_bindings(mrb);
   install_settings_bindings(mrb);

@@ -137,7 +137,7 @@ SceneDesc courier_with_box() {
   NodeDesc hero = node("Courier", {0, 1, 20}, {1, 1, 1}, {{"body", std::string("character")}});
   hero.children = {3};
   NodeDesc hand = node("Hand", {0, 0.2f, -0.6f}, {1, 1, 1}, {});  // (no body: the box under it rides too)
-  hand.parent = 2;  // (after the camera and the ground)
+  hand.parent = 2;                                                // (after the camera and the ground)
   hand.children = {4};
   NodeDesc box = node("Box", {0, 0, 0}, {0.4f, 0.4f, 0.4f}, moving("kinematic"));
   box.parent = 3;

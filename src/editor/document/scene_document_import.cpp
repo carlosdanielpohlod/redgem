@@ -154,6 +154,10 @@ void SceneDocument::append_model_nodes(const SceneDesc& model, const model_impor
     if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
   follow_pasted_joints(model, desc_.nodes, offsets.nodes);  // what was pasted together stays joined
+  append_model_animation(model, offsets);
+}
+
+void SceneDocument::append_model_animation(const SceneDesc& model, const model_import::DescOffsets& offsets) {
   // The imported skeletons and animations point at the imported nodes (now further on in the list).
   const std::size_t first_animation = desc_.animations.size();
   for (const SkinDesc& skin : model.skins) desc_.skins.push_back(model_import::imported_skin(skin, offsets));

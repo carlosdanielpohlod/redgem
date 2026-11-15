@@ -4,21 +4,18 @@ description: "What RedGem is, where to start, and how a game's folder is organiz
 
 # RedGem 3D Engine
 
-RedGem is a 3D game engine with its own editor. You build levels in the editor (or in Blender),
-write the gameplay in **Ruby**, press Play, and export a standalone game.
-
-This manual is for people making games with it.
+Build levels in the RedGem editor or import them from Blender. Write gameplay in **Ruby**, test
+it in Play mode, and export a standalone game.
 
 ## Where to start
 
-1. [Install](install.md) the editor.
-2. Follow [Your first game](first-game.md): about fifteen minutes from an empty folder to a
-   playable game.
-3. Keep [Behaviours](scripting/behaviours.md) and the [API reference](scripting/api.md) open while
-   you write scripts.
-4. [The command line](command-line.md) reads and changes scenes as text, plays a game with no
-   window, takes pictures of it and looks it over: handy in scripts and with coding assistants
-   (see [Making games with an AI assistant](assistants.md)).
+1. [Install](install.md) RedGem and open the project hub.
+2. Follow [Your first game](first-game.md) to edit a template, write a Ruby behaviour, and
+   export a playable build.
+3. Use [Behaviours](scripting/behaviours.md) and the [API reference](scripting/api.md) while
+   writing gameplay.
+4. Use the [command line](command-line.md) to inspect scenes, run checks, or play a game
+   without opening the editor.
 
 ## How a game is organized
 
@@ -30,11 +27,11 @@ A game is a folder:
 | `scenes/*.glb` | More levels |
 | `scripts/*.rb` | Ruby behaviours and scene scripts |
 | `models/*.glb` | Models you can drop into a level |
-| `prefabs/*.glb` | [Reusable object files](prefabs.md), loaded through scene references |
+| `prefabs/*.glb` | [Reusable objects](prefabs.md) you can place in the editor or spawn from Ruby |
 | `sounds/` | `.wav`, `.ogg`, `.mp3` or `.flac` files |
 | `images/` | Pictures for menus and the HUD (`.png`, `.jpg`) |
 | `locales/` | The texts players read, one translation file per language: `en.json`, `pt.json`... (see [Texts in several languages](scripting/i18n.md)) |
 | `game.json` | The game's id, studio, title and window size |
 
-The editor reads and writes these files directly. There is no project database and no import
-step: what you see in the folder is the game.
+Keep the project folder together when moving the game or adding it to version control. The
+editor saves scene edits directly to the project's `.glb` files.

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/image_header.hpp"
+#include "editor/document/glb_file.hpp"
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -148,6 +150,23 @@ TEST_CASE("a .gltf written by hand loads: one triangle on one object") {
   CHECK(primitive.positions.size() == kTriangleCorners * kFloatsPerPosition);
   CHECK(primitive.indices == std::vector<std::uint32_t>{0, 1, 2});
   CHECK(result.scene.find_node("Triangle") != kNoIndex);
+}
+
+TEST_CASE("a GLB with a non-finite vertex color fails to load") {
+  const Scratch scratch;
+  auto file = triangle();
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  const int view = file.add_view(std::vector<float>{nan, 0, 0, 0, 1, 0, 0, 0, 1});
+  file.primitive()["attributes"]["COLOR_0"] = file.add_accessor(view, kFloatComponent, kTriangleCorners, "VEC3");
+  file.doc["buffers"] = json::array({{{"byteLength", file.bin.size()}}});
+  const auto path = scratch.game() / "triangle.glb";
+  std::string error;
+  REQUIRE_MESSAGE(write_glb(path, GlbFile{file.doc, file.bin}, error), error);
+
+  const LoadResult result = load_gltf_scene(path.string());
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("accessor contains a non-finite value") != std::string::npos);
+  CHECK(result.scene.meshes.empty());
 }
 
 TEST_CASE("an element count that makes the size check wrap around fails the load instead of overrunning memory") {

@@ -440,10 +440,9 @@ promise of how it will be closed.
   no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
   timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
   hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
-- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
-  migrate it one after another. A room writing a key of that slot at the moment another room
-  writes the migrated values can make that migration fail as busy: the slot is then refused for
-  the migrating room's run, and migrated on its next first use.
+- On a dedicated server, rooms serialize migrations of the same slot, but ordinary writes to
+  other keys can still run while a migration is preparing its replacement. Those writes may be
+  overwritten. Migrate a shared slot before letting other rooms write to it.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that

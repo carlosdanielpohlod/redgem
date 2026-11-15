@@ -4,12 +4,17 @@
 #include <mruby/string.h>
 
 #include "app/engine.hpp"
+#include "app/profile_overlay.hpp"
 #include "core/config.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
 namespace {
 constexpr const char* kScenePhasePrefix = "scene:";
+// Background, FPS, frame duration and one row per phase. Script samples add a header and ranked rows.
+constexpr std::size_t kBaseOverlayItems = 3 + kProfilePhaseCount;
+constexpr std::size_t kMostOverlayItems = kBaseOverlayItems + 1 + kOverlayScriptRows;
+constexpr int kFramesBeforeSceneChange = 2;
 bool has_line_starting_with(const std::vector<HudItem>& hud, const std::string& prefix) {
   return std::any_of(hud.begin(), hud.end(), [&](const HudItem& item) { return item.text.rfind(prefix, 0) == 0; });
 }
@@ -71,12 +76,13 @@ TEST_CASE("statistics overlay is opt in and remains bounded across frames and sc
   ProfileGame game;
   game.ruby("Debug.stats_visible = true");
   CHECK(game.ruby("Debug.profiling?") == "true");
-  game.frame();
-  REQUIRE_FALSE(game.engine->script_context().hud.empty());
-  const auto items = game.engine->script_context().hud.size();
-  game.frame();
-  CHECK(game.engine->script_context().hud.size() == items);
-  CHECK(has_line_starting_with(game.engine->script_context().hud, kScenePhasePrefix));
+  for (int frame = 0; frame < kFramesBeforeSceneChange; ++frame) {
+    game.frame();
+    const auto& hud = game.engine->script_context().hud;
+    CHECK(hud.size() >= kBaseOverlayItems);
+    CHECK(hud.size() <= kMostOverlayItems);
+    CHECK(has_line_starting_with(hud, kScenePhasePrefix));
+  }
   game.ruby("Game.load_scene('level2')");
   game.frame();
   game.frame();
