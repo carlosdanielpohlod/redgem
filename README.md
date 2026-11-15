@@ -59,7 +59,8 @@ end
   scenes set up in Ruby; classes load on first use, no `require`.
 - **Gameplay kit**: keyboard, mouse and gamepad input, menus and a HUD that scales with the
   screen, particles, camera follow, orbit, shake and cuts, per-character animation with blending,
-  events and root motion, navigation, saved progress with versions and migrations.
+  events and root motion, navigation, saved progress (a game versions its save data and upgrades
+  older saves).
 - **NPCs**: state machines with sight and hearing, daily schedules, heads that look at the player,
   things to interact with, and branching dialogue shown in a dialogue box.
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
