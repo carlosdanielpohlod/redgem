@@ -138,11 +138,11 @@ class NetworkSync < Behaviour
   end
 
   # Whether its owner tells the others where it is: in a game, and not between two levels.
-  def sends? = Network.online? && !Network.changing_level?
+  def __sends? = Network.online? && !Network.changing_level?
 
   def update(dt)
     return watch(dt) unless mine?
-    return unless sends?
+    return unless __sends?
 
     @since_sent += dt
     return if @since_sent < 1.0 / SENDS_PER_SECOND

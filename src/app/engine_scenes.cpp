@@ -85,6 +85,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   context_.scene_name = incoming.name();
   scene_generation_ = incoming.generation();
   animations_.reset(scene_desc_.animations, scene_);
+  head_aims_.clear();
   particles_.clear();
   particle_emitters_.clear();
   // Every object is in place by now: each script's first update sees the whole scene.
