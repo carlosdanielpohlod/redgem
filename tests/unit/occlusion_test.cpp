@@ -6,6 +6,7 @@
 #include <mruby/string.h>
 
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <variant>
@@ -31,11 +32,14 @@ constexpr float kTwice = 2.0f;
 constexpr float kLongFrame = 10.0f;
 constexpr float kNoTime = 0.0f;
 constexpr Vec3 kListener{0, 1, 0};
-constexpr Vec3 kBehind{0, 1, -6};    // past the wall
-constexpr Vec3 kBeside{4, 1, 0};     // in the open
-constexpr Vec3 kWallAt{0, 1, -3};    // between them
+constexpr Vec3 kBehind{0, 1, -6};  // past the wall
+constexpr Vec3 kBeside{4, 1, 0};   // in the open
+constexpr Vec3 kWallAt{0, 1, -3};  // between them
 constexpr Vec3 kWallHalf{3, 2, 0.25f};
 constexpr Vec3 kCrateHalf{0.5f, 0.5f, 0.5f};
+constexpr Vec3 kGroundAt{0, 0.5f, 0};  // its top is the height of the listener and the sounds
+constexpr Vec3 kGroundHalf{10, 0.5f, 10};
+enum GroundId : ObjectId { kGround = 3 };
 
 enum Ids : ObjectId { kWall = 1, kCrate = 2 };
 
@@ -44,7 +48,7 @@ struct WalledAudio {
   testing::RecordingAudio audio;
   bool wall = false;
   WalledAudio() {
-    audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+    audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
     audio.set_occlusion_query([this](Vec3, Vec3) { return wall; });
   }
 };
@@ -164,9 +168,16 @@ TEST_CASE("a static body between two points muffles; a moving one, or one aside,
   CHECK_FALSE(static_body_between(*world, kListener, kBeside));
 }
 
+TEST_CASE("the ground a listener stands on is not a wall to the sounds on it") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  REQUIRE_FALSE(world->add_object(box(kGround, {{"collider", std::string("box")}}, kGroundAt, kGroundHalf)));
+  CHECK_FALSE(static_body_between(*world, kListener, kBeside));
+  CHECK_FALSE(static_body_between(*world, kListener, kBehind));
+}
+
 TEST_CASE("the recording audio over a real world: a sound behind a static wall is muffled") {
   testing::RecordingAudio audio;
-  audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+  audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
   auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
   REQUIRE_FALSE(world->add_object(box(kWall, {{"collider", std::string("box")}}, kWallAt, kWallHalf)));
   audio.set_occlusion_query([&](Vec3 from, Vec3 to) { return static_body_between(*world, from, to); });

@@ -128,7 +128,7 @@ SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound
                                      std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
   // (The one it would replace goes on when it cannot start.)
-  if (!driver_.start(id, name, sound, *mix, effects_of(sound))) return kNoSoundSource;
+  if (!driver_.start(id, name, sound, mix, effects_of(sound))) return kNoSoundSource;
   if (place) stop(*place);
   sounds_.emplace(id, sound);
   ++next_;
