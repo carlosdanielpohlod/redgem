@@ -262,22 +262,15 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): crowds, missions,
-the editor's support for them, a stable API, a multi-level multiplayer template, the packed
-Android app on the emulator, and the test cases still on the real clock.
+The 1.0 blockers still open (see the 1.0 cut plan): missions, the editor's support for NPCs,
+dialogue and missions, a multi-level multiplayer template, the packed Android app on the
+emulator, and the test cases still on the real clock.
 
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
   [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox, with voiced lines: there is
   no mission system yet, and quest stages are GameVariables until a game gives `Dialogue.quests`.
-- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
-  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
-  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
-  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
-  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
-  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
-  the scene loads.
 - There are no quest files or mission objectives: no journal page in `GameMenu`, no world markers
   or on-screen pointer to the current objective, and no quest state shared by a party in
   multiplayer.
@@ -301,9 +294,6 @@ Android app on the emulator, and the test cases still on the real clock.
 
 ### Documentation
 
-- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
-  across.
-- The API reference does not mark its classes and methods stable or experimental.
 - No template is a game of several levels with multiplayer: each template has one scene.
 
 ## After 1.0
