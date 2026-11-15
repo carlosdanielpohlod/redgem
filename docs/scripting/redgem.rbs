@@ -673,9 +673,12 @@ end
 # Where the characters a game moves can walk, and the way from one place to another.
 %a{redgem:experimental}
 module Navigation
-  # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+  # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
   %a{redgem:experimental}
-  def self.path: (Vector3 from, Vector3 to) -> (Array[Vector3] | nil)
+  def self.path: (Vector3 from, Vector3 to, ?avoid: Array[GameObject] | GameObject) -> (Array[Vector3] | nil)
+  # the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
+  %a{redgem:experimental}
+  def self.steer: (Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, ?crowd: Array[[Vector3, Vector3, Numeric]], ?ignore: Array[GameObject] | GameObject) -> Vector3
   # the walkable point nearest a point (within 8 m of it), or nil
   %a{redgem:experimental}
   def self.nearest: (Vector3 point) -> (Vector3 | nil)
@@ -691,6 +694,44 @@ module Navigation
   # how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
   %a{redgem:experimental}
   def self.stats: () -> Hash[Symbol, Numeric | bool]
+end
+
+# A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.
+%a{redgem:experimental}
+class NavAgent < Behaviour
+  # sends it to a point; false when there is no way there
+  %a{redgem:experimental}
+  def go_to: (Vector3 point) -> bool
+  # stops it where it is
+  %a{redgem:experimental}
+  def stop: () -> void
+  # whether it got where it was sent
+  %a{redgem:experimental}
+  def arrived?: () -> bool
+  # whether it is on its way somewhere
+  %a{redgem:experimental}
+  def walking?: () -> bool
+  # where it was sent last, or nil
+  %a{redgem:experimental}
+  def destination: () -> (Vector3 | nil)
+  # the points it still walks through, the next first
+  %a{redgem:experimental}
+  def waypoints: () -> Array[Vector3]
+  # the velocity it walks at, as it steered this frame
+  %a{redgem:experimental}
+  def velocity: () -> Vector3
+  # meters per second at most (setting `speed`, 3)
+  %a{redgem:experimental}
+  def speed: () -> Float
+  # how wide it is kept from others, in meters (setting `radius`, 0.4)
+  %a{redgem:experimental}
+  def radius: () -> Float
+  # how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+  %a{redgem:experimental}
+  def arrive_distance: () -> Float
+  # the agents of the running scene
+  %a{redgem:experimental}
+  def self.all: () -> Array[NavAgent]
 end
 
 # Where the scene's water is: the height of its surface, and how deep a point is under it.
@@ -1096,6 +1137,9 @@ module Audio
   # the volume of everything
   %a{redgem:stable}
   def self.volume=: (Numeric volume) -> Numeric
+  # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
+  %a{redgem:experimental}
+  def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
   # changes the volume or pitch of a sound that plays; false once it stopped
   %a{redgem:experimental}
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
@@ -1205,9 +1249,9 @@ class UI::Focus
   # a focus on the first widget
   %a{redgem:stable}
   def initialize: () -> void
-  # moves it among count widgets, as up or down was pressed this frame
+  # moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
   %a{redgem:stable}
-  def update: (Integer count) -> void
+  def update: (Integer count, ?pad: Integer) -> void
   # whether the widget of that index has it: pass it as focused:
   %a{redgem:stable}
   def at?: (Integer index) -> bool
@@ -1986,6 +2030,9 @@ class Dialogue::Conversation
   # the id of the node it is at, or nil
   %a{redgem:experimental}
   def node_id: () -> (String | nil)
+  # how many lines it has shown (a line it comes back to counts again)
+  %a{redgem:experimental}
+  def steps: () -> Integer
   # its dialogue
   %a{redgem:experimental}
   def script: () -> Dialogue::Script
@@ -2063,6 +2110,23 @@ class Talkable < Behaviour
   # the name of its dialogue file
   %a{redgem:experimental}
   def dialogue: () -> (String | nil)
+end
+
+# A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.
+%a{redgem:experimental}
+class DialogueBox < Behaviour
+  # how many of a line's letters show after that many seconds at that speed (0: all)
+  %a{redgem:experimental}
+  def self.letters_shown: (Integer letters, Float seconds, Float speed) -> Integer
+  # whether the line it shows has all of its letters out (true while it shows none)
+  %a{redgem:experimental}
+  def whole?: () -> bool
+  # the player whose gamepad works it (0 unless said)
+  %a{redgem:experimental}
+  def pad: () -> Integer
+  # how fast a line appears (45 unless said; 0: at once)
+  %a{redgem:experimental}
+  def letters_per_second: () -> Float
 end
 
 # Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.

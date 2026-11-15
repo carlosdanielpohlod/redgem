@@ -35,6 +35,17 @@ From a game made with 0.5.0:
 
 ### Added
 
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
@@ -46,6 +57,10 @@ From a game made with 0.5.0:
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. Quest stages are variables until a game sets
   `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
@@ -104,7 +119,7 @@ From a game made with 0.5.0:
   has no breaking change within a 1.x minor release. A test fails when a class or method has no
   mark. What came in 0.4.1, 0.5.0 and since is experimental for now, and so are the NPC classes
   (Interactable, Interactor, Interaction, Brain, Perception, LineOfSight, Talkable, HeadLook,
-  Schedule) and dialogue (Dialogue, GameVariables, GameClock): the cameras' follow, orbit and shake, joints,
+  Schedule, NavAgent) and dialogue (Dialogue, DialogueBox, GameVariables, GameClock): the cameras' follow, orbit and shake, joints,
   navigation, water, scroll lists, emitters, the debug drawing and profiling calls, save slots,
   asynchronous scene loading, prefab spawning and movement validation, among others.
 

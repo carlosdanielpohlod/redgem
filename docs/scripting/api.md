@@ -20,6 +20,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. | [Stable](stability.md) |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). | [Experimental](stability.md) |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. | [Experimental](stability.md) |
+| [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. | [Experimental](stability.md) |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. | [Experimental](stability.md) |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. | [Stable](stability.md) |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). | [Stable](stability.md) |
@@ -58,6 +59,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. | [Experimental](stability.md) |
 | [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. | [Experimental](stability.md) |
 | [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. | [Experimental](stability.md) |
+| [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. | [Experimental](stability.md) |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. | [Experimental](stability.md) |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. | [Experimental](stability.md) |
 | [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. | [Experimental](stability.md) |
@@ -336,14 +338,33 @@ Points and axes are in world space; `anchor:` defaults to the object's position,
 
 Where the characters a game moves can walk, and the way from one place to another. *Experimental.* See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
 
-- `Navigation.path(Vector3 from, Vector3 to) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there *Experimental.*
+- `Navigation.path(Vector3 from, Vector3 to, avoid: Array[GameObject] | GameObject = []) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off *Experimental.*
+- `Navigation.steer(Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, crowd: Array[[Vector3, Vector3, Numeric]] = [], ignore: Array[GameObject] | GameObject = []) -> Vector3`: the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground *Experimental.*
 - `Navigation.nearest(Vector3 point) -> Vector3 | nil`: the walkable point nearest a point (within 8 m of it), or nil *Experimental.*
 - `Navigation.walkable?(Vector3 point) -> bool`: whether a point is on walkable ground, up to a character's height above it *Experimental.*
 - `Navigation.draw(Vector3 around, Numeric radius = 10, color: Color = :blue, alpha: Integer = 255) -> Integer`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many *Experimental.*
 - `Navigation.bake -> Hash[Symbol, Numeric | bool]`: bakes the scene's grid again now (a level a script changed); returns what stats does *Experimental.*
 - `Navigation.stats -> Hash[Symbol, Numeric | bool]`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:} *Experimental.*
 
-The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## NavAgent
+
+A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. *Experimental.* See [gameplay.md#crowds-agents-that-walk-among-others](gameplay.md#crowds-agents-that-walk-among-others).
+
+- `go_to(Vector3 point) -> bool`: sends it to a point; false when there is no way there *Experimental.*
+- `stop -> void`: stops it where it is *Experimental.*
+- `arrived? -> bool`: whether it got where it was sent *Experimental.*
+- `walking? -> bool`: whether it is on its way somewhere *Experimental.*
+- `destination -> Vector3 | nil`: where it was sent last, or nil *Experimental.*
+- `waypoints -> Array[Vector3]`: the points it still walks through, the next first *Experimental.*
+- `velocity -> Vector3`: the velocity it walks at, as it steered this frame *Experimental.*
+- `speed -> Float`: meters per second at most (setting `speed`, 3) *Experimental.*
+- `radius -> Float`: how wide it is kept from others, in meters (setting `radius`, 0.4) *Experimental.*
+- `arrive_distance -> Float`: how near the goal is there, in meters (setting `arrive_distance`, 0.3) *Experimental.*
+- `NavAgent.all -> Array[NavAgent]`: the agents of the running scene *Experimental.*
+
+Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too).
 
 ## Water
 
@@ -525,6 +546,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.music_pitch = Numeric pitch`: changes the music's pitch
 - `Audio.music_volume = Numeric volume`: changes the music's volume
 - `Audio.volume = Numeric volume`: the volume of everything
+- `Audio.ducking(volume: Numeric = 0.4, attack: Numeric = 0.15, release: Numeric = 0.6) -> bool`: how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off *Experimental.*
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped *Experimental.*
 - `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up) -> void`: where the ears are (move it with the camera)
@@ -533,7 +555,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.stop(Integer id) -> void`: stops that sound
 - `Audio.stop_sources -> void`: stops every sound played with play or play_at
 
-Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
+Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
 
 ## UI
 
@@ -572,7 +594,7 @@ A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left
 Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. See [gameplay.md](gameplay.md).
 
 - `UI::Focus.new -> UI::Focus`: a focus on the first widget
-- `update(Integer count) -> void`: moves it among count widgets, as up or down was pressed this frame
+- `update(Integer count, pad: Integer = 0) -> void`: moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
 - `at?(Integer index) -> bool`: whether the widget of that index has it: pass it as focused:
 - `move_to(Integer index) -> void`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index -> Integer`: the widget that has it
@@ -935,6 +957,7 @@ One player's way through a dialogue: the line it is at, the choices offered, and
 - `over? -> bool`: whether it ended *Experimental.*
 - `node -> Hash[String, untyped] | nil`: the node it is at, or nil once it is over *Experimental.*
 - `node_id -> String | nil`: the id of the node it is at, or nil *Experimental.*
+- `steps -> Integer`: how many lines it has shown (a line it comes back to counts again) *Experimental.*
 - `script -> Dialogue::Script`: its dialogue *Experimental.*
 - `actor -> GameObject | nil`: the hero of the player in it *Experimental.*
 - `speaker -> GameObject | nil`: who talks to that player, or nil *Experimental.*
@@ -974,6 +997,15 @@ The values every player shares, which dialogue conditions read and effects chang
 A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. *Experimental.* See [dialogue.md](dialogue.md).
 
 - `dialogue -> String | nil`: the name of its dialogue file *Experimental.*
+
+## DialogueBox
+
+A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. *Experimental.* See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
+
+- `DialogueBox.letters_shown(Integer letters, Float seconds, Float speed) -> Integer`: how many of a line's letters show after that many seconds at that speed (0: all) *Experimental.*
+- `whole? -> bool`: whether the line it shows has all of its letters out (true while it shows none) *Experimental.*
+- `pad -> Integer`: the player whose gamepad works it (0 unless said) *Experimental.*
+- `letters_per_second -> Float`: how fast a line appears (45 unless said; 0: at once) *Experimental.*
 
 ## Interaction
 

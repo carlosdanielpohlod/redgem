@@ -47,6 +47,8 @@ class MusicPlayer {
   void set_pitch(float pitch);
   // The music group's volume, over both tracks.
   void set_group_volume(float volume);
+  // A gain over both tracks apart from the group's volume: the music ducked under a voice.
+  void set_ducked(float gain);
   // Moves the fades on by `seconds` and feeds the streams; every frame.
   void update(float seconds);
   // The track playing (not the one fading out), if any.
@@ -61,6 +63,7 @@ class MusicPlayer {
   };
   static Track faded_in(MusicTrackId id, const MusicRequest& request);
   float heard_volume(const Track& track) const;
+  void apply_volumes();
   bool faded_out() const;  // the track fading out is silent now
   void leave(float fade_seconds);
   void advance(Track& track, float seconds);
@@ -70,6 +73,7 @@ class MusicPlayer {
   std::optional<Track> playing_;
   std::optional<Track> leaving_;
   float group_volume_ = kFullVolume;
+  float ducked_ = kFullVolume;
   MusicTrackId next_ = 1;
 };
 
