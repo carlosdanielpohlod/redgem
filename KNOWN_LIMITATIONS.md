@@ -203,6 +203,8 @@ the same pull request.
   a vehicle are simulated in the world and keep their own motion; a static collider stays where
   it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
   and an object put under a vehicle does not become a wheel.
+- A character passes through every kinematic body under it, so it cannot stand on one it carries
+  (a board under its feet): make such a board the parent, or keep it out of the character.
 - An object that an animation clip poses keeps being posed by it under a new parent; a part taken
   out of a spawned copy is no longer posed by that copy's clip.
 - An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it
@@ -260,8 +262,55 @@ the same pull request.
 
 ## Before 1.0
 
-What a game made outside this project would run into first, roughly in order. Each line is a gap,
-not a promise of how it will be closed.
+The 1.0 blockers still open (see the 1.0 cut plan): crowds, voice, the quest journal and markers,
+the editor's support for them, a stable API, a multi-level multiplayer template, the packed
+Android app on the emulator, and the test cases still on the real clock.
+
+### Gameplay API
+
+- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
+  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox, and given
+  [quests](docs/scripting/quests.md): there is no voice yet. A line's `voice` plays nothing.
+- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
+  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
+  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
+  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
+  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
+  the scene loads.
+- A dialogue line's voice clip does not play from the speaker's head: there are no subtitles timed
+  to it, and no mouth follows it.
+- Quests have no journal page in `GameMenu`, no world markers and no on-screen pointer to the
+  current objective: a game shows them itself from `Quests.active`.
+- The editor does not show interactables, perception cones or schedules in the Scene view. There is
+  no panel that runs a dialogue or a quest without Play, and `redgem check` errors do not appear in
+  the Console.
+
+### Shipping
+
+- The packed Android app has not been run on an emulator or a phone yet: the continuous integration
+  only builds its player.
+
+### Engineering
+
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
+
+### Documentation
+
+- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
+  across.
+- The API reference does not mark its classes and methods stable or experimental.
+- No template is a game of several levels with multiplayer: each template has one scene.
+
+## After 1.0
+
+Gaps that do not block a professional multi-level multiplayer game. Each line is a gap, not a
+promise of how it will be closed.
 
 ### Editor
 
@@ -325,8 +374,8 @@ not a promise of how it will be closed.
   positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
 - One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
   effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
-  ducking, filters). Fades are linear in volume, and only the music fades by itself; a sound's
-  levels change at once.
+  filters). Only the music group ducks, and only under the voice group. Fades and ducking are
+  linear in volume, and only the music fades by itself; a sound's levels change at once.
 
 ### Text
 
@@ -349,58 +398,51 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md), and given [quests](docs/scripting/quests.md): there
-  is no NPC behaviour or voice yet. Dialogue has no box or choice list on screen yet (a game draws
-  its own from `Dialogue.current`), and a line's `voice` plays nothing. A dialogue's texts take no placeholder values, and GameVariables
-  hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
-  A machine has one conversation at a time (two local players cannot talk at once), and over the
-  network a speaker without a NetworkSync is found on the client by its name.
-  An Interactor's line of sight is one ray
-- Quests have no journal page, world markers or pointer to the current objective yet: a game
-  shows them itself from `Quests.active`. Their state shares the room of GameVariables (1024
-  values: a quest takes one, and one more for each objective under way). The host takes a client's
-  word for what its player collected, delivered, defeated or reached. A `go_to` place is found by
-  its exact name, and the game's checks are asked only where a `QuestTracker` runs.
-- NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
-  daily schedules on a `GameClock` and head look-at, and can be used and talked to through
-  [interaction](docs/scripting/interaction.md); there is no voice yet.
-  Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
-  character faces when it starts to look, and it does not avoid turning through the body when the
-  target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the
-  game saves it. A Perception's sight is one
-  ray from its eyes to a point on each watched object (a body mostly behind a low wall is hidden,
-  and a thin gap shows it whole), it looks every frame for every watched object, and hearing goes
-  through walls. Brains and Perceptions work on the host only: a noise made on a client is heard by
-  nobody, so a client's footsteps reach the host's NPCs only through the game's own messages. A
-  brain's state is not saved with `Save`. An Interactor's line of sight is one ray
-  between the actor's and the target's positions (a target whose position is inside the ground or
-  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
-  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
-  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
-  the on-screen controls being turned on). Over the network the host runs every use, checking
-  sight from the hero's late pose: a client hears of what it did only through the game's own
-  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
-  them to an action of its own rebinds one.
+- A dialogue's texts take no placeholder values, and GameVariables hold only nil, true, false,
+  numbers and texts (at most 1024 of them), which a game saves itself. A machine has one
+  conversation at a time (two local players cannot talk at once), and over the network a speaker
+  without a NetworkSync is found on the client by its name. The DialogueBox has one look (a game
+  that wants another draws its own from `Dialogue.current`) and does not stop the hero while it
+  shows.
+- Quest state shares the room of GameVariables (1024 values: a quest takes one, and one more for
+  each objective under way). The host takes a client's word for what its player collected,
+  delivered, defeated or reached. A `go_to` place is found by its exact name, and the game's checks
+  are asked only where a `QuestTracker` runs.
+- NPCs have a state machine (`Brain`) and senses (`Perception`, see
+  [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
+  used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one
+  bone (no spine or eyes), its forward is guessed from the way the character faces when it starts
+  to look, and it does not avoid turning through the body when the target is behind. Each machine
+  keeps its own `GameClock`, and the clock is not saved unless the game saves it. A Perception's
+  sight is one ray from its eyes to a point on each watched object (a body mostly behind a low wall
+  is hidden, and a thin gap shows it whole), it looks every frame for every watched object, and
+  hearing goes through walls. Brains and Perceptions work on the host only: a noise made on a
+  client is heard by nobody, so a client's footsteps reach the host's NPCs only through the game's
+  own messages. A brain's state is not saved with `Save`. An Interactor's line of sight is one ray
+  between the actor's and the target's positions (a target whose position is inside the ground or a
+  wall is never in sight, and a thin gap can show something mostly hidden), there is no hold-to-use
+  or use of an object's part, and its prompt is one line at a fixed place on the screen, which
+  names the key bound even on a phone (the engine cannot tell a touch screen from the on-screen
+  controls being turned on). Over the network the host runs every use, checking sight from the
+  hero's late pose: a client hears of what it did only through the game's own messages. The
+  built-in `:interact` takes E and a gamepad's Y in every game: a game that binds them to an action
+  of its own rebinds one.
 - A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
   one whose other end is in another scene, or was deleted, is not made (the log says so). The
   editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
-- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
-- Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
-  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
-  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
-  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not in the grid: a
+  path goes around those it is told to `avoid:` (at most 64, each a disc around its box seen from
+  above), and a `NavAgent` steers around the rest. Agents find each other in Ruby, each looking at
+  every other one each frame, so a large crowd costs more as it grows; there are no formations or
+  queues. A level a script changes needs `Navigation.bake`; there are no off-grid links (jumps,
+  ladders, teleporters), no navigation areas with costs and no bake preview in the editor
   while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
-- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
-  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
-  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
-  longer needs.
 - `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
   migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
   no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
@@ -415,9 +457,6 @@ not a promise of how it will be closed.
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
   first happens. A game that keeps spawning (bullets, debris) has to destroy what it no longer
   needs.
-- `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
-  automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
-  work. Slot selection and storage calls are synchronous.
 - `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
   a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
   creating the scene's objects, its water and its navigation bake still take one frame each, and
@@ -489,11 +528,10 @@ not a promise of how it will be closed.
   that picture fails to load. Names in it are matched case included, even on Windows and macOS,
   whose own folders ignore case. A file read out of it is held twice for a moment (the archive's
   copy and the one handed to raylib or cgltf), and each read opens the archive file anew.
-- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
-  plays: raylib streams music only from a file on the disk. On Android the archive is copied out
-  of the APK into the app's storage on the first run (and after each update), so it takes its
-  room twice on the phone. The packed Android app has not been run on an emulator or a phone yet:
-  the continuous integration only builds its player.
+- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it plays:
+  raylib streams music only from a file on the disk. On Android the archive is copied out of the
+  APK into the app's storage on the first run (and after each update), so it takes its room twice
+  on the phone.
 - No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.
@@ -527,9 +565,6 @@ not a promise of how it will be closed.
 - The profiler's Physics phase counts only the time a frame waits for its overlapped step, not the
   step itself on the physics thread. Every scene gets a new thread pool, made when it loads.
   A dedicated server's rooms ignore `physics.threads`.
-- Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
-  most on phones.
-- Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
 - Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
   Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
@@ -539,12 +574,6 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About 130 test cases still sleep or measure the real clock (directly or through their file's
-  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
-  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
-  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
-  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
-  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
@@ -632,16 +661,12 @@ not a promise of how it will be closed.
 
 ### Documentation
 
-- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
-  across.
 - The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
   and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
   the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
   and what any method returns is not checked against the engine, nor are the names of keywords.
   The signatures cover the engine's API only: a game's own classes need signatures of their own
   for a type checker, and a game made before them gets them with `redgem api --rbs`.
-- Templates are `empty` and `platformer` only; there is no example of running game tests in a
-  game's own continuous integration.
 
 ### Working with AI assistants
 

@@ -20,6 +20,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint, or by an object's Joint component in the editor: GameObject#joint). |
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
+| [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
@@ -58,11 +59,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Dialogue::Script`](#dialoguescript) | A dialogue file as it was read. |
 | [`GameVariables`](#gamevariables) | The values every player shares, which dialogue conditions read and effects change; owned by the host over the network. |
 | [`Talkable`](#talkable) | A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt "Talk" when it has none) starts its dialogue. |
-| [`Quests`](#quests) | The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them. |
-| [`Quests::Quest`](#questsquest) | One quest and where the party is in it (Quests[name] gives one). |
-| [`Quests::Objective`](#questsobjective) | One thing the party does in a stage of a quest. |
-| [`Quests::Definition`](#questsdefinition) | A quest file as it was read. |
-| [`QuestTracker`](#questtracker) | A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. |
+| [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. |
 | [`Perception`](#perception) | A behaviour: what an NPC sees (a cone checked by a ray) and hears (a radius); its behaviours hear on_see, on_lose_sight and on_hear. |
@@ -341,14 +338,33 @@ Points and axes are in world space; `anchor:` defaults to the object's position,
 
 Where the characters a game moves can walk, and the way from one place to another. See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
 
-- `Navigation.path(Vector3 from, Vector3 to) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+- `Navigation.path(Vector3 from, Vector3 to, avoid: Array[GameObject] | GameObject = []) -> Array[Vector3] | nil`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off
+- `Navigation.steer(Vector3 position, Vector3 velocity, Vector3 preferred, speed: Numeric, radius: Numeric, crowd: Array[[Vector3, Vector3, Numeric]] = [], ignore: Array[GameObject] | GameObject = []) -> Vector3`: the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground
 - `Navigation.nearest(Vector3 point) -> Vector3 | nil`: the walkable point nearest a point (within 8 m of it), or nil
 - `Navigation.walkable?(Vector3 point) -> bool`: whether a point is on walkable ground, up to a character's height above it
 - `Navigation.draw(Vector3 around, Numeric radius = 10, color: Color = :blue, alpha: Integer = 255) -> Integer`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
 - `Navigation.bake -> Hash[Symbol, Numeric | bool]`: bakes the scene's grid again now (a level a script changed); returns what stats does
 - `Navigation.stats -> Hash[Symbol, Numeric | bool]`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
 
-The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
+
+## NavAgent
+
+A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. See [gameplay.md#crowds-agents-that-walk-among-others](gameplay.md#crowds-agents-that-walk-among-others).
+
+- `go_to(Vector3 point) -> bool`: sends it to a point; false when there is no way there
+- `stop -> void`: stops it where it is
+- `arrived? -> bool`: whether it got where it was sent
+- `walking? -> bool`: whether it is on its way somewhere
+- `destination -> Vector3 | nil`: where it was sent last, or nil
+- `waypoints -> Array[Vector3]`: the points it still walks through, the next first
+- `velocity -> Vector3`: the velocity it walks at, as it steered this frame
+- `speed -> Float`: meters per second at most (setting `speed`, 3)
+- `radius -> Float`: how wide it is kept from others, in meters (setting `radius`, 0.4)
+- `arrive_distance -> Float`: how near the goal is there, in meters (setting `arrive_distance`, 0.3)
+- `NavAgent.all -> Array[NavAgent]`: the agents of the running scene
+
+Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too).
 
 ## Water
 
@@ -530,6 +546,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.music_pitch = Numeric pitch`: changes the music's pitch
 - `Audio.music_volume = Numeric volume`: changes the music's volume
 - `Audio.volume = Numeric volume`: the volume of everything
+- `Audio.ducking(volume: Numeric = 0.4, attack: Numeric = 0.15, release: Numeric = 0.6) -> bool`: how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped
 - `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up) -> void`: where the ears are (move it with the camera)
@@ -538,7 +555,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.stop(Integer id) -> void`: stops that sound
 - `Audio.stop_sources -> void`: stops every sound played with play or play_at
 
-Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
+Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
 
 ## UI
 
@@ -577,7 +594,7 @@ A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left
 Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. See [gameplay.md](gameplay.md).
 
 - `UI::Focus.new -> UI::Focus`: a focus on the first widget
-- `update(Integer count) -> void`: moves it among count widgets, as up or down was pressed this frame
+- `update(Integer count, pad: Integer = 0) -> void`: moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)
 - `at?(Integer index) -> bool`: whether the widget of that index has it: pass it as focused:
 - `move_to(Integer index) -> void`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index -> Integer`: the widget that has it
@@ -920,7 +937,7 @@ Conversations written in dialogue files (dialogues/<name>.json): lines, choices,
 - `Dialogue.stop -> bool | nil`: ends the conversation this machine's player is in
 - `Dialogue.on(Symbol event) { (untyped, untyped, untyped) -> void } -> void`: :start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen
 - `Dialogue.load(String | Symbol name) -> Dialogue::Script`: the dialogue of that name, read from its file once (raises for one that is not there or not well made)
-- `Dialogue.quests -> untyped`: what reads and moves quest stages (Quests unless a game says)
+- `Dialogue.quests -> untyped`: what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
 - `Dialogue.quests = untyped quests`: what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
 
 ## Dialogue::Conversation
@@ -940,6 +957,7 @@ One player's way through a dialogue: the line it is at, the choices offered, and
 - `over? -> bool`: whether it ended
 - `node -> Hash[String, untyped] | nil`: the node it is at, or nil once it is over
 - `node_id -> String | nil`: the id of the node it is at, or nil
+- `steps -> Integer`: how many lines it has shown (a line it comes back to counts again)
 - `script -> Dialogue::Script`: its dialogue
 - `actor -> GameObject | nil`: the hero of the player in it
 - `speaker -> GameObject | nil`: who talks to that player, or nil
@@ -980,82 +998,14 @@ A behaviour: someone the player can talk to; using it (its Interactable, added w
 
 - `dialogue -> String | nil`: the name of its dialogue file
 
-## Quests
+## DialogueBox
 
-The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them. See [quests.md](quests.md).
+A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. See [dialogue.md#showing-a-conversation](dialogue.md#showing-a-conversation).
 
-- `Quests[String | Symbol name] -> Quests::Quest`: the quest of that name, started or not (raises for one with no file)
-- `Quests.load(String | Symbol name) -> Quests::Definition`: the quest file of that name, read once (raises for one that is not there or not well made)
-- `Quests.started -> Array[Quests::Quest]`: every quest that started, completed ones too
-- `Quests.active -> Array[Quests::Quest]`: every quest under way: started, and not complete
-- `Quests.completed -> Array[Quests::Quest]`: every quest that is complete
-- `Quests.stage(String | Symbol name) -> String | nil`: the stage a quest is at, or nil while it has not started
-- `Quests.start(String | Symbol name) -> bool`: starts a quest at its first stage (false when it had started); raises on a client
-- `Quests.set_stage(String | Symbol name, String | nil stage, Dialogue::Conversation | nil conversation = nil) -> String | nil`: moves a quest to a stage (nil: not started), its objectives from nothing; raises on a client and for a stage it has not
-- `Quests.reset(String | Symbol name) -> String | nil`: as if the quest never started
-- `Quests.collected(String | Symbol item, Integer count = 1) -> bool`: the players collected items: for the collect objectives (on a client, told to the host)
-- `Quests.delivered(String | Symbol item, to: GameObject | String, count: Integer = 1) -> bool`: the players delivered items to someone: for the deliver objectives
-- `Quests.defeated(GameObject | String who, Integer count = 1) -> bool`: the players defeated someone (an object, or its name): for the defeat objectives
-- `Quests.reached(GameObject | String place) -> bool`: a hero reached a place (an object, or its name): for the go_to objectives (a QuestTracker says it)
-- `Quests.check(String | Symbol name) { (Quests::Quest) -> bool } -> untyped`: a check of the game's own, for the objectives {"check": name}: |quest| true once it is passed (asked every frame on the host)
-- `Quests.on(Symbol event) { (untyped, untyped, untyped) -> void } -> void`: events: :start and :complete |quest|, :stage |quest, stage, from|, :objective |quest, objective|, :change |quest|
-- `Quests.to_h -> Hash[String, Hash[String, untyped]]`: the quests that started, for Save: {"bread" => {"stage" => "bring", "progress" => [2, 0]}}
-- `Quests.replace(Hash[String | Symbol, untyped] | nil saved) -> Hash[String, Hash[String, untyped]]`: puts these in the place of every quest's state (a save read back; a stage the file no longer has is left out); raises on a client
-- `Quests.save(Symbol | String key = :quests) -> untyped`: Save.set(key, Quests.to_h)
-- `Quests.restore(Symbol | String key = :quests) -> Hash[String, Hash[String, untyped]]`: Quests.replace(Save.get(key, {}))
-
-## Quests::Quest
-
-One quest and where the party is in it (Quests[name] gives one). See [quests.md#where-the-party-is](quests.md#where-the-party-is).
-
-- `name -> String`: its name: that of its file in quests/, without .json
-- `definition -> Quests::Definition | nil`: its file as read (nil for a quest with no file)
-- `stage -> String | nil`: the stage it is at, or nil while it has not started
-- `started? -> bool`: whether it started
-- `complete? -> bool`: whether it reached a stage that ends it
-- `active? -> bool`: started, and not complete
-- `title -> String | nil`: its title, in the language in use
-- `description -> String | nil`: its description, in the language in use, or nil
-- `stage_text -> String | nil`: the text of the stage it is at, or nil
-- `objectives -> Array[Quests::Objective]`: the objectives of the stage it is at
-- `next_stage -> String | nil`: the stage it goes to once its objectives are done, or nil
-
-## Quests::Objective
-
-One thing the party does in a stage of a quest. See [quests.md#objectives](quests.md#objectives).
-
-- `quest -> Quests::Quest`: the quest it is of
-- `index -> Integer`: its place among the stage's objectives
-- `kind -> Symbol`: :go_to, :talk_to, :deliver, :collect, :defeat or :check
-- `target -> String`: what it names: a place, someone, an item or a check
-- `count -> Integer`: how many it takes (1 unless the file says)
-- `progress -> Integer`: how many it has
-- `done? -> bool`: whether it has as many as it takes
-- `text -> String`: its text, in the language in use, with {progress} and {count} filled in
-- `radius -> Float | Integer`: a go_to's meters from its place (2 unless the file says)
-- `recipient -> String | nil`: a deliver's: who the items go to
-- `dialogue -> String | nil`: a talk_to's: the dialogue it must be, or nil
-- `node -> String | nil`: a talk_to's: the node it must reach, or nil
-- `data -> Hash[String, untyped]`: its line in the file
-
-## Quests::Definition
-
-A quest file as it was read. See [quests.md](quests.md).
-
-- `name -> String`: its name
-- `title_key -> String`: the I18n key of its title
-- `description_key -> String | nil`: the I18n key of its description, or nil
-- `start -> String`: the stage it starts at
-- `stage(String id) -> Hash[String, untyped] | nil`: the stage of that id (its line in the file), or nil
-- `stage?(String | nil id) -> bool`: whether it has a stage of that id
-- `stage_ids -> Array[String]`: the ids of its stages
-- `end?(String | nil id) -> bool`: whether reaching that stage completes the quest
-- `objectives(String | nil id) -> Array[Hash[String, untyped]]`: the objectives of a stage, as the file has them
-
-## QuestTracker
-
-A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. See [quests.md](quests.md).
-
+- `DialogueBox.letters_shown(Integer letters, Float seconds, Float speed) -> Integer`: how many of a line's letters show after that many seconds at that speed (0: all)
+- `whole? -> bool`: whether the line it shows has all of its letters out (true while it shows none)
+- `pad -> Integer`: the player whose gamepad works it (0 unless said)
+- `letters_per_second -> Float`: how fast a line appears (45 unless said; 0: at once)
 
 ## Interaction
 

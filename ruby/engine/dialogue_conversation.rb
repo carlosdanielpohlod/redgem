@@ -23,7 +23,8 @@ module Dialogue
       def text = I18n.t(key)
     end
 
-    attr_reader :script, :actor, :speaker, :node_id
+    # steps: how many lines it has shown (a line it comes back to counts again).
+    attr_reader :script, :actor, :speaker, :node_id, :steps
 
     # stepped: |from, choice, to| after every move (choice: its index, nil, or :left when the player
     # left it with stop; to: nil at the end).
@@ -34,6 +35,7 @@ module Dialogue
       @deciding = deciding
       @shown = shown
       @stepped = stepped
+      @steps = 0
     end
 
     # Goes to where the dialogue starts. Itself.
@@ -120,6 +122,7 @@ module Dialogue
       @node_id = node_id
       return finish if node_id.nil?
 
+      @steps += 1
       decide if @deciding
       Dialogue.__shown(:line, self) if @shown
     end

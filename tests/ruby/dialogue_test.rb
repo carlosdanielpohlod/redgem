@@ -84,6 +84,14 @@ class DialogueTest < RedGemTest::Case
     refute conversation.continue, "the player must choose"
   end
 
+  def test_every_line_shown_counts_a_step_also_one_shown_again
+    conversation = talk
+    assert_equal 1, conversation.steps
+    conversation.continue
+    conversation.__jump("offer")
+    assert_equal 3, conversation.steps
+  end
+
   def test_only_the_choices_whose_conditions_hold_are_offered
     conversation = talk.tap(&:continue)
     assert_equal ["baker.bye"], conversation.choices.map(&:key)

@@ -22,6 +22,17 @@ until 1.0, a release may change what games rely on (see
   reads every quest: stages that are not there, objectives that could never be done, dialogues,
   nodes and items that are not there, and missing texts; and every stage a dialogue names. See the
   manual's Quests page.
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
@@ -32,6 +43,10 @@ until 1.0, a release may change what games rely on (see
   conversation of their own, the host follows it step by step and its effects happen there.
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
   keys and texts missing from `locales/`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
@@ -526,6 +541,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A character is not pushed by what it carries**: a kinematic body under a character (a box in
+  its hand) that touched its capsule pushed it, and the character, moving, took the body on with
+  it: a courier standing still drifted away, and one teleported with a parcel in hand was shoved
+  meters past where it was put. A character now passes through the kinematic bodies under it.
 - **Perception resets with each scene**: loading a scene logged "resetting the handlers of
   Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
   modules by name and Perception is a class. It now finds classes too, so a new scene starts with

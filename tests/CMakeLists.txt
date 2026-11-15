@@ -5,6 +5,7 @@ add_executable(redgem_tests
   unit/body_limit_test.cpp
   unit/nav_settings_test.cpp
   unit/nav_path_test.cpp
+  unit/nav_steering_test.cpp
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
@@ -50,6 +51,7 @@ add_executable(redgem_tests
   unit/gltf_loader_safety_test.cpp
   unit/spatial_audio_test.cpp
   unit/music_player_test.cpp
+  unit/music_ducking_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
@@ -213,6 +215,7 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp

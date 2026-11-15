@@ -108,7 +108,8 @@ class Reader {
 
   // Every key of an object is one of these (a misspelt one would be passed over without a word).
   void only(const Json& object, const std::string& where, Keys keys) {
-    for (const auto& [key, value] : object.items()) {
+    for (const auto& item : object.items()) {
+      const std::string& key = item.key();
       const bool known = std::any_of(keys.begin(), keys.end(), [&](const char* name) { return key == name; });
       if (!known) error(where, "\"" + key + "\" is not something it can have");
     }

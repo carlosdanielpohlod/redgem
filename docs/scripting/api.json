@@ -1814,11 +1814,28 @@
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
-            {"name": "to", "type": "Vector3"}
+            {"name": "to", "type": "Vector3"},
+            {"name": "avoid", "type": "Array[GameObject] | GameObject", "keyword": true, "optional": true, "default": "[]"}
           ],
           "returns": {"type": "Array[Vector3] | nil"},
-          "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there",
+          "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off",
           "example": "waypoints = Navigation.path(transform.position, Scene.find('Player').transform.position)"
+        },
+        {
+          "name": "steer",
+          "static": true,
+          "params": [
+            {"name": "position", "type": "Vector3"},
+            {"name": "velocity", "type": "Vector3"},
+            {"name": "preferred", "type": "Vector3"},
+            {"name": "speed", "type": "Numeric", "keyword": true},
+            {"name": "radius", "type": "Numeric", "keyword": true},
+            {"name": "crowd", "type": "Array[[Vector3, Vector3, Numeric]]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject", "keyword": true, "optional": true, "default": "[]"}
+          ],
+          "returns": {"type": "Vector3"},
+          "about": "the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground",
+          "example": "velocity = Navigation.steer(transform.position, velocity, toward * 3.0, speed: 3.0, radius: 0.4, ignore: game_object)"
         },
         {
           "name": "nearest",
@@ -1866,7 +1883,94 @@
         }
       ],
       "guide": "gameplay.md#chase-the-player-navigation",
-      "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+      "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+    },
+    {
+      "name": "NavAgent",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.",
+      "methods": [
+        {
+          "name": "go_to",
+          "params": [
+            {"name": "point", "type": "Vector3"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "sends it to a point; false when there is no way there",
+          "example": "Scene.find('Guard').add_component(NavAgent, speed: 2.5).go_to(gate.transform.position)"
+        },
+        {
+          "name": "stop",
+          "params": [],
+          "returns": {"type": "void"},
+          "about": "stops it where it is"
+        },
+        {
+          "name": "arrived?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it got where it was sent"
+        },
+        {
+          "name": "walking?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it is on its way somewhere"
+        },
+        {
+          "name": "destination",
+          "params": [],
+          "returns": {"type": "Vector3 | nil"},
+          "about": "where it was sent last, or nil"
+        },
+        {
+          "name": "waypoints",
+          "params": [],
+          "returns": {"type": "Array[Vector3]"},
+          "about": "the points it still walks through, the next first"
+        },
+        {
+          "name": "velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "the velocity it walks at, as it steered this frame"
+        },
+        {
+          "name": "speed",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters per second at most (setting `speed`, 3)"
+        },
+        {
+          "name": "radius",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how wide it is kept from others, in meters (setting `radius`, 0.4)"
+        },
+        {
+          "name": "arrive_distance",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how near the goal is there, in meters (setting `arrive_distance`, 0.3)"
+        },
+        {
+          "name": "all",
+          "params": [],
+          "returns": {"type": "Array[NavAgent]"},
+          "about": "the agents of the running scene",
+          "static": true
+        }
+      ],
+      "internal": [
+        "crowd",
+        "objects",
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "gameplay.md#crowds-agents-that-walk-among-others",
+      "notes": "Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too)."
     },
     {
       "name": "Water",
@@ -2933,6 +3037,17 @@
           "about": "the volume of everything"
         },
         {
+          "name": "ducking",
+          "static": true,
+          "params": [
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.4"},
+            {"name": "attack", "type": "Numeric", "keyword": true, "optional": true, "default": "0.15"},
+            {"name": "release", "type": "Numeric", "keyword": true, "optional": true, "default": "0.6"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off"
+        },
+        {
           "name": "set",
           "static": true,
           "params": [
@@ -3007,7 +3122,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
@@ -3369,10 +3484,11 @@
         {
           "name": "update",
           "params": [
-            {"name": "count", "type": "Integer"}
+            {"name": "count", "type": "Integer"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
           ],
           "returns": {"type": "void"},
-          "about": "moves it among count widgets, as up or down was pressed this frame"
+          "about": "moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)"
         },
         {
           "name": "at?",
@@ -5410,6 +5526,12 @@
           "about": "the id of the node it is at, or nil"
         },
         {
+          "name": "steps",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "how many lines it has shown (a line it comes back to counts again)"
+        },
+        {
           "name": "script",
           "params": [],
           "returns": {"type": "Dialogue::Script"},
@@ -6023,6 +6145,47 @@
         "update"
       ],
       "guide": "quests.md"
+    },
+    {
+      "name": "DialogueBox",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.",
+      "methods": [
+        {
+          "name": "letters_shown",
+          "static": true,
+          "params": [
+            {"name": "letters", "type": "Integer"},
+            {"name": "seconds", "type": "Float"},
+            {"name": "speed", "type": "Float"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "how many of a line's letters show after that many seconds at that speed (0: all)"
+        },
+        {
+          "name": "whole?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the line it shows has all of its letters out (true while it shows none)"
+        },
+        {
+          "name": "pad",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the player whose gamepad works it (0 unless said)"
+        },
+        {
+          "name": "letters_per_second",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how fast a line appears (45 unless said; 0: at once)"
+        }
+      ],
+      "internal": [
+        "update"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
     },
     {
       "name": "Interaction",

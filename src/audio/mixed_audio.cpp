@@ -24,14 +24,30 @@ void MixedAudio::set_group_volume(MixGroup group, float volume) {
   if (group == MixGroup::Music) music_.set_group_volume(volume);
 }
 
+bool MixedAudio::set_music_ducking(const MusicDucking& ducking) { return ducker_.set(ducking); }
+
+void MixedAudio::reset_music_ducking() {
+  ducker_.reset();
+  sounds_.set_group_gain(MixGroup::Music, ducker_.gain());
+  music_.set_ducked(ducker_.gain());
+}
+
 bool MixedAudio::play_music(const std::string& name, const MusicRequest& request) { return music_.play(name, request); }
 void MixedAudio::fade_out_music(float seconds) { music_.stop(seconds); }
 void MixedAudio::set_music_pitch(float pitch) { music_.set_pitch(pitch); }
 void MixedAudio::set_music_volume(float volume) { music_.set_volume(volume); }
 
 void MixedAudio::update(float seconds) {
-  sounds_.update();
+  sounds_.update();  // (a voice that ended no longer ducks)
+  duck(seconds);
   music_.update(seconds);
+}
+
+// The music group, its sounds and its tracks, follows the ducker.
+void MixedAudio::duck(float seconds) {
+  const float gain = ducker_.update(sounds_.group_heard(MixGroup::Voice), seconds);
+  sounds_.set_group_gain(MixGroup::Music, gain);
+  music_.set_ducked(gain);
 }
 
 }  // namespace redgem
