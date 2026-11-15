@@ -1259,6 +1259,9 @@ Save.delete(:name)
 Save.clear                            # start from nothing
 ```
 
+`Save.delete` and `Save.clear` raise `RuntimeError` if the store cannot write the change.
+The existing data stays available and the call can be retried.
+
 Whole numbers come back as integers (a saved `12.0` is read as `12`): call `.to_f` on a value you
 divide.
 

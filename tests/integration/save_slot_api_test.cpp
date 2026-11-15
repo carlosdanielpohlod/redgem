@@ -47,6 +47,25 @@ class SlotListFailure final : public std::runtime_error {
   bool& destroyed_;
 };
 }  // namespace
+
+TEST_CASE("a failed save deletion or clear can be retried without reviving the deleted data") {
+  SlotData data;
+  bool can_flush = true;
+  SaveFile store(data.file, [&can_flush](std::FILE* file) { return can_flush && durable::flush_to_disk(file); });
+  REQUIRE(store.set("coins", 1));
+  SlotGame game(data.file, &store);
+  const char* erase = nullptr;
+  SUBCASE("delete") { erase = "Save.delete(:coins)"; }
+  SUBCASE("clear") { erase = "Save.clear"; }
+  const std::string attempt = std::string("begin; ") + erase + "; false; rescue RuntimeError; true; end";
+  can_flush = false;
+  CHECK(game.ruby(attempt.c_str()) == "true");
+  CHECK(game.ruby("Save[:coins]") == "1");
+  can_flush = true;
+  CHECK(game.ruby(attempt.c_str()) == "false");
+  CHECK_FALSE(SaveFile(data.file).get("coins").has_value());
+}
+
 TEST_CASE("Save selects isolated named slots and keeps the default across restarts") {
   SlotData data;
   {
