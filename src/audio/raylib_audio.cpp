@@ -131,7 +131,13 @@ void mix_callback(void* buffer, unsigned frames) { effect_rack().process_mix(sta
 struct PlayingVoice {
   Voice voice;
   std::optional<EffectSlot> slot;
+  float send_volume;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
 };
+void send_volume(PlayingVoice& playing, float volume) {
+  if (!playing.slot || playing.send_volume == volume) return;
+  playing.send_volume = volume;
+  effect_rack().set_volume(*playing.slot, volume);
+}
 std::optional<EffectSlot> attach_slot(AudioStream stream) {
   const auto slot = effect_rack().claim();
   if (slot) AttachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
@@ -159,15 +165,17 @@ void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mi
 class RaylibSoundDriver final : public SoundDriver {
  public:
   explicit RaylibSoundDriver(SoundLibrary& library) : library_(library) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!library_.ready()) return false;
     auto voice = load_voice(library_, name, sound.loop);
     if (!voice) return false;
     const auto stream = voice_stream(*voice);
     prepare_stream(stream, sound, mix);
     const auto slot = attach_slot(stream);
+    if (slot) effect_rack().set_effects(*slot, effects);
     if (slot) effect_rack().set_volume(*slot, mix.volume);
-    voices_.emplace(id, PlayingVoice{*voice, slot});
+    voices_.emplace(id, PlayingVoice{*voice, slot, mix.volume});
     PlayAudioStream(stream);
     return true;
   }
@@ -177,14 +185,14 @@ class RaylibSoundDriver final : public SoundDriver {
   bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(stream_of(id)); }
   void mix(SoundSourceId id, SpatialMix mix) override {
     apply_mix(stream_of(id), mix);
-    const auto slot = voices_.at(id).slot;
-    if (slot) effect_rack().set_volume(*slot, mix.volume);
+    send_volume(voices_.at(id), mix.volume);
   }
   void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(stream_of(id), pitch); }
   void effects(SoundSourceId id, const VoiceEffects& effects) override {
     const auto slot = voices_.at(id).slot;
     if (slot) effect_rack().set_effects(*slot, effects);
   }
+  void close_reverbs() override { effect_rack().close_buses(); }
   void stop(SoundSourceId id) override {
     const auto found = voices_.find(id);
     if (found == voices_.end()) return;

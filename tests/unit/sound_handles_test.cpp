@@ -30,7 +30,8 @@ constexpr int kFramesPastRelease = static_cast<int>(kDefaultDuckRelease / config
 class HandleTestDriver final : public SoundDriver {
  public:
   std::map<SoundSourceId, testing::RecordedVoice> voices;
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     voices.emplace(id, testing::RecordedVoice{name, sound, mix, true, VoiceEffects{}});
     return true;
   }

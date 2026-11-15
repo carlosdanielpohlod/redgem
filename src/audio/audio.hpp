@@ -36,9 +36,10 @@ class AudioSystem {
   // The player's volume of one of the engine's groups (Settings.music_volume...): what each sound
   // of it and of the groups under it is heard at, times its own.
   virtual void set_group_volume(MixGroup group, float volume) { groups_.set_player_volume(group, volume); }
-  // A game's own group under `parent` (Audio.group), at its volume; the same name again moves it.
-  // nullopt for an engine group's name, a parent under it, or no room left (kMaxMixGroups).
-  virtual std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, float volume) {
+  // A game's own group under `parent` (Audio.group), at its volume (full when none); the same
+  // name again moves it, and keeps its volume when none is given. nullopt for an engine group's
+  // name, a parent under it, or no room left (kMaxMixGroups).
+  virtual std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) {
     return groups_.define(name, parent, volume);
   }
   // A group by its name, the engine's or the game's.
@@ -124,7 +125,7 @@ class MixedAudio : public AudioSystem {
   bool stop_sound(SoundSourceId id) override;
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
-  std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, float volume) override;
+  std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) override;
   bool set_group_effects(MixGroup group, const GroupEffects& effects) override;
   void forget_game_groups() override;
   bool set_music_ducking(const MusicDucking& ducking) override;

@@ -33,6 +33,7 @@ class EffectRack {
   void release(EffectSlot slot);
   void set_effects(EffectSlot slot, const VoiceEffects& effects);
   void set_volume(EffectSlot slot, float volume);  // what the sound is heard at, for its send
+  void close_buses();                              // every reverb and its tail; a send opens its bus again
   // The audio thread: a sound's frames (interleaved stereo, before its volume and pan), then the
   // mix of every sound.
   void process_voice(EffectSlot slot, float* frames, std::size_t count);
@@ -51,6 +52,7 @@ class EffectRack {
   struct Bus {
     std::unique_ptr<Reverb> reverb;  // made the first time a sound sends to it
     std::vector<float> send;
+    std::size_t written = 0;  // the frames of send this period holds
   };
   void send(Slot& slot, const float* frames, std::size_t count);
   void open_bus(std::size_t bus);

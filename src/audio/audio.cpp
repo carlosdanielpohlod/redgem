@@ -123,8 +123,8 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
 SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
                                      std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
-  if (!driver_.start(id, name, sound, mix)) return kNoSoundSource;  // the old sound keeps playing on failure
-  driver_.effects(id, groups_.effects_of(sound.group));
+  // (The old sound keeps playing on failure.)
+  if (!driver_.start(id, name, sound, mix, groups_.effects_of(sound.group))) return kNoSoundSource;
   if (place) stop(*place);
   sounds_.emplace(id, sound);
   ++next_;

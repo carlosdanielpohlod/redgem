@@ -31,9 +31,10 @@ struct RecordedTrack {
 class RecordingSoundDriver final : public SoundDriver {
  public:
   explicit RecordingSoundDriver(const std::filesystem::path& dir) : dir_(dir) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!find_sound_file(dir_, name)) return false;
-    voices.emplace(id, RecordedVoice{name, sound, mix, true, VoiceEffects{}});
+    voices.emplace(id, RecordedVoice{name, sound, mix, true, effects});
     started.push_back(name);
     return true;
   }

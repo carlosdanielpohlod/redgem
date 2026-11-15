@@ -527,8 +527,8 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.music_volume = Numeric volume`: changes the music's volume
 - `Audio.volume = Numeric volume`: the volume of everything
 - `Audio.ducking(volume: Numeric = 0.4, attack: Numeric = 0.15, release: Numeric = 0.6) -> bool`: how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
-- `Audio.group(Symbol name, parent: Symbol = :effects, volume: Numeric = 1.0) -> nil`: makes a mix group of the game's own under another (or moves it, or changes its volume)
-- `Audio.effects(Symbol group, low_pass: Numeric | nil = nil, reverb: Numeric = 0.0) -> bool`: muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off
+- `Audio.group(Symbol name, parent: Symbol = :effects, volume: Numeric | nil = nil) -> nil`: makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given
+- `Audio.effects(Symbol group, low_pass: Numeric | nil = nil, reverb: Numeric = 0.0) -> nil`: muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped
 - `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up) -> void`: where the ears are (move it with the camera)

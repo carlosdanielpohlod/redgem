@@ -69,6 +69,10 @@ TEST_CASE("a group defined again moves and changes its volume, but never under i
   CHECK(groups.define("cave", MixGroup::Voice, kQuarter) == cave);
   CHECK(groups.within(*drips, MixGroup::Voice));
   CHECK(groups.heard_volume(*drips) == doctest::Approx(kQuarter));
+  CHECK(groups.define("cave", MixGroup::Effects, std::nullopt) == cave);  // (moved, its volume kept)
+  CHECK(groups.heard_volume(*drips) == doctest::Approx(kQuarter));
+  CHECK(groups.define("fresh", MixGroup::Effects, std::nullopt).has_value());
+  CHECK(groups.player_volume(*groups.find("fresh")) == doctest::Approx(kFullVolume));
   CHECK_FALSE(groups.define("cave", *drips, kFullVolume).has_value());
   CHECK_FALSE(groups.define("cave", *cave, kFullVolume).has_value());
   CHECK_FALSE(groups.define("voice", MixGroup::Music, kFullVolume).has_value());
@@ -109,14 +113,18 @@ TEST_CASE("Audio.group and Audio.effects reach the sounds of a game's group and 
   ruby(*engine, "Audio.group(:cave, volume: 0.5); $drip = Audio.play(:beep, loop: true, group: :cave)");
   ruby(*engine, "Settings.effects_volume = 0.5");
   CHECK(audio.voices().at(1).mix.volume == doctest::Approx(kQuarter));
-  CHECK(ruby(*engine, "Audio.effects(:cave, low_pass: 1200, reverb: 0.4)") == "true");
+  ruby(*engine, "Audio.effects(:cave, low_pass: 1200, reverb: 0.4)");
   const VoiceEffects& effects = audio.voices().at(1).effects;
   CHECK(effects.low_pass_hz == kCaveCutoff);
   CHECK(effects.reverb == doctest::Approx(kCaveReverb));
-  CHECK(ruby(*engine, "Audio.effects(:effects, low_pass: 400)") == "true");
+  ruby(*engine, "Audio.effects(:effects, low_pass: 400)");
   CHECK(audio.voices().at(1).effects.low_pass_hz == kDeepCutoff);  // (the lower one, from over it)
   ruby(*engine, "Audio.effects(:cave); Audio.effects(:effects)");
   CHECK(audio.voices().at(1).effects == VoiceEffects{});
+  ruby(*engine, "Audio.effects(:cave, reverb: 0.4); Audio.play(:beep, group: :cave)");
+  CHECK(audio.voices().at(2).effects.reverb == doctest::Approx(kCaveReverb));  // (from its start)
+  ruby(*engine, "Audio.group(:cave, parent: :voice)");
+  CHECK(audio.voices().at(1).mix.volume == doctest::Approx(kHalfShare));  // (moved, still at 0.5)
 }
 
 TEST_CASE("a game's group under the voice ducks the music, and the game's groups end with it") {

@@ -2950,10 +2950,10 @@
           "params": [
             {"name": "name", "type": "Symbol"},
             {"name": "parent", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
-            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+            {"name": "volume", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "nil"},
-          "about": "makes a mix group of the game's own under another (or moves it, or changes its volume)"
+          "about": "makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given"
         },
         {
           "name": "effects",
@@ -2963,7 +2963,7 @@
             {"name": "low_pass", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "reverb", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
           ],
-          "returns": {"type": "bool"},
+          "returns": {"type": "nil"},
           "about": "muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off"
         },
         {

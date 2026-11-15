@@ -28,13 +28,13 @@ MixGroupTree::MixGroupTree() {
   for (const MixGroup group : kMixGroups) groups_.push_back(named(mix_group_name(group)));
 }
 
-std::optional<MixGroup> MixGroupTree::define(const std::string& name, MixGroup parent, float volume) {
+std::optional<MixGroup> MixGroupTree::define(const std::string& name, MixGroup parent, std::optional<float> volume) {
   if (!may_define(name, parent)) return std::nullopt;
   const auto existing = find(name);
   const MixGroup group = existing.value_or(static_cast<MixGroup>(groups_.size()));
   if (!existing) groups_.push_back(named(name));
   at(group).parent = parent;
-  at(group).volume = volume;
+  if (volume) at(group).volume = *volume;
   return group;
 }
 

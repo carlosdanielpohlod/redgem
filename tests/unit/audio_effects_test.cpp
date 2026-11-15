@@ -149,6 +149,38 @@ TEST_CASE("a sound's send reaches its group's reverb in the mix, at the sound's 
   CHECK(energy(after, 0, after.size()) < loud);  // (a silent sound sends nothing; the tail dies)
 }
 
+TEST_CASE("a low-pass turned on again starts from silence, not from where it was turned off") {
+  EffectRack rack;
+  const auto slot = rack.claim();
+  REQUIRE(slot);
+  rack.set_effects(*slot, VoiceEffects{kLowCutoff, kNoReverb, MixGroup::Effects});
+  for (int period = 0; period < kPeriods; ++period) {
+    auto loud = frames_of(kFrames, kHalfShare);
+    rack.process_voice(*slot, loud.data(), kFrames);
+  }
+  rack.set_effects(*slot, VoiceEffects{});
+  rack.set_effects(*slot, VoiceEffects{kLowCutoff, kNoReverb, MixGroup::Effects});
+  auto quiet = frames_of(kFrames, 0.0f);
+  rack.process_voice(*slot, quiet.data(), kFrames);
+  CHECK(loudest(quiet) == 0.0f);
+}
+
+TEST_CASE("closing the buses ends the reverbs and their tails") {
+  EffectRack rack;
+  const auto slot = rack.claim();
+  REQUIRE(slot);
+  rack.set_effects(*slot, VoiceEffects{std::nullopt, kFullReverb, MixGroup::Voice});
+  auto sound = frames_of(kFrames, kHalfShare);
+  auto mix = frames_of(kFrames, 0.0f);
+  rack.process_voice(*slot, sound.data(), kFrames);
+  rack.process_mix(mix.data(), kFrames);
+  rack.set_effects(*slot, VoiceEffects{});
+  rack.close_buses();
+  std::fill(mix.begin(), mix.end(), 0.0f);
+  rack.process_mix(mix.data(), kFrames);
+  CHECK(loudest(mix) == 0.0f);
+}
+
 TEST_CASE("the rack has a slot for every sound at once and one more, given back when released") {
   EffectRack rack;
   std::vector<EffectSlot> slots;

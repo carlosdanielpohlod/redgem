@@ -79,14 +79,18 @@ void spatial_mono_frames(float* samples, unsigned frames);
 class SoundDriver {
  public:
   virtual ~SoundDriver() = default;
-  // False must leave no stream behind. Apply the initial mix and pitch before playback begins.
-  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) = 0;
+  // False must leave no stream behind. Apply the initial mix, pitch and effects (its group's)
+  // before playback begins.
+  virtual bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                     const VoiceEffects& effects) = 0;
   virtual void update(SoundSourceId id) = 0;
   virtual bool playing(SoundSourceId id) const = 0;
   virtual void mix(SoundSourceId id, SpatialMix mix) = 0;
   virtual void pitch(SoundSourceId id, float pitch) = 0;
-  // The effects of its group (a backend with none ignores them); after start, and when they change.
+  // The effects of its group when they change (a backend with none ignores them).
   virtual void effects(SoundSourceId, const VoiceEffects&) {}
+  // Ends every group's reverb and its tail, when the game's groups end.
+  virtual void close_reverbs() {}
   virtual void stop(SoundSourceId id) = 0;
 };
 
@@ -122,6 +126,7 @@ class SoundPool {
   // Every sound mixed again, and given its effects again: after the groups changed.
   void refresh();
   void refresh_effects();
+  void close_reverbs() { driver_.close_reverbs(); }
   bool playing(SoundSourceId id) const;
   bool stop(SoundSourceId id);
   void clear();
