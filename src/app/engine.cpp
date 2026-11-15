@@ -126,6 +126,7 @@ void Engine::build_world(const GameSettings& settings) {
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
+  head_aims_.clear();
   particles_.set_gravity(gravity());
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
@@ -177,12 +178,13 @@ void Engine::follow_group_volume(MixGroup group, float volume) {
   audio().set_group_volume(group, volume);
 }
 
-// The game's sounds end with it, and its player's group volumes with them (the audio may go on
+// The game's sounds end with it, and its player's group volumes and its ducking with them (the audio may go on
 // sounding for someone else: the editor's previews).
 void Engine::release_audio() {
   if (!audio_open()) return;  // (the engine failed to start before it had any)
   audio().stop_sounds();
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
+  audio().reset_music_ducking();
 }
 
 void Engine::connect_display() {
@@ -242,6 +244,7 @@ void Engine::keep_bindings() {
 
 void Engine::connect_effects() {
   context_.animations = &animations_;
+  context_.head_aims = &head_aims_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
   context_.renders_particles = options_.presenter != nullptr;

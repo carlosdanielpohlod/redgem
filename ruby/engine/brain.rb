@@ -11,6 +11,7 @@
 #     transition from: :search, to: :patrol, after: 8.0     # a timer: seconds in the state
 #     transition from: :any, to: :search, on: :hear, unless: :chasing?
 #     transition from: :patrol, to: :search, if: -> { time_in_state > 30 && tired? }  # a guard
+#     transition from: :search, to: :scheduled, after: 60.0  # back to what its Schedule says
 #
 #     def chasing? = state == :chase
 #   end
@@ -24,12 +25,16 @@
 # argument: `if: ->(seen) { seen.tag?("Player") }`. A hook is a method's name or a block too.
 #
 # The object's Perception fires :see, :lose_sight (with the object) and :hear (with the noise);
-# its Interactable fires :interact (with the actor). The game fires its own: brain.fire(:hit, 3).
+# its Interactable fires :interact (with the actor); its Schedule fires :schedule (with the
+# activity), and a transition to: :scheduled goes to the state named after the activity it is time
+# for (when the brain has such a state; one from :any or to :scheduled never re-enters a state).
+# The game fires its own: brain.fire(:hit, 3).
 # Time in a state is game time: it stands still while the game is paused. Over the network only
 # the host thinks: on a client a Brain does nothing (the host moves what the players see).
 # A game's Brain that has its own update calls super.
 class Brain < Behaviour
   ANY = :any
+  SCHEDULED = :scheduled   # to: the state named after the activity its Schedule says it is time for
   HOOKS = %i[enter update exit].freeze
   TRANSITION_OPTIONS = %i[on after if unless].freeze
 
@@ -107,7 +112,7 @@ class Brain < Behaviour
 
     awaken if state.nil?
     @time_in_state = time_in_state + dt
-    take(due_transition)
+    move_to(choice(transitions_on(nil), nil))
     run_hook(:update, dt)
   end
 
@@ -117,7 +122,7 @@ class Brain < Behaviour
     return false unless thinks_here?
 
     awaken if state.nil?
-    take(transitions_on(event.to_sym).find { |transition| allowed?(transition, payload) })
+    move_to(choice(transitions_on(event.to_sym), payload))
   end
 
   # Goes to a state now, whatever the transitions say (out of it and in again, if it is there).
@@ -139,6 +144,8 @@ class Brain < Behaviour
   def on_lose_sight(object) = fire(:lose_sight, object)
   def on_hear(noise) = fire(:hear, noise)
   def on_interact(actor) = fire(:interact, actor)
+  # ... and its Schedule: an activity's hour came.
+  def on_schedule(activity) = fire(:schedule, activity)
 
   private
 
@@ -158,7 +165,7 @@ class Brain < Behaviour
     return if @checked
 
     names = self.class.states.keys
-    wrong = (sources - [ANY] + destinations + [self.class.initial]).uniq - names
+    wrong = (sources - [ANY] + (destinations - [SCHEDULED]) + [self.class.initial]).uniq - names
     raise ArgumentError, "#{self.class} has transitions or an initial state unknown: #{wrong.inspect}" unless
       wrong.empty?
 
@@ -168,18 +175,52 @@ class Brain < Behaviour
   def sources = self.class.transitions.map(&:from)
   def destinations = self.class.transitions.map(&:to)
 
-  def due_transition = transitions_on(nil).find { |transition| allowed?(transition, nil) }
+  # The state the first transition that may be taken leads to, or nil.
+  def choice(transitions, payload)
+    transitions.each do |transition|
+      next unless could_start?(transition)
+
+      target = target_of(transition, payload)
+      return target if target && allowed?(transition, target, payload)
+    end
+    nil
+  end
+
+  # Where a transition leads: its state, or for :scheduled the state of the activity it is time
+  # for (the :schedule event's, else the object's Schedule's), when the brain has one of that name.
+  def target_of(transition, payload)
+    return transition.to unless transition.to == SCHEDULED
+
+    activity = transition.event == :schedule ? payload : get_component(Schedule)&.current
+    state_named(activity)
+  end
+
+  # The state an activity names, or nil when the brain has none of that name.
+  def state_named(activity)
+    name = activity&.to_sym
+    self.class.states.key?(name) ? name : nil
+  end
 
   def transitions_on(event) = self.class.transitions.select { |transition| transition.event == event }
 
-  def allowed?(transition, payload)
-    starts_here?(transition) && waited?(transition) && guards_agree?(transition, payload)
+  # What a transition needs whatever it leads to: to start from this state (or :any), with its
+  # time in the state gone by.
+  def could_start?(transition) = [state, ANY].include?(transition.from) && waited?(transition)
+
+  def allowed?(transition, target, payload)
+    starts_here?(transition, target) && waited?(transition) && guards_agree?(transition, payload)
   end
 
-  # Whether it starts from this state; one from :any never leads to the state the brain is in.
-  def starts_here?(transition)
-    transition.from == state || (transition.from == ANY && transition.to != state)
+  # Whether it starts from this state. One from :any, or to :scheduled, never leads to the state
+  # the brain is in.
+  def starts_here?(transition, target)
+    return false unless [state, ANY].include?(transition.from)
+
+    target != state || fixed_self_transition?(transition)
   end
+
+  # A transition from a state back into it, which it names: out of it and in again.
+  def fixed_self_transition?(transition) = transition.from == state && transition.to != SCHEDULED
 
   def waited?(transition) = transition.after.nil? || time_in_state >= transition.after
 
@@ -189,11 +230,11 @@ class Brain < Behaviour
     yes && !no
   end
 
-  def take(transition)
-    return false if transition.nil?
+  def move_to(target)
+    return false if target.nil?
 
     leave
-    enter(transition.to)
+    enter(target)
     true
   end
 

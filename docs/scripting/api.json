@@ -9,6 +9,8 @@
     "Camera::Follow",
     "Camera::Rig",
     "Camera::Shake",
+    "Dialogue::Rules",
+    "Dialogue::VariableQuests",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -141,6 +143,14 @@
           ],
           "returns": {"type": "void"},
           "about": "a Perception on the object heard a noise"
+        },
+        {
+          "name": "on_schedule",
+          "params": [
+            {"name": "activity", "type": "Symbol"}
+          ],
+          "returns": {"type": "void"},
+          "about": "a Schedule on the object came to the hour of another activity"
         },
         {
           "name": "persist",
@@ -1805,11 +1815,28 @@
           "static": true,
           "params": [
             {"name": "from", "type": "Vector3"},
-            {"name": "to", "type": "Vector3"}
+            {"name": "to", "type": "Vector3"},
+            {"name": "avoid", "type": "Array[GameObject] | GameObject", "keyword": true, "optional": true, "default": "[]"}
           ],
           "returns": {"type": "Array[Vector3] | nil"},
-          "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there",
+          "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there; `avoid:` game objects whose bodies it keeps a character's width off",
           "example": "waypoints = Navigation.path(transform.position, Scene.find('Player').transform.position)"
+        },
+        {
+          "name": "steer",
+          "static": true,
+          "params": [
+            {"name": "position", "type": "Vector3"},
+            {"name": "velocity", "type": "Vector3"},
+            {"name": "preferred", "type": "Vector3"},
+            {"name": "speed", "type": "Numeric", "keyword": true},
+            {"name": "radius", "type": "Numeric", "keyword": true},
+            {"name": "crowd", "type": "Array[[Vector3, Vector3, Numeric]]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject", "keyword": true, "optional": true, "default": "[]"}
+          ],
+          "returns": {"type": "Vector3"},
+          "about": "the flat velocity nearest `preferred` that keeps clear of `crowd` ([position, velocity, radius] each, characters that steer too) and of the bodies that move near `position` (but `ignore`), and on walkable ground",
+          "example": "velocity = Navigation.steer(transform.position, velocity, toward * 3.0, speed: 3.0, radius: 0.4, ignore: game_object)"
         },
         {
           "name": "nearest",
@@ -1857,7 +1884,94 @@
         }
       ],
       "guide": "gameplay.md#chase-the-player-navigation",
-      "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+      "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not in the grid: a path goes around those of `avoid:`, and `steer` (or a NavAgent) around the rest, looking 3 seconds ahead. A level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+    },
+    {
+      "name": "NavAgent",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way.",
+      "methods": [
+        {
+          "name": "go_to",
+          "params": [
+            {"name": "point", "type": "Vector3"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "sends it to a point; false when there is no way there",
+          "example": "Scene.find('Guard').add_component(NavAgent, speed: 2.5).go_to(gate.transform.position)"
+        },
+        {
+          "name": "stop",
+          "params": [],
+          "returns": {"type": "void"},
+          "about": "stops it where it is"
+        },
+        {
+          "name": "arrived?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it got where it was sent"
+        },
+        {
+          "name": "walking?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it is on its way somewhere"
+        },
+        {
+          "name": "destination",
+          "params": [],
+          "returns": {"type": "Vector3 | nil"},
+          "about": "where it was sent last, or nil"
+        },
+        {
+          "name": "waypoints",
+          "params": [],
+          "returns": {"type": "Array[Vector3]"},
+          "about": "the points it still walks through, the next first"
+        },
+        {
+          "name": "velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "the velocity it walks at, as it steered this frame"
+        },
+        {
+          "name": "speed",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters per second at most (setting `speed`, 3)"
+        },
+        {
+          "name": "radius",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how wide it is kept from others, in meters (setting `radius`, 0.4)"
+        },
+        {
+          "name": "arrive_distance",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how near the goal is there, in meters (setting `arrive_distance`, 0.3)"
+        },
+        {
+          "name": "all",
+          "params": [],
+          "returns": {"type": "Array[NavAgent]"},
+          "about": "the agents of the running scene",
+          "static": true
+        }
+      ],
+      "internal": [
+        "crowd",
+        "objects",
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "gameplay.md#crowds-agents-that-walk-among-others",
+      "notes": "Its object walks by its character controller (`character.move`), or by its transform when it has none. When it gets less than a quarter of the way it would walk in a second, it asks for another way around what moves within 2 m of it (other agents too)."
     },
     {
       "name": "Water",
@@ -2699,6 +2813,58 @@
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether all its clips move the object"
+        },
+        {
+          "name": "look_at",
+          "params": [
+            {"name": "target", "type": "Vector3 | GameObject"},
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""},
+            {"name": "max_angle", "type": "Numeric", "keyword": true, "optional": true, "default": "60.0"}
+          ],
+          "returns": {"type": "void"},
+          "about": "turns a bone (the head unless said) toward a point or an object's eyes, at most max_angle degrees off its clips' pose, easing in, until look_away"
+        },
+        {
+          "name": "look_away",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "void"},
+          "about": "the bone goes back to its clips' pose, easing out"
+        },
+        {
+          "name": "looking?",
+          "params": [
+            {"name": "bone", "type": "String | Symbol | GameObject", "keyword": true, "optional": true, "default": "\"Head\""}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a bone is turned toward something, or on its way back"
+        },
+        {
+          "name": "bone",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the object under the character with that name (or that name after a rig's prefix:), or nil"
+        },
+        {
+          "name": "bone!",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
+          "about": "bone that raises when the character has none of that name"
+        },
+        {
+          "name": "bone_named?",
+          "static": true,
+          "params": [
+            {"name": "part", "type": "String"},
+            {"name": "name", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a part's name is that bone's: the name, or the name after a prefix:"
         }
       ],
       "guide": "animation.md"
@@ -2872,6 +3038,17 @@
           "about": "the volume of everything"
         },
         {
+          "name": "ducking",
+          "static": true,
+          "params": [
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.4"},
+            {"name": "attack", "type": "Numeric", "keyword": true, "optional": true, "default": "0.15"},
+            {"name": "release", "type": "Numeric", "keyword": true, "optional": true, "default": "0.6"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off"
+        },
+        {
           "name": "set",
           "static": true,
           "params": [
@@ -2946,7 +3123,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
@@ -3308,10 +3485,11 @@
         {
           "name": "update",
           "params": [
-            {"name": "count", "type": "Integer"}
+            {"name": "count", "type": "Integer"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
           ],
           "returns": {"type": "void"},
-          "about": "moves it among count widgets, as up or down was pressed this frame"
+          "about": "moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)"
         },
         {
           "name": "at?",
@@ -5187,6 +5365,400 @@
       "guide": "interaction.md"
     },
     {
+      "name": "Dialogue",
+      "kind": "module",
+      "about": "Conversations written in dialogue files (dialogues/<name>.json): lines, choices, conditions and effects; each player has their own, decided on the host.",
+      "methods": [
+        {
+          "name": "start",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol | Dialogue::Script"},
+            {"name": "actor", "type": "GameObject", "keyword": true},
+            {"name": "speaker", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Dialogue::Conversation | bool"},
+          "about": "starts a conversation of the actor (a player's hero) with the speaker, on that player's machine (true when it went to another); raises on a client"
+        },
+        {
+          "name": "current",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Dialogue::Conversation | nil"},
+          "about": "the conversation this machine's player is in, or nil"
+        },
+        {
+          "name": "busy?",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether this machine's player is in a conversation, or left one this frame"
+        },
+        {
+          "name": "stop",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool | nil"},
+          "about": "ends the conversation this machine's player is in"
+        },
+        {
+          "name": "on",
+          "static": true,
+          "params": [
+            {"name": "event", "type": "Symbol"},
+            {"name": "block", "type": "^(untyped, untyped, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": ":start, :line and :end |conversation| of this machine's player; :event |name, data, conversation| where effects happen"
+        },
+        {
+          "name": "load",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "the dialogue of that name, read from its file once (raises for one that is not there or not well made)"
+        },
+        {
+          "name": "quests",
+          "static": true,
+          "params": [],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages (GameVariables \"quest.<name>\" unless a game says)"
+        },
+        {
+          "name": "quests=",
+          "static": true,
+          "params": [
+            {"name": "quests", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)"
+        }
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "Dialogue::Conversation",
+      "kind": "class",
+      "about": "One player's way through a dialogue: the line it is at, the choices offered, and how it goes on.",
+      "methods": [
+        {
+          "name": "text",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the line, in the language in use (nil once it is over)"
+        },
+        {
+          "name": "text_key",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of the line"
+        },
+        {
+          "name": "speaker_name",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "who says it, in the language in use (nil when the node names nobody)"
+        },
+        {
+          "name": "speaker_key",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of who says it, or nil"
+        },
+        {
+          "name": "voice",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the sound the line names, or nil (kept for later: nothing plays it yet)"
+        },
+        {
+          "name": "choices",
+          "params": [],
+          "returns": {"type": "Array[Dialogue::Conversation::Choice]"},
+          "about": "the choices offered now: those whose conditions hold"
+        },
+        {
+          "name": "choosing?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the player answers this line by choosing"
+        },
+        {
+          "name": "continue",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "on from a line with no choices: to what follows, or the end; false when it waits for a choice"
+        },
+        {
+          "name": "choose",
+          "params": [
+            {"name": "choice", "type": "Dialogue::Conversation::Choice | Integer"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "takes a choice: its effects happen, and it goes where the choice leads; false for one not offered"
+        },
+        {
+          "name": "stop",
+          "params": [
+            {"name": "quietly", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "ends it where it is (quietly: without telling the host)"
+        },
+        {
+          "name": "over?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it ended"
+        },
+        {
+          "name": "node",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node it is at, or nil once it is over"
+        },
+        {
+          "name": "node_id",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the id of the node it is at, or nil"
+        },
+        {
+          "name": "steps",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "how many lines it has shown (a line it comes back to counts again)"
+        },
+        {
+          "name": "script",
+          "params": [],
+          "returns": {"type": "Dialogue::Script"},
+          "about": "its dialogue"
+        },
+        {
+          "name": "actor",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the hero of the player in it"
+        },
+        {
+          "name": "speaker",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "who talks to that player, or nil"
+        },
+        {
+          "name": "deciding?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether its effects happen on this machine (offline, and on the host)"
+        }
+      ],
+      "internal": [
+        "begin",
+        "inspect"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Conversation::Choice",
+      "kind": "class",
+      "about": "An answer the player may give.",
+      "methods": [
+        {
+          "name": "index",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "its place among the node's choices (what choose takes)"
+        },
+        {
+          "name": "key",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the I18n key of its text"
+        },
+        {
+          "name": "text",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its text, in the language in use"
+        }
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
+      "name": "Dialogue::Script",
+      "kind": "class",
+      "about": "A dialogue file as it was read.",
+      "methods": [
+        {
+          "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its name: that of its file in dialogues/, without .json"
+        },
+        {
+          "name": "start",
+          "params": [],
+          "returns": {"type": "String | Array[Hash[String, untyped]]"},
+          "about": "where it starts: a node's id, or branches"
+        },
+        {
+          "name": "node",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the node of that id, or nil"
+        },
+        {
+          "name": "node?",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether it has a node of that id"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "GameVariables",
+      "kind": "module",
+      "about": "The values every player shares, which dialogue conditions read and effects change; owned by the host over the network.",
+      "methods": [
+        {
+          "name": "[]",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "the value of a variable, or nil when it was never set"
+        },
+        {
+          "name": "[]=",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "sets a variable (nil, true, false, a number or a text); raises on a client"
+        },
+        {
+          "name": "to_h",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "every variable that was set, by name (what to save)"
+        },
+        {
+          "name": "replace",
+          "static": true,
+          "params": [
+            {"name": "values", "type": "Hash[String | Symbol, untyped]"}
+          ],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "puts these in the place of every variable (a save read back)"
+        },
+        {
+          "name": "on_change",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(String, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "|name, value| on every change"
+        },
+        {
+          "name": "value?",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can hold a value"
+        },
+        {
+          "name": "name?",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a variable can be called so"
+        }
+      ],
+      "guide": "dialogue.md#gamevariables"
+    },
+    {
+      "name": "Talkable",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: someone the player can talk to; using it (its Interactable, added with the prompt \"Talk\" when it has none) starts its dialogue.",
+      "methods": [
+        {
+          "name": "dialogue",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the name of its dialogue file"
+        }
+      ],
+      "internal": [
+        "start",
+        "on_interact"
+      ],
+      "guide": "dialogue.md"
+    },
+    {
+      "name": "DialogueBox",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.",
+      "methods": [
+        {
+          "name": "letters_shown",
+          "static": true,
+          "params": [
+            {"name": "letters", "type": "Integer"},
+            {"name": "seconds", "type": "Float"},
+            {"name": "speed", "type": "Float"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "how many of a line's letters show after that many seconds at that speed (0: all)"
+        },
+        {
+          "name": "whole?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the line it shows has all of its letters out (true while it shows none)"
+        },
+        {
+          "name": "pad",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the player whose gamepad works it (0 unless said)"
+        },
+        {
+          "name": "letters_per_second",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how fast a line appears (45 unless said; 0: at once)"
+        }
+      ],
+      "internal": [
+        "update"
+      ],
+      "guide": "dialogue.md#showing-a-conversation"
+    },
+    {
       "name": "Interaction",
       "kind": "module",
       "about": "Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides.",
@@ -5530,11 +6102,218 @@
         "on_hear",
         "on_interact",
         "on_lose_sight",
+        "on_schedule",
         "on_see",
         "thinks_here?",
         "update"
       ],
       "guide": "npcs.md#brain"
+    },
+    {
+      "name": "GameClock",
+      "kind": "module",
+      "about": "The time of day in the game's world, on game time: what schedules follow.",
+      "methods": [
+        {
+          "name": "hour",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "the hour of the day, its minutes as a fraction: 0 up to 24"
+        },
+        {
+          "name": "minute",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the minute of the hour"
+        },
+        {
+          "name": "minute_of_day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "whole minutes since midnight: 0 up to 1439"
+        },
+        {
+          "name": "day",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "the day it is, from 1"
+        },
+        {
+          "name": "to_s",
+          "static": true,
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the time as \"HH:MM\""
+        },
+        {
+          "name": "set",
+          "static": true,
+          "params": [
+            {"name": "hour", "type": "Integer", "keyword": true},
+            {"name": "minute", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "day", "type": "Integer", "keyword": true, "optional": true, "default": "GameClock.day"}
+          ],
+          "returns": {"type": "void"},
+          "about": "sets the time of day in whole hours and minutes (and the day, from 1)"
+        },
+        {
+          "name": "speed",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "game seconds for each second of game time (60 unless said)"
+        },
+        {
+          "name": "speed=",
+          "static": true,
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "changes it (0 stops the clock)"
+        },
+        {
+          "name": "state",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Float]"},
+          "about": "what to save: { seconds:, speed: }"
+        },
+        {
+          "name": "restore",
+          "static": true,
+          "params": [
+            {"name": "saved", "type": "Hash[Symbol | String, Numeric] | nil"}
+          ],
+          "returns": {"type": "void"},
+          "about": "back to a saved state; nil (nothing saved yet) leaves the clock as it is"
+        },
+        {
+          "name": "seconds",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds of the world's time since the first day began"
+        }
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "Schedule",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity).",
+      "methods": [
+        {
+          "name": "current",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the activity it is time for, or nil"
+        },
+        {
+          "name": "plan",
+          "params": [],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "[[minute of the day, activity], ...] in the order of the day"
+        },
+        {
+          "name": "plan=",
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Hash[String, Symbol | String] | String"},
+          "about": "changes the plan: { \"06:00\" => :work } or \"06:00 work, ...\""
+        },
+        {
+          "name": "parse",
+          "static": true,
+          "params": [
+            {"name": "given", "type": "Hash[String, Symbol | String] | String"}
+          ],
+          "returns": {"type": "Array[[Integer, Symbol]]"},
+          "about": "a plan as given, in the order of the day"
+        },
+        {
+          "name": "activity_at",
+          "static": true,
+          "params": [
+            {"name": "plan", "type": "Array[[Integer, Symbol]]"},
+            {"name": "minute_of_day", "type": "Integer"}
+          ],
+          "returns": {"type": "Symbol | nil"},
+          "about": "what a plan says for a minute of the day"
+        },
+        {
+          "name": "minute_of",
+          "static": true,
+          "params": [
+            {"name": "time", "type": "String"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "\"06:30\" as minutes of the day (390)"
+        }
+      ],
+      "internal": [
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#daily-schedules"
+    },
+    {
+      "name": "HeadLook",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target.",
+      "methods": [
+        {
+          "name": "target",
+          "params": [],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "what it looks at instead of the heroes, or nil"
+        },
+        {
+          "name": "target=",
+          "params": [
+            {"name": "target", "type": "GameObject | Vector3 | nil"}
+          ],
+          "returns": {"type": "GameObject | Vector3 | nil"},
+          "about": "sets it (nil: the heroes)"
+        },
+        {
+          "name": "nearest_hero",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
+          "about": "the nearest hero in range and in front of it, or nil"
+        },
+        {
+          "name": "bone",
+          "params": [],
+          "returns": {"type": "GameObject"},
+          "about": "the head's bone"
+        },
+        {
+          "name": "range",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "meters to a hero (4 unless said)"
+        },
+        {
+          "name": "angle",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "degrees off its forward a hero may be at, and the most the head turns (70 unless said)"
+        }
+      ],
+      "internal": [
+        "on_destroy",
+        "start",
+        "update"
+      ],
+      "guide": "npcs.md#head-look-at"
     }
   ]
 }

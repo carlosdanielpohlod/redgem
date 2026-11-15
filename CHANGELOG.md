@@ -10,6 +10,40 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
+- **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
+  one another by `next`, by branches with conditions, or by the player's choices, with conditions
+  on variables and quest stages and effects that set or add to variables, move quests and tell the
+  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
+  (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
+  `GameVariables` hold the values every player shares. Over the network each player has a
+  conversation of their own, the host follows it step by step and its effects happen there.
+  `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
+  keys and texts missing from `locales/`. Quest stages are variables until a game sets
+  `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
+- **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
+  time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
+  `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
+  its object hears `on_schedule(activity)`, its Brain the `:schedule` event, and a transition
+  `to: :scheduled` goes to the state of the activity it is time for. `animation.look_at(target)`
+  turns a character's head bone toward a point or an object in engine C++, on top of its clips'
+  pose, within a largest angle and easing in and out (`look_away`, `looking?`, `bone`). A
+  `HeadLook` behaviour looks at the nearest hero in range and in front, or at a target.
 - **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
   states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
   transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
@@ -501,6 +535,10 @@ until 1.0, a release may change what games rely on (see
   `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
   them. The prelude's growth made it most of the scripts' frame. The engine now looks each name up
   once: a frame of 1000 behaviours takes about 0.65 ms instead of 2.
+- **Perception resets with each scene**: loading a scene logged "resetting the handlers of
+  Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
+  modules by name and Perception is a class. It now finds classes too, so a new scene starts with
+  no senses left from the one before.
 - **Web requests end with their game**: their threads used to be detached, so one still running
   at exit could outlive the program's static objects. A game that ends (or an editor play session
   that stops) now gives every request on its way up, hangs up its connection so its wait ends at

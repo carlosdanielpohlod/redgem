@@ -1,5 +1,5 @@
 ---
-description: "NPCs: a Brain (a state machine with transitions, guards, timers and events), and Perception (a sight cone with a line of sight, and hearing)."
+description: "NPCs: a Brain (a state machine with transitions, guards, timers and events), Perception (a sight cone with a line of sight, and hearing), daily schedules on a game clock, and head look-at."
 ---
 
 # NPCs
@@ -9,6 +9,8 @@ A character the player meets is made of a few behaviours on one object:
 - a `Brain`, which says what it is doing (patrolling, chasing, talking) and what makes it do
   something else;
 - a `Perception`, which tells the brain what it sees and hears;
+- a `Schedule`, which says what it does at each hour of the game's day;
+- a `HeadLook`, which turns its head toward who is near;
 - an [`Interactable`](interaction.md), when the player can talk to it or use it.
 
 ```ruby
@@ -79,6 +81,7 @@ The events the engine fires on its own:
 | `:lose_sight` | ... and go out of it | the object |
 | `:hear` | the Perception hears a noise | a `Perception::Noise` |
 | `:interact` | the player uses the object's Interactable | the actor (the hero) |
+| `:schedule` | the hour of another activity of its Schedule came | the activity (a Symbol) |
 
 The game fires its own with `brain.fire(:hit, damage)`; `fire` is true when the brain changed
 state. `brain.go(:stunned)` changes state at once, whatever the transitions say. `state`,
@@ -136,11 +139,88 @@ not; the noise's `source` does not hear itself. Its object's behaviours hear
 | `watch` | the tag of what it looks for | the heroes |
 
 Each setting is also a Blender property of the object. One that is not a number from 0 up
-raises as the behaviour starts. While the game is paused it notices nothing new.
+raises as the behaviour starts, and so does a plan with two entries at one time. While the game is paused it notices nothing new.
+
+## Daily schedules
+
+`GameClock` is the time of day in the game's world. It starts at 06:00 of day 1 and runs on game
+time, so it stands still while the game is paused. Unless told, a game minute goes by each
+second, and a day takes 24 minutes. It goes on across levels.
+
+```ruby
+GameClock.to_s                        # "06:30"
+GameClock.hour                        # 6.5
+GameClock.day                         # 1
+GameClock.set(hour: 21, minute: 30)   # night falls (whole numbers; day: too, from 1)
+GameClock.speed = 120.0               # game seconds each second: a day in 12 minutes (0 stops it)
+Save.set(:clock, GameClock.state)     # saving it is the game's ...
+GameClock.restore(Save.get(:clock))   # ... and restoring it (nil, nothing saved yet: as it is)
+```
+
+A `Schedule` is an NPC's day: what it does from what time. Each entry lasts until the next, and
+the last one lasts through midnight until the first:
+
+```ruby
+baker.add_component(Schedule, plan: { "06:00" => :bake, "12:30" => :sell, "20:00" => :sleep })
+baker.add_component(Schedule, plan: "06:00 bake, 12:30 sell, 20:00 sleep")  # as a Blender property
+```
+
+`schedule.current` is the activity it is time for. As the hour of another one comes, the object's
+behaviours hear `on_schedule(activity)`, and its Brain the `:schedule` event. A transition
+`to: :scheduled` goes to the state named after the activity it is time for:
+
+```ruby
+class Baker < Brain
+  state :bake
+  state :sell
+  state :sleep
+  state :flee
+  transition from: %i[bake sell sleep], to: :scheduled, on: :schedule   # follows the day
+  transition from: :any, to: :flee, on: :hear
+  transition from: :flee, to: :scheduled, after: 10.0                   # back to what it is time for
+end
+```
+
+A transition to `:scheduled` is not taken when the brain has no state of that activity's name,
+and it never leads to the state the brain is in. A plan that is not `"HH:MM activity"` entries
+raises as the behaviour starts, and so does a plan with two entries at one time.
+
+## Head look-at
+
+An NPC's head can turn toward something, on top of what its clips do. The engine turns the bone
+after the clips and the scripts each frame, no further than a largest angle off the pose the clips
+gave it, and eases in as it starts and out as it stops:
+
+```ruby
+animation.look_at(player)                                # the "Head" bone toward its eyes, at most 60 degrees
+animation.look_at(Vector3.new(0, 2, 5), bone: "Neck", max_angle: 45.0)
+animation.look_away                                      # back to the clips' pose
+animation.looking?                                       # still turned, or on its way back
+animation.bone("Head")                                   # the bone object, or nil
+```
+
+A bone looks at an object's eyes (1.6 m above its origin) and holds there until `look_away`; call
+`look_at` every frame to follow something that moves. A bone is found under the character by
+its name, or by that name after a rig's prefix (`"mixamorig:Head"` is a `"Head"`). Its forward is
+the way the character faced when it started to look.
+
+A `HeadLook` behaviour does this on its own: each frame it looks at the eyes of the nearest hero in
+range and in front of it, or at its `target` (an object or a point) when the game sets one.
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `bone` | the name of the head's bone | `"Head"` |
+| `range` | meters to a hero | 4 |
+| `angle` | degrees off its forward a hero may be at, and the most the head turns | 70 |
+| `aim` | meters above a hero's origin it looks at | 1.6 |
+
+Look-at is what each machine sees: a HeadLook runs on every machine, each toward the heroes it
+sees.
 
 ## Over the network
 
 Only the host thinks and perceives: on a client, a `Brain` and a `Perception` do nothing, and a
 noise made there is heard by nobody. The host moves the NPC, and the players see it move through
-its [NetworkSync](multiplayer.md). An NPC's `on_interact` runs on the host already (see
+its [NetworkSync](multiplayer.md). Each machine keeps its own `GameClock`: the host tells the
+others the time, with a message of the game's own. An NPC's `on_interact` runs on the host already (see
 [Interaction over the network](interaction.md)).

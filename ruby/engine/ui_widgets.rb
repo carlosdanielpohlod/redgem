@@ -41,11 +41,11 @@ module UI
       @index = 0
     end
 
-    # Moves among `count` widgets, as up or down was pressed this frame.
-    def update(count)
+    # Moves among `count` widgets, as up or down was pressed this frame (on gamepad `pad`).
+    def update(count, pad: Input::FIRST_PAD)
       return @index = 0 unless count.positive?
 
-      @index = (@index + UI.direction(UP, DOWN)) % count
+      @index = (@index + UI.direction(UP, DOWN, pad: pad)) % count
     end
 
     def at?(index) = @index == index
@@ -64,7 +64,9 @@ module UI
   end
 
   # 1 when `forth` was pressed this frame, -1 for `back`, 0 for neither (or both).
-  def self.direction(back, forth) = (pressed_any?(forth) ? 1 : 0) - (pressed_any?(back) ? 1 : 0)
+  def self.direction(back, forth, pad: Input::FIRST_PAD)
+    (pressed_any?(forth, pad: pad) ? 1 : 0) - (pressed_any?(back, pad: pad) ? 1 : 0)
+  end
 
   # -1 (left), 1 (right) or 0, as pressed this frame.
   def self.sideways = direction(LEFT, RIGHT)

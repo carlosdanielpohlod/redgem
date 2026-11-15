@@ -23,6 +23,11 @@ constexpr const char* kRunSceneScriptEntry = "__run";
 
 std::string object_called(const std::string& name) { return "object '" + name + "'"; }
 
+// What an engine module's name may hold: a module (Network) or a class with class methods (Perception).
+bool is_module_or_class(mrb_value constant) {
+  return mrb_type(constant) == MRB_TT_MODULE || mrb_type(constant) == MRB_TT_CLASS;
+}
+
 }  // namespace
 
 void ScriptHost::attach_scripts() {
@@ -70,7 +75,7 @@ mrb_value ScriptHost::module_named(const char* name) {
   mrb_state* mrb = vm_.state();
   if (!mrb_class_defined(mrb, name)) return mrb_nil_value();
   const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name));
-  return mrb_type(constant) == MRB_TT_MODULE ? constant : mrb_nil_value();
+  return is_module_or_class(constant) ? constant : mrb_nil_value();
 }
 
 bool ScriptHost::defines_its_class(const std::string& script, const std::string& class_name, const std::string& where) {

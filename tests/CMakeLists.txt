@@ -5,6 +5,7 @@ add_executable(redgem_tests
   unit/body_limit_test.cpp
   unit/nav_settings_test.cpp
   unit/nav_path_test.cpp
+  unit/nav_steering_test.cpp
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
@@ -24,6 +25,7 @@ add_executable(redgem_tests
   unit/names_test.cpp
   unit/folder_names_test.cpp
   unit/texts_test.cpp
+  unit/dialogue_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -48,6 +50,7 @@ add_executable(redgem_tests
   unit/gltf_loader_safety_test.cpp
   unit/spatial_audio_test.cpp
   unit/music_player_test.cpp
+  unit/music_ducking_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
@@ -185,6 +188,7 @@ add_executable(redgem_tests
   unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/head_aim_test.cpp
   unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp
@@ -210,6 +214,7 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
@@ -234,6 +239,7 @@ add_executable(redgem_tests
   integration/save_migration_api_test.cpp
   integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
   integration/debug_draw_api_test.cpp
