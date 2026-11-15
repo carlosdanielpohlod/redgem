@@ -37,7 +37,9 @@ class AudioSystem {
   virtual void set_group_volume(MixGroup, float) {}
   // How the music group goes down while a voice plays (Audio.ducking); false for ducking that is
   // not valid, which changes nothing.
-  virtual bool set_music_ducking(const MusicDucking&) { return false; }
+  virtual bool set_music_ducking(const MusicDucking& ducking) { return valid_music_ducking(ducking); }
+  // The default ducking, and the music back at full volume at once: the game ended.
+  virtual void reset_music_ducking() {}
 
   // A new track fades in over `request.fade_seconds` while the one playing fades out.
   virtual bool play_music(const std::string& name, const MusicRequest& request) = 0;
@@ -105,6 +107,7 @@ class MixedAudio : public AudioSystem {
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
   bool set_music_ducking(const MusicDucking& ducking) override;
+  void reset_music_ducking() override;
   bool play_music(const std::string& name, const MusicRequest& request) override;
   void fade_out_music(float seconds) override;
   void set_music_pitch(float pitch) override;

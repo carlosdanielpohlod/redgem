@@ -177,12 +177,18 @@ void SoundPool::set_group_gain(MixGroup group, float gain) {
   current = gain;
   refresh();
 }
-bool SoundPool::group_playing(MixGroup group) const {
+bool SoundPool::group_heard(MixGroup group) const {
   for (const auto& [id, sound] : sounds_) {
     if (sound.group != group) continue;
-    if (driver_.playing(id)) return true;
+    if (heard(id, sound)) return true;
   }
   return false;
+}
+bool SoundPool::heard(SoundSourceId id, const SpatialSound& sound) const {
+  const auto mix = mix_of(sound);
+  if (!mix) return false;
+  if (mix->volume <= 0.0f) return false;
+  return driver_.playing(id);
 }
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
 bool SoundPool::stop(SoundSourceId id) {

@@ -24,6 +24,7 @@ constexpr float kMusicVolume = 0.7f;  // Audio.music's own default
 constexpr float kFadeSeconds = 0.5f;
 // Frames that see a fade of kFadeSeconds through, at the engine's fixed step, and one more.
 constexpr int kFramesPastFade = static_cast<int>(kFadeSeconds / config::kFixedDeltaSeconds) + 2;
+constexpr int kFramesPastRelease = static_cast<int>(kDefaultDuckRelease / config::kFixedDeltaSeconds) + 2;
 
 // A sound driver that keeps what it was asked to play (every name is there).
 class HandleTestDriver final : public SoundDriver {
@@ -265,6 +266,8 @@ TEST_CASE("the music ducks by default over the attack, and a ducked volume of 1 
   CHECK(audio.tracks().begin()->second.volume == doctest::Approx(kDefaultDuckedVolume));
   CHECK(ruby(*engine, "Audio.ducking(volume: Audio::NO_DUCKING)") == "true");
   frames(*engine, 1);
+  CHECK(audio.tracks().begin()->second.volume < kFullVolume);  // (it comes back over the release)
+  frames(*engine, kFramesPastRelease);
   CHECK(audio.tracks().begin()->second.volume == doctest::Approx(kFullVolume));
 }
 
@@ -282,8 +285,11 @@ TEST_CASE("a game's ducking ends with it") {
   testing::RecordingAudio audio;
   {
     auto engine = sandbox(audio);
-    ruby(*engine, "Audio.ducking(volume: 0, attack: 0)");
+    ruby(*engine, "Audio.ducking(volume: 0, attack: 0); Audio.play(:beep, loop: true, group: :voice)");
+    frames(*engine, 1);
+    REQUIRE(audio.music_ducked() == doctest::Approx(0.0f));
   }
+  CHECK(audio.music_ducked() == doctest::Approx(kFullVolume));  // (at once, not over a release)
   FlatSound line;
   line.loop = true;
   line.group = MixGroup::Voice;
