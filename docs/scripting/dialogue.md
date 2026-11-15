@@ -21,7 +21,7 @@ change the game's shared values, `GameVariables`, and quest stages.
     "hello": {
       "speaker": "baker.name",
       "text": "baker.hello",
-      "voice": "baker/hello.ogg",
+      "voice": "baker/hello",
       "effects": [{ "set": "met_baker", "to": true }],
       "next": "offer"
     },
@@ -62,7 +62,7 @@ itself calls `Dialogue.start("baker", actor: hero, speaker: baker)` from its own
 |---|---|
 | `text` | The line: an I18n key. Every node has one. |
 | `speaker` | Who says it: the I18n key of the name shown. |
-| `voice` | A sound in `sounds/` for the line. It is kept, but nothing plays it yet. |
+| `voice` | A sound in `sounds/` for the line, named as `Audio.play` names one (`"baker/hello"` is `sounds/baker/hello.ogg`). See [Voice](#voice). |
 | `effects` | What happens as the conversation reaches the node. |
 | `next` | Where it goes on: a node's id, or a list of branches. |
 | `choices` | What the player may answer, instead of `next`. |
@@ -164,6 +164,37 @@ Dialogue.stop                              # the player leaves it
 `Dialogue.on(:start)` hears of a new one. What `Dialogue.on` registers lasts until the next level
 is loaded, and a level that loads ends every conversation.
 
+## Voice
+
+A line with a `voice` plays its clip as it is shown, in the `:voice` group: the player's voice
+volume applies to it, and the music ducks under it (see `Audio.ducking`). The clip plays from the
+speaker's head and follows it as it moves: the bone of the speaker's `HeadLook`, or its bone called
+`Head`, or the speaker itself when it has neither. A conversation with no speaker hears it with no
+place in the world.
+
+The subtitle (the line's text) shows for as long as the clip plays. A line with no choices goes on
+by itself when its clip ends; the player can skip it before (`conversation.continue`), which stops
+the clip. A line with choices waits for one after its clip. A voice whose sound is not there plays
+nothing, and the line waits for the player, as one with no voice does.
+
+```ruby
+conversation.speaking?                     # its line's clip plays
+```
+
+A speaker with a `VoiceMouth` moves its mouth with the clip's loudness, which the engine follows as
+the clip plays (`Audio.loudness(handle)`, 0 to 1): a shape key opens from 0 to 1, or a jaw bone
+turns about its own X axis from the pose its clips give it.
+
+```ruby
+find!("Baker").add_component(VoiceMouth, morph: "MouthOpen")
+find!("Guard").add_component(VoiceMouth, jaw: "Jaw", angle: 18.0)
+```
+
+`VoiceMouth` takes `morph` (a shape key), `jaw` (a bone; a rig's prefix, as in `mixamorig:Jaw`, is
+fine), `angle` (degrees the jaw turns when the mouth is all open: 15 unless said) and `full` (the
+loudness that opens it all the way: 0.25 unless said). It can also follow a clip a game plays
+itself: `mouth.follow(Audio.play_at(:hum, position, group: :voice))`.
+
 ## Over the network
 
 Each player has a conversation of their own, shown on that player's machine. `on_interact` runs
@@ -173,7 +204,9 @@ follows it step by step. The client says every step it takes, and the host takes
 on its copy: the effects happen on the host, which then tells every machine of the variables that
 changed. A step the host would not take (a choice whose conditions do not hold there) does not
 happen, and the client is put back where the host is. `Dialogue.start` raises on a client, and so
-does setting a `GameVariables` value there. A newcomer hears of every variable as it joins.
+does setting a `GameVariables` value there. A newcomer hears of every variable as it joins. A
+line's voice plays on the machine of the player in the conversation: the other players do not hear
+it.
 
 ## Checking dialogues
 
@@ -181,8 +214,8 @@ does setting a `GameVariables` value there. A newcomer hears of every variable a
 branch, condition or effect cannot have (a misspelt one), a node named that is not there, a node
 or choice that leads nowhere, a text key with no text in `locales/` (nor among the engine's), and a
 quest that is not in `quests/`, when the game has that folder. Warnings: a node nothing leads to,
-a node whose choices all have conditions, branches that all have one, and a text a language of the
-game lacks.
+a node whose choices all have conditions, branches that all have one, a text a language of the
+game lacks, and a voice whose sound is not in `sounds/`.
 
 ```text
 $ redgem check games/my_game

@@ -68,6 +68,8 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`GameClock`](#gameclock) | The time of day in the game's world, on game time: what schedules follow. | [Experimental](stability.md) |
 | [`Schedule`](#schedule) | A behaviour: an NPC's day, what it does from what time by the GameClock; its behaviours hear on_schedule(activity). | [Experimental](stability.md) |
 | [`HeadLook`](#headlook) | A behaviour: turns an NPC's head toward the nearest hero in range and in front, or toward its target. | [Experimental](stability.md) |
+| [`VoiceMouth`](#voicemouth) | A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:). | [Experimental](stability.md) |
+| [`Dialogue::Voice`](#dialoguevoice) | The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown). | [Experimental](stability.md) |
 
 ## Behaviour
 
@@ -163,6 +165,8 @@ Where an object is, how it is turned and how big it is.
 - `local_position = Vector3 vector`: moves it relative to its parent
 - `rotation -> Vector3`: its rotation, Euler degrees (Vector3)
 - `rotation = Vector3 degrees`: turns it to those Euler degrees
+- `local_rotation -> Vector3`: its rotation relative to its parent, Euler degrees (Vector3) *Experimental.*
+- `local_rotation = Vector3 degrees`: turns it to those Euler degrees relative to its parent *Experimental.*
 - `rotate(Vector3 degrees) -> void`: turns it by those Euler degrees
 - `look_at(Vector3 | GameObject target, Vector3 up = Vector3.up) -> void`: turns it to face a point
 - `translate(Vector3 offset) -> void`: moves it by an offset
@@ -555,6 +559,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.move(Integer id, Vector3 position) -> void`: moves a sound played with play_at
 - `Audio.playing?(Integer id) -> bool`: whether that sound still plays
 - `Audio.stop(Integer id) -> void`: stops that sound
+- `Audio.loudness(Integer | nil id) -> Float`: how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended *Experimental.*
 - `Audio.stop_sources -> void`: stops every sound played with play or play_at
 
 Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A game makes groups of its own with `Audio.group(:cave, parent: :effects, volume: 0.8)`, 13 at most, and plays sounds in them by name; a group is heard at its volume times the volumes of the groups over it, and the game's groups end with it. `Audio.effects(group, low_pass:, reverb:)` puts effects on the sounds of a group and of the groups under it: `low_pass` (20 to 20000 Hz) muffles them, and the lowest cutoff over a sound is the one it gets; `reverb` (0 to 1) sends that much of each sound to the reverb of the nearest group that has one. Effects are on sounds, not on the music's tracks. A track that cannot play leaves the one playing as it was. While a sound of the `:voice` group plays, the music and the sounds of the `:music` group duck: they go down to `volume` (0.4 unless `Audio.ducking` says) over `attack` seconds, and come back over `release` seconds once no voice plays. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused.
@@ -950,7 +955,8 @@ One player's way through a dialogue: the line it is at, the choices offered, and
 - `text_key -> String | nil`: the I18n key of the line *Experimental.*
 - `speaker_name -> String | nil`: who says it, in the language in use (nil when the node names nobody) *Experimental.*
 - `speaker_key -> String | nil`: the I18n key of who says it, or nil *Experimental.*
-- `voice -> String | nil`: the sound the line names, or nil (kept for later: nothing plays it yet) *Experimental.*
+- `voice -> String | nil`: the sound of the line's voice clip (in sounds/), or nil *Experimental.*
+- `speaking? -> bool`: whether the line's voice clip plays; a line with no choices goes on by itself as it ends *Experimental.*
 - `choices -> Array[Dialogue::Conversation::Choice]`: the choices offered now: those whose conditions hold *Experimental.*
 - `choosing? -> bool`: whether the player answers this line by choosing *Experimental.*
 - `continue -> bool`: on from a line with no choices: to what follows, or the end; false when it waits for a choice *Experimental.*
@@ -1108,6 +1114,25 @@ A behaviour: turns an NPC's head toward the nearest hero in range and in front, 
 - `bone -> GameObject`: the head's bone *Experimental.*
 - `range -> Float`: meters to a hero (4 unless said) *Experimental.*
 - `angle -> Float`: degrees off its forward a hero may be at, and the most the head turns (70 unless said) *Experimental.*
+
+## VoiceMouth
+
+A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:). *Experimental.* See [dialogue.md#voice](dialogue.md#voice).
+
+- `follow(Integer | nil handle) -> Integer | nil`: moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker *Experimental.*
+- `openness -> Float`: how open the mouth is now, 0 to 1 *Experimental.*
+- `VoiceMouth.openness_at(Numeric loudness, Numeric full) -> Float`: how open a mouth is (0 to 1) for a voice of that loudness, all open from full *Experimental.*
+
+## Dialogue::Voice
+
+The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown). *Experimental.* See [dialogue.md#voice](dialogue.md#voice).
+
+- `Dialogue::Voice.play(String | Symbol name, GameObject | nil speaker) -> Dialogue::Voice | nil`: plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play *Experimental.*
+- `handle -> Integer | nil`: the clip's sound handle *Experimental.*
+- `playing? -> bool`: whether the clip still plays *Experimental.*
+- `follow -> void`: moves the clip to where the speaker's head is now *Experimental.*
+- `place -> Vector3`: where the clip plays from: the speaker's head, or the speaker *Experimental.*
+- `stop -> bool`: stops the clip *Experimental.*
 
 ## Notes
 

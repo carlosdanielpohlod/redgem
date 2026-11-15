@@ -31,6 +31,9 @@ class AudioSystem {
   virtual bool set_sound_levels(SoundSourceId, const SoundLevels&) { return false; }
   virtual bool sound_playing(SoundSourceId) const { return false; }
   virtual bool stop_sound(SoundSourceId) { return false; }
+  // How loud a sound of the voice group is as it plays (0 to 1, smoothed, before its volume): what
+  // a mouth follows (Audio.loudness). 0 for other sounds, and once it ended.
+  virtual float sound_loudness(SoundSourceId) const { return kSilence; }
   // Releases every sound with a handle; the music keeps playing.
   virtual void stop_sounds() {}
   // The player's volume of one of the engine's groups (Settings.music_volume...): what each sound
@@ -123,6 +126,7 @@ class MixedAudio : public AudioSystem {
   bool set_sound_levels(SoundSourceId id, const SoundLevels& levels) override;
   bool sound_playing(SoundSourceId id) const override;
   bool stop_sound(SoundSourceId id) override;
+  float sound_loudness(SoundSourceId id) const override;
   void stop_sounds() override;
   void set_group_volume(MixGroup group, float volume) override;
   std::optional<MixGroup> define_group(const std::string& name, MixGroup parent, std::optional<float> volume) override;

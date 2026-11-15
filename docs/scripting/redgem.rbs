@@ -252,6 +252,12 @@ class Transform
   # turns it to those Euler degrees
   %a{redgem:stable}
   def rotation=: (Vector3 degrees) -> Vector3
+  # its rotation relative to its parent, Euler degrees (Vector3)
+  %a{redgem:experimental}
+  def local_rotation: () -> Vector3
+  # turns it to those Euler degrees relative to its parent
+  %a{redgem:experimental}
+  def local_rotation=: (Vector3 degrees) -> Vector3
   # turns it by those Euler degrees
   %a{redgem:stable}
   def rotate: (Vector3 degrees) -> void
@@ -1164,6 +1170,9 @@ module Audio
   # stops that sound
   %a{redgem:stable}
   def self.stop: (Integer id) -> void
+  # how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended
+  %a{redgem:experimental}
+  def self.loudness: (Integer | nil id) -> Float
   # stops every sound played with play or play_at
   %a{redgem:stable}
   def self.stop_sources: () -> void
@@ -2009,9 +2018,12 @@ class Dialogue::Conversation
   # the I18n key of who says it, or nil
   %a{redgem:experimental}
   def speaker_key: () -> (String | nil)
-  # the sound the line names, or nil (kept for later: nothing plays it yet)
+  # the sound of the line's voice clip (in sounds/), or nil
   %a{redgem:experimental}
   def voice: () -> (String | nil)
+  # whether the line's voice clip plays; a line with no choices goes on by itself as it ends
+  %a{redgem:experimental}
+  def speaking?: () -> bool
   # the choices offered now: those whose conditions hold
   %a{redgem:experimental}
   def choices: () -> Array[Dialogue::Conversation::Choice]
@@ -2353,4 +2365,41 @@ class HeadLook < Behaviour
   # degrees off its forward a hero may be at, and the most the head turns (70 unless said)
   %a{redgem:experimental}
   def angle: () -> Float
+end
+
+# A behaviour: moves a speaker's mouth with the loudness of its voice, through a shape key (morph:) or a jaw bone (jaw:, angle:).
+%a{redgem:experimental}
+class VoiceMouth < Behaviour
+  # moves the mouth with that sound (a handle of the :voice group) in place of the one it followed; a dialogue line's voice does it for its speaker
+  %a{redgem:experimental}
+  def follow: (Integer | nil handle) -> (Integer | nil)
+  # how open the mouth is now, 0 to 1
+  %a{redgem:experimental}
+  def openness: () -> Float
+  # how open a mouth is (0 to 1) for a voice of that loudness, all open from full
+  %a{redgem:experimental}
+  def self.openness_at: (Numeric loudness, Numeric full) -> Float
+end
+
+# The clip of a dialogue line's voice, playing from the speaker's head in the :voice group (made by the conversation shown).
+%a{redgem:experimental}
+class Dialogue::Voice
+  # plays a line's clip from the speaker's head (with no place in the world for no speaker); nil when it does not play
+  %a{redgem:experimental}
+  def self.play: (String | Symbol name, GameObject | nil speaker) -> (Dialogue::Voice | nil)
+  # the clip's sound handle
+  %a{redgem:experimental}
+  def handle: () -> (Integer | nil)
+  # whether the clip still plays
+  %a{redgem:experimental}
+  def playing?: () -> bool
+  # moves the clip to where the speaker's head is now
+  %a{redgem:experimental}
+  def follow: () -> void
+  # where the clip plays from: the speaker's head, or the speaker
+  %a{redgem:experimental}
+  def place: () -> Vector3
+  # stops the clip
+  %a{redgem:experimental}
+  def stop: () -> bool
 end
