@@ -178,12 +178,14 @@ void Engine::follow_group_volume(MixGroup group, float volume) {
   audio().set_group_volume(group, volume);
 }
 
-// The game's sounds end with it, and its player's group volumes with them (the audio may go on
-// sounding for someone else: the editor's previews).
+// The game's sounds end with it, and its player's group volumes, its ducking and its own groups
+// with them (the audio may go on sounding for someone else: the editor's previews).
 void Engine::release_audio() {
   if (!audio_open()) return;  // (the engine failed to start before it had any)
   audio().stop_sounds();
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
+  audio().reset_music_ducking();
+  audio().forget_game_groups();
 }
 
 void Engine::connect_display() {

@@ -39,11 +39,14 @@ std::string ruby(Engine& engine, const std::string& code) {
 
 TEST_CASE("loading a scene twice resets Perception's senses with no error") {
   auto engine = sandbox();
+  engine->frame(config::kFixedDeltaSeconds);
+  // The sandbox's first scene has broken scripts of its own on purpose: only the loads count.
+  const int errors_before = engine->scripts().error_count();
   for (int load = 0; load < kLoads; ++load) {
     ruby(*engine, std::string("Perception.registered << :from_the_scene_before; Game.load_scene('") + kLevel + "')");
     engine->frame(config::kFixedDeltaSeconds);
     REQUIRE(engine->scene_name() == kLevel);
     CHECK(ruby(*engine, "Perception.registered.empty?") == "true");
   }
-  CHECK(engine->scripts().error_count() == 0);
+  CHECK(engine->scripts().error_count() == errors_before);
 }

@@ -9,21 +9,30 @@
 // defines, their parameters included.
 //
 // A method in that file:
-//   {"name": "tween", "params": [P...], "returns": {"type": "Behaviour::Timer"}, "about": "...",
-//    "static": true (called on the class or module), "top": 3, "example": "..."}
+//   {"name": "tween", "stability": "stable", "params": [P...], "returns": {"type": "Behaviour::Timer"},
+//    "about": "...", "static": true (called on the class or module), "top": 3, "example": "..."}
 // and each of its parameters, in the order a call gives them:
 //   {"name": "ease", "type": "Symbol", "keyword": true, "optional": true, "default": ":smooth"}
 // with "keyword" (ease: :linear), "rest" (*names, or **settings with "keyword"), "block" (&block,
 // last), "optional" and "default" (Ruby, as a call would write it; every optional parameter has
 // one, but a block and a rest) all left out when false or empty. Types are in api_types.hpp's
-// language. A class: {"name", "kind": "class" or "module", "superclass" (when not Object),
-// "about", "guide", "methods", "notes", "internal"}.
+// language. A class: {"name", "stability", "kind": "class" or "module", "superclass" (when not
+// Object), "about", "guide", "methods", "notes", "internal"}. "stability" is "stable" (no breaking
+// change within a 1.x minor) or "experimental" (it may change in any release); an experimental
+// class has no stable method. Every class and method has one: a test refuses one without.
 
 #include <cstddef>
 #include <string>
 #include <vector>
 
 namespace redgem::tools {
+
+// Whether games may rely on a class or a method (docs/scripting/stability.md).
+enum class ApiStability {
+  Unmarked,      // the reference does not say: a mistake the tests catch
+  Stable,        // no breaking change within a 1.x minor release
+  Experimental,  // may change in any release
+};
 
 struct ApiParam {
   std::string name;
@@ -43,6 +52,7 @@ struct ApiMethod {
   bool on_class = false;  // called on the class or module (Input.axis), not on an instance
   int top = 0;            // its rank among the calls games make most (1 is first); 0 when not ranked
   std::string example;    // a line of Ruby, for the ranked ones
+  ApiStability stability = ApiStability::Unmarked;
 };
 
 struct ApiClass {
@@ -53,6 +63,7 @@ struct ApiClass {
   std::string guide;  // the manual's page about it, from docs/scripting/ ("behaviours.md")
   std::string notes;  // what one line per method cannot say
   std::vector<ApiMethod> methods;
+  ApiStability stability = ApiStability::Unmarked;
   // Methods the class has for the engine's own use (public in Ruby, not for games): listed so
   // the tests know they are not forgotten, and shown nowhere.
   std::vector<std::string> internal;
@@ -82,6 +93,10 @@ const std::string& api_reference_json();
 std::string signature(const ApiClass& owner, const ApiMethod& method);
 // ... with its types: "Input.axis(Symbol name, pad: Integer = 0) -> Float".
 std::string typed_signature(const ApiClass& owner, const ApiMethod& method);
+// "stable", "experimental", or nothing for an unmarked one.
+const char* stability_name(ApiStability stability);
+// The classes and methods with no stability mark: "NPC", "Input.axis", "Transform#rotate".
+std::vector<std::string> unmarked_bindings(const ApiReference& reference);
 // The class of that name (any case); nullptr when there is none.
 const ApiClass* find_api_class(const ApiReference& reference, const std::string& name);
 

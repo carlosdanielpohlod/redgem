@@ -42,9 +42,10 @@ compilers are pinned: llvm-mingw by `tools/windows/fetch_toolchain.sh`, the Andr
 `tools/android/fetch_toolchain.sh`, the runners by their image names.
 
 1. Bump the version in `CMakeLists.txt` and move the `[Unreleased]` part of `CHANGELOG.md` under
-   it, on a branch named `release-<version>`, and open its pull request. Its run builds the five
-   downloads from the branch's head and keeps them as the run's artifacts (`redgem-<system>`):
-   try them. It touches no release. It fails at once when the branch does not name the version
+   it, with its **Migrating** section (what a game made with the release before must change, or
+   that it needs nothing; see `docs/scripting/stability.md`), on a branch named
+   `release-<version>`, and open its pull request. Its run builds the five downloads from the
+   branch's head and keeps them as the run's artifacts (`redgem-<system>`): try them. It touches no release. It fails at once when the branch does not name the version
    in `CMakeLists.txt`, or when that version's release is published already.
 2. Merge it, and push the tag: `git tag v<version> <merge commit> && git push origin v<version>`.
    The tag's run builds the downloads from the tag and attaches them to the tag's draft release,

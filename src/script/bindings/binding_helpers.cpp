@@ -68,10 +68,11 @@ bool is_placeable(const Scene& objects, ObjectId id) {
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
 Scene& scene(mrb_state* mrb) { return *context(mrb).scene; }
 ScriptBudget& script_budget(mrb_state* mrb) { return script_host(mrb).vm().budget_keeper(); }
+mrb_sym symbol(mrb_state* mrb, const char* name) { return script_host(mrb).vm().symbol(name); }
 
 ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self) {
-  const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
-  const mrb_value serial = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kSerialVariable));
+  const mrb_value id = mrb_iv_get(mrb, self, symbol(mrb, kIdVariable));
+  const mrb_value serial = mrb_iv_get(mrb, self, symbol(mrb, kSerialVariable));
   const bool bound = mrb_integer_p(id) && mrb_integer_p(serial);
   if (!bound) mrb_raise(mrb, E_TYPE_ERROR, "object is not bound to the scene");
   return {static_cast<ObjectId>(mrb_integer(id)), static_cast<ObjectSerial>(mrb_integer(serial))};
@@ -80,8 +81,8 @@ ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self) {
 GameObject& alive_object(mrb_state* mrb, mrb_value self) {
   const ObjectId found = scene(mrb).resolve(wrapped_handle(mrb, self));
   if (found == kNoObject) {
-    const mrb_value name = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kNameVariable));
-    const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
+    const mrb_value name = mrb_iv_get(mrb, self, symbol(mrb, kNameVariable));
+    const mrb_value id = mrb_iv_get(mrb, self, symbol(mrb, kIdVariable));
     mrb_raisef(mrb, E_RUNTIME_ERROR, "game object %v (id %v) was destroyed", name, id);
   }
   return scene(mrb).at(found);
@@ -126,7 +127,7 @@ mrb_value text_value(mrb_state* mrb, const std::string& text) {
 }
 
 void set_entry(mrb_state* mrb, mrb_value hash, const char* key, mrb_value value) {
-  mrb_hash_set(mrb, hash, mrb_symbol_value(mrb_intern_cstr(mrb, key)), value);
+  mrb_hash_set(mrb, hash, mrb_symbol_value(symbol(mrb, key)), value);
 }
 
 bool is_name(mrb_value value) { return mrb_symbol_p(value) || mrb_string_p(value); }
