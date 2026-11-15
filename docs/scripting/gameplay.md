@@ -492,7 +492,8 @@ sword.set_parent(hand, keep_world: false)         # its pose in the old parent, 
 
 `parent` reads it back. An object never goes under itself or anything it carries (an
 `ArgumentError`), nor under a template, and a vehicle's wheel stays on it. A kinematic body or a
-trigger under a parent goes where the parent takes it. A dynamic body, a character and a vehicle
+trigger under a parent goes where the parent takes it; under a character, the character
+passes through it (a box in its hand never pushes it). A dynamic body, a character and a vehicle
 are simulated in the world: the parent does not carry them, and under it they keep their own
 motion (make a body kinematic, with `rigidbody.kinematic = true`, to carry it). A static collider
 stays where it was made. When `keep_world: false` moves a body, it is taken to its new place and

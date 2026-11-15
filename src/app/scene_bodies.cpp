@@ -108,6 +108,26 @@ void settle_layer(const PhysicsWorld& physics, const GameObject& object, BodyCon
   body.layer = kDefaultLayerName;
 }
 
+bool keeps_its_own_motion(PhysicsWorld& physics, ObjectId id) {
+  return physics.has_object(id) && !follows_its_object(physics, id);
+}
+
+// The kinematic bodies and triggers under an object, which ride with it: under a body that keeps
+// its own motion (a dynamic one, a character, a vehicle), what it carries is its own.
+void collect_riders(const Scene& scene, PhysicsWorld& physics, ObjectId id, std::vector<ObjectId>& riders) {
+  for (const ObjectId child : scene.at(id).children) {
+    if (keeps_its_own_motion(physics, child)) continue;
+    if (physics.has_object(child)) riders.push_back(child);
+    collect_riders(scene, physics, child, riders);
+  }
+}
+
+std::vector<ObjectId> carried_by(const Scene& scene, PhysicsWorld& physics, ObjectId character) {
+  std::vector<ObjectId> riders;
+  collect_riders(scene, physics, character, riders);
+  return riders;
+}
+
 }  // namespace
 
 void create_all(const Source& source, PhysicsWorld& physics) {
@@ -129,6 +149,7 @@ void push_poses(const Scene& scene, PhysicsWorld& physics) {
   for (const ObjectId id : scene.alive_ids()) {
     if (!physics.has_object(id)) continue;
     if (follows_its_object(physics, id)) physics.set_target_pose(id, scene.world_transform(id));
+    if (physics.body_type(id) == BodyType::Character) physics.set_carried_bodies(id, carried_by(scene, physics, id));
   }
 }
 

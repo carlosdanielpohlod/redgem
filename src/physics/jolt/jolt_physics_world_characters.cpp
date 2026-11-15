@@ -3,6 +3,11 @@
 
 #include "physics/jolt/jolt_physics_world.hpp"
 
+#include <Jolt/Physics/Body/BodyFilter.h>
+
+#include <algorithm>
+#include <vector>
+
 #include "physics/physics_config.hpp"
 
 namespace redgem::jolt {
@@ -40,6 +45,19 @@ bool rests_on_ground(const JPH::CharacterVirtual& character) {
 
 // The speed a character carries into a step, before gravity and its own move: the ground's
 // (plus a jump) while it stands on it, else its own fall.
+// What a character's moves meet: everything but its own inner body and the bodies it carries.
+class CarrierFilter final : public JPH::BodyFilter {
+ public:
+  CarrierFilter(JPH::BodyID inner, const std::vector<JPH::BodyID>& carried) : inner_(inner), carried_(carried) {}
+  bool ShouldCollide(const JPH::BodyID& body) const override {
+    return body != inner_ && std::find(carried_.begin(), carried_.end(), body) == carried_.end();
+  }
+
+ private:
+  JPH::BodyID inner_;
+  const std::vector<JPH::BodyID>& carried_;
+};
+
 JPH::Vec3 carried_velocity(const Record& record) {
   const JPH::CharacterVirtual& character = *record.character;
   if (!rests_on_ground(character)) return JPH::Vec3(0.0f, character.GetLinearVelocity().GetY(), 0.0f);
@@ -97,7 +115,7 @@ void World::move_character(const Record& record, float dt) {
   const JPH::ObjectLayer layer = object_layer_of(record);
   const JPH::DefaultBroadPhaseLayerFilter broad_filter(object_vs_broad_phase_, layer);
   const JPH::DefaultObjectLayerFilter layer_filter(object_pairs_, layer);
-  const JPH::IgnoreSingleBodyFilter body_filter(character.GetInnerBodyID());
+  const CarrierFilter body_filter(character.GetInnerBodyID(), record.carried);
   const JPH::ShapeFilter shape_filter;
   character.ExtendedUpdate(dt, to_jolt(gravity_), update_settings, broad_filter, layer_filter, body_filter,
                            shape_filter, temp_allocator_);
@@ -113,6 +131,16 @@ void World::add_character_displacement(ObjectId object, Vec3 offset) {
   Record* record = find(object);
   if (!is_character(record)) return;
   record->pending_displacement = record->pending_displacement + Vec3{offset.x, 0.0f, offset.z};
+}
+
+void World::set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) {
+  Record* record = find(character);
+  if (!is_character(record)) return;
+  record->carried.clear();
+  for (const ObjectId object : carried) {
+    const JPH::BodyID body = body_of(object);
+    if (!body.IsInvalid()) record->carried.push_back(body);
+  }
 }
 
 void World::character_jump(ObjectId object, float speed) {
