@@ -10,6 +10,7 @@
 #include "audio/envelope_follower.hpp"
 #include "audio/mix_group_tree.hpp"
 #include "audio/mix_groups.hpp"
+#include "audio/occlusion.hpp"
 #include "core/math.hpp"
 
 namespace redgem {
@@ -47,6 +48,10 @@ struct SpatialSound {
   bool positional = true;
   MixGroup group = MixGroup::Effects;
   int priority = kDefaultSoundPriority;
+  // Whether walls between it and the listener muffle it (Audio.play_at's occlusion:).
+  bool occludable = true;
+  // How far behind a wall it is, from kOpen to kBehindWall: the pool keeps it.
+  float occlusion = kOpen;
 };
 
 // A sound with no place in the world (Audio.play): a looping hum, an alarm, a voice line.
@@ -135,6 +140,10 @@ class SoundPool {
   void refresh();
   void refresh_effects();
   void close_reverbs() { driver_.close_reverbs(); }
+  // How a sound behind a wall is heard (false for settings that are not valid), and what says
+  // whether a wall is in the way: none, and no sound is ever behind one.
+  bool set_occlusion(const OcclusionSettings& settings);
+  void set_occlusion_query(OcclusionQuery query);
   bool playing(SoundSourceId id) const;
   // How loud a sound of the voice group is as it plays, smoothed (see EnvelopeFollower); 0 for
   // other sounds, and once it ended.
@@ -143,7 +152,9 @@ class SoundPool {
   void follow(float seconds);
   bool stop(SoundSourceId id);
   void clear();
-  void update();
+  // Feeds the sounds, lets go of those that ended, moves their occlusions on by `seconds` and
+  // mixes them again.
+  void update(float seconds);
 
  private:
   std::optional<SpatialMix> mix_of(const SpatialSound& sound) const;
@@ -154,6 +165,10 @@ class SoundPool {
   SoundSourceId start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
                             std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
+  VoiceEffects effects_of(const SpatialSound& sound) const;
+  bool blocked(const SpatialSound& sound) const;
+  bool looks_for_walls() const;
+  void occlude(float seconds);
   void reap();  // lets go of the sounds that ended
   void forget(std::map<SoundSourceId, SpatialSound>::iterator sound);
   void keep(SoundSourceId id, const SpatialSound& sound);  // a sound that started
@@ -161,6 +176,8 @@ class SoundPool {
   MixGroupTree own_groups_;
   MixGroupTree& groups_;
   AudioListener listener_;
+  OcclusionSettings occlusion_;
+  OcclusionQuery walls_;
   std::map<SoundSourceId, SpatialSound> sounds_;
   std::map<SoundSourceId, EnvelopeFollower> loudness_;  // of the sounds of the voice group
   std::uint64_t next_ = 1;                              // never reuse handles, including across game changes
