@@ -24,7 +24,7 @@ namespace fs = std::filesystem;
 struct DialogueChecks {
   fs::path game_dir;
   GameLocales locales;
-  bool has_quests;               // a game with no quests folder keeps its quests in GameVariables: any name will do
+  bool has_quests = false;       // a game with no quests folder keeps its quests in GameVariables: any name will do
   std::set<std::string> quests;  // the quests it has
   std::map<std::string, std::set<std::string>> stages;  // the stages of each that reads
   CheckReport& report;

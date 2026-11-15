@@ -25,7 +25,7 @@ struct QuestChecks {
   fs::path game_dir;
   GameLocales locales;
   std::map<std::string, std::set<std::string>> dialogues;  // the nodes of each dialogue (none: it does not read)
-  bool has_items;                                          // a game with no items folder may name any item
+  bool has_items = false;                                  // a game with no items folder may name any item
   std::set<std::string> items;
   CheckReport& report;
 };
