@@ -132,7 +132,7 @@ void mix_callback(void* buffer, unsigned frames) { effect_rack().process_mix(sta
 struct PlayingVoice {
   Voice voice;
   std::optional<EffectSlot> slot;
-  float send_volume;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
+  float send_volume = 0.0F;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
 };
 void send_volume(PlayingVoice& playing, float volume) {
   if (!playing.slot || playing.send_volume == volume) return;

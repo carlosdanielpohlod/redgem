@@ -128,15 +128,9 @@ TEST_CASE("a migration hook cannot switch slots or change saved values directly"
   {
     MigrationGame patched(data.file);
     patched.ruby("Save.version = 2");
-    SUBCASE("slot selection") {
-      patched.ruby("Save.migrate(from: 1) { |data| Save.slot = 'other'; data }");
-    }
-    SUBCASE("clearing saved values") {
-      patched.ruby("Save.migrate(from: 1) { |data| Save.clear; data }");
-    }
-    SUBCASE("nested update") {
-      patched.ruby("Save.migrate(from: 1) { |data| Save.update(:gold) { 0 }; data }");
-    }
+    SUBCASE("slot selection") { patched.ruby("Save.migrate(from: 1) { |data| Save.slot = 'other'; data }"); }
+    SUBCASE("clearing saved values") { patched.ruby("Save.migrate(from: 1) { |data| Save.clear; data }"); }
+    SUBCASE("nested update") { patched.ruby("Save.migrate(from: 1) { |data| Save.update(:gold) { 0 }; data }"); }
     CHECK(contains(patched.ruby(kRefused), "must use the values Hash"));
     CHECK(patched.ruby("Save.slot") == "default");
     CHECK(patched.ruby("Save.slots == ['default']") == "true");

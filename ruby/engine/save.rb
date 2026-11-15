@@ -98,9 +98,9 @@ module Save
     __select(name)
     __recheck
     __ready
-  rescue RuntimeError => error
+  rescue RuntimeError => e
     __back_to(previous)
-    raise error
+    raise e
   end
 
   def self.__back_to(previous)

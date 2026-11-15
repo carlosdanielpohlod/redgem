@@ -78,6 +78,13 @@ Scene Scene::from_desc(const SceneDesc& desc) {
 
 namespace {
 
+ObjectId created_parent(const std::vector<ObjectId>& ids, int parent) {
+  if (parent < 0) return kNoObject;
+  const auto index = static_cast<std::size_t>(parent);
+  if (index >= ids.size()) return kNoObject;
+  return ids[index];
+}
+
 GameObject rigid_object(const NodeDesc& node, ObjectId id, ObjectId parent, int mesh_offset, const SceneDesc& assets) {
   GameObject object = placed_object(node, id);
   copy_parts(node, object);
@@ -100,8 +107,7 @@ std::vector<ObjectId> Scene::instantiate_rigid(const std::vector<NodeDesc>& node
   ids.reserve(nodes.size());
   for (const auto& node : nodes) {
     const ObjectId id = free_slot();
-    const bool parent_created = is_index_of(node.parent, ids.size());
-    const ObjectId parent = parent_created ? ids[static_cast<std::size_t>(node.parent)] : kNoObject;
+    const ObjectId parent = created_parent(ids, node.parent);
     objects_[id] = rigid_object(node, id, parent, mesh_offset, assets);
     if (parent != kNoObject) objects_[parent].children.push_back(id);
     ids.push_back(id);

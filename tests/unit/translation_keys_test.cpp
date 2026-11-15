@@ -14,6 +14,7 @@
 #include <string>
 
 #include "core/texts.hpp"
+#include "script/quest_file.hpp"
 
 using namespace redgem;
 namespace fs = std::filesystem;
@@ -78,6 +79,18 @@ Keys engine_keys() {
   keys.merge(keys_in_code(kSource / "src", kCppKey, ".hpp"));
   keys.merge(keys_in_code(kSource / "ruby" / "engine", kRubyKey, ".rb"));
   keys.merge(keys_in_code(kSource / "ruby" / "engine", kRubyConstantKey, ".rb"));
+  return keys;
+}
+
+Keys quest_keys(const fs::path& game) {
+  Keys keys;
+  for (const std::string& name : quest::quest_names(game)) {
+    const auto file = quest::read_quest_file(game, name);
+    const fs::path path = game / quest::shown_file(name);
+    REQUIRE_MESSAGE(file.has_value(), path.string());
+    REQUIRE_MESSAGE(file->ok(), path.string());
+    for (const auto& text : file->texts) keys.insert(text.name);
+  }
   return keys;
 }
 
@@ -150,6 +163,7 @@ TEST_CASE("every key a game or a template shows has a text in English, and every
     const fs::path locales = game / "locales";
     Keys used = keys_in_code(game / "scripts", kRubyKey, ".rb");
     used.merge(keys_in_code(game / "dialogues", kDialogueKey, ".json"));
+    used.merge(quest_keys(game));
     const Keys own = fs::is_directory(locales) ? keys_of(locales / kEnglishFile) : Keys();
     for (const std::string& key : used) {
       CHECK_MESSAGE(own.count(key) + engine.count(key) > 0, (game.string() + " shows " + key + " with no text"));
