@@ -1432,8 +1432,9 @@ Save.migrate(from: 2) { |data| data.merge("lives" => 3) }
 
 Declare them where scripts run before the game first reads its save (the top of the first
 scene's script, say). A hook gets the slot's values as a Hash with String keys and returns the
-new ones; a version that changed nothing needs no hook. The first use of a slot after that (any
-`get`, `set`, `keys`... or `Save.slot =`) checks it:
+new ones. Use that Hash for reads and writes inside the hook. Accessing a slot's values through
+`Save` or switching slots inside a hook raises. A version that changed nothing needs no hook.
+The first use of a slot after that (any `get`, `set`, `keys`... or `Save.slot =`) checks it:
 
 - a slot of an older version goes through the hooks it needs, in order, and is written back whole
   and at once (one file write, or one database transaction), stamped with the new version, so

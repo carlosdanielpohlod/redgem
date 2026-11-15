@@ -57,7 +57,7 @@ struct Record {
   Vec3 pending_displacement;  // characters: root motion, gone through in the next step
   std::optional<float> pending_jump;
   std::vector<JPH::BodyID> carried;  // characters: the bodies under them, which they pass through
-  std::set<ObjectId> overlaps;  // triggers only
+  std::set<ObjectId> overlaps;       // triggers only
 };
 
 // A joint, and what it was made between (`b` is kNoObject for the world).
