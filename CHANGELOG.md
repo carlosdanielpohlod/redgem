@@ -504,6 +504,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **The editor bridge says when a recovery waits**: after an editor closed without saving, the
+  next one offers to recover its edits, and that dialog made every live change fail with "editor
+  is busy" while `status` showed nothing. `status` now has `recovery_pending`, and refused changes
+  name the recovery prompt as the reason.
 - **Perception resets with each scene**: loading a scene logged "resetting the handlers of
   Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
   modules by name and Perception is a class. It now finds classes too, so a new scene starts with

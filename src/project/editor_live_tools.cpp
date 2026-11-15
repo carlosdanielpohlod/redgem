@@ -17,6 +17,9 @@ namespace redgem::tools {
 namespace {
 using namespace mcp;
 
+constexpr const char* kRecoveryPending =
+    "the editor offers to recover unsaved edits of an earlier session; answer it in the editor "
+    "(recover them, or discard them) first";
 constexpr const char* kExternalChange =
     "the scene changed on disk while the editor has unsaved edits; resolve it in the editor "
     "(reload the file, or keep the edits) first";
@@ -32,7 +35,8 @@ Json state(EditorSession& session) {
           {"selection", selected},
           {"can_undo", session.document().can_undo()},
           {"can_redo", session.document().can_redo()},
-          {"external_change_pending", session.external_change_pending()}};
+          {"external_change_pending", session.external_change_pending()},
+          {"recovery_pending", session.recovery_pending()}};
 }
 
 int object(EditorSession& session, const Json& args) {
@@ -54,10 +58,12 @@ std::string apply_words(SceneEdit& edit, int& index, const Json& args) {
   return {};
 }
 
-// The scene changed on disk while the editor had unsaved edits: the editor asks its user which to
-// keep, and that question (a dialog, which makes the editor busy too) is what holds every change.
+// The scene changed on disk while the editor had unsaved edits, or the editor found the copy of an
+// earlier session's unsaved edits (it closed without saving them): the editor asks its user what
+// to keep, and that question (a dialog, which makes the editor busy too) is what holds every change.
 void require_no_external_change(const EditorSession& session) {
   if (session.external_change_pending()) throw std::invalid_argument(kExternalChange);
+  if (session.recovery_pending()) throw std::invalid_argument(kRecoveryPending);
 }
 
 void require_editable(const EditorSession& session, bool busy) {
