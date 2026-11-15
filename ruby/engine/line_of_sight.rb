@@ -2,7 +2,7 @@
 # (what is under it, or what carries it) first. An Interactor uses it to reach what it uses, a
 # Perception to see.
 #
-#   LineOfSight.clear?(eyes, player.transform.position, player, ignore: LineOfSight.carried(game_object))
+#   LineOfSight.clear?(eyes, player.transform.position, player, ignore: game_object.__with_children)
 module LineOfSight
   # Meters short of a target a ray may stop (on the target's own surface) and still see it.
   TOLERANCE = 0.05
@@ -18,9 +18,6 @@ module LineOfSight
       hit = Physics.raycast(from, (to - from) / length, length, ignore: ignore)
       unblocked?(hit, target, length)
     end
-
-    # An object and everything under it: what it carries hides nothing from it.
-    def carried(object) = [object] + object.children.flat_map { |child| carried(child) }
 
     # Whether an object is the whole, or is under it (a character's collider on a child).
     def part_of?(object, whole)

@@ -141,6 +141,26 @@ class BrainTest < RedGemTest::Case
     assert_raises(ArgumentError) { broken.new.update(FRAME) }
   end
 
+  def test_any_is_no_state_to_go_to
+    to_any = Class.new(Brain) do
+      state :idle
+      transition from: :idle, to: :any, on: :hit
+    end
+    assert_raises(ArgumentError) { to_any.new.update(FRAME) }
+  end
+
+  def test_the_initial_state_must_be_declared
+    misspelled = Class.new(Brain) do
+      initial :idel
+      state :idle
+    end
+    assert_raises(ArgumentError) { misspelled.new.update(FRAME) }
+  end
+
+  def test_time_in_state_is_zero_before_the_first_frame
+    assert_in_delta 0.0, @brain.time_in_state
+  end
+
   def test_a_brain_without_states_raises
     assert_raises(ArgumentError) { Class.new(Brain).new.update(FRAME) }
   end

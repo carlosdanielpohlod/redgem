@@ -2875,7 +2875,8 @@
             {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
           "about": "plays a sound; returns its id (for stop, playing? and set), or nil",
@@ -2952,7 +2953,8 @@
             {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "reference_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "max_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "50.0"},
-            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"},
+            {"name": "priority", "type": "Integer", "keyword": true, "optional": true, "default": "128"}
           ],
           "returns": {"type": "Integer | nil"},
           "about": "plays a sound at a place in the world; returns its id, or nil"
@@ -3004,7 +3006,7 @@
           "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 128 sounds with ids play at once. Past that, a new sound takes the place of the weakest one playing (the lowest `priority`, a whole number from 0 to 255, then the quietest as heard, then the oldest) when its priority is at least that one's: that one stops. Otherwise it does not play and gets `nil`. Old ids are never reused."
     },
     {
       "name": "UI",
@@ -5332,15 +5334,6 @@
           "about": "whether a ray from a point to a point on the target hits nothing but the target (what is under it, or what carries it) first"
         },
         {
-          "name": "carried",
-          "static": true,
-          "params": [
-            {"name": "object", "type": "GameObject"}
-          ],
-          "returns": {"type": "Array[GameObject]"},
-          "about": "an object and everything under it"
-        },
-        {
           "name": "part_of?",
           "static": true,
           "params": [
@@ -5417,7 +5410,7 @@
             {"name": "object", "type": "GameObject"}
           ],
           "returns": {"type": "Float"},
-          "about": "degrees between where it looks and where an object is"
+          "about": "degrees between where it looks and where an object is, across the ground"
         },
         {
           "name": "eye_point",
@@ -5599,6 +5592,7 @@
         "on_lose_sight",
         "on_schedule",
         "on_see",
+        "thinks_here?",
         "update"
       ],
       "guide": "npcs.md#brain"

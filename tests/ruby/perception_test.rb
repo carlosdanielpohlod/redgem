@@ -35,6 +35,7 @@ class SensedObject
 
   def alive? = @alive
   def props = {}
+  def __with_children = [self] + children.flat_map(&:__with_children)
   def get_component(klass) = @behaviours.find { |behaviour| behaviour.is_a?(klass) }
   def __add_behaviour(behaviour) = @behaviours << behaviour
 
@@ -103,6 +104,19 @@ class PerceptionTest < RedGemTest::Case
     assert_equal [:on_lose_sight, @hero], @guard.heard.last
     refute @perception.sees_any?
     assert_vector seen_at, @perception.last_seen(@hero)
+  end
+
+  def test_a_destroyed_hero_goes_out_of_sight_and_is_forgotten
+    @perception.update(FRAME)
+    @hero.alive = false
+    @perception.update(FRAME)
+    assert_equal [:on_lose_sight, @hero], @guard.heard.last
+    assert_nil @perception.last_seen(@hero)
+  end
+
+  def test_the_cone_is_measured_across_the_ground
+    @hero.transform.position = Vector3.new(0, -AHEAD, -0.5)   # right in front, a floor below
+    assert_in_delta 0.0, @perception.angle_to(@hero)
   end
 
   def test_it_notices_nothing_while_paused
