@@ -29,6 +29,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   reads every quest: stages that are not there, objectives that could never be done, dialogues,
   nodes and items that are not there, and missing texts; and every stage a dialogue names. See the
   manual's Quests page.
+- **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
+  (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
+  listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
+  fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
 
 ## [0.6.0] - 2026-11-15
 

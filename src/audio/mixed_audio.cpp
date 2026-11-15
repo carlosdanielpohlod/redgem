@@ -61,7 +61,7 @@ void MixedAudio::set_music_pitch(float pitch) { music_.set_pitch(pitch); }
 void MixedAudio::set_music_volume(float volume) { music_.set_volume(volume); }
 
 void MixedAudio::update(float seconds) {
-  sounds_.update();  // (a voice that ended no longer ducks)
+  sounds_.update(seconds);  // (a voice that ended no longer ducks)
   sounds_.follow(seconds);
   duck(seconds);
   music_.update(seconds);

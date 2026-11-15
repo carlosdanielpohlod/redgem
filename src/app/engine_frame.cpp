@@ -23,8 +23,10 @@ void Engine::frame(float frame_seconds) {
   answer_requests();
   follow_presenter();
   advance_or_loading(frame_seconds);
-  present();
+  // Audio can query static bodies. Do this before the next physics step runs in parallel.
   audio().update(frame_seconds);
+  begin_prepared_step();
+  present();
   ++context_.time.frame;
   keep_bindings();
   switch_scene_if_asked();
@@ -116,7 +118,6 @@ void Engine::advance_game(float frame_seconds) {
       options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
-  begin_prepared_step();  // (drawn meanwhile: see frame())
 }
 
 void Engine::run_fixed_steps(int steps) {
