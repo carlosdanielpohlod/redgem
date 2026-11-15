@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
+  one another by `next`, by branches with conditions, or by the player's choices, with conditions
+  on variables and quest stages and effects that set or add to variables, move quests and tell the
+  game (`Dialogue.on(:event)`). Each line can name a `voice`, kept for later. A `Talkable`
+  behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
+  (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
+  `GameVariables` hold the values every player shares. Over the network each player has a
+  conversation of their own, the host follows it step by step and its effects happen there.
+  `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
+  keys and texts missing from `locales/`. Quest stages are variables until a game sets
+  `Dialogue.quests`. See the manual's Dialogue page.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):

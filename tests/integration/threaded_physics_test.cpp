@@ -131,7 +131,8 @@ TEST_CASE(
 
 TEST_CASE("a step begun on its own thread ends as the same step taken in place") {
   const auto in_place = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, kDefaultMaxBodies, kManyThreads);
-  OverlappedPhysicsWorld overlapped(create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, kDefaultMaxBodies, kManyThreads));
+  OverlappedPhysicsWorld overlapped(
+      create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, kDefaultMaxBodies, kManyThreads));
   fill(*in_place);
   fill(overlapped);
   for (int step = 0; step < kSteps; ++step) {
@@ -160,8 +161,8 @@ TEST_CASE("what is asked of a world while it steps on its own thread is answered
 }
 
 TEST_CASE("a world that goes while it steps on its own thread first lets the step end") {
-  auto overlapped =
-      std::make_unique<OverlappedPhysicsWorld>(create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, kDefaultMaxBodies, kTwoThreads));
+  auto overlapped = std::make_unique<OverlappedPhysicsWorld>(
+      create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, {}, kDefaultMaxBodies, kTwoThreads));
   fill(*overlapped);
   overlapped->begin_step(kDt);
   overlapped.reset();  // (the sanitizers see a step still at work on a world taken apart)

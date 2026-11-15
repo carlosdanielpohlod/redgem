@@ -35,5 +35,11 @@
   "multiplayer.play_online": "Play online",
   "multiplayer.room": "Room {room}",
   "over.record": "New record: {seconds} s!",
-  "over.win": "You win!"
+  "over.win": "You win!",
+  "tree.again": "My leaves have never been greener. Thank you!",
+  "tree.bye": "Goodbye",
+  "tree.hello": "Psst, traveler. It has not rained in weeks. Could you spare some water?",
+  "tree.name": "Old tree",
+  "tree.thanks": "Ahh, much better. I will remember this.",
+  "tree.water": "Water the tree"
 }
