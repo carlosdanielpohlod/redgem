@@ -777,6 +777,10 @@ module Audio
   def self.volume=: (Numeric volume) -> Numeric
   # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
   def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
+  # makes a mix group of the game's own under another, at volume (1 when nil); again, moves it, and changes its volume if one is given
+  def self.group: (Symbol name, ?parent: Symbol, ?volume: Numeric | nil) -> nil
+  # muffles a group's sounds (low_pass in Hz) and sends them to its reverb (0 to 1); with neither, takes them off
+  def self.effects: (Symbol group, ?low_pass: Numeric | nil, ?reverb: Numeric) -> nil
   # changes the volume or pitch of a sound that plays; false once it stopped
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
