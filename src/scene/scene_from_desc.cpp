@@ -101,7 +101,7 @@ std::vector<ObjectId> Scene::instantiate_rigid(const std::vector<NodeDesc>& node
   for (const auto& node : nodes) {
     const ObjectId id = free_slot();
     const bool parent_created = is_index_of(node.parent, ids.size());
-    const ObjectId parent = parent_created ? ids[static_cast<std::size_t>(node.parent)] : kNoObject;
+    const ObjectId parent = parent_created ? ids.at(static_cast<std::size_t>(node.parent)) : kNoObject;
     objects_[id] = rigid_object(node, id, parent, mesh_offset, assets);
     if (parent != kNoObject) objects_[parent].children.push_back(id);
     ids.push_back(id);
