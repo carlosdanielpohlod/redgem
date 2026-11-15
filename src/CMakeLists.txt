@@ -56,6 +56,9 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/interactor.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/schedule.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -325,6 +328,7 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_graph_player.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
+  scene/animation/head_aim.cpp
   scene/animation/animation_player_characters.cpp
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
@@ -446,6 +450,7 @@ redgem_add_library(redgem_runtime
   script/bindings/input_bindings.cpp
   script/bindings/input_action_bindings.cpp
   script/bindings/animation_bindings.cpp
+  script/bindings/head_aim_bindings.cpp
   script/bindings/animation_graph_bindings.cpp
   script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
