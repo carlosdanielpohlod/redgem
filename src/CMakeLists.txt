@@ -11,6 +11,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/nav_agent.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/save_spawns.rb
@@ -58,13 +59,16 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_conversation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_voice.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_clock.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/schedule.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/voice_mouth.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -382,9 +386,14 @@ redgem_add_library(redgem_runtime
   navigation/nav_physics_probe.cpp
   navigation/nav_path.cpp
   navigation/nav_queries.cpp
+  navigation/nav_steering.cpp
   navigation/navigation.cpp
   audio/audio.cpp
   audio/ducking.cpp
+  audio/envelope_follower.cpp
+  audio/audio_effects.cpp
+  audio/effect_rack.cpp
+  audio/mix_group_tree.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp
@@ -410,6 +419,7 @@ redgem_add_library(redgem_runtime
   storage/save_file_slots.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
+  script/symbol_cache.cpp
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp
@@ -447,6 +457,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/navigation_bindings.cpp
+  script/bindings/navigation_crowd_bindings.cpp
   script/bindings/water_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp

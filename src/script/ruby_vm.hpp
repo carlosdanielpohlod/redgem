@@ -10,9 +10,10 @@
 #include <memory>
 #include <vector>
 
+#include "script/ruby_reload.hpp"
 #include "script/script_budget.hpp"
 #include "script/script_sampler.hpp"
-#include "script/ruby_reload.hpp"
+#include "script/symbol_cache.hpp"
 
 namespace redgem {
 class ReloadOwnership;
@@ -60,6 +61,10 @@ class RubyVm {
   // Turning it on starts a fresh profile; turned off it keeps what it found.
   void set_sampling(bool on);
   ScriptSampler& sampler() { return sampler_; }
+  // The symbol of a name the engine uses again and again (see SymbolCache): a method it calls, an
+  // instance variable its bindings read. On the interpreter's thread.
+  mrb_sym symbol(const char* name) { return symbols_.of(name); }
+  const SymbolCache& symbols() const { return symbols_; }
 
  private:
   RubyResult run_protected(mrb_protect_error_func* body, void* request);
@@ -73,6 +78,7 @@ class RubyVm {
   mrb_state* mrb_;
   ReloadHooks reload_hooks_{};
   std::unique_ptr<ReloadOwnership> reload_ownership_;
+  SymbolCache symbols_;  // (after the interpreter it is for)
 };
 
 }  // namespace redgem

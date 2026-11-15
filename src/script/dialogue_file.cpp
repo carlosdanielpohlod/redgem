@@ -107,7 +107,8 @@ class Reader {
 
   // Every key of an object is one of these (a misspelt one would be passed over without a word).
   void only(const Json& object, const std::string& where, Keys keys) {
-    for (const auto& [key, value] : object.items()) {
+    for (const auto& item : object.items()) {
+      const std::string& key = item.key();
       const bool known = std::any_of(keys.begin(), keys.end(), [&](const char* name) { return key == name; });
       if (!known) error(where, "\"" + key + "\" is not something it can have");
     }
@@ -149,8 +150,9 @@ class Reader {
     if (!node.contains(kVoice)) return;
     const Json& voice = node.at(kVoice);
     if (!voice.is_string() || !safe_asset_name(voice.get_ref<const std::string&>())) {
-      error(where, "\"voice\" is a sound's name inside the game's sounds folder");
+      return error(where, "\"voice\" is a sound's name inside the game's sounds folder");
     }
+    file_.voices.push_back({voice.get<std::string>(), where});
   }
 
   // How it goes on: "next", "end": true, or (a node) "choices"; one of them.
