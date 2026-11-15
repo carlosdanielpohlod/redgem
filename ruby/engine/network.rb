@@ -75,13 +75,15 @@ module Network
   TALK_LEFT = "$talk_left".freeze  # client to host: the player left the conversation: [dialogue]
   VARIABLE = "$variable".freeze    # host to everyone: [name, value]
   VARIABLES = "$variables".freeze  # host to a newcomer, or everyone: every variable, [[name, value]...]
+  # Quests (see network_quests.rb).
+  QUEST_REPORT = "$quest".freeze   # client to host: its player did this: [kind, subject, other or nil, count]
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned, DESPAWN => :receive_despawn,
     LEVEL => :receive_level, LEVEL_PLAYED => :receive_level_played, LEVEL_READY => :receive_level_ready,
     LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, INTERACT => :receive_interact,
     TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at, TALK_LEFT => :receive_talk_left,
-    VARIABLE => :receive_variable, VARIABLES => :receive_variables
+    VARIABLE => :receive_variable, VARIABLES => :receive_variables, QUEST_REPORT => :receive_quest_report
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {

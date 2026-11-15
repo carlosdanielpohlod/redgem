@@ -9,16 +9,17 @@
 
 #include <nlohmann/json.hpp>
 
+#include "script/game_json_files.hpp"
+
 // A game's dialogue files: <game>/dialogues/<name>.json, each the lines of a conversation and the
 // ways between them (see ruby/engine/dialogue.rb for what one holds). The engine reads one as a
 // script asks for it, and `redgem check` reads them all; both look it over the same way here, so a
 // script is only given a file that is well made.
 namespace redgem::dialogue {
 
-inline constexpr const char* kFileExtension = ".json";
+inline constexpr const char* kFileExtension = game_json::kFileExtension;
 inline constexpr std::uintmax_t kMaxFileBytes = 1024 * 1024;
-// How deep a file's JSON may nest (each level a Ruby value inside another, once it is read).
-inline constexpr int kMaxDepth = 32;
+inline constexpr int kMaxDepth = game_json::kMaxDepth;
 // What the network carries of a dialogue (ruby/engine/network_dialogues.rb): bytes in its name and
 // in the id of a node. What a variable may be called and hold (ruby/engine/game_variables.rb).
 inline constexpr std::size_t kMaxNameBytes = 128;
@@ -32,6 +33,13 @@ struct NameUse {
   std::string where;
 };
 
+// A quest's stage a dialogue file names (a condition's "is" or "not", an effect's "to").
+struct StageUse {
+  std::string quest;
+  std::string stage;
+  std::string where;
+};
+
 // A dialogue file, read and looked over.
 struct DialogueFile {
   nlohmann::json json;                // as read (nothing when it is not JSON)
@@ -39,6 +47,7 @@ struct DialogueFile {
   std::vector<std::string> warnings;  // what may be a mistake: a node never reached
   std::vector<NameUse> texts;         // the I18n keys it shows
   std::vector<NameUse> quests;        // the quests its conditions and effects name
+  std::vector<StageUse> stages;       // the stages of quests they name
   std::vector<NameUse> voices;        // the sounds its lines' voices play
 
   bool ok() const { return errors.empty(); }

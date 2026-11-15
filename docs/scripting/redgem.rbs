@@ -1998,7 +1998,7 @@ module Dialogue
   # the dialogue of that name, read from its file once (raises for one that is not there or not well made)
   %a{redgem:experimental}
   def self.load: (String | Symbol name) -> Dialogue::Script
-  # what reads and moves quest stages (GameVariables "quest.<name>" unless a game says)
+  # what reads and moves quest stages (Quests unless a game says)
   %a{redgem:experimental}
   def self.quests: () -> untyped
   # what reads and moves quest stages: an object with stage(name) and set_stage(name, stage, conversation)
@@ -2131,6 +2131,187 @@ class Talkable < Behaviour
   # the name of its dialogue file
   %a{redgem:experimental}
   def dialogue: () -> (String | nil)
+end
+
+# The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them.
+%a{redgem:experimental}
+module Quests
+  # the quest of that name, started or not (raises for one with no file)
+  %a{redgem:experimental}
+  def self.[]: (String | Symbol name) -> Quests::Quest
+  # the quest file of that name, read once (raises for one that is not there or not well made)
+  %a{redgem:experimental}
+  def self.load: (String | Symbol name) -> Quests::Definition
+  # every quest that started, completed ones too
+  %a{redgem:experimental}
+  def self.started: () -> Array[Quests::Quest]
+  # every quest under way: started, and not complete
+  %a{redgem:experimental}
+  def self.active: () -> Array[Quests::Quest]
+  # every quest that is complete
+  %a{redgem:experimental}
+  def self.completed: () -> Array[Quests::Quest]
+  # the stage a quest is at, or nil while it has not started
+  %a{redgem:experimental}
+  def self.stage: (String | Symbol name) -> (String | nil)
+  # starts a quest at its first stage (false when it had started); raises on a client
+  %a{redgem:experimental}
+  def self.start: (String | Symbol name) -> bool
+  # moves a quest to a stage (nil: not started), its objectives from nothing; raises on a client and for a stage it has not
+  %a{redgem:experimental}
+  def self.set_stage: (String | Symbol name, String | nil stage, ?Dialogue::Conversation | nil conversation) -> (String | nil)
+  # as if the quest never started
+  %a{redgem:experimental}
+  def self.reset: (String | Symbol name) -> (String | nil)
+  # the players collected items: for the collect objectives (on a client, told to the host)
+  %a{redgem:experimental}
+  def self.collected: (String | Symbol item, ?Integer count) -> bool
+  # the players delivered items to someone: for the deliver objectives
+  %a{redgem:experimental}
+  def self.delivered: (String | Symbol item, to: GameObject | String, ?count: Integer) -> bool
+  # the players defeated someone (an object, or its name): for the defeat objectives
+  %a{redgem:experimental}
+  def self.defeated: (GameObject | String who, ?Integer count) -> bool
+  # a hero reached a place (an object, or its name): for the go_to objectives (a QuestTracker says it)
+  %a{redgem:experimental}
+  def self.reached: (GameObject | String place) -> bool
+  # a check of the game's own, for the objectives {"check": name}: |quest| true once it is passed (asked every frame on the host)
+  %a{redgem:experimental}
+  def self.check: (String | Symbol name) { (Quests::Quest) -> bool } -> untyped
+  # events: :start and :complete |quest|, :stage |quest, stage, from|, :objective |quest, objective|, :change |quest|
+  %a{redgem:experimental}
+  def self.on: (Symbol event) { (untyped, untyped, untyped) -> void } -> void
+  # the quests that started, for Save: {"bread" => {"stage" => "bring", "progress" => [2, 0]}}
+  %a{redgem:experimental}
+  def self.to_h: () -> Hash[String, Hash[String, untyped]]
+  # puts these in the place of every quest's state (a save read back; a stage the file no longer has is left out); raises on a client
+  %a{redgem:experimental}
+  def self.replace: (Hash[String | Symbol, untyped] | nil saved) -> Hash[String, Hash[String, untyped]]
+  # Save.set(key, Quests.to_h)
+  %a{redgem:experimental}
+  def self.save: (?Symbol | String key) -> untyped
+  # Quests.replace(Save.get(key, {}))
+  %a{redgem:experimental}
+  def self.restore: (?Symbol | String key) -> Hash[String, Hash[String, untyped]]
+end
+
+# One quest and where the party is in it (Quests[name] gives one).
+%a{redgem:experimental}
+class Quests::Quest
+  # its name: that of its file in quests/, without .json
+  %a{redgem:experimental}
+  def name: () -> String
+  # its file as read (nil for a quest with no file)
+  %a{redgem:experimental}
+  def definition: () -> (Quests::Definition | nil)
+  # the stage it is at, or nil while it has not started
+  %a{redgem:experimental}
+  def stage: () -> (String | nil)
+  # whether it started
+  %a{redgem:experimental}
+  def started?: () -> bool
+  # whether it reached a stage that ends it
+  %a{redgem:experimental}
+  def complete?: () -> bool
+  # started, and not complete
+  %a{redgem:experimental}
+  def active?: () -> bool
+  # its title, in the language in use
+  %a{redgem:experimental}
+  def title: () -> (String | nil)
+  # its description, in the language in use, or nil
+  %a{redgem:experimental}
+  def description: () -> (String | nil)
+  # the text of the stage it is at, or nil
+  %a{redgem:experimental}
+  def stage_text: () -> (String | nil)
+  # the objectives of the stage it is at
+  %a{redgem:experimental}
+  def objectives: () -> Array[Quests::Objective]
+  # the stage it goes to once its objectives are done, or nil
+  %a{redgem:experimental}
+  def next_stage: () -> (String | nil)
+end
+
+# One thing the party does in a stage of a quest.
+%a{redgem:experimental}
+class Quests::Objective
+  # the quest it is of
+  %a{redgem:experimental}
+  def quest: () -> Quests::Quest
+  # its place among the stage's objectives
+  %a{redgem:experimental}
+  def index: () -> Integer
+  # :go_to, :talk_to, :deliver, :collect, :defeat or :check
+  %a{redgem:experimental}
+  def kind: () -> Symbol
+  # what it names: a place, someone, an item or a check
+  %a{redgem:experimental}
+  def target: () -> String
+  # how many it takes (1 unless the file says)
+  %a{redgem:experimental}
+  def count: () -> Integer
+  # how many it has
+  %a{redgem:experimental}
+  def progress: () -> Integer
+  # whether it has as many as it takes
+  %a{redgem:experimental}
+  def done?: () -> bool
+  # its text, in the language in use, with {progress} and {count} filled in
+  %a{redgem:experimental}
+  def text: () -> String
+  # a go_to's meters from its place (2 unless the file says)
+  %a{redgem:experimental}
+  def radius: () -> (Float | Integer)
+  # a deliver's: who the items go to
+  %a{redgem:experimental}
+  def recipient: () -> (String | nil)
+  # a talk_to's: the dialogue it must be, or nil
+  %a{redgem:experimental}
+  def dialogue: () -> (String | nil)
+  # a talk_to's: the node it must reach, or nil
+  %a{redgem:experimental}
+  def node: () -> (String | nil)
+  # its line in the file
+  %a{redgem:experimental}
+  def data: () -> Hash[String, untyped]
+end
+
+# A quest file as it was read.
+%a{redgem:experimental}
+class Quests::Definition
+  # its name
+  %a{redgem:experimental}
+  def name: () -> String
+  # the I18n key of its title
+  %a{redgem:experimental}
+  def title_key: () -> String
+  # the I18n key of its description, or nil
+  %a{redgem:experimental}
+  def description_key: () -> (String | nil)
+  # the stage it starts at
+  %a{redgem:experimental}
+  def start: () -> String
+  # the stage of that id (its line in the file), or nil
+  %a{redgem:experimental}
+  def stage: (String id) -> (Hash[String, untyped] | nil)
+  # whether it has a stage of that id
+  %a{redgem:experimental}
+  def stage?: (String | nil id) -> bool
+  # the ids of its stages
+  %a{redgem:experimental}
+  def stage_ids: () -> Array[String]
+  # whether reaching that stage completes the quest
+  %a{redgem:experimental}
+  def end?: (String | nil id) -> bool
+  # the objectives of a stage, as the file has them
+  %a{redgem:experimental}
+  def objectives: (String | nil id) -> Array[Hash[String, untyped]]
+end
+
+# A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host.
+%a{redgem:experimental}
+class QuestTracker < Behaviour
 end
 
 # A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.

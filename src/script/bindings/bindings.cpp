@@ -36,6 +36,7 @@ void install_gameplay_bindings(mrb_state* mrb) {
   install_save_bindings(mrb);
   install_i18n_bindings(mrb);
   install_dialogue_bindings(mrb);
+  install_quest_bindings(mrb);
 }
 
 }  // namespace

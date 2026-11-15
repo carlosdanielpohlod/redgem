@@ -17,6 +17,18 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
+  `deliver`, `collect`, `defeat`, and a `check` of the game's own in Ruby) that go on to the next
+  stage once they are all done, until one that ends the quest. `Quests.start`, `set_stage`,
+  `collected`, `delivered`, `defeated` and `Quests[name]` (its stage, texts and objectives with
+  their progress); `Quests.on(:start/:stage/:objective/:complete/:change)` on every machine. A
+  `QuestTracker` behaviour on the hero finds the places it reaches and asks the checks. Dialogue
+  conditions and effects read and move these quests. The state lives in GameVariables, so the party
+  shares it and the host owns it: a client's player's progress is told to the host, which counts
+  it. `Quests.save` and `Quests.restore` keep it with `Save` (and its migrations). `redgem check`
+  reads every quest: stages that are not there, objectives that could never be done, dialogues,
+  nodes and items that are not there, and missing texts; and every stage a dialogue names. See the
+  manual's Quests page.
 - **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
   (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
   listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,

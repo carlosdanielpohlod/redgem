@@ -262,18 +262,14 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): missions, the editor's support for NPCs,
-dialogue and missions, a multi-level multiplayer template, the packed Android app on the
-emulator, and the test cases still on the real clock.
+The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, editor support
+for NPCs, dialogue and quests, a multi-level multiplayer template, the packed Android app on
+the emulator, and the test cases still on the real clock.
 
 ### Gameplay API
 
-- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md) shown in a DialogueBox, with voiced lines: there is
-  no mission system yet, and quest stages are GameVariables until a game gives `Dialogue.quests`.
-- There are no quest files or mission objectives: no journal page in `GameMenu`, no world markers
-  or on-screen pointer to the current objective, and no quest state shared by a party in
-  multiplayer.
+- [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
+  on-screen objective pointer. Games can build those views from `Quests.active`.
 - The editor does not show interactables, perception cones or schedules in the Scene view. There is
   no panel that runs a dialogue or a quest without Play, and `redgem check` errors do not appear in
   the Console.
@@ -400,6 +396,10 @@ promise of how it will be closed.
   clips are files (no text-to-speech). A mouth follows a voice's loudness, not its sounds (no
   visemes or lip sync); the raylib backend measures at most 8 voices at once (another one waits for
   a meter to be free, its mouth shut until then), and a jaw turns about its own X axis only.
+- Quests share the 1024 GameVariables entries. Each quest uses one entry and each objective
+  with progress uses another. The host accepts reports of collection, delivery, defeats and
+  arrival from its clients. A `go_to` place must have the exact target name. Custom checks
+  run where a `QuestTracker` is active.
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see
   [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
   used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one

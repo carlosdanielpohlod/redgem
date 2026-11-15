@@ -62,6 +62,11 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_voice.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_dialogues.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/talkable.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quests.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quest.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quest_progress.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quest_tracker.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_quests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/brain.rb
@@ -438,7 +443,9 @@ redgem_add_library(redgem_runtime
   script/script_host_animation.cpp
   script/script_host_input.cpp
   script/game_locales.cpp
+  script/game_json_files.cpp
   script/dialogue_file.cpp
+  script/quest_file.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -481,6 +488,7 @@ redgem_add_library(redgem_runtime
   script/bindings/settings_bindings.cpp
   script/bindings/i18n_bindings.cpp
   script/bindings/dialogue_bindings.cpp
+  script/bindings/quest_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
@@ -842,6 +850,8 @@ if(NOT ANDROID)
     project/shot_command.cpp
     project/game_checks.cpp
   project/dialogue_checks.cpp
+  project/text_checks.cpp
+  project/quest_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
     project/api_types.cpp

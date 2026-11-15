@@ -46,6 +46,7 @@ nav:
       - Animation graphs: scripting/animation.md
       - Interaction: scripting/interaction.md
       - Dialogue: scripting/dialogue.md
+      - Quests: scripting/quests.md
       - NPCs: scripting/npcs.md
       - Multiplayer: scripting/multiplayer.md
       - Online services: scripting/online-services.md

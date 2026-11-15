@@ -11,7 +11,8 @@
 # them, and setting one there raises: a client changes them through the host (a dialogue's effects
 # go there). They last as the levels change, until the game ends; a game saves them with
 # Save.write(:variables, GameVariables.to_h) and puts them back with GameVariables.replace.
-# What on_change registers lasts until the next level is loaded.
+# What on_change registers lasts until the next level is loaded. The quests keep their state here too
+# ("quest.<name>", see quests.rb).
 module GameVariables
   MAX_NAME_SIZE = 64      # bytes in a variable's name
   MAX_TEXT_SIZE = 1024    # bytes in a text a variable holds
@@ -97,10 +98,17 @@ module GameVariables
     def change(name, value, tell: true)
       raise ArgumentError, "GameVariables hold at most #{MAX_COUNT} variables" if full_for?(name)
 
+      was = @values[name]
       store(name, value)
       announce(name, value) if tell
-      @handlers.dup.each { |block| block.call(name, value) }
+      heard(name, value, was, false)
       value
+    end
+
+    # The quests, then the game's handlers, hear of a change (bulk: as all were put back).
+    def heard(name, value, was, bulk)
+      Quests.__variable(name, value, was, bulk)
+      @handlers.dup.each { |block| block.call(name, value) }
     end
 
     def store(name, value) = value.nil? ? @values.delete(name) : @values[name] = value
@@ -116,7 +124,7 @@ module GameVariables
     def put_all(values)
       changed = (@values.keys | values.keys).reject { |name| @values[name] == values[name] }
       @values = values.compact
-      changed.each { |name| @handlers.dup.each { |block| block.call(name, @values[name]) } }
+      changed.each { |name| heard(name, @values[name], nil, true) }
     end
   end
 end

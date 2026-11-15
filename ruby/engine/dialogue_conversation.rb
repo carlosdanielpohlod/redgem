@@ -141,9 +141,15 @@ module Dialogue
       return finish if node_id.nil?
 
       @steps += 1
-      Rules.apply(node["effects"], self) if @deciding
+      decide if @deciding
       speak if @shown
       Dialogue.__shown(:line, self) if @shown
+    end
+
+    # The node's effects happen, and the quests hear that its speaker was talked to.
+    def decide
+      Rules.apply(node["effects"], self)
+      Quests.__talked(self) unless @speaker.nil?
     end
 
     # The line's voice plays, in place of the one before.

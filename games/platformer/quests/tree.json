@@ -1,0 +1,21 @@
+{
+  "title": "quest.tree.title",
+  "description": "quest.tree.description",
+  "start": "water",
+  "stages": {
+    "water": {
+      "text": "quest.tree.water",
+      "objectives": [{ "talk_to": "Tree1", "dialogue": "tree", "node": "thanks", "text": "quest.tree.talk" }],
+      "next": "goal"
+    },
+    "goal": {
+      "text": "quest.tree.goal",
+      "objectives": [
+        { "collect": "coin", "text": "quest.tree.coin" },
+        { "go_to": "Goal", "radius": 3, "text": "quest.tree.go_to_goal" }
+      ],
+      "next": "done"
+    },
+    "done": { "text": "quest.tree.done", "end": true }
+  }
+}
