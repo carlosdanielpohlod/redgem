@@ -64,6 +64,15 @@ void check_voices(const DialogueChecks& checks, const std::string& file, const d
   }
 }
 
+void check_loaded_dialogue(const DialogueChecks& checks, const std::string& file, const dialogue::DialogueFile& read) {
+  add_lines(checks.report.errors, file, read.errors);
+  add_lines(checks.report.warnings, file, read.warnings);
+  check_texts(checks.locales, checks.report, file, read.texts);
+  check_quests(checks, file, read);
+  check_stages(checks, file, read);
+  check_voices(checks, file, read);
+}
+
 void check_dialogue(const DialogueChecks& checks, const std::string& name) {
   const std::string file = dialogue::shown_file(name);
   const auto bytes = read_file_up_to(dialogue::dialogue_file(checks.game_dir, name), dialogue::kMaxFileBytes);
@@ -74,12 +83,7 @@ void check_dialogue(const DialogueChecks& checks, const std::string& name) {
   }
   const dialogue::DialogueFile read =
       dialogue::read_dialogue({reinterpret_cast<const char*>(bytes->data()), bytes->size()});
-  add_lines(checks.report.errors, file, read.errors);
-  add_lines(checks.report.warnings, file, read.warnings);
-  check_texts(checks.locales, checks.report, file, read.texts);
-  check_quests(checks, file, read);
-  check_stages(checks, file, read);
-  check_voices(checks, file, read);
+  check_loaded_dialogue(checks, file, read);
 }
 
 void add_quests(DialogueChecks& checks) {
