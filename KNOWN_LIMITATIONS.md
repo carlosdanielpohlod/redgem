@@ -398,6 +398,35 @@ promise of how it will be closed.
 
 ### Gameplay API
 
+- NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
+  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
+  yet. The DialogueBox has one look (a game that wants another draws its own from
+  `Dialogue.current`) and does not stop the hero while it shows, a line's `voice` plays nothing, and quest stages are GameVariables until a
+  game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
+  hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
+  A machine has one conversation at a time (two local players cannot talk at once), and over the
+  network a speaker without a NetworkSync is found on the client by its name.
+  An Interactor's line of sight is one ray
+- NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
+  daily schedules on a `GameClock` and head look-at, and can be used and talked to through
+  [interaction](docs/scripting/interaction.md); there is no dialogue, voice or mission system yet.
+  Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
+  character faces when it starts to look, and it does not avoid turning through the body when the
+  target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the
+  game saves it. A Perception's sight is one
+  ray from its eyes to a point on each watched object (a body mostly behind a low wall is hidden,
+  and a thin gap shows it whole), it looks every frame for every watched object, and hearing goes
+  through walls. Brains and Perceptions work on the host only: a noise made on a client is heard by
+  nobody, so a client's footsteps reach the host's NPCs only through the game's own messages. A
+  brain's state is not saved with `Save`. An Interactor's line of sight is one ray
+  between the actor's and the target's positions (a target whose position is inside the ground or
+  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
+  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
+  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
+  the on-screen controls being turned on). Over the network the host runs every use, checking
+  sight from the hero's late pose: a client hears of what it did only through the game's own
+  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
+  them to an action of its own rebinds one.
 - A dialogue's texts take no placeholder values, and GameVariables hold only nil, true, false,
   numbers and texts (at most 1024 of them), which a game saves itself. A machine has one
   conversation at a time (two local players cannot talk at once), and over the network a speaker
