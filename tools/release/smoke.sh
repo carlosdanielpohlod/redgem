@@ -29,6 +29,7 @@ GL_OPTION="--gl"
 GL_LIBRARIES=(opengl32.dll libgallium_wgl.dll)   # what --gl copies beside every program
 
 GL_DIR=""   # --gl: Mesa's libraries, copied beside the Windows programs
+TIMEOUT_COMMAND=""
 
 say() { echo "smoke: $*"; }
 
@@ -52,7 +53,7 @@ built_program() {
 
 # Runs a program that opens a window ($@) until it closes itself, and fails unless it ends well.
 expect_window_closes() {
-  REDGEM_CLOSE_AFTER_FRAMES="${CLOSE_AFTER_FRAMES}" expect_success timeout "${WINDOW_SECONDS}" "$@"
+  REDGEM_CLOSE_AFTER_FRAMES="${CLOSE_AFTER_FRAMES}" expect_success "${TIMEOUT_COMMAND}" "${WINDOW_SECONDS}" "$@"
 }
 
 # A demo, built by the editor for this system and played by the download's player.
@@ -70,7 +71,7 @@ run_tests() {
   local game="$1" shots="$2"
   expect_success "${EDITOR_RUN[@]}" new "${game}" --template "${TEMPLATE}"
   expect_success "${EDITOR_RUN[@]}" check "${game}" --run-tests
-  expect_success timeout "${WINDOW_SECONDS}" "${TESTER_RUN[@]}" "${game}" "${WINDOW_TEST}" --screenshots "${shots}"
+  expect_success "${TIMEOUT_COMMAND}" "${WINDOW_SECONDS}" "${TESTER_RUN[@]}" "${game}" "${WINDOW_TEST}" --screenshots "${shots}"
   [[ -s "${shots}/${WINDOW_PICTURE}" ]] || { echo "the system test left no ${WINDOW_PICTURE}" >&2; exit 1; }
 }
 
@@ -84,6 +85,10 @@ read_options() {
 
 main() {
   read_options "$@"
+  TIMEOUT_COMMAND="$(command -v timeout || command -v gtimeout)" || {
+    echo "smoke.sh needs timeout or gtimeout from GNU coreutils." >&2
+    exit 1
+  }
   local name demo
   name="$(basename "${ARCHIVE}")"
   # (A global: the trap runs after main has returned.)
