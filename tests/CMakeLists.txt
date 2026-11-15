@@ -710,6 +710,9 @@ add_test(NAME tools.release_downloads
 # starts its programs.
 add_test(NAME tools.release_linux
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_linux_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# What opens a download's windows before a release is published, on stand-ins for its programs.
+add_test(NAME tools.release_smoke
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_smoke_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
