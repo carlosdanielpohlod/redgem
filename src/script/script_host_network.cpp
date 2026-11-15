@@ -13,9 +13,10 @@ namespace {
 
 constexpr const char* kNetworkModule = "Network";
 // What forgets the handlers of a scene when another takes its place (Input: a capture waiting;
-// Interaction: the scene's Interactables too; Dialogue: the conversations, which end with the scene).
-constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP",     "Input",        "Game",
-                                             "Interaction",  "Dialogue", "GameVariables"};
+// Interaction: the scene's Interactables and Interactors too; Perception: the scene's senses;
+// Dialogue: the conversations, which end with the scene).
+constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP",       "Input",    "Game",
+                                             "Interaction",  "Perception", "Dialogue", "GameVariables"};
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
 constexpr const char* kLevelTickEntry = "__level_tick";

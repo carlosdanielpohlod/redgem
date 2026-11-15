@@ -973,8 +973,15 @@ Audio.play(:line_042, group: :voice)
 Audio.play_at(:radio, position, loop: true, group: :music)
 ```
 
-At most 64 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
-does not loop lets its id go when it ends.
+At most 128 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
+does not loop lets its id go when it ends. Past that, a new sound takes the place of the weakest one
+playing: the lowest `priority:` (0 to 255, 128 unless it says), then the quietest as heard, then
+the oldest. A sound weaker than all of them does not play:
+
+```ruby
+Audio.play(:boss_roar, priority: 255)       # always heard
+Audio.play_at(:leaf, position, priority: 10) # the first to give way
+```
 
 ## A sense of speed
 

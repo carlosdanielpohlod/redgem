@@ -44,7 +44,11 @@ nav:
       - Live script reload: scripting/live_reload.md
       - Gameplay recipes: scripting/gameplay.md
       - Interaction: scripting/interaction.md
+<<<<<<< HEAD
       - Dialogue: scripting/dialogue.md
+=======
+      - NPCs: scripting/npcs.md
+>>>>>>> origin/main
       - Multiplayer: scripting/multiplayer.md
       - Online services: scripting/online-services.md
       - Texts in several languages: scripting/i18n.md
