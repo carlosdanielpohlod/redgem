@@ -132,6 +132,31 @@ TEST_CASE("a kinematic body under a parent goes where the parent takes it") {
   CHECK(says(*engine, lift_below));
 }
 
+// A courier with a box in hand, touching its capsule: a scene of the two, the box under a hand.
+SceneDesc courier_with_box() {
+  NodeDesc hero = node("Courier", {0, 1, 20}, {1, 1, 1}, {{"body", std::string("character")}});
+  hero.children = {3};
+  NodeDesc hand = node("Hand", {0, 0.2f, -0.6f}, {1, 1, 1}, {});  // (no body: the box under it rides too)
+  hand.parent = 2;  // (after the camera and the ground)
+  hand.children = {4};
+  NodeDesc box = node("Box", {0, 0, 0}, {0.4f, 0.4f, 0.4f}, moving("kinematic"));
+  box.parent = 3;
+  return scene_with({hero, hand, box});
+}
+
+TEST_CASE("a character is not pushed by the kinematic body it carries") {
+  // The box touching the courier used to push it, and the courier, moving, took the box on:
+  // standing still it drifted away, and teleported it was shoved meters past where it was put.
+  TempGame game(kGame);
+  auto engine = engine_for(game, courier_with_box());
+  frames(*engine, kFewFrames);
+  CHECK(says(*engine, "(Scene.find('Courier').transform.position.flat - Vector3.new(0, 0, 20)).length < 0.1"));
+  ruby(*engine, "Scene.find('Courier').transform.position = Vector3.new(0, 1, -20)");
+  frames(*engine, kFewFrames);
+  CHECK(says(*engine, "(Scene.find('Courier').transform.position.flat - Vector3.new(0, 0, -20)).length < 0.1"));
+  CHECK(says(*engine, "(Scene.find('Box').transform.position.flat - Vector3.new(0, 0, -20.6)).length < 0.1"));
+}
+
 TEST_CASE("a wheel stays on its vehicle") {
   NodeDesc car = node("Car", {0, 1, 0}, {2, 0.5f, 4}, moving("vehicle"));
   car.children = {3};

@@ -417,6 +417,7 @@ redgem_add_library(redgem_runtime
   storage/save_file_slots.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
+  script/symbol_cache.cpp
   script/reload_shape.cpp
   script/ruby_reload.cpp
   script/ruby_classes.cpp

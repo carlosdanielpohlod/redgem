@@ -97,7 +97,7 @@ bool ScriptHost::is_behaviour_class(RClass* klass) { return inherits_class(klass
 bool ScriptHost::overrides(RClass* klass, const char* method) {
   mrb_state* mrb = vm_.state();
   RClass* owner = klass;  // becomes the class (or included module) the method is found in
-  const mrb_method_t found = mrb_method_search_vm(mrb, &owner, mrb_intern_cstr(mrb, method));
+  const mrb_method_t found = mrb_method_search_vm(mrb, &owner, vm_.symbol(method));
   return !MRB_METHOD_UNDEF_P(found) && owner != class_named(kBehaviourClass);
 }
 

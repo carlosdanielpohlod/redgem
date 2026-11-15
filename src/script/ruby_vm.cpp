@@ -28,6 +28,7 @@ struct CallRequest {
   const char* method = nullptr;
   const mrb_value* argv = nullptr;
   mrb_int argc = 0;
+  SymbolCache* symbols = nullptr;
 };
 
 // Nested lazy loads checkpoint their enclosing source before tracking their own declarations.
@@ -93,13 +94,15 @@ mrb_value run_observation(mrb_state* mrb, void* data) {
 
 mrb_value run_call(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const CallRequest*>(userdata);
-  return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method), request->argc, request->argv);
+  const mrb_sym method = request->symbols->of(request->method);
+  return mrb_funcall_argv(mrb, request->receiver, method, request->argc, request->argv);
 }
 
 struct MadeCallRequest {
   mrb_value receiver;
   const char* method = nullptr;
   const RubyVm::ArgumentsMaker* make = nullptr;
+  SymbolCache* symbols = nullptr;
 };
 
 // The arguments, or nothing with `trouble` saying why. (Ruby's own errors are not caught here:
@@ -118,8 +121,8 @@ mrb_value run_made_call(mrb_state* mrb, void* userdata) {
   std::string trouble;
   const std::vector<mrb_value> args = made_arguments(mrb, *request->make, trouble);
   if (!trouble.empty()) mrb_raise(mrb, E_RUNTIME_ERROR, trouble.c_str());
-  return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method),
-                          static_cast<mrb_int>(args.size()), args.data());
+  const mrb_sym method = request->symbols->of(request->method);
+  return mrb_funcall_argv(mrb, request->receiver, method, static_cast<mrb_int>(args.size()), args.data());
 }
 
 struct DescribeRequest {
@@ -158,7 +161,7 @@ RClass* define_timeout_class(mrb_state* mrb) {
 }  // namespace
 
 // (The allocator's data is how the code fetch hook finds the budget: mruby has no other slot free.)
-RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)) {
+RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)), symbols_(mrb_) {
   if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
   budget_.attach(mrb_, define_timeout_class(mrb_));
   reload_hooks_ = class_reload_hooks(mrb_, mrb_->class_class);
@@ -241,17 +244,17 @@ RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args) {
-  CallRequest request{receiver, method, args.begin(), static_cast<mrb_int>(args.size())};
+  CallRequest request{receiver, method, args.begin(), static_cast<mrb_int>(args.size()), &symbols_};
   return run_protected(run_call, &request);
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vector<mrb_value>& args) {
-  CallRequest request{receiver, method, args.data(), static_cast<mrb_int>(args.size())};
+  CallRequest request{receiver, method, args.data(), static_cast<mrb_int>(args.size()), &symbols_};
   return run_protected(run_call, &request);
 }
 
 RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
-  MadeCallRequest request{receiver, method, &make};
+  MadeCallRequest request{receiver, method, &make, &symbols_};
   return run_protected(run_made_call, &request);
 }
 
