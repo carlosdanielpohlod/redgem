@@ -19,12 +19,16 @@ class QuestTracker < Behaviour
   def mine? = get_component(NetworkSync)&.mine? != false
 
   def look_around
-    waiting = Quests.active.flat_map(&:objectives).select { |objective| awaiting_arrival?(objective) }
+    waiting = waiting_arrivals
     @reported = reported & waiting.map { |objective| report_key(objective) }
-    objective = waiting.find { |entry| !reported?(entry) && near?(entry) }
+    objective = waiting.find { |entry| ready_to_report?(entry) }
     # Reporting can change stages. Re-read the objectives next frame.
     reach(objective) if objective
   end
+
+  def waiting_arrivals = Quests.active.flat_map(&:objectives).select { |objective| awaiting_arrival?(objective) }
+
+  def ready_to_report?(objective) = !reported?(objective) && near?(objective)
 
   def awaiting_arrival?(objective) = objective.kind == :go_to && !objective.done?
 

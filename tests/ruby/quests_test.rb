@@ -2,18 +2,18 @@
 # objectives, how it goes on from stage to stage, who hears of it, and how it is saved. The quest
 # is given as the engine reads its file (string keys); the people in it are stand-ins.
 
-# Someone of the scene, as the quests and a conversation see them.
-class Someone
-  attr_reader :name
+class QuestsTest < RedGemTest::Case
+  # Someone of the scene, as the quests and a conversation see them.
+  class Someone
+    attr_reader :name
 
-  def initialize(name)
-    @name = name
+    def initialize(name)
+      @name = name
+    end
+
+    def get_component(_klass) = nil
   end
 
-  def get_component(_klass) = nil
-end
-
-class QuestsTest < RedGemTest::Case
   SACKS = 3
   # Bread for the baker: collect flour and drive off a wolf, bring the flour and talk to the baker,
   # then wait for the oven.
@@ -42,12 +42,6 @@ class QuestsTest < RedGemTest::Case
   ROUND = { "title" => "t", "start" => "a", "stages" => {
     "a" => { "text" => "t", "objectives" => [{ "check" => "always", "text" => "t" }], "next" => "b" },
     "b" => { "text" => "t", "objectives" => [{ "check" => "always", "text" => "t" }], "next" => "a" }
-  } }.freeze
-  WALK = { "title" => "t", "start" => "path", "stages" => {
-    "path" => { "text" => "t", "objectives" => [
-      { "go_to" => "Mill", "text" => "t" }, { "collect" => "flour", "text" => "t" }
-    ], "next" => "done" },
-    "done" => { "text" => "t", "end" => true }
   } }.freeze
 
   def setup

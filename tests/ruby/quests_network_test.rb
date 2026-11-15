@@ -1,8 +1,8 @@
 # Quests over the network (quests.rb, network_quests.rb), with this machine pretending to be the
 # host or a client: what it sends is written down instead, and what arrives is handed to it as the
 # engine would. (Two real machines play a quest in tests/system_pairs.)
-module Network
-  class << self
+class QuestsNetworkTest < RedGemTest::Case
+  class << Network
     attr_accessor :pretend_online, :pretend_host, :pretend_id
     attr_reader :sent
 
@@ -17,9 +17,7 @@ module Network
 
     def forget_sent = @sent = []
   end
-end
 
-class QuestsNetworkTest < RedGemTest::Case
   GUEST = 2
   SACKS = 2
   FLOUR = {
