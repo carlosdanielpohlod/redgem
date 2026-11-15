@@ -14,6 +14,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_scene_bindings(mrb);
   install_scatter_bindings(mrb);
   install_camera_bindings(mrb);
+  install_exposure_bindings(mrb);
   install_physics_bindings(mrb);
   install_rigidbody_bindings(mrb);  // after the physics': it adds to Rigidbody and CharacterController
   install_physics_query_bindings(mrb);

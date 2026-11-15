@@ -15,11 +15,43 @@ until 1.0, a release may change what games rely on (see
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
   it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
   game's group of `:voice` ducks the music too.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
 - **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
   that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
   quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
   stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
   default).
+- **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
+  physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
+  of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
+  scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
+- **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
+  letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
+  text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
+  Hebrew are drawn in their order on screen by the Unicode Bidirectional Algorithm (SheenBidi 2.9,
+  Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
+  vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
+  not joined yet (no shaping).
+
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
   connection that stays up. Each machine loads it in the background and waits, frozen, until all
@@ -395,6 +427,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
 - In a network game, a machine that is not the host can no longer load a level on its own
   (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
   objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
