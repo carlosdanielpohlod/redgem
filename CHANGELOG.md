@@ -570,6 +570,10 @@ From a game made with 0.5.0:
 
 ### Fixed
 
+- **The editor bridge says when a recovery waits**: after an editor closed without saving, the
+  next one offers to recover its edits, and that dialog made every live change fail with "editor
+  is busy" while `status` showed nothing. `status` now has `recovery_pending`, and a change refused
+  while it waits names the recovery prompt.
 - **Behaviour updates are about three times faster**: each call the engine made into Ruby (every
   behaviour's update, every frame) and each binding on a GameObject looked up a name (the method's,
   `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
