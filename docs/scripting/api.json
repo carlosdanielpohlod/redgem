@@ -3485,10 +3485,11 @@
         {
           "name": "update",
           "params": [
-            {"name": "count", "type": "Integer"}
+            {"name": "count", "type": "Integer"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
           ],
           "returns": {"type": "void"},
-          "about": "moves it among count widgets, as up or down was pressed this frame"
+          "about": "moves it among count widgets, as up or down was pressed this frame on that gamepad (and the keyboard)"
         },
         {
           "name": "at?",
