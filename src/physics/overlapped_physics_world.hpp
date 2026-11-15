@@ -47,6 +47,7 @@ class OverlappedPhysicsWorld final : public PhysicsWorld {
   void set_velocity(ObjectId object, Vec3 velocity) override;
   void add_impulse(ObjectId object, Vec3 impulse) override;
   void set_character_move(ObjectId object, Vec3 horizontal_velocity) override;
+  void add_character_displacement(ObjectId object, Vec3 offset) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
