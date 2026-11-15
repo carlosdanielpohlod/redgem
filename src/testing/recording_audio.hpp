@@ -124,6 +124,7 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   float master_volume() const { return master_volume_; }                              // the game's
   float heard_master_volume() const { return heard_master_volume_; }                  // the game's times the player's
   float group_volume(MixGroup group) const { return groups().player_volume(group); }  // the player's
+  using MixedAudio::music_ducked;
 
  private:
   float master_volume_ = kFullVolume;
