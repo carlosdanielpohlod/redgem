@@ -89,14 +89,18 @@ module Save
 
   # Selects a slot and checks it; a refused one leaves the selection where it was, and raises.
   def self.slot=(name)
-    previous = slot
     __outside_migration
+    __select_checked(name)
+  end
+
+  def self.__select_checked(name)
+    previous = slot
     __select(name)
     __recheck
     __ready
-  rescue RuntimeError
+  rescue RuntimeError => error
     __back_to(previous)
-    raise
+    raise error
   end
 
   def self.__back_to(previous)
