@@ -6,18 +6,15 @@
   <a href="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml"><img src="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml/badge.svg?branch=main" alt="macOS"></a>
 </p>
 
-A 3D game engine and editor where games are written in **Ruby**, the most human-friendly
-language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
-ship a standalone game.
+RedGem is a 3D game engine with an editor and **Ruby** scripting. Build a level in the editor or
+import it from **Blender**, test your game with Play, and export a standalone build.
 
 <p align="center">
   <img src="docs/images/editor.webp" alt="The RedGem editor: a treasure chest on a scanned coast in the Scene view, with the Hierarchy, the Inspector and the Project panel" width="900"><br>
   <sub>The editor. Scene: <a href="https://polyhaven.com/a/treasure_chest">Treasure Chest</a> by Rico Cilliers, the coast scan and the sky from <a href="https://polyhaven.com">Poly Haven</a> (CC0).</sub>
 </p>
 
-> **Experimental.** RedGem is a young engine: expect rough edges, and see the
-> [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
-> open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).
+> **Experimental.** Check the [known limitations](KNOWN_LIMITATIONS.md) before starting a project.
 
 <p align="center">
   <a href="https://www.redgem-engine.org/#showcase"><img src="https://www.redgem-engine.org/assets/poster-0.5.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
@@ -116,10 +113,9 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 | macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 | macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 
-The project hub opens: pick *Platformer* under *New game* and press Play. The Linux download is
-the tested one and builds games for Linux, Windows and Android; the Windows one has only been
-tried under Wine so far, and the macOS ones only on GitHub's virtual Macs (they build games for the
-Mac). Details in [docs/install.md](docs/install.md).
+In the project hub, choose **New game**, select **Platformer**, and create a project. Open it and
+press **Play**. Use WASD to move and Space to jump. See the [installation guide](docs/install.md)
+for system requirements and the [first-game tutorial](docs/first-game.md) to edit the level.
 
 With Docker, on Linux:
 
@@ -152,8 +148,8 @@ ctest --test-dir build                  # run the tests
 ./build/src/redgem build games/my_game dist/apk --target android   # an Android .apk
 ```
 
-A built game is a copy of `redgem-player`, the small program that plays a game and nothing else,
-next to the game's files: the editor and the other tools stay with you.
+A desktop build includes the game executable and its data. Share the entire output folder,
+or the `.app` on macOS. See [Building and sharing](docs/shipping.md) for each platform.
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,
 `models/`, `sounds/` and `game.json`.
