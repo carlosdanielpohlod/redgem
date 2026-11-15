@@ -565,6 +565,10 @@ From a game made with 0.5.0:
 
 ### Fixed
 
+- **A character is not pushed by what it carries**: a kinematic body under a character (a box in
+  its hand) that touched its capsule pushed it, and the character, moving, took the body on with
+  it: a courier standing still drifted away, and one teleported with a parcel in hand was shoved
+  meters past where it was put. A character now passes through the kinematic bodies under it.
 - **Perception resets with each scene**: loading a scene logged "resetting the handlers of
   Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
   modules by name and Perception is a class. It now finds classes too, so a new scene starts with
