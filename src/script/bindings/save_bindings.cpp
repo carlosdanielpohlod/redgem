@@ -87,14 +87,19 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
   return made;
 }
 
+void require_save_change(mrb_state* mrb, bool stored) {
+  if (stored) return;
+  mrb_raisef(mrb, E_RUNTIME_ERROR, "could not write %s", save(mrb).where().c_str());
+}
+
 mrb_value save_delete(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
-  written(mrb, [&] { return save(mrb).remove(name); });
+  require_save_change(mrb, written(mrb, [&] { return save(mrb).remove(name); }));
   return mrb_nil_value();
 }
 
 mrb_value save_clear(mrb_state* mrb, mrb_value) {
-  paused(mrb, [&] { return save(mrb).clear(); });
+  require_save_change(mrb, written(mrb, [&] { return save(mrb).clear(); }));
   return mrb_nil_value();
 }
 

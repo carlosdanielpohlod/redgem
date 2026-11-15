@@ -44,7 +44,7 @@ class SaveFile final : public SaveStore {
       : file_(std::move(file)), flush_(std::move(flush)) {}
 
   std::optional<nlohmann::json> get(const std::string& key) override;
-  // False when the file could not be written (the value is still kept for this run).
+  // False when the file could not be written (a non-nil value is still kept for this run).
   bool set(const std::string& key, const nlohmann::json& value) override;
   bool remove(const std::string& key) override;
   bool clear() override;
