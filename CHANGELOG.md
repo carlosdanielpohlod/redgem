@@ -15,6 +15,13 @@ until 1.0, a release may change what games rely on (see
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
   it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
   game's group of `:voice` ducks the music too.
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
 - **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
   `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
   plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends

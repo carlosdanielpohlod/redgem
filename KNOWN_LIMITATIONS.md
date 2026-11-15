@@ -429,6 +429,16 @@ promise of how it will be closed.
   one whose other end is in another scene, or was deleted, is not made (the log says so). The
   editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
 - Animation clips have no IK.
+- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
+  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not in the grid: a
+  path goes around those it is told to `avoid:` (at most 64, each a disc around its box seen from
+  above), and a `NavAgent` steers around the rest. Agents find each other in Ruby, each looking at
+  every other one each frame, so a large crowd costs more as it grows; there are no formations or
+  queues. A level a script changes needs `Navigation.bake`; there are no off-grid links (jumps,
+  ladders, teleporters), no navigation areas with costs and no bake preview in the editor
+  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
+  the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
 - `Save` supports named slots, per-object pose/appearance checkpoints, save versions with

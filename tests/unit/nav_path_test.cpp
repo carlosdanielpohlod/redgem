@@ -220,3 +220,68 @@ TEST_CASE("the nearest walkable point is looked for 8 m around, even on the smal
   CHECK(nearest_nav_node(grid, {grid.position(0).x - 7.0f, 0.0f, 0.0f}).has_value());  // 7 m away
   CHECK_FALSE(nearest_nav_node(grid, {grid.position(0).x - 9.0f, 0.0f, 0.0f}).has_value());
 }
+
+namespace {
+
+constexpr float kClearance = 0.4f;
+constexpr float kCrateRadius = 1.2f;
+constexpr float kCrateHeight = 1.0f;
+
+// A crate standing on the ground with its middle over a cell's.
+NavObstacle crate_over(const NavGrid& grid, int x, int z) {
+  const Vec3 middle = grid.position(node_at(grid, x, z));
+  return {middle, kCrateRadius, middle.y, middle.y + kCrateHeight};
+}
+
+}  // namespace
+
+TEST_CASE("cells under an obstacle are blocked, cells clear of it and above it are not") {
+  const NavGrid grid = open_ground(9, 9);
+  const NavBlocked blocked(grid, {crate_over(grid, 4, 4)}, kClearance, kHeadroom);
+  CHECK(blocked.blocks(node_at(grid, 4, 4)));
+  CHECK(blocked.blocks(node_at(grid, 5, 4)));  // within the crate's radius and a character's
+  CHECK_FALSE(blocked.blocks(node_at(grid, 7, 4)));
+  NavObstacle overhead = crate_over(grid, 4, 4);
+  overhead.bottom = kHeadroom + kStepHeight;  // a lamp hanging higher than anyone
+  overhead.top = overhead.bottom + kCrateHeight;
+  CHECK(NavBlocked(grid, {overhead}, kClearance, kHeadroom).size() == 0);
+  CHECK(NavBlocked::none().size() == 0);
+}
+
+TEST_CASE("a path goes around blocked cells, and a straight walk does not cross them") {
+  const NavGrid grid = open_ground(9, 9);
+  const NavBlocked blocked(grid, {crate_over(grid, 4, 4)}, kClearance, kHeadroom);
+  const NavGrid::Node start = node_at(grid, 0, 4);
+  const NavGrid::Node goal = node_at(grid, 8, 4);
+  CHECK(walks_straight(grid, start, goal));
+  CHECK_FALSE(walks_straight(grid, start, goal, blocked));
+  const NavGridPath path = find_nav_path(grid, start, goal, nav::kMaxSearchNodes, blocked);
+  REQUIRE(path.status == NavPathStatus::Found);
+  for (const NavGrid::Node node : path.nodes) CHECK_FALSE(blocked.blocks(node));
+  const std::vector<NavGrid::Node> pulled = pull_straight(grid, path.nodes, blocked);
+  CHECK(pulled.size() >= 3);  // it turns around the crate
+  for (std::size_t index = 1; index < pulled.size(); ++index) {
+    CHECK(walks_straight(grid, pulled[index - 1], pulled[index], blocked));
+  }
+}
+
+TEST_CASE("a path from beside an obstacle walks out of its way, never deeper in") {
+  const NavGrid grid = open_ground(9, 9);
+  const NavBlocked blocked(grid, {crate_over(grid, 4, 4)}, kClearance, kHeadroom);
+  const NavGrid::Node start = node_at(grid, 3, 4);  // within the crate's reach
+  REQUIRE(blocked.blocks(start));
+  CHECK(blocked.lets(start, node_at(grid, 2, 4)));        // away from it
+  CHECK_FALSE(blocked.lets(start, node_at(grid, 4, 4)));  // into it
+  CHECK_FALSE(blocked.lets(node_at(grid, 2, 4), start));  // back in, from the open
+  const NavGridPath path = find_nav_path(grid, start, node_at(grid, 8, 4), nav::kMaxSearchNodes, blocked);
+  REQUIRE(path.status == NavPathStatus::Found);
+  CHECK_FALSE(passes_column(grid, path.nodes, 4, 4));
+}
+
+TEST_CASE("how deep a point is into an obstacle's reach") {
+  const NavObstacle crate{{0, 0, 0}, kCrateRadius, 0.0f, kCrateHeight};
+  CHECK(nav_obstacle_depth({0, 0, 0}, crate, kClearance, kHeadroom) == doctest::Approx(kCrateRadius + kClearance));
+  CHECK(nav_obstacle_depth({kCrateRadius, 0, 0}, crate, kClearance, kHeadroom) == doctest::Approx(kClearance));
+  CHECK(nav_obstacle_depth({kCrateRadius * kTwo, 0, 0}, crate, kClearance, kHeadroom) <= 0.0f);
+  CHECK(nav_obstacle_depth({0, kCrateHeight * kTwo, 0}, crate, kClearance, kHeadroom) <= 0.0f);  // on top of it
+}
