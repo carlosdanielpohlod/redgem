@@ -122,9 +122,11 @@ ends.
 
 ## Quests
 
-Until a game has quests of its own, a quest's stage is the variable `"quest.<name>"`. A game with
-its own quest system sets `Dialogue.quests` to an object with `stage(name)` and
-`set_stage(name, stage, conversation)`, and conditions and effects go to it instead.
+A quest's conditions and effects read and move the quests of [quest files](quests.md). A quest
+with no file is only its stage, the variable `"quest.<name>"`, so a game with no `quests/` folder
+can still keep stages. A game with its own quest system sets `Dialogue.quests` to an object with
+`stage(name)` and `set_stage(name, stage, conversation)`, and conditions and effects go to it
+instead.
 
 ## Showing a conversation
 
@@ -162,7 +164,8 @@ does setting a `GameVariables` value there. A newcomer hears of every variable a
 `redgem check` reads every dialogue file. Errors: a file that is not JSON, a key a node, choice,
 branch, condition or effect cannot have (a misspelt one), a node named that is not there, a node
 or choice that leads nowhere, a text key with no text in `locales/` (nor among the engine's), and a
-quest that is not in `quests/`, when the game has that folder. Warnings: a node nothing leads to,
+quest that is not in `quests/`, when the game has that folder, or a stage that quest does not have.
+Warnings: a node nothing leads to,
 a node whose choices all have conditions, branches that all have one, and a text a language of the
 game lacks.
 

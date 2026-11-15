@@ -10,6 +10,18 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
+  `deliver`, `collect`, `defeat`, and a `check` of the game's own in Ruby) that go on to the next
+  stage once they are all done, until one that ends the quest. `Quests.start`, `set_stage`,
+  `collected`, `delivered`, `defeated` and `Quests[name]` (its stage, texts and objectives with
+  their progress); `Quests.on(:start/:stage/:objective/:complete/:change)` on every machine. A
+  `QuestTracker` behaviour on the hero finds the places it reaches and asks the checks. Dialogue
+  conditions and effects read and move these quests. The state lives in GameVariables, so the party
+  shares it and the host owns it: a client's player's progress is told to the host, which counts
+  it. `Quests.save` and `Quests.restore` keep it with `Save` (and its migrations). `redgem check`
+  reads every quest: stages that are not there, objectives that could never be done, dialogues,
+  nodes and items that are not there, and missing texts; and every stage a dialogue names. See the
+  manual's Quests page.
 - **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
   one another by `next`, by branches with conditions, or by the player's choices, with conditions
   on variables and quest stages and effects that set or add to variables, move quests and tell the
@@ -19,8 +31,7 @@ until 1.0, a release may change what games rely on (see
   `GameVariables` hold the values every player shares. Over the network each player has a
   conversation of their own, the host follows it step by step and its effects happen there.
   `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
-  keys and texts missing from `locales/`. Quest stages are variables until a game sets
-  `Dialogue.quests`. See the manual's Dialogue page.
+  keys and texts missing from `locales/`. See the manual's Dialogue page.
 - **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
   time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
   `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):

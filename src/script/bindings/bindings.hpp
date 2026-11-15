@@ -41,6 +41,7 @@ void install_save_bindings(mrb_state* mrb);
 void install_save_slot_bindings(mrb_state* mrb);
 void install_i18n_bindings(mrb_state* mrb);
 void install_dialogue_bindings(mrb_state* mrb);
+void install_quest_bindings(mrb_state* mrb);
 void install_network_bindings(mrb_state* mrb);
 void install_http_bindings(mrb_state* mrb);
 void install_settings_bindings(mrb_state* mrb);

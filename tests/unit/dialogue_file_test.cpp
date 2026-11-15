@@ -139,3 +139,14 @@ TEST_CASE("a dialogue's name stays in the dialogues folder") {
   CHECK_FALSE(is_dialogue_name(""));
   CHECK_FALSE(is_dialogue_name(std::string(kMaxNameBytes + 1, 'a')));
 }
+
+TEST_CASE("the stages of quests a dialogue names are listed for the check") {
+  const DialogueFile file = read_dialogue(R"({"start": [{"if": [{"quest": "bread", "not": "done"}], "next": "a"},
+    {"next": "a"}], "nodes": {"a": {"text": "t", "end": true, "effects": [{"quest": "bread", "to": "baked"}]}}})");
+  REQUIRE(file.stages.size() == 2);
+  CHECK(file.stages[0].quest == "bread");
+  CHECK(file.stages[0].stage == "done");
+  CHECK(file.stages[0].where == "start branch 1");
+  CHECK(file.stages[1].stage == "baked");
+  CHECK(file.stages[1].where == "node a");
+}

@@ -88,6 +88,7 @@ ToolResult checked(const ToolLine& line) {
   check_scripts(line.words.front(), report);
   check_scenes(line.words.front(), report);
   check_dialogues(line.words.front(), report);
+  check_quests(line.words.front(), report);
   const std::optional<TestsRun> tests = tests_if_asked(line, report);
   ToolResult result{kExitSuccess, problem_lines(report, tests, line.has(kAllOption)), {}};
   if (tests) result.out += tests_line(*tests) + "\n";

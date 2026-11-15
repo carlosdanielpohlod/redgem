@@ -10,7 +10,6 @@
     "Camera::Rig",
     "Camera::Shake",
     "Dialogue::Rules",
-    "Dialogue::VariableQuests",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -5309,7 +5308,7 @@
           "static": true,
           "params": [],
           "returns": {"type": "untyped"},
-          "about": "what reads and moves quest stages (GameVariables \"quest.<name>\" unless a game says)"
+          "about": "what reads and moves quest stages (Quests unless a game says)"
         },
         {
           "name": "quests=",
@@ -5594,6 +5593,436 @@
         "on_interact"
       ],
       "guide": "dialogue.md"
+    },
+    {
+      "name": "Quests",
+      "kind": "module",
+      "about": "The game's quests, written in quest files (quests/<name>.json): stages with objectives (go to, talk to, deliver, collect, defeat, a check); kept in GameVariables, so the party shares them and the host owns them.",
+      "methods": [
+        {
+          "name": "[]",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Quests::Quest"},
+          "about": "the quest of that name, started or not (raises for one with no file)"
+        },
+        {
+          "name": "load",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Quests::Definition"},
+          "about": "the quest file of that name, read once (raises for one that is not there or not well made)"
+        },
+        {
+          "name": "started",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[Quests::Quest]"},
+          "about": "every quest that started, completed ones too"
+        },
+        {
+          "name": "active",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[Quests::Quest]"},
+          "about": "every quest under way: started, and not complete"
+        },
+        {
+          "name": "completed",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[Quests::Quest]"},
+          "about": "every quest that is complete"
+        },
+        {
+          "name": "stage",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "String | nil"},
+          "about": "the stage a quest is at, or nil while it has not started"
+        },
+        {
+          "name": "start",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "starts a quest at its first stage (false when it had started); raises on a client"
+        },
+        {
+          "name": "set_stage",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "stage", "type": "String | nil"},
+            {"name": "conversation", "type": "Dialogue::Conversation | nil", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "String | nil"},
+          "about": "moves a quest to a stage (nil: not started), its objectives from nothing; raises on a client and for a stage it has not"
+        },
+        {
+          "name": "reset",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "String | nil"},
+          "about": "as if the quest never started"
+        },
+        {
+          "name": "collected",
+          "static": true,
+          "params": [
+            {"name": "item", "type": "String | Symbol"},
+            {"name": "count", "type": "Integer", "optional": true, "default": "1"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "the players collected items: for the collect objectives (on a client, told to the host)"
+        },
+        {
+          "name": "delivered",
+          "static": true,
+          "params": [
+            {"name": "item", "type": "String | Symbol"},
+            {"name": "to", "type": "GameObject | String", "keyword": true},
+            {"name": "count", "type": "Integer", "keyword": true, "optional": true, "default": "1"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "the players delivered items to someone: for the deliver objectives"
+        },
+        {
+          "name": "defeated",
+          "static": true,
+          "params": [
+            {"name": "who", "type": "GameObject | String"},
+            {"name": "count", "type": "Integer", "optional": true, "default": "1"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "the players defeated someone (an object, or its name): for the defeat objectives"
+        },
+        {
+          "name": "reached",
+          "static": true,
+          "params": [
+            {"name": "place", "type": "GameObject | String"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "a hero reached a place (an object, or its name): for the go_to objectives (a QuestTracker says it)"
+        },
+        {
+          "name": "check",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "block", "type": "^(Quests::Quest) -> boolish", "block": true}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "a check of the game's own, for the objectives {\"check\": name}: |quest| true once it is passed (asked every frame on the host)"
+        },
+        {
+          "name": "on",
+          "static": true,
+          "params": [
+            {"name": "event", "type": "Symbol"},
+            {"name": "block", "type": "^(untyped, untyped, untyped) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "events: :start and :complete |quest|, :stage |quest, stage, from|, :objective |quest, objective|, :change |quest|"
+        },
+        {
+          "name": "to_h",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[String, Hash[String, untyped]]"},
+          "about": "the quests that started, for Save: {\"bread\" => {\"stage\" => \"bring\", \"progress\" => [2, 0]}}"
+        },
+        {
+          "name": "replace",
+          "static": true,
+          "params": [
+            {"name": "saved", "type": "Hash[String | Symbol, untyped] | nil"}
+          ],
+          "returns": {"type": "Hash[String, Hash[String, untyped]]"},
+          "about": "puts these in the place of every quest's state (a save read back; a stage the file no longer has is left out); raises on a client"
+        },
+        {
+          "name": "save",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String", "optional": true, "default": ":quests"}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "Save.set(key, Quests.to_h)"
+        },
+        {
+          "name": "restore",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String", "optional": true, "default": ":quests"}
+          ],
+          "returns": {"type": "Hash[String, Hash[String, untyped]]"},
+          "about": "Quests.replace(Save.get(key, {}))"
+        }
+      ],
+      "guide": "quests.md"
+    },
+    {
+      "name": "Quests::Quest",
+      "kind": "class",
+      "about": "One quest and where the party is in it (Quests[name] gives one).",
+      "methods": [
+        {
+          "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its name: that of its file in quests/, without .json"
+        },
+        {
+          "name": "definition",
+          "params": [],
+          "returns": {"type": "Quests::Definition | nil"},
+          "about": "its file as read (nil for a quest with no file)"
+        },
+        {
+          "name": "stage",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the stage it is at, or nil while it has not started"
+        },
+        {
+          "name": "started?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it started"
+        },
+        {
+          "name": "complete?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it reached a stage that ends it"
+        },
+        {
+          "name": "active?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "started, and not complete"
+        },
+        {
+          "name": "title",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "its title, in the language in use"
+        },
+        {
+          "name": "description",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "its description, in the language in use, or nil"
+        },
+        {
+          "name": "stage_text",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the text of the stage it is at, or nil"
+        },
+        {
+          "name": "objectives",
+          "params": [],
+          "returns": {"type": "Array[Quests::Objective]"},
+          "about": "the objectives of the stage it is at"
+        },
+        {
+          "name": "next_stage",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the stage it goes to once its objectives are done, or nil"
+        }
+      ],
+      "internal": [
+        "==",
+        "inspect"
+      ],
+      "guide": "quests.md#where-the-party-is"
+    },
+    {
+      "name": "Quests::Objective",
+      "kind": "class",
+      "about": "One thing the party does in a stage of a quest.",
+      "methods": [
+        {
+          "name": "quest",
+          "params": [],
+          "returns": {"type": "Quests::Quest"},
+          "about": "the quest it is of"
+        },
+        {
+          "name": "index",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "its place among the stage's objectives"
+        },
+        {
+          "name": "kind",
+          "params": [],
+          "returns": {"type": "Symbol"},
+          "about": ":go_to, :talk_to, :deliver, :collect, :defeat or :check"
+        },
+        {
+          "name": "target",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "what it names: a place, someone, an item or a check"
+        },
+        {
+          "name": "count",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "how many it takes (1 unless the file says)"
+        },
+        {
+          "name": "progress",
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "how many it has"
+        },
+        {
+          "name": "done?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it has as many as it takes"
+        },
+        {
+          "name": "text",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its text, in the language in use, with {progress} and {count} filled in"
+        },
+        {
+          "name": "radius",
+          "params": [],
+          "returns": {"type": "Float | Integer"},
+          "about": "a go_to's meters from its place (2 unless the file says)"
+        },
+        {
+          "name": "recipient",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "a deliver's: who the items go to"
+        },
+        {
+          "name": "dialogue",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "a talk_to's: the dialogue it must be, or nil"
+        },
+        {
+          "name": "node",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "a talk_to's: the node it must reach, or nil"
+        },
+        {
+          "name": "data",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
+          "about": "its line in the file"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "quests.md#objectives"
+    },
+    {
+      "name": "Quests::Definition",
+      "kind": "class",
+      "about": "A quest file as it was read.",
+      "methods": [
+        {
+          "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "its name"
+        },
+        {
+          "name": "title_key",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the I18n key of its title"
+        },
+        {
+          "name": "description_key",
+          "params": [],
+          "returns": {"type": "String | nil"},
+          "about": "the I18n key of its description, or nil"
+        },
+        {
+          "name": "start",
+          "params": [],
+          "returns": {"type": "String"},
+          "about": "the stage it starts at"
+        },
+        {
+          "name": "stage",
+          "params": [
+            {"name": "id", "type": "String"}
+          ],
+          "returns": {"type": "Hash[String, untyped] | nil"},
+          "about": "the stage of that id (its line in the file), or nil"
+        },
+        {
+          "name": "stage?",
+          "params": [
+            {"name": "id", "type": "String | nil"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether it has a stage of that id"
+        },
+        {
+          "name": "stage_ids",
+          "params": [],
+          "returns": {"type": "Array[String]"},
+          "about": "the ids of its stages"
+        },
+        {
+          "name": "end?",
+          "params": [
+            {"name": "id", "type": "String | nil"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether reaching that stage completes the quest"
+        },
+        {
+          "name": "objectives",
+          "params": [
+            {"name": "id", "type": "String | nil"}
+          ],
+          "returns": {"type": "Array[Hash[String, untyped]]"},
+          "about": "the objectives of a stage, as the file has them"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "quests.md"
+    },
+    {
+      "name": "QuestTracker",
+      "kind": "class",
+      "superclass": "Behaviour",
+      "about": "A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host.",
+      "methods": [],
+      "internal": [
+        "update"
+      ],
+      "guide": "quests.md"
     },
     {
       "name": "Interaction",

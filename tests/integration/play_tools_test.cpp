@@ -185,7 +185,8 @@ TEST_CASE("a check reads every dialogue: what it names, where it leads, and its 
     "hello": {"text": "baker.hello", "choices": [{"text": "baker.bye", "end": true},
                                                   {"text": "baker.buy", "next": "sell"}]}}})");
   game.write("dialogues/village/guard.json", R"({"start": "a", "nodes": {"a": {"text": "baker.hello"}}})");
-  game.write("quests/other.json", "{}");
+  game.write("quests/other.json", R"({"title": "baker.hello", "start": "a", "stages": {"a": {"text": "baker.hello",
+    "end": true}}})");
   game.write("dialogues/quest.json", R"({"start": "a", "nodes": {"a": {"text": "baker.hello", "end": true,
     "effects": [{"quest": "bread", "to": "done"}]}}})");
   const ToolResult checked = tool({"check", game.dir(), "--all"});
@@ -197,6 +198,45 @@ TEST_CASE("a check reads every dialogue: what it names, where it leads, and its 
   CHECK(has(checked.out, "error dialogues/village/guard.json: node a: it leads nowhere"));
   CHECK(has(checked.out, "error dialogues/quest.json: node a: there is no quest bread (quests/bread.json)"));
   CHECK(has(checked.out, "check: 4 errors"));
+}
+
+TEST_CASE("a check reads every quest: its stages, what it names, and its texts") {
+  GameCopy game("quests");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.write("locales/en.json", R"({"t": "Text"})");
+  game.write("items/flour.json", "{}");
+  game.write("dialogues/baker.json", R"({"start": "a", "nodes": {"a": {"text": "t", "end": true,
+    "effects": [{"quest": "bread", "to": "baked"}]}, "b": {"text": "t", "end": true,
+    "effects": [{"quest": "bread", "to": "done"}]}}})");
+  game.write("quests/bread.json", R"({"title": "t", "start": "find", "stages": {
+    "find": {"text": "t", "objectives": [{"collect": "flour", "count": 2, "text": "t"},
+                                         {"collect": "salt", "text": "t"},
+                                         {"talk_to": "Baker", "dialogue": "baker", "node": "z", "text": "t"},
+                                         {"talk_to": "Miller", "dialogue": "miller", "text": "t"},
+                                         {"defeat": "Wolf", "count": 0, "text": "missing.key"}], "next": "bake"},
+    "done": {"text": "t", "end": true}}})");
+  const ToolResult checked = tool({"check", game.dir(), "--all"});
+  CHECK(checked.exit_code == kExitFailure);
+  CHECK(has(checked.out, "error quests/bread.json: stage find: there is no stage \"bake\""));
+  CHECK(has(checked.out, "error quests/bread.json: stage find objective 5: \"count\" is a whole number"));
+  CHECK(has(checked.out, "error quests/bread.json: stage find objective 5: no text for missing.key"));
+  CHECK(has(checked.out, "error quests/bread.json: stage find objective 2: there is no item salt (items/salt.json)"));
+  CHECK(has(checked.out, "error quests/bread.json: stage find objective 3: dialogue baker has no node \"z\""));
+  CHECK(has(checked.out, "error quests/bread.json: stage find objective 4: there is no dialogue miller"));
+  CHECK(has(checked.out, "check: 6 errors"));
+}
+
+TEST_CASE("a check finds a dialogue that moves a quest to a stage it does not have") {
+  GameCopy game("quest_stages");
+  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.write("locales/en.json", R"({"t": "Text"})");
+  game.write("quests/bread.json", R"({"title": "t", "start": "done", "stages": {"done": {"text": "t", "end": true}}})");
+  game.write("dialogues/baker.json", R"({"start": [{"if": [{"quest": "bread", "is": "baked"}], "next": "a"},
+    {"next": "a"}], "nodes": {"a": {"text": "t", "end": true, "effects": [{"quest": "bread", "to": "burnt"}]}}})");
+  const ToolResult checked = tool({"check", game.dir(), "--all"});
+  CHECK(has(checked.out, "error dialogues/baker.json: start branch 1: quest bread has no stage \"baked\""));
+  CHECK(has(checked.out, "error dialogues/baker.json: node a: quest bread has no stage \"burnt\""));
+  CHECK(has(checked.out, "check: 2 errors"));
 }
 
 TEST_CASE("a game without a quests folder may name any quest") {

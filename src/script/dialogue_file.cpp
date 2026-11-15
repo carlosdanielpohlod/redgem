@@ -7,9 +7,9 @@
 #include <map>
 #include <set>
 
-#include "core/game_files.hpp"
 #include "core/config.hpp"
 #include "core/safe_path.hpp"
+#include "script/game_json_files.hpp"
 
 namespace redgem::dialogue {
 namespace {
@@ -35,6 +35,7 @@ constexpr const char* kBy = "by";
 constexpr const char* kData = "data";
 constexpr std::array<const char*, 2> kSubjects = {kVar, kQuest};
 constexpr std::array<const char*, 4> kComparisons = {"is", "not", "at_least", "at_most"};
+constexpr std::array<const char*, 2> kStageComparisons = {"is", "not"};
 constexpr std::array<const char*, 2> kNumberComparisons = {"at_least", "at_most"};
 constexpr std::array<const char*, 4> kEffectKinds = {"set", "add", kQuest, "event"};
 // What each kind of effect holds besides its own key, and whether that is a must.
@@ -222,6 +223,19 @@ class Reader {
     }
     read_subject(condition, first_of(condition, kSubjects), where);
     read_comparison(condition, first_of(condition, kComparisons), where);
+    if (condition.contains(kQuest)) read_stage_compared(condition, where);
+  }
+
+  // A quest's stage compared by "is" or "not" (a text: null is a quest not started).
+  void read_stage_compared(const Json& condition, const std::string& where) {
+    const char* comparison = first_of(condition, kStageComparisons);
+    if (comparison == nullptr || !condition.at(comparison).is_string()) return;
+    add_stage(condition, condition.at(comparison), where);
+  }
+
+  void add_stage(const Json& object, const Json& stage, const std::string& where) {
+    if (!object.at(kQuest).is_string()) return;
+    file_.stages.push_back({object.at(kQuest).get<std::string>(), stage.get<std::string>(), where});
   }
 
   // The variable or the quest a condition or an effect names.
@@ -268,6 +282,7 @@ class Reader {
     if (kind == kQuest && !is_name_text(effect.at(kTo), kMaxVariableNameBytes)) {
       return error(where, "a quest goes \"to\" a stage: a name");
     }
+    if (kind == kQuest) add_stage(effect, effect.at(kTo), where);
     if (kind == "set" && !is_variable_value(effect.at(kTo))) {
       error(where, "\"to\" is null, true, false, a number or a text");
     }
@@ -309,46 +324,14 @@ class Reader {
   std::set<std::string> ids_;
 };
 
-// The JSON of a file's text; nothing (discarded) when it is not JSON or nests too deep.
-Json parsed(std::string_view text) {
-  bool too_deep = false;
-  const auto watch_depth = [&too_deep](int depth, Json::parse_event_t, Json&) {
-    too_deep = too_deep || depth >= kMaxDepth;  // (the outermost value is at depth 0)
-    return !too_deep;
-  };
-  Json json = Json::parse(text, watch_depth, false);
-  return too_deep ? Json(Json::value_t::discarded) : json;
-}
-
-bool is_dialogue_file(const fs::path& path) { return path.extension() == kFileExtension && game_files::is_file(path); }
-
-void add_dialogues_in(const fs::path& root, const fs::path& folder, std::vector<std::string>& names, int depth);
-
-// (Folders nest this deep at most: a link that loops would never end.)
-constexpr int kMaxFolderDepth = 8;
-
-void add_entry(const fs::path& root, const fs::path& entry, std::vector<std::string>& names, int depth) {
-  std::error_code error;
-  if (fs::is_symlink(entry, error)) return;
-  if (is_dialogue_file(entry)) {
-    names.push_back(entry.lexically_relative(root).replace_extension().generic_u8string());
-  } else if (game_files::is_folder(entry)) {
-    add_dialogues_in(root, entry, names, depth + 1);
-  }
-}
-
-void add_dialogues_in(const fs::path& root, const fs::path& folder, std::vector<std::string>& names, int depth) {
-  if (depth > kMaxFolderDepth) return;
-  for (const fs::path& entry : game_files::entries_in(folder)) add_entry(root, entry, names, depth);
-}
-
 }  // namespace
 
 DialogueFile read_dialogue(std::string_view text) {
   DialogueFile file;
-  file.json = parsed(text);
+  file.json = game_json::parsed(text);
   if (file.json.is_discarded()) {
-    file.errors.push_back("it is not JSON (or it nests deeper than " + std::to_string(kMaxDepth) + " levels)");
+    file.errors.push_back("it is not JSON (or it nests deeper than " + std::to_string(game_json::kMaxDepth) +
+                          " levels)");
     return file;
   }
   Reader(file).read_root(file.json);
@@ -366,12 +349,7 @@ std::string shown_file(std::string_view name) {
 }
 
 std::vector<std::string> dialogue_names(const fs::path& game_dir) {
-  std::vector<std::string> names;
-  const fs::path folder = game_dir / config::kDialoguesDirName;
-  if (!game_files::is_folder(folder) || through_link(game_dir, config::kDialoguesDirName)) return names;
-  add_dialogues_in(folder, folder, names, 0);
-  std::sort(names.begin(), names.end());
-  return names;
+  return game_json::names_in(game_dir, config::kDialoguesDirName);
 }
 
 }  // namespace redgem::dialogue

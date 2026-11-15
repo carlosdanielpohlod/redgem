@@ -350,17 +350,21 @@ not a promise of how it will be closed.
 ### Gameplay API
 
 - NPCs can be used through [interaction](docs/scripting/interaction.md) and talked to through
-  [dialogue files](docs/scripting/dialogue.md): there is no NPC behaviour, voice or mission system
-  yet. Dialogue has no box or choice list on screen yet (a game draws its own from
-  `Dialogue.current`), a line's `voice` plays nothing, and quest stages are GameVariables until a
-  game gives `Dialogue.quests`. A dialogue's texts take no placeholder values, and GameVariables
+  [dialogue files](docs/scripting/dialogue.md), and given [quests](docs/scripting/quests.md): there
+  is no NPC behaviour or voice yet. Dialogue has no box or choice list on screen yet (a game draws
+  its own from `Dialogue.current`), and a line's `voice` plays nothing. A dialogue's texts take no placeholder values, and GameVariables
   hold only nil, true, false, numbers and texts (at most 1024 of them), which a game saves itself.
   A machine has one conversation at a time (two local players cannot talk at once), and over the
   network a speaker without a NetworkSync is found on the client by its name.
   An Interactor's line of sight is one ray
+- Quests have no journal page, world markers or pointer to the current objective yet: a game
+  shows them itself from `Quests.active`. Their state shares the room of GameVariables (1024
+  values: a quest takes one, and one more for each objective under way). The host takes a client's
+  word for what its player collected, delivered, defeated or reached. A `go_to` place is found by
+  its exact name, and the game's checks are asked only where a `QuestTracker` runs.
 - NPCs have a state machine (`Brain`) and senses (`Perception`, see [NPCs](docs/scripting/npcs.md)),
   daily schedules on a `GameClock` and head look-at, and can be used and talked to through
-  [interaction](docs/scripting/interaction.md); there is no dialogue, voice or mission system yet.
+  [interaction](docs/scripting/interaction.md); there is no voice yet.
   Head look-at turns one bone (no spine or eyes), its forward is guessed from the way the
   character faces when it starts to look, and it does not avoid turning through the body when the
   target is behind. Each machine keeps its own `GameClock`, and the clock is not saved unless the

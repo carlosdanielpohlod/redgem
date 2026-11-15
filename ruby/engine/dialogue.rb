@@ -37,10 +37,10 @@ module Dialogue
 
   class << self
     # What reads and changes quest stages: an object with stage(name) and set_stage(name, stage,
-    # conversation). Quests that are GameVariables ("quest.<name>") unless a game says.
+    # conversation). Quests (see quests.rb) unless a game says.
     attr_writer :quests
 
-    def quests = @quests || VariableQuests
+    def quests = @quests || Quests
 
     # The conversation this machine's player is in, or nil.
     attr_reader :current
@@ -150,17 +150,6 @@ module Dialogue
       return nil if sync.nil? || !Network.online? || sync.mine?
 
       sync.owner
-    end
-  end
-
-  # Quest stages kept as GameVariables, "quest.<name>", until the game has quests of its own.
-  module VariableQuests
-    PREFIX = "quest.".freeze
-
-    def self.stage(name) = GameVariables[PREFIX + name.to_s]
-
-    def self.set_stage(name, stage, _conversation)
-      GameVariables[PREFIX + name.to_s] = stage
     end
   end
 end
