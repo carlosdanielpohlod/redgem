@@ -58,6 +58,11 @@ class GameCopy {
     settings["physics"][key] = value;
     write("game.json", settings.dump());
   }
+  // Takes out the old tree's dialogue and quest: their texts go with the locales a test replaces.
+  void remove_tree() const {
+    fs::remove(dir_ / "dialogues/tree.json");
+    fs::remove(dir_ / "quests/tree.json");
+  }
   void write(const std::string& file, const std::string& text) const {
     std::string error;
     fs::create_directories((dir_ / file).parent_path());
@@ -178,7 +183,7 @@ TEST_CASE("a check lists a screenful of problems unless asked for all") {
 
 TEST_CASE("a check reads every dialogue: what it names, where it leads, and its texts") {
   GameCopy game("dialogues");
-  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");  // (its texts go with the locales replaced here)
+  game.remove_tree();
   game.write("locales/en.json", R"({"baker.hello": "Hello!", "baker.bye": "Bye"})");
   game.write("locales/pt.json", R"({"baker.hello": "Olá!"})");
   game.write("dialogues/baker.json", R"({"start": "hello", "nodes": {
@@ -202,7 +207,7 @@ TEST_CASE("a check reads every dialogue: what it names, where it leads, and its 
 
 TEST_CASE("a check reads every quest: its stages, what it names, and its texts") {
   GameCopy game("quests");
-  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.remove_tree();
   game.write("locales/en.json", R"({"t": "Text"})");
   game.write("items/flour.json", "{}");
   game.write("dialogues/baker.json", R"({"start": "a", "nodes": {"a": {"text": "t", "end": true,
@@ -228,7 +233,7 @@ TEST_CASE("a check reads every quest: its stages, what it names, and its texts")
 
 TEST_CASE("a check finds a dialogue that moves a quest to a stage it does not have") {
   GameCopy game("quest_stages");
-  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.remove_tree();
   game.write("locales/en.json", R"({"t": "Text"})");
   game.write("quests/bread.json", R"({"title": "t", "start": "done", "stages": {"done": {"text": "t", "end": true}}})");
   game.write("dialogues/baker.json", R"({"start": [{"if": [{"quest": "bread", "is": "baked"}], "next": "a"},
@@ -241,7 +246,8 @@ TEST_CASE("a check finds a dialogue that moves a quest to a stage it does not ha
 
 TEST_CASE("a game without a quests folder may name any quest") {
   GameCopy game("dialogue_quests");
-  fs::remove(fs::path(game.dir()) / "dialogues/tree.json");
+  game.remove_tree();
+  fs::remove_all(fs::path(game.dir()) / "quests");
   game.write("locales/en.json", R"({"sign.text": "Keep out"})");
   game.write("dialogues/sign.json", R"({"start": "a", "nodes": {"a": {"text": "sign.text", "end": true,
     "effects": [{"quest": "bread", "to": "started"}]}}})");
