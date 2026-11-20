@@ -27,13 +27,16 @@ class SystemTest
     @finished = false
   end
 
-  # Called by the engine once per frame. Returns :running, :passed or :failed.
+  # Called by the engine once per frame. Returns :running, :waiting (a frame of a wait in real
+  # seconds: the engine paces it and does not count it), :passed or :failed.
   def __tick
     return result if @finished
 
     @fiber.resume
     @finished = !@fiber.alive?
-    @finished ? result : :running
+    return result if @finished
+
+    @waiting_real_time ? :waiting : :running
   rescue Exception => e # rubocop:disable Lint/RescueException
     fail_with(e)
   end
@@ -49,6 +52,20 @@ class SystemTest
       wait
     end
     raise RedGemTest::Failure, "#{message} within #{frames} frames"
+  end
+
+  # Waits until the block is true, or fails after that many real seconds: for what another
+  # program does (a game that joins, a server that restarts). The frames run at the game's pace
+  # and do not count toward the test's limit of frames.
+  def wait_for(seconds:, message: "condition not met")
+    raise ArgumentError, "wait_for takes seconds: a number" unless seconds.is_a?(Numeric)
+
+    deadline = Time.now.to_f + seconds
+    until yield
+      raise RedGemTest::Failure, "#{message} within #{seconds} s" if Time.now.to_f >= deadline
+
+      real_time_frame
+    end
   end
 
   # Block form reads well in tests: t.assert("coin collected") { ... }.
@@ -68,6 +85,13 @@ class SystemTest
   def log(message) = Debug.log("[test] #{message}")
 
   private
+
+  def real_time_frame
+    @waiting_real_time = true
+    wait
+  ensure
+    @waiting_real_time = false
+  end
 
   # The test is over: no key stays down for whatever runs next.
   def fail_with(error)
