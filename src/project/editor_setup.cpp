@@ -1,7 +1,9 @@
 #include "project/editor_setup.hpp"
 
+#include <exception>
 #include <string>
 
+#include "core/translations.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "project/build_steps.hpp"
@@ -53,8 +55,12 @@ std::vector<BuildChoice> build_choices() {
 }
 
 GameCheck check_for_editor(const std::filesystem::path& game_dir) {
-  const tools::CheckReport report = tools::check_game(game_dir);
-  return {report.errors, report.warnings, tools::check_summary(report)};
+  try {
+    const tools::CheckReport report = tools::check_game(game_dir);
+    return {report.errors, report.warnings, tools::check_summary(report)};
+  } catch (const std::exception& error) {  // (a scene the engine of the check cannot start with)
+    return {{error.what()}, {}, tr("project.check.stopped")};
+  }
 }
 
 EditorOptions editor_options(GpuChoice gpu) {

@@ -4,6 +4,7 @@
 #include <charconv>
 #include <utility>
 
+#include "core/config.hpp"
 #include "script/script_host.hpp"
 
 namespace redgem {
@@ -41,6 +42,8 @@ std::optional<ConsoleScriptLine> console_script_line(std::string_view row) {
 }
 
 std::string check_message(const std::string& line, const std::filesystem::path& game_dir) {
+  const std::string scripts = std::string(config::kScriptsDirName) + "/";
+  if (line.rfind(scripts, 0) != 0) return line;  // a line about a script starts with its file
   const auto source = console_script_line(std::string(kBacktracePrefix) + line);
   if (!source) return line;
   const std::string file = (game_dir / std::filesystem::u8path(source->file)).generic_u8string();

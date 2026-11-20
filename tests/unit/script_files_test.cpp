@@ -181,7 +181,8 @@ TEST_CASE("a check's line about a script's line gets a backtrace row under it, w
 TEST_CASE("a check's line with no script line in it stays as it is") {
   const std::filesystem::path game = "/games/forest";
   for (const std::string line : {"scripts/goal.rb does not define class Goal (attached in scene main #20 Goal)",
-                                 "dialogues/baker.json: node hello: it leads nowhere", "scripts/x.rb:0: nothing"}) {
+                                 "dialogues/baker.json: node hello: it leads nowhere", "scripts/x.rb:0: nothing",
+                                 "scene main #4 door.rb:2: scripts/x.rb is not there"}) {
     CHECK(check_message(line, game) == line);
   }
 }

@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <string>
 
 #include "core/config.hpp"
@@ -22,7 +23,8 @@ void frames(EditorApp& app) {
 }
 
 std::filesystem::path broken_game() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_check_console_editor";
+  const auto game = std::filesystem::temp_directory_path() /
+                    ("redgem_check_console_editor_" + std::to_string(std::random_device{}()));
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);
