@@ -3,9 +3,11 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <optional>
 #include <utility>
 
 #include "app/engine.hpp"
+#include "core/translations.hpp"
 
 namespace redgem {
 namespace {
@@ -86,6 +88,24 @@ std::vector<PreviewVariable> variables_from(const nlohmann::json& json) {
   return variables;
 }
 
+// What a method of EditorPreview answers (the state, as JSON text), or nothing with `error` saying why.
+std::optional<std::string> answer_of(RubyVm& vm, const std::string& method, const std::vector<std::string>& args,
+                                     std::string& error) {
+  const int arena = mrb_gc_arena_save(vm.state());
+  const RubyResult module = vm.eval(kPreviewModule, kWhere);
+  const RubyResult answer = vm.call_with(module.value, method.c_str(), [&args](mrb_state* mrb) {
+    std::vector<mrb_value> values;
+    for (const std::string& arg : args) values.push_back(mrb_str_new(mrb, arg.data(), arg.size()));
+    return values;
+  });
+  const bool told = answer.ok && mrb_string_p(answer.value);
+  std::optional<std::string> text;
+  if (told) text = std::string(RSTRING_PTR(answer.value), static_cast<std::size_t>(RSTRING_LEN(answer.value)));
+  mrb_gc_arena_restore(vm.state(), arena);
+  if (!told) error = answer.ok ? tr("editor.story.no_answer") : answer.error;
+  return text;
+}
+
 }  // namespace
 
 PreviewState preview_state_from(const nlohmann::json& json) {
@@ -111,28 +131,15 @@ bool StoryPreview::ready() {
   options.fixed_step = true;
   engine_ = Engine::create(options, SceneDesc{});
   if (engine_) return true;
-  error_ = "the story preview cannot start the game's engine";
+  error_ = tr("editor.story.no_engine");
   return false;
 }
 
 bool StoryPreview::ask(const std::string& method, const std::vector<std::string>& args) {
   if (!ready()) return false;
-  RubyVm& vm = engine_->scripts().vm();
-  const int arena = mrb_gc_arena_save(vm.state());
-  const RubyResult module = vm.eval(kPreviewModule, kWhere);
-  const RubyResult answer = vm.call_with(module.value, method.c_str(), [&args](mrb_state* mrb) {
-    std::vector<mrb_value> values;
-    for (const std::string& arg : args) values.push_back(mrb_str_new(mrb, arg.data(), arg.size()));
-    return values;
-  });
-  const bool told = answer.ok && mrb_string_p(answer.value);
-  const std::string text = told ? std::string(RSTRING_PTR(answer.value), RSTRING_LEN(answer.value)) : std::string();
-  mrb_gc_arena_restore(vm.state(), arena);
-  if (!told) {
-    error_ = answer.ok ? "the story preview answered nothing" : answer.error;
-    return false;
-  }
-  state_ = preview_state_from(nlohmann::json::parse(text, nullptr, false));
+  const std::optional<std::string> answer = answer_of(engine_->scripts().vm(), method, args, error_);
+  if (!answer) return false;
+  state_ = preview_state_from(nlohmann::json::parse(*answer, nullptr, false));
   error_.clear();
   return true;
 }
@@ -149,6 +156,10 @@ bool StoryPreview::set_stage(const std::string& quest, const std::string& stage)
   return ask("__set_stage", {quest, stage});
 }
 
-bool StoryPreview::reset() { return ask("__reset", {}); }
+void StoryPreview::reset() {
+  engine_.reset();
+  state_ = PreviewState{};
+  error_.clear();
+}
 
 }  // namespace redgem

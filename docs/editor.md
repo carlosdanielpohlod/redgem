@@ -239,8 +239,8 @@ program shows at once.
   shows its stage, the stage's text and objectives, and a button for every stage to move it there.
   A dialogue's effects move the quests too.
 - **GameVariables (scratch)** lists every variable the runs set. They are the preview's own: Play,
-  the game's saves and the edited scene never see them. **Reset variables** clears them, and the
-  conversation with them.
+  the game's saves and the edited scene never see them. **Reset variables** clears them, the
+  conversation and the quests, and reads the game's texts (`locales/`) again.
 
 The runs go in an engine of their own with no scene: nothing of the scene's scripts runs, so a
 `check` objective is never passed, a conversation has no speaker for a `talk_to` objective, and

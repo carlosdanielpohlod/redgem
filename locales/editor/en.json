@@ -90,6 +90,8 @@
   "editor.story.over": "The conversation is over.",
   "editor.story.continue": "Continue",
   "editor.story.if": "if",
+  "editor.story.no_engine": "the Story panel cannot start the game's engine",
+  "editor.story.no_answer": "the Story panel's engine answered nothing",
   "editor.story.effects": "effects",
   "editor.story.next": "next",
   "editor.create.camera": "Camera",

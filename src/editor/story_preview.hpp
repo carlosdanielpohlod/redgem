@@ -84,8 +84,9 @@ class StoryPreview {
   bool go_on();  // a line with no choices: on to what follows
   bool start_quest(const std::string& name);
   bool set_stage(const std::string& quest, const std::string& stage);
-  // Every variable back to nothing, the conversation gone.
-  bool reset();
+  // Every variable back to nothing, the conversation and the quests gone; the game's texts are
+  // read again as the next run starts.
+  void reset();
 
   const PreviewState& state() const { return state_; }
   const std::string& error() const { return error_; }

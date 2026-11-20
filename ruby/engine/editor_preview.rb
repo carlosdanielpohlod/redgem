@@ -26,12 +26,6 @@ module EditorPreview
 
     def __set_stage(name, stage) = act { Quests.set_stage(name, stage) }
 
-    # Every variable, and the conversation, back to nothing.
-    def __reset
-      @conversation = nil
-      act { GameVariables.replace({}) }
-    end
-
     def __state = HTTP.__json({ dialogue: conversation_state, quests: quests_state, variables: GameVariables.to_h })
 
     private

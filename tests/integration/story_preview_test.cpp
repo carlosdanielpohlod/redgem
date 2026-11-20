@@ -100,7 +100,7 @@ TEST_CASE("a quest is moved from stage to stage without Play") {
   CHECK_FALSE(bread.objectives[0].done);
   REQUIRE(preview.set_stage("bread", "done"));
   CHECK(preview.state().quests[0].complete);
-  REQUIRE(preview.reset());
+  preview.reset();
   CHECK(preview.state().quests.empty());
   CHECK(preview.state().variables.empty());
   fs::remove_all(game);
