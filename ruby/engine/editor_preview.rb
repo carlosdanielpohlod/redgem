@@ -6,7 +6,7 @@ module EditorPreview
   class << self
     # A new conversation of a dialogue, read again from its file (ending the one before).
     def __dialogue(name)
-      Dialogue.__scene_reset
+      forget_files
       @conversation = Dialogue::Conversation.new(Dialogue.load(name), actor: nil, deciding: true)
       @conversation.begin
       __state
@@ -20,11 +20,14 @@ module EditorPreview
     # Starts a quest at its first stage (read again from its file, and from nothing when it had
     # started), or moves it to a stage.
     def __start_quest(name)
-      Quests.__scene_reset
+      forget_files
       act { Quests.set_stage(name, Quests.load(name).start) }
     end
 
-    def __set_stage(name, stage) = act { Quests.set_stage(name, stage) }
+    def __set_stage(name, stage)
+      forget_files
+      act { Quests.set_stage(name, stage) }
+    end
 
     def __state = HTTP.__json({ dialogue: conversation_state, quests: quests_state, variables: GameVariables.to_h })
 
@@ -33,6 +36,12 @@ module EditorPreview
     def act
       yield
       __state
+    end
+
+    # The dialogues and quests read so far: the next step reads their files again.
+    def forget_files
+      Dialogue.__scene_reset
+      Quests.__scene_reset
     end
 
     def conversation_state
@@ -54,9 +63,23 @@ module EditorPreview
 
     def quests_state = Quests.started.map { |quest| quest_state(quest) }
 
+    # A quest's stages from its start along each one's "next", then the others.
+    def story_order(definition)
+      chained = chain(definition, definition.start, [])
+      chained + (definition.stage_ids - chained)
+    end
+
+    def chain(definition, id, ordered)
+      return ordered unless next_in_story?(definition, id, ordered)
+
+      chain(definition, definition.stage(id)["next"], ordered << id)
+    end
+
+    def next_in_story?(definition, id, ordered) = definition.stage?(id) && !ordered.include?(id)
+
     def quest_state(quest)
       { name: quest.name, stage: quest.stage, complete: quest.complete?, text: quest.stage_text,
-        next: quest.next_stage, stages: quest.definition&.stage_ids || [],
+        next: quest.next_stage, stages: quest.definition ? story_order(quest.definition) : [],
         objectives: quest.objectives.map { |objective| { text: objective.text, done: objective.done? } } }
     end
   end

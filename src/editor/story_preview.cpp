@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <exception>
 #include <optional>
 #include <utility>
 
@@ -129,19 +130,23 @@ bool StoryPreview::ready() {
   options.game_dir = game_dir_;
   options.scene_name = kPreviewScene;
   options.fixed_step = true;
-  engine_ = Engine::create(options, SceneDesc{});
-  if (engine_) return true;
-  error_ = tr("editor.story.no_engine");
-  return false;
+  try {
+    engine_ = Engine::create(options, SceneDesc{});
+    return true;
+  } catch (const std::exception& error) {  // (a game.json, say, the engine cannot start with)
+    error_ = tr("editor.story.no_engine") + std::string(": ") + error.what();
+    return false;
+  }
 }
 
 bool StoryPreview::ask(const std::string& method, const std::vector<std::string>& args) {
   if (!ready()) return false;
   const std::optional<std::string> answer = answer_of(engine_->scripts().vm(), method, args, error_);
-  if (!answer) return false;
-  state_ = preview_state_from(nlohmann::json::parse(*answer, nullptr, false));
-  error_.clear();
-  return true;
+  // A step that went wrong may have made some of its effects happen: the state is shown as it is.
+  const std::optional<std::string> now = answer ? answer : answer_of(engine_->scripts().vm(), "__state", {}, error_);
+  if (now) state_ = preview_state_from(nlohmann::json::parse(*now, nullptr, false));
+  if (answer) error_.clear();
+  return answer.has_value();
 }
 
 bool StoryPreview::start_dialogue(const std::string& name) { return ask("__dialogue", {name}); }

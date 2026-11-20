@@ -94,7 +94,7 @@ TEST_CASE("a quest is moved from stage to stage without Play") {
   CHECK(bread.stage == "flour");
   CHECK(bread.text == "Find flour");
   CHECK(bread.next == "bring");
-  CHECK(bread.stages == std::vector<std::string>{"bring", "done", "flour"});
+  CHECK(bread.stages == std::vector<std::string>{"flour", "bring", "done"});  // as the story goes
   REQUIRE(bread.objectives.size() == 1);
   CHECK(bread.objectives[0].text == "Flour 0/3");
   CHECK_FALSE(bread.objectives[0].done);

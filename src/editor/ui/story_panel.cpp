@@ -4,6 +4,9 @@
 
 #include <imgui.h>
 
+#include <algorithm>
+#include <functional>
+
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/story_preview.hpp"
@@ -20,12 +23,15 @@ namespace {
 constexpr const char* kNothing = "null";
 constexpr const char* kNoneListed = "[]";
 
+// What a button of the runs asked for, taken once they are drawn (it changes what they show).
+using Step = std::function<void()>;
+
 // A list to pick a file's name from, read again from the game's folder as it opens.
 void name_picker(const char* label, const char* id, std::vector<std::string>& names, std::string& picked,
                  std::vector<std::string> (*read)(const std::filesystem::path&), const std::filesystem::path& game) {
   ImGui::SetNextItemWidth(ImGui::GetFontSize() * editor_config::kStoryPickerWidth);
   if (!ImGui::BeginCombo(id, picked.empty() ? label : picked.c_str())) return;
-  names = read(game);
+  if (ImGui::IsWindowAppearing()) names = read(game);
   for (const std::string& name : names) {
     if (ImGui::Selectable(name.c_str(), name == picked)) picked = name;
   }
@@ -39,10 +45,10 @@ void step_details(const char* key, const std::string& json) {
   ImGui::TextColored(muted_color(), "%s %s", tr(key), json.c_str());
 }
 
-void draw_choice(StoryPreview& preview, const PreviewChoice& choice) {
+void draw_choice(StoryPreview& preview, const PreviewChoice& choice, Step& step) {
   ImGui::PushID(choice.index);
   ImGui::BeginDisabled(!choice.offered);
-  if (ImGui::Button(choice.text.c_str())) preview.choose(choice.index);
+  if (ImGui::Button(choice.text.c_str())) step = [&preview, index = choice.index] { preview.choose(index); };
   ImGui::EndDisabled();
   step_details("editor.story.if", choice.conditions);
   step_details("editor.story.effects", choice.effects);
@@ -58,19 +64,26 @@ void draw_line_text(const PreviewLine& line) {
   step_details("editor.story.effects", line.effects);
 }
 
-void draw_line(StoryPreview& preview, const PreviewLine& line) {
+// Whether the player answers the line (else it goes on as Continue says: also a line whose choices
+// all have conditions that do not hold).
+bool answered(const PreviewLine& line) {
+  return std::any_of(line.choices.begin(), line.choices.end(),
+                     [](const PreviewChoice& choice) { return choice.offered; });
+}
+
+void draw_line(StoryPreview& preview, const PreviewLine& line, Step& step) {
   if (line.over) {
     ImGui::TextColored(muted_color(), "%s", tr("editor.story.over"));
     return;
   }
   draw_line_text(line);
-  for (const PreviewChoice& choice : line.choices) draw_choice(preview, choice);
-  if (!line.choices.empty()) return;
-  if (ImGui::Button(icon_label(ICON_FA_FORWARD, "editor.story.continue"))) preview.go_on();
+  for (const PreviewChoice& choice : line.choices) draw_choice(preview, choice, step);
+  if (answered(line)) return;
+  if (ImGui::Button(icon_label(ICON_FA_FORWARD, "editor.story.continue"))) step = [&preview] { preview.go_on(); };
   step_details("editor.story.next", line.next);
 }
 
-void draw_quest(StoryPreview& preview, const PreviewQuest& quest) {
+void draw_quest(StoryPreview& preview, const PreviewQuest& quest, Step& step) {
   ImGui::PushID(quest.name.c_str());
   ImGui::TextColored(quest.complete ? success_color() : accent_color(), "%s: %s", quest.name.c_str(),
                      quest.stage.c_str());
@@ -79,7 +92,8 @@ void draw_quest(StoryPreview& preview, const PreviewQuest& quest) {
     ImGui::Text("%s %s", objective.done ? ICON_FA_SQUARE_CHECK : ICON_FA_SQUARE, objective.text.c_str());
   }
   for (const std::string& stage : quest.stages) {
-    if (ImGui::SmallButton(stage.c_str())) preview.set_stage(quest.name, stage);
+    if (ImGui::SmallButton(stage.c_str()))
+      step = [&preview, name = quest.name, stage] { preview.set_stage(name, stage); };
     ImGui::SameLine();
   }
   ImGui::NewLine();
@@ -118,14 +132,13 @@ void draw_pickers(StoryPreview& preview, StoryState& story, const std::filesyste
   if (ImGui::Button(icon_label(ICON_FA_ROTATE_LEFT, "editor.story.reset"))) preview.reset();
 }
 
-// (A copy: a step taken by a button changes the preview's state while the rest is drawn.)
-void draw_runs(StoryPreview& preview) {
-  const PreviewState state = preview.state();
+void draw_runs(StoryPreview& preview, Step& step) {
+  const PreviewState& state = preview.state();
   if (ImGui::CollapsingHeader(tr("editor.story.conversation"), ImGuiTreeNodeFlags_DefaultOpen)) {
-    if (state.line) draw_line(preview, *state.line);
+    if (state.line) draw_line(preview, *state.line, step);
   }
   if (ImGui::CollapsingHeader(tr("editor.story.quests"), ImGuiTreeNodeFlags_DefaultOpen)) {
-    for (const PreviewQuest& quest : state.quests) draw_quest(preview, quest);
+    for (const PreviewQuest& quest : state.quests) draw_quest(preview, quest, step);
   }
   if (ImGui::CollapsingHeader(tr("editor.story.variables"), ImGuiTreeNodeFlags_DefaultOpen)) draw_variables(state);
 }
@@ -137,8 +150,10 @@ void draw_story(StoryPreview& preview, StoryState& story, const std::filesystem:
   draw_pickers(preview, story, game_dir);
   if (!preview.error().empty()) ImGui::TextColored(error_color(), "%s", preview.error().c_str());
   ImGui::Separator();
-  draw_runs(preview);
+  Step step;
+  draw_runs(preview, step);
   ImGui::End();
+  if (step) step();
 }
 
 }  // namespace redgem::ui
