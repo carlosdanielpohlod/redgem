@@ -272,7 +272,6 @@ real clock.
   on-screen objective pointer. Games can build those views from `Quests.active`.
 - The editor's [Story panel](docs/editor.md#story-panel) runs dialogues and quests without the
   scene: `check` objectives never pass, `talk_to` objectives have no speaker, and voices are silent.
-- There is no panel that runs a dialogue or a quest without Play.
 - [NPC gizmos](docs/editor.md#npc-gizmos) show, while editing, only the parts an object's
   properties name (a part a script adds shows once the game runs), and while the game runs they
   show no texts (prompts, plans).
