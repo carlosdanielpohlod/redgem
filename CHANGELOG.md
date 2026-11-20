@@ -15,6 +15,14 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sound occlusion**: a sound played from inside its own static collider is no longer muffled
+  from every side, and static triggers no longer muffle. A pile of moving bodies in front of a
+  wall no longer hides the wall. A listener touching a building made as one mesh still hears its
+  inner walls. `Audio.play_at` no longer waits for an overlapped physics step: the sound's walls
+  are looked for on the next frame.
+
 ## [0.6.1] - 2026-11-15
 
 ### Migrating

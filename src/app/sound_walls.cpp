@@ -5,24 +5,29 @@
 namespace redgem {
 namespace {
 
-// Meters: a sound this near its listener, or this near the surface it sits on, is not behind it.
+// Meters: a surface this near either end of the ray is one that end stands on or is in.
 constexpr float kWallMargin = 0.05f;
 
-// A static body the ray enters on its way: not one the listener stands on or in, which the ray
-// starts touching (a listener on the ground does not hear every sound behind the ground).
-bool wall_on_the_way(const PhysicsWorld& physics, const RaycastHit& hit) {
-  if (hit.distance <= kWallMargin) return false;
-  return physics.body_type(hit.object) == BodyType::Static;
+bool past_the_margin(const RaycastHit& hit) { return hit.distance > kWallMargin; }
+
+// Whether a ray from `from` toward `to` crosses a static surface away from where it starts. One
+// the start stands on or is in (the ground under a listener, the machine a sound plays from) is
+// crossed at once, so it does not count; further surfaces of the same body still do.
+bool crosses_from(const PhysicsWorld& physics, Vec3 from, Vec3 to, float reach) {
+  const Vec3 way = to - from;
+  const auto hits = physics.static_surfaces(from, way / length(way), reach);
+  return std::any_of(hits.begin(), hits.end(), past_the_margin);
 }
 
 }  // namespace
 
+// A wall stands between them when the ray crosses one from each end: the body the sound is in,
+// seen only from the listener's side, is not a wall.
 bool static_body_between(const PhysicsWorld& physics, Vec3 from, Vec3 to) {
-  const Vec3 way = to - from;
-  const float reach = length(way) - kWallMargin;
+  const float reach = length(to - from) - kWallMargin;
   if (reach <= kWallMargin) return false;
-  const auto hits = physics.raycast_all(from, way / length(way), reach, QueryFilter{});
-  return std::any_of(hits.begin(), hits.end(), [&](const RaycastHit& hit) { return wall_on_the_way(physics, hit); });
+  if (!crosses_from(physics, from, to, reach)) return false;
+  return crosses_from(physics, to, from, reach);
 }
 
 }  // namespace redgem
