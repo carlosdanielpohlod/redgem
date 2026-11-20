@@ -14,77 +14,12 @@ set -euo pipefail
 
 # shellcheck source=tools/release/release_files.sh
 source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
+# shellcheck source=tools/release/unpack_download.sh
+source "$(dirname "${BASH_SOURCE[0]}")/unpack_download.sh"
 
 USAGE_MARK="usage:"   # how the relay and the server start their --help
 ELF_MARK="ELF"        # what the first bytes of a Linux program say, after one byte
 LINUX_TARGET="linux"
-
-# How each program is run, set by unpack: the editor, the relay and the game server.
-EDITOR_RUN=()
-RELAY_RUN=()
-SERVER_RUN=()
-# The download's unpacked folder (its demos and, on Linux, its bin/).
-ROOT=""
-
-# Runs program $1 with the arguments after it and fails unless what it printed holds text $2.
-expect_output() {
-  local expected="$1" output
-  shift
-  output="$("$@" 2>&1 | tr -d '\r')" || { echo "$* failed:" >&2; echo "${output}" >&2; exit 1; }
-  if [[ "${output}" != *"${expected}"* ]]; then
-    echo "$* said \"${output}\", not \"${expected}\"" >&2
-    exit 1
-  fi
-  echo "$*: ${output%%$'\n'*}"
-}
-
-# Runs the program and arguments given and fails unless it succeeds; prints its last line.
-expect_success() {
-  local output
-  output="$("$@" 2>&1)" || { echo "$* failed:" >&2; echo "${output}" >&2; exit 1; }
-  echo "$*: ${output##*$'\n'}"
-}
-
-# Unpacks download $1 (called $2) into folder $3 and says how its programs are run.
-unpack() {
-  local archive="$1" name="$2" work="$3" bin suffix=""
-  ROOT="${work}/${PACKAGE_NAME}"
-  case "${name}" in
-    "${LINUX_DOWNLOAD}")
-      tar -xzf "${archive}" -C "${work}"
-      bin="${ROOT}/bin"
-      ;;
-    "${APPIMAGE_DOWNLOAD}")
-      # (Unpacked too, for its demos and its programs' glibc; its programs are run through it.)
-      install -m 755 "${archive}" "${work}/${name}"
-      (cd "${work}" && "./${name}" --appimage-extract > /dev/null)
-      ROOT="${work}/${APPIMAGE_UNPACKED}"
-      export APPIMAGE_EXTRACT_AND_RUN=1
-      EDITOR_RUN=("${work}/${name}")
-      RELAY_RUN=("${work}/${name}" redgem-relay)
-      SERVER_RUN=("${work}/${name}" redgem-server)
-      return
-      ;;
-    "${WINDOWS_DOWNLOAD}")
-      unzip -q "${archive}" -d "${work}"
-      bin="${ROOT}"
-      suffix=".exe"
-      ;;
-    "${MAC_ARM_DOWNLOAD}" | "${MAC_INTEL_DOWNLOAD}")
-      # (ditto, as the Finder unpacks: it keeps the app's signature whole.)
-      ditto -x -k "${archive}" "${work}"
-      codesign --verify --strict --verbose "${ROOT}/RedGem.app"
-      bin="${ROOT}/RedGem.app/Contents/MacOS"
-      ;;
-    *)
-      echo "${name}: not a download of a release (they are: ${DOWNLOADS[*]})" >&2
-      exit 1
-      ;;
-  esac
-  EDITOR_RUN=("${bin}/redgem${suffix}")
-  RELAY_RUN=("${bin}/redgem-relay${suffix}")
-  SERVER_RUN=("${bin}/redgem-server${suffix}")
-}
 
 is_linux_download() { [[ "$1" == "${LINUX_DOWNLOAD}" || "$1" == "${APPIMAGE_DOWNLOAD}" ]]; }
 

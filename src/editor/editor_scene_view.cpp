@@ -63,6 +63,7 @@ void EditorApp::draw_edited_scene() {
   BeginTextureMode(view.target);
   BeginMode3D(view.camera);
   draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
+  draw_npc_gizmos(selected_npc_gizmos());
   EndMode3D();
   EndTextureMode();
 }
@@ -70,8 +71,9 @@ void EditorApp::draw_edited_scene() {
 void EditorApp::set_editor_look() {
   renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
   renderer_->set_motion_blur(kNoMotionBlur);
-  renderer_->set_underwater({});               // the editor's camera flies through water without the look
-  renderer_->allow_temporal_antialias(false);  // its gizmos and grid test against the scene's depth
+  renderer_->set_auto_exposure(AutoExposureOverrides{});  // the scene's own, whatever a game set
+  renderer_->set_underwater({});                          // the editor's camera flies through water without the look
+  renderer_->allow_temporal_antialias(false);             // its gizmos and grid test against the scene's depth
 }
 
 void EditorApp::aim_viewport_camera() {

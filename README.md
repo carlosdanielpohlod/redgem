@@ -6,18 +6,15 @@
   <a href="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml"><img src="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml/badge.svg?branch=main" alt="macOS"></a>
 </p>
 
-A 3D game engine and editor where games are written in **Ruby**, the most human-friendly
-language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
-ship a standalone game.
+RedGem is a 3D game engine with an editor and **Ruby** scripting. Build a level in the editor or
+import it from **Blender**, test your game with Play, and export a standalone build.
 
 <p align="center">
   <img src="docs/images/editor.webp" alt="The RedGem editor: a treasure chest on a scanned coast in the Scene view, with the Hierarchy, the Inspector and the Project panel" width="900"><br>
   <sub>The editor. Scene: <a href="https://polyhaven.com/a/treasure_chest">Treasure Chest</a> by Rico Cilliers, the coast scan and the sky from <a href="https://polyhaven.com">Poly Haven</a> (CC0).</sub>
 </p>
 
-> **Experimental.** RedGem is a young engine: expect rough edges, and see the
-> [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
-> open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).
+> **Experimental.** Check the [known limitations](KNOWN_LIMITATIONS.md) before starting a project.
 
 <p align="center">
   <a href="https://www.redgem-engine.org/#showcase"><img src="https://www.redgem-engine.org/assets/poster-0.5.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
@@ -57,8 +54,12 @@ end
 
 - **Ruby scripting**: behaviours with `start`, `update`, triggers, collisions, timers and tweens;
   scenes set up in Ruby; classes load on first use, no `require`.
-- **Gameplay kit**: keyboard, mouse and gamepad input, menus and HUD, particles, camera follow,
-  orbit and shake, per-character animation with blending, saved progress.
+- **Gameplay kit**: keyboard, mouse and gamepad input, menus and a HUD that scales with the
+  screen, particles, camera follow, orbit, shake and cuts, per-character animation with blending,
+  events and root motion, navigation and crowds, saved progress (a game versions its save data
+  and upgrades older saves).
+- **NPCs**: state machines with sight and hearing, daily schedules, head tracking, crowd
+  navigation, voiced branching dialogue and shared [quests](docs/scripting/quests.md).
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
   internet through a relay that ships with the engine, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors,
@@ -72,8 +73,8 @@ end
 - **Advanced graphics**: physically based materials, HDR with filmic tone mapping, sun shadows,
   reflections, ambient occlusion, bloom, fog, temporal anti-aliasing, water with refraction and
   shore foam, scattered vegetation, particles that cast shadows, skeletal animation.
-- **Advanced audio**: sounds and music with volume and pitch, 3D positional sound panned and
-  fading with distance from the listener, music pitch for engine notes and speed.
+- **Audio**: 3D positional sound with occlusion, music crossfades, sound priorities, and mix
+  groups with low-pass filters, reverb, and music ducking during dialogue.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
 - **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
   own (`redgem-test`): the game your players get has no test code in it, and no editor either.
@@ -116,10 +117,9 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 | macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 | macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 
-The project hub opens: pick *Platformer* under *New game* and press Play. The Linux download is
-the tested one and builds games for Linux, Windows and Android; the Windows one has only been
-tried under Wine so far, and the macOS ones only on GitHub's virtual Macs (they build games for the
-Mac). Details in [docs/install.md](docs/install.md).
+In the project hub, choose **New game**, select **Platformer**, and create a project. Open it and
+press **Play**. Use WASD to move and Space to jump. See the [installation guide](docs/install.md)
+for system requirements and the [first-game tutorial](docs/first-game.md) to edit the level.
 
 With Docker, on Linux:
 
@@ -152,8 +152,8 @@ ctest --test-dir build                  # run the tests
 ./build/src/redgem build games/my_game dist/apk --target android   # an Android .apk
 ```
 
-A built game is a copy of `redgem-player`, the small program that plays a game and nothing else,
-next to the game's files: the editor and the other tools stay with you.
+A desktop build includes the game executable and its data. Share the entire output folder,
+or the `.app` on macOS. See [Building and sharing](docs/shipping.md) for each platform.
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,
 `models/`, `sounds/` and `game.json`.

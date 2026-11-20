@@ -32,6 +32,7 @@ void EffectRack::release(EffectSlot slot) {
 void EffectRack::set_effects(EffectSlot slot, const VoiceEffects& effects) {
   const Lock lock(mutex_);
   Slot& own = slots_.at(slot);
+  if (!own.cutoff) own.filter.reset();  // (a filter off kept its old level)
   if (own.cutoff != effects.low_pass_hz) own.filter.set_cutoff(effects.low_pass_hz);
   own.cutoff = effects.low_pass_hz;
   own.reverb = effects.reverb;
@@ -42,6 +43,11 @@ void EffectRack::set_effects(EffectSlot slot, const VoiceEffects& effects) {
 void EffectRack::set_volume(EffectSlot slot, float volume) {
   const Lock lock(mutex_);
   slots_.at(slot).volume = volume;
+}
+
+void EffectRack::close_buses() {
+  const Lock lock(mutex_);
+  for (Bus& bus : buses_) bus = Bus{};
 }
 
 // (Under the lock.)
@@ -69,6 +75,7 @@ void EffectRack::send(Slot& slot, const float* frames, std::size_t count) {
   const float level = slot.reverb * slot.volume;
   float* into = bus.send.data() + slot.sent * kEffectChannels;
   for (std::size_t sample = 0; sample < samples; ++sample) into[sample] += frames[sample] * level;
+  bus.written = std::max(bus.written, slot.sent + samples / kEffectChannels);
 }
 
 void EffectRack::process_mix(float* frames, std::size_t count) {
@@ -77,7 +84,8 @@ void EffectRack::process_mix(float* frames, std::size_t count) {
   for (Bus& bus : buses_) {
     if (!bus.reverb) continue;
     bus.reverb->process(bus.send.data(), frames, heard);
-    std::fill(bus.send.begin(), bus.send.end(), 0.0f);
+    std::fill_n(bus.send.begin(), std::max(heard, bus.written) * kEffectChannels, 0.0f);
+    bus.written = 0;
   }
   for (Slot& slot : slots_) slot.sent = 0;
 }

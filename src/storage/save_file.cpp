@@ -206,15 +206,13 @@ bool SaveFile::set(const std::string& key, const nlohmann::json& value) {
 
 bool SaveFile::remove(const std::string& key) {
   load();
-  if (values_.erase(key) == 0) return true;
-  return write();
+  auto previous = values_.extract(key);
+  if (previous.empty() || write()) return true;
+  values_.insert(std::move(previous));
+  return false;
 }
 
-bool SaveFile::clear() {
-  load();
-  values_.clear();
-  return write();
-}
+bool SaveFile::clear() { return replace({}); }
 
 // (What could not be written is not kept either: the values stay as the file has them.)
 bool SaveFile::replace(const Values& values) {

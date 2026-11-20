@@ -50,16 +50,23 @@ mrb_value audio_occlusion(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).set_occlusion(settings));
 }
 
+// Audio.group's volume, none when nil.
+std::optional<float> group_volume(mrb_state* mrb, mrb_value volume) {
+  if (mrb_nil_p(volume)) return std::nullopt;
+  return static_cast<float>(at_least(mrb, mrb_as_float(mrb, volume), kSilent, "Audio.group's volume"));
+}
+
 // Audio.__group(name, parent, volume): a game's own group under another.
 mrb_value audio_group(mrb_state* mrb, mrb_value) {
-  mrb_value name, parent;
-  mrb_float volume = 0.0;
-  mrb_get_args(mrb, "oof", &name, &parent, &volume);
+  mrb_value name, parent, volume;
+  mrb_get_args(mrb, "ooo", &name, &parent, &volume);
   const std::string group = to_name(mrb, name);
   const MixGroup over = mix_group(mrb, parent);
-  const float heard = static_cast<float>(at_least(mrb, volume, kSilent, "Audio.group's volume"));
-  known(mrb, audio(mrb).define_group(group, over, heard),
-        "Audio.group cannot make :%s: an engine group's name, a parent under it, or more than 13 groups", group);
+  constexpr auto kGameGroups = static_cast<int>(kMaxMixGroups - kMixGroupCount);
+  if (!audio(mrb).define_group(group, over, group_volume(mrb, volume)))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR,
+               "Audio.group cannot make :%s: an engine group's name, a parent under it, or more than %d groups",
+               group.c_str(), kGameGroups);
   return mrb_nil_value();
 }
 
@@ -73,7 +80,8 @@ mrb_value audio_effects(mrb_state* mrb, mrb_value) {
     effects.low_pass_hz = static_cast<float>(
         from_to(mrb, mrb_as_float(mrb, low_pass), kLowestCutoff, kHighestCutoff, "Audio.effects's low_pass"));
   effects.reverb = static_cast<float>(from_to(mrb, reverb, kNoReverb, kFullReverb, "Audio.effects's reverb"));
-  return mrb_bool_value(audio(mrb).set_group_effects(mix_group(mrb, group), effects));
+  audio(mrb).set_group_effects(mix_group(mrb, group), effects);  // (checked above, so it takes)
+  return mrb_nil_value();
 }
 
 // A priority a sound may have, a whole number from kLowestSoundPriority to kHighestSoundPriority.
@@ -200,6 +208,13 @@ MixGroup spatial_group(mrb_state* mrb, mrb_value value) {
 int spatial_priority(mrb_state* mrb, mrb_value value) {
   return mrb_undef_p(value) ? kDefaultSoundPriority : sound_priority(mrb, value, "Audio.play_at's priority");
 }
+
+void check_spatial_sound(mrb_state* mrb, const SpatialSound& sound) {
+  if (valid_spatial_sound(sound)) return;
+  mrb_raise(mrb, E_ARGUMENT_ERROR,
+            "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+}
+
 SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   SpatialSound sound;
   sound.position = to_vec3(mrb, arguments.position);
@@ -213,9 +228,7 @@ SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   sound.occludable =
       spatial_flag(mrb, arguments.options[Occlusion], true, "Audio.play_at's occlusion must be true or false");
   sound.priority = spatial_priority(mrb, arguments.options[Priority]);
-  if (!valid_spatial_sound(sound))
-    mrb_raise(mrb, E_ARGUMENT_ERROR,
-              "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
+  check_spatial_sound(mrb, sound);
   return sound;
 }
 mrb_value audio_play_at(mrb_state* mrb, mrb_value) {
@@ -260,6 +273,10 @@ mrb_value audio_set_doppler(mrb_state* mrb, mrb_value) {
 mrb_value audio_playing(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).sound_playing(spatial_source_id(mrb, single_arg(mrb))));
 }
+// Audio.loudness(id): how loud a voice is as it plays (0 to 1), what a mouth follows.
+mrb_value audio_loudness(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, audio(mrb).sound_loudness(spatial_source_id(mrb, single_arg(mrb))));
+}
 mrb_value audio_stop(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).stop_sound(spatial_source_id(mrb, single_arg(mrb))));
 }
@@ -285,6 +302,7 @@ void install_spatial_audio_bindings(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "doppler=", audio_set_doppler, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "playing?", audio_playing, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "stop", audio_stop, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, module, "loudness", audio_loudness, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "__set", audio_set, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, module, "stop_sources", audio_stop_all, MRB_ARGS_NONE());
 }

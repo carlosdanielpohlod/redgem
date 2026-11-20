@@ -68,19 +68,34 @@ module Network
   LEVEL_PLAYED = "$played".freeze  # the host to a newcomer: [change, name] the level the game plays
   LEVEL_READY = "$ready".freeze  # to the host: change, this machine has the level of that change
   LEVEL_GO = "$go".freeze        # the host to everyone (or a newcomer): change, everyone has it, play
+  # Conversations and GameVariables (see network_dialogues.rb).
+  TALK = "$talk".freeze            # host to a client: talk: [dialogue, actor key, speaker key or nil]
+  STEP = "$step".freeze            # client to host: [dialogue, from node, choice index or nil, to node or nil]
+  TALK_AT = "$talk_at".freeze      # host to a client: be at this node (nil: the end): [dialogue, node]
+  TALK_LEFT = "$talk_left".freeze  # client to host: the player left the conversation: [dialogue]
+  VARIABLE = "$variable".freeze    # host to everyone: [name, value]
+  VARIABLES = "$variables".freeze  # host to a newcomer, or everyone: every variable, [[name, value]...]
+  # Quests (see network_quests.rb).
+  QUEST_REPORT = "$quest".freeze   # client to host: its player did this: [kind, subject, other or nil, count]
   # Who answers each of them (see the methods of those names).
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned, DESPAWN => :receive_despawn,
     LEVEL => :receive_level, LEVEL_PLAYED => :receive_level_played, LEVEL_READY => :receive_level_ready,
-    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, INTERACT => :receive_interact
+    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, INTERACT => :receive_interact,
+    TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at, TALK_LEFT => :receive_talk_left,
+    VARIABLE => :receive_variable, VARIABLES => :receive_variables, QUEST_REPORT => :receive_quest_report
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
-    connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects,
-    reconnected: :welcome_back, lost: :keep_only_my_objects
+    connected: %i[enter_game], joined: %i[greet tell_variables], left: %i[remove_objects_of],
+    disconnected: %i[keep_only_my_objects], reconnected: %i[welcome_back tell_variables],
+    lost: %i[keep_only_my_objects]
   }.freeze
   # ... and after it (the game's handlers may still ask who was there).
-  AFTERWARDS = { left: :forget_peer, disconnected: :forget_game, lost: :forget_game }.freeze
+  AFTERWARDS = {
+    left: %i[forget_peer forget_talks_of], disconnected: %i[forget_game forget_all_talks],
+    lost: %i[forget_game forget_all_talks]
+  }.freeze
   # The events whose handlers get why, instead of a peer.
   REASONED = %i[failed lost].freeze
 
@@ -205,10 +220,10 @@ module Network
     # Someone came, went, or the game started or ended: the engine reacts, then the game's handlers
     # hear of it (a failed join's with its reason, when there is one).
     def happened(kind, peer, name)
-      __send__(REACTIONS[kind], peer) if REACTIONS[kind]
+      REACTIONS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
       told = told_about(kind, peer, name)
       (@listeners[kind] || []).dup.each { |block| block.call(told) }
-      __send__(AFTERWARDS[kind], peer) if AFTERWARDS[kind]
+      AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
     end
 
     # What the handlers of an event get: the peer, or why a join failed or this machine could not

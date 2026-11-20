@@ -4,30 +4,202 @@ What changed in each release of RedGem. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every release so far is experimental:
 until 1.0, a release may change what games rely on (see
-[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)). From 1.0, a stable call of the scripting API has no
+breaking change within a 1.x minor release, and an experimental one may change in any release
+([API stability](docs/scripting/stability.md)).
+
+Each release has these parts, in this order, each only when it has something: **Migrating** (what
+to change in a game made with the release before, step by step, for every breaking change; say
+when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves the
+`[Unreleased]` part under its version and starts a new one with the same headings.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sound occlusion**: a sound played from inside its own static collider is no longer muffled
+  from every side. A pile of moving bodies in front of a wall no longer hides the wall. A listener
+  touching a building made as one mesh still hears its inner walls, and a wall of one quad, or a
+  terrain over a cave, muffles from both sides. `Audio.play_at` no longer waits for an overlapped physics step: the sound's walls
+  are looked for on the next frame.
 ### Added
 
 - **Doppler effect**: `Audio.play_at(..., velocity:)`, `Audio.move(id, position, velocity)` and
   `Audio.listener(position, forward, up, velocity)` give the sounds and the ears a velocity, and a
   positional sound plays higher coming nearer and lower going away. `Audio.doppler = scale` makes
   it stronger or turns it off (0 to 10, 1 by default).
+- **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
+  Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
+  NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
+  parts the scripts gave them. **View > NPC gizmos** turns them off.
+
+## [0.6.1] - 2026-11-15
+
+### Migrating
+
+Games made with 0.6.0 can keep their scenes and saves. If a positional sound should keep playing
+at full clarity behind walls, pass `occlusion: false` to `Audio.play_at`. If a game handles failed
+save writes, handle errors from `Save.delete` and `Save.clear` as well.
+
+### Added
+
+- **`t.wait_for(seconds:)` in system tests**: waits until a block is true, or fails, in real
+  seconds. A headless test runs its frames as fast as it can, so its limit of 3600 frames could
+  be gone in about a second while another program (a game joining, a proxy, a server) had yet to
+  act. The frames of such a wait go at the game's pace and do not count toward the limit.
+- **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
+  `deliver`, `collect`, `defeat`, and a `check` of the game's own in Ruby) that go on to the next
+  stage once they are all done, until one that ends the quest. `Quests.start`, `set_stage`,
+  `collected`, `delivered`, `defeated` and `Quests[name]` (its stage, texts and objectives with
+  their progress); `Quests.on(:start/:stage/:objective/:complete/:change)` on every machine. A
+  `QuestTracker` behaviour on the hero finds the places it reaches and asks the checks. Dialogue
+  conditions and effects read and move these quests. The state lives in GameVariables, so the party
+  shares it and the host owns it: a client's player's progress is told to the host, which counts
+  it. `Quests.save` and `Quests.restore` keep it with `Save` (and its migrations). `redgem check`
+  reads every quest: stages that are not there, objectives that could never be done, dialogues,
+  nodes and items that are not there, and missing texts; and every stage a dialogue names. See the
+  manual's Quests page.
 - **Sound occlusion**: a positional sound behind one of the level's static bodies is heard quieter
   (40%) and through a low-pass (1000 Hz), fading in and out over 0.2 seconds; a ray from the
   listener to each sound in reach checks it every frame. `Audio.occlusion(volume:, low_pass:,
   fade:)` changes it, and `Audio.play_at(..., occlusion: false)` keeps a sound out of it.
+
+### Changed
+
+- The first-game guide covers creating a project, testing it in the editor and exporting a build.
+
+### Fixed
+
+- A failed save deletion or clear can be retried without losing the in-memory data. Migration
+  hooks can no longer switch slots or change saved values outside the migration.
+- KTX2 decoding handles unaligned input, and glTF import rejects accessors with non-finite values.
+- The CI suite checks quest translations, and the release smoke test accepts Homebrew's
+  `gtimeout` on macOS.
+
+## [0.6.0] - 2026-11-15
+
+### Migrating
+
+From a game made with 0.5.0:
+
+- **`game.json`**: add `"studio"`. A game's save, settings, bindings and crash reports now live in
+  `<studio>/<title>/` in the player's data folder, and nothing is moved there: to keep a player's
+  save, copy their old `redgem/saves` file to `save.json` in the new folder.
+- **`Audio.play`** returns an id or `nil`: a script that compares its result with `true` or
+  `false` tests it for `nil` instead.
+- **`Game.load_scene` in a network game** returns `false` on a machine that is not the host: load
+  levels on the host, and every machine follows. Drop any use of `Network::RESEND`.
+- **Network games** are encrypted: players of this version cannot join hosts, relays or servers of
+  an earlier one. Update the relay and the server with the game.
+- **Leaves**: a scene that wants its foliage as before sets `foliage_translucency` to 0.
+- The stability marks below change no game: every class and method is now stable or
+  experimental, and what came in the last two releases is experimental (see
+  [API stability](docs/scripting/stability.md)).
+
+### Added
+
+- **Voice**: a dialogue line's `voice` plays its clip as the line is shown, in the `:voice` group
+  (the music ducks under it), from the speaker's head bone (or the speaker) as it moves. The line
+  shows while the clip plays and goes on when it ends, unless the player skips it; a line with
+  choices waits for one. A `VoiceMouth` behaviour opens a speaker's mouth with the clip's loudness,
+  through a shape key (`morph:`) or a jaw bone (`jaw:`, `angle:`). The engine follows a voice's
+  loudness as it plays (`Audio.loudness(handle)`), `conversation.speaking?` says whether its clip
+  plays, and `Transform#local_rotation` reads and sets a rotation relative to the parent.
+  `redgem check` warns of a voice whose sound is not in `sounds/`. A voice is now named as
+  `Audio.play` names a sound, without its extension.
 - **Mix groups of a game's own, with effects**: `Audio.group(:cave, parent: :effects, volume:)`
   adds a group under another (13 at most, ending with the game), and sounds play in it by name.
   `Audio.effects(group, low_pass:, reverb:)` muffles the sounds of a group and of the groups under
   it with a low-pass (20 to 20000 Hz) and sends them to the group's reverb (0 to 1). A voice under a
   game's group of `:voice` ducks the music too.
+- **Crowds**: `NavAgent`, a behaviour that walks a character where it is sent (`go_to`,
+  `arrived?`, `stop`) along `Navigation.path`, steering clear of other agents and of the bodies
+  that move, and finding another way when something stands in its way for a second. Steering is a
+  sampled reciprocal velocity obstacle in C++ (`Navigation.steer`): two agents share the
+  avoidance and both keep to their right, a moving body is avoided whole, and no velocity leaves
+  walkable ground. `Navigation.path(from, to, avoid: objects)` goes around the bodies of those
+  objects.
+- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
+  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
+  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
+  with the game.
+- **Dialogue**: conversations written in `dialogues/<name>.json`, nodes of I18n lines that lead to
+  one another by `next`, by branches with conditions, or by the player's choices, with conditions
+  on variables and quest stages and effects that set or add to variables, move quests and tell the
+  game (`Dialogue.on(:event)`). Each line can name a `voice`. A `Talkable`
+  behaviour starts its dialogue from `on_interact`; `Dialogue.current` is the player's conversation
+  (`continue`, `choices`, `choose`, `stop`) and `Dialogue.on(:start/:line/:end)` follows it. New
+  `GameVariables` hold the values every player shares. Over the network each player has a
+  conversation of their own, the host follows it step by step and its effects happen there.
+  `redgem check` reads every dialogue: dead ends, nodes and quests that are not there, misspelt
+  keys and texts missing from `locales/`. Quest stages are variables until a game sets
+  `Dialogue.quests`. See the manual's Dialogue page.
+- **A dialogue box**: `DialogueBox` shows the player's conversation at the bottom of the screen,
+  the speaker and the line, which appears letter by letter, and its choices, worked by keyboard,
+  gamepad and touch. A press shows the whole line and the next goes on; Backspace, a gamepad's B
+  or the Skip button leaves.
+- **NPC schedules and head look-at**: `GameClock` is the time of day in the game's world (game
+  time, a game minute each second unless `GameClock.speed` says, with days, `set`, and `state` and
+  `restore` for saving). A `Schedule` behaviour gives an NPC its day (`"06:00 bake, 12:30 sell"`):
+  its object hears `on_schedule(activity)`, its Brain the `:schedule` event, and a transition
+  `to: :scheduled` goes to the state of the activity it is time for. `animation.look_at(target)`
+  turns a character's head bone toward a point or an object in engine C++, on top of its clips'
+  pose, within a largest angle and easing in and out (`look_away`, `looking?`, `bone`). A
+  `HeadLook` behaviour looks at the nearest hero in range and in front, or at a target.
+- **NPC behaviour**: a `Brain` behaviour is a state machine for NPCs. A game's NPC declares its
+  states (with `enter`, `update` and `exit` hooks, or `enter_<state>` methods and the like) and
+  transitions between them, each from a state, a list or `:any`, taken every frame or `on:` an
+  event, `after:` seconds in the state, and when its `if:` and `unless:` guards agree (a guard
+  block may take the event's payload). A `Perception` behaviour gives it senses: a sight cone out to
+  a range, checked by a line-of-sight ray, that watches the players' heroes (or a tag), and a
+  hearing radius that `Perception.noise(at:, loudness:)` reaches. Its object's behaviours hear
+  `on_see`, `on_lose_sight` and `on_hear`, and a Brain gets them, and a use of its Interactable, as
+  the `:see`, `:lose_sight`, `:hear` and `:interact` events. Over the network only the host thinks
+  and perceives. `LineOfSight` is the ray check Interactors and Perceptions share, and
+  `Interactor.all` lists the heroes. See the manual's NPCs page.
 - **Sound priorities and voice stealing**: 128 sounds with ids play at once instead of 64. Past
   that, a new sound takes the place of the weakest one playing (the lowest `priority:`, then the
   quietest as heard, then the oldest) when its priority is at least that one's; the one it replaces
   stops. `Audio.play` and `Audio.play_at` take `priority:`, a whole number from 0 to 255 (128 by
   default).
+- **Physics on more than one thread**: `"physics": {"threads": 4}` in game.json solves each
+  physics step with Jolt's thread pool and overlaps each frame's last fixed step with the drawing
+  of that frame: the main thread draws frame N while a physics thread steps frame N+1 from what the
+  scripts left it, and the next frame starts by waiting for it. Scripts never run during a step and
+  see the scene's transforms, a copy of the bodies taken at that sync point; what `update` does to
+  bodies acts one step sooner, and contacts are told a frame later. 1 thread, the default, keeps
+  every step exactly as before, and a dedicated server's rooms always use it.
+- **Auto exposure**: an environment with `auto_exposure = true` adapts the picture to how bright
+  the scene is, as eyes do: the graphics card measures the picture's average brightness every
+  frame and the exposure moves toward it over time, faster toward light than toward the dark.
+  `exposure_min_ev`, `exposure_max_ev`, `exposure_speed_up`, `exposure_speed_down` and
+  `exposure_compensation` tune it; a cut to another camera or a new scene starts it settled.
+  Scripts change it for the game's camera with `Camera.auto_exposure`,
+  `Camera.exposure_compensation`, `Camera.exposure_range` and `Camera.exposure_speed` (nil gives
+  each back to the scene). Off unless a scene turns it on.
+
+- **Leaves lit from behind**: foliage (textured cut-out and blended materials) between the camera
+  and the sun lets some of its light through, tinted by the leaf, brightest looking into the sun
+  and held back where the leaf is shaded. The environment's `foliage_translucency` (0 to 1) sets
+  how much.
+- **Font fallback chains and right-to-left text**: `UI.font = [:latin, :cjk, :emoji]` draws each
+  letter of a UI text with the first face in `fonts/` that has it, then the built-in face, so one
+  text can mix scripts; `UI.font` returns the list, and a chain holds at most four faces. Arabic and
+  Hebrew are drawn in their order on screen by the Unicode Bidirectional Algorithm (SheenBidi 2.9,
+  Apache 2.0, a new dependency), with mixed left-to-right words and numbers, mirrored brackets and
+  vowel marks kept on their letters; `UI.text_width` measures the same layout. Arabic letters are
+  not joined yet (no shaping).
+- **Stable and experimental calls**: every class and method of the API reference is marked
+  `stable` or `experimental`, in `docs/scripting/api.json`, the manual's API page (a Stability
+  column, and *Experimental.* after what may change), `redgem api` (`(experimental)`, and a
+  `"stability"` in `--json`) and the type signatures (`%a{redgem:stable}`). From 1.0, a stable call
+  has no breaking change within a 1.x minor release. A test fails when a class or method has no
+  mark. What came in 0.4.1, 0.5.0 and since is experimental for now, and so are the NPC classes
+  (Interactable, Interactor, Interaction, Brain, Perception, LineOfSight, Talkable, HeadLook,
+  Schedule, NavAgent) and dialogue (Dialogue, DialogueBox, GameVariables, GameClock): the cameras' follow, orbit and shake, joints,
+  navigation, water, scroll lists, emitters, the debug drawing and profiling calls, save slots,
+  asynchronous scene loading, prefab spawning and movement validation, among others.
+
 - **Changing level together in a network game**: on the host (a player's or a dedicated server's
   room), `Game.load_scene` and `Game.load_scene_async` change the level of every machine, over the
   connection that stays up. Each machine loads it in the background and waits, frozen, until all
@@ -136,10 +308,6 @@ until 1.0, a release may change what games rely on (see
   seconds) and takes at most 16 KiB of code. Release builds leave it
   out (the CMake option `REDGEM_RUBY_EVAL` follows `REDGEM_BUILD_TESTS`), and
   `tests/ships_no_ruby_eval.sh` checks that their programs have none of it (see docs/mcp.md).
-- **Music ducking**: while a sound of the `:voice` group plays, the music and the sounds of the
-  `:music` group go down to 40% over 0.15 seconds, and come back over 0.6 seconds once no voice
-  plays. `Audio.ducking(volume:, attack:, release:)` changes it; `volume: 1` turns it off. It ends
-  with the game.
 - **Animation events**: `animation.on(:Attack, at: 0.4) { |event| ... }` (or `seconds:`) calls a
   block when a character's clip passes a moment, and `animation.on_marker(:footstep)` when it
   passes a marker authored with the clip (a `redgem_events = "footstep@0.25, footstep@0.75"`
@@ -151,6 +319,17 @@ until 1.0, a release may change what games rely on (see
   for one clip, moves the character by its clip's root (horizontal travel and yaw, weighted
   across blends) and keeps the root over it; a `CharacterController` goes there through the
   physics, so walls stop it.
+- **A release opens its windows before it is published**: the release workflow unpacks the Linux
+  and Windows downloads and, with `tools/release/smoke.sh`, builds and plays a demo with the
+  download's player, runs a new game's tests (`redgem check --run-tests`), plays one system test
+  in a window and opens the editor on a demo, on Xvfb with Mesa's llvmpipe on Linux and with
+  Mesa's `opengl32.dll` on Windows. The draft release gets no download unless it passes. On a
+  machine with a graphics card, `tools/release/smoke.sh <download>` does the same by hand.
+- **`REDGEM_CLOSE_AFTER_FRAMES=<n>`**: every window of the engine (the editor, the project hub,
+  a game, a built game's player) closes itself once it has shown that many frames, as its close
+  button would.
+- **The Windows download has `redgem-test.exe`**, so `redgem check --run-tests` runs a game's tests
+  on Windows too.
 - **A physics body limit per game**: `"physics": {"max_bodies": 16384}` in `game.json` sizes every
   scene's physics world, from 64 to 65,536 bodies (4096 by default); the body pairs, contacts and
   scratch memory of a step grow with it. `redgem check` refuses a value out of bounds, and the
@@ -403,6 +582,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Foliage glows against the sun** unless a scene says otherwise: `foliage_translucency` is 0.5
+  when not given. A scene that wants its leaves as they were sets it to 0.
 - In a network game, a machine that is not the host can no longer load a level on its own
   (`Game.load_scene` returns `false`), and loading a level no longer asks the host for the spawned
   objects again: every machine changes level with the host. (`Network::RESEND` is gone.)
@@ -461,6 +642,23 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **The editor bridge says when a recovery waits**: after an editor closed without saving, the
+  next one offers to recover its edits, and that dialog made every live change fail with "editor
+  is busy" while `status` showed nothing. `status` now has `recovery_pending`, and a change refused
+  while it waits names the recovery prompt.
+- **Behaviour updates are about three times faster**: each call the engine made into Ruby (every
+  behaviour's update, every frame) and each binding on a GameObject looked up a name (the method's,
+  `@id`, `@serial`) among all of the interpreter's symbols, and that lookup can scan every one of
+  them. The prelude's growth made it most of the scripts' frame. The engine now looks each name up
+  once: a frame of 1000 behaviours takes about 0.65 ms instead of 2.
+- **A character is not pushed by what it carries**: a kinematic body under a character (a box in
+  its hand) that touched its capsule pushed it, and the character, moving, took the body on with
+  it: a courier standing still drifted away, and one teleported with a parcel in hand was shoved
+  meters past where it was put. A character now passes through the kinematic bodies under it.
+- **Perception resets with each scene**: loading a scene logged "resetting the handlers of
+  Perception: undefined method '__scene_reset' for NilClass", because the engine looked up only
+  modules by name and Perception is a class. It now finds classes too, so a new scene starts with
+  no senses left from the one before.
 - **Web requests end with their game**: their threads used to be detached, so one still running
   at exit could outlive the program's static objects. A game that ends (or an editor play session
   that stops) now gives every request on its way up, hangs up its connection so its wait ends at
@@ -877,7 +1075,9 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...v0.4.0

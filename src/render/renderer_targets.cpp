@@ -24,7 +24,10 @@ constexpr int kReflectionFaceSize = 256;  // pixels along each side
 constexpr int kPanoramaWidth = 1024;      // pixels
 constexpr int kPanoramaHeight = 512;
 constexpr int kHdrFormat = PIXELFORMAT_UNCOMPRESSED_R16G16B16A16;  // linear light, brighter than white allowed
-constexpr int kScreenFormat = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;   // what ends up on screen
+// The adapted exposure, in full floats: in half floats a frame's small step toward the target is
+// rounded away and the exposure stops short of it.
+constexpr int kExposureFormat = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;
+constexpr int kScreenFormat = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;  // what ends up on screen
 
 // A depth texture (not a render buffer: the ambient occlusion pass and the lit shader read
 // depth), attached to the framebuffer being set up.
@@ -147,6 +150,11 @@ void Renderer::Impl::load_fixed_targets() {
   // Around the horizon the panorama wraps; at the poles it must not (up would blend with down).
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_S, RL_TEXTURE_WRAP_REPEAT);
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_T, RL_TEXTURE_WRAP_CLAMP);
+  luminance = load_target(render_math::kLuminanceSide, render_math::kLuminanceSide, kHdrFormat, false);
+  for (RenderTexture2D& exposure : exposures) {
+    exposure = load_target(kExposureSide, kExposureSide, kExposureFormat, false);
+    SetTextureFilter(exposure.texture, TEXTURE_FILTER_POINT);  // one texel; OpenGL ES may not filter full floats
+  }
 }
 
 void Renderer::Impl::ensure_targets(int width, int height, int asked) {
@@ -235,7 +243,8 @@ void Renderer::Impl::release_targets() {
 void Renderer::Impl::release_fixed_targets() {
   unload_depth_target(shadow);
   unload_depth_target(local_shadow);
-  for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output}) unload(*target);
+  for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output, &luminance}) unload(*target);
+  for (RenderTexture2D& exposure : exposures) unload(exposure);
 }
 
 }  // namespace redgem

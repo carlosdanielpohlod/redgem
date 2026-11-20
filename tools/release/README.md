@@ -7,7 +7,7 @@ A release carries five downloads, under these names (the README's
 | --- | --- | --- |
 | `redgem-linux-x86_64.tar.gz` | the editor and its tools in `bin/`, with the players for Windows and Android games in `bin/runtimes/windows` and `bin/runtimes/android` | Ubuntu 22.04 (GCC 12, libstdc++ linked in): runs on glibc 2.35 and later |
 | `redgem-linux-x86_64.AppImage` | the tarball's files, with `AppRun` (`AppRun.sh` here: the editor, or the program named first), the menu entry and the icon from `branding/` | packed from the tarball's files with appimagetool and its runtime (pinned by `fetch_appimage_tools.sh`) |
-| `redgem-windows-x86_64.zip` | the editor, the player, the relay and the game server | Ubuntu 24.04, with llvm-mingw |
+| `redgem-windows-x86_64.zip` | the editor, the player, the relay, the game server and the test tool | Ubuntu 24.04, with llvm-mingw |
 | `redgem-macos-arm64.zip` | `RedGem.app` for Apple Silicon | macOS 15 (arm64) |
 | `redgem-macos-x86_64.zip` | `RedGem.app` for Intel Macs | macOS 15 (Intel) |
 
@@ -42,9 +42,10 @@ compilers are pinned: llvm-mingw by `tools/windows/fetch_toolchain.sh`, the Andr
 `tools/android/fetch_toolchain.sh`, the runners by their image names.
 
 1. Bump the version in `CMakeLists.txt` and move the `[Unreleased]` part of `CHANGELOG.md` under
-   it, on a branch named `release-<version>`, and open its pull request. Its run builds the five
-   downloads from the branch's head and keeps them as the run's artifacts (`redgem-<system>`):
-   try them. It touches no release. It fails at once when the branch does not name the version
+   it, with its **Migrating** section (what a game made with the release before must change, or
+   that it needs nothing; see `docs/scripting/stability.md`), on a branch named
+   `release-<version>`, and open its pull request. Its run builds the five downloads from the
+   branch's head and keeps them as the run's artifacts (`redgem-<system>`): try them. It touches no release. It fails at once when the branch does not name the version
    in `CMakeLists.txt`, or when that version's release is published already.
 2. Merge it, and push the tag: `git tag v<version> <merge commit> && git push origin v<version>`.
    The tag's run builds the downloads from the tag and attaches them to the tag's draft release,
@@ -60,9 +61,16 @@ What a run checks, and what it does not:
   programs run on its own system (`tools/release/smoke_test.sh`: the editor's `--version`, the
   relay's and the server's `--help`, and on a Mac the app's signature; for the Linux downloads,
   also `redgem check` and `redgem build --target linux` on a demo and the glibc floor of the
-  programs and of the built game, on the runner and again in a bare Ubuntu 22.04 container). That is
-  all: no editor window is opened from a download (the Mac's app is opened for a picture, which
-  is not a check), and no game is played.
+  programs and of the built game, on the runner and again in a bare Ubuntu 22.04 container).
+- The Linux and Windows downloads then open their windows (`tools/release/smoke.sh`): a demo is
+  built and played by the download's player, a new `third-person` game's tests run
+  (`redgem check --run-tests`), one system test (`smoke_window_test.rb`) is played in a window and
+  must leave its picture, and the editor is opened on a demo. The player and the editor close
+  themselves after a few frames (`REDGEM_CLOSE_AFTER_FRAMES`, which every window of the engine
+  reads) and must end well. The runners have no graphics card: on Linux the windows are drawn by
+  Mesa's llvmpipe under Xvfb; on Windows by Mesa's `opengl32.dll` (llvmpipe, pinned by
+  `tools/windows/fetch_mesa.sh`), put beside the programs. The Mac's are not opened (the Mac's app
+  is opened for a picture, which is not a check).
 - Then the five together, and the players' symbols: if one is missing, or any job failed, nothing
   is attached.
 - Attaching (`tools/release/attach_to_draft.sh`): the new downloads go up under other names
@@ -81,7 +89,7 @@ The same scripts pack the downloads from local builds:
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 tools/windows/build_runtime.sh
-cmake --build build-windows --target redgem redgem_relay redgem_server
+cmake --build build-windows --target redgem redgem_relay redgem_server redgem_test_tool
 tools/android/build_runtime.sh
 tools/release/package.sh                 # dist/release: the Linux and Windows downloads, and the symbols
 tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz \
@@ -89,7 +97,14 @@ tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz \
   redgem-symbols-linux.zip redgem-symbols-windows.zip redgem-symbols-android.zip
 tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
 tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.AppImage
+tools/release/smoke.sh dist/release/redgem-linux-x86_64.tar.gz     # opens windows: needs a display
+tools/release/smoke.sh dist/release/redgem-linux-x86_64.AppImage
 ```
+
+`smoke.sh` draws with the machine's graphics card. With no display, run it under
+`xvfb-run -a -s "-screen 0 1600x900x24 -noreset"` with `LIBGL_ALWAYS_SOFTWARE=1`, as the workflow
+does. On Windows (Git Bash), with no card that draws OpenGL 3.3:
+`GALLIUM_DRIVER=llvmpipe tools/release/smoke.sh --gl "$(tools/windows/fetch_mesa.sh)" dist/release/redgem-windows-x86_64.zip`.
 
 Built so on a recent system, the Linux programs need that system's glibc and libstdc++, so
 `smoke_test.sh` (through `glibc_floor.sh`) refuses them: the release's are built as the

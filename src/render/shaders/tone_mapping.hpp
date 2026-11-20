@@ -4,7 +4,8 @@
 
 namespace redgem::shaders {
 
-// HDR scene + bloom -> exposure, filmic tone mapping (ACES fit), vignette, gamma.
+// HDR scene + bloom -> exposure (the environment's, times the adapted one when auto exposure is on:
+// see exposure.hpp, whose adaptedScale with_adapted_scale puts in), filmic tone mapping (ACES fit), vignette, gamma.
 // Alpha carries the luma, which the anti-aliasing pass reads.
 // Under water (underwater > 0) the picture wobbles a little and fades with distance into the
 // water's own color, what its absorption leaves of the light (render/underwater.hpp).
@@ -101,7 +102,7 @@ void main() {
   scene *= mix(1.0, texture(occlusionTexture, at).r, occlusionAmount);
   // Under water, the glow of bright things (the sun through the surface) fades into the water too.
   scene = underwaterFog(scene + texture(bloomTexture, at).rgb * bloomStrength, at);
-  vec3 color = scene * exposure;
+  vec3 color = scene * exposure * adaptedScale();
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
   float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);

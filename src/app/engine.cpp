@@ -26,9 +26,11 @@
 namespace redgem {
 namespace {
 
-// What muffles the game's sounds, while it has a world.
-bool walls_between(const PhysicsWorld* physics, Vec3 from, Vec3 to) {
+// What muffles the game's sounds, while it has a world. A world in the middle of an overlapped
+// step would make the frame wait for it: the sound asks again on the audio's next update.
+std::optional<bool> walls_between(const PhysicsWorld* physics, bool stepping, Vec3 from, Vec3 to) {
   if (physics == nullptr) return false;
+  if (stepping) return std::nullopt;
   return static_body_between(*physics, from, to);
 }
 
@@ -128,15 +130,22 @@ void Engine::open_network(const GameSettings& settings) {
 
 void Engine::build_world(const GameSettings& settings) {
   collision_layers_ = settings.collision_layers;
+  physics_threads_ = chosen_physics_threads(settings);
   max_bodies_ = settings.max_bodies;
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
+  head_aims_.clear();
   particles_.set_gravity(gravity());
   if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
   find_water();
+}
+
+int Engine::chosen_physics_threads(const GameSettings& settings) const {
+  if (serves_a_room()) return config::kDefaultPhysicsThreads;  // (a room draws nothing to overlap)
+  return config::bounded_physics_threads(options_.physics_threads.value_or(settings.physics_threads));
 }
 
 void Engine::open_presenter(const GameSettings& settings) {
@@ -184,7 +193,7 @@ void Engine::release_audio() {
   if (!audio_open()) return;  // (the engine failed to start before it had any)
   audio().stop_sounds();
   for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
-  audio().set_music_ducking(MusicDucking{});
+  audio().reset_music_ducking();
   audio().forget_game_groups();
   audio().set_occlusion(OcclusionSettings{});
   audio().set_doppler(kRealDoppler);
@@ -248,6 +257,7 @@ void Engine::keep_bindings() {
 
 void Engine::connect_effects() {
   context_.animations = &animations_;
+  context_.head_aims = &head_aims_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
   context_.renders_particles = options_.presenter != nullptr;
@@ -276,7 +286,8 @@ void Engine::fill_context(const GameSettings& settings) {
   context_.http = &http_;
   describe_game(context_, settings);
   context_.audio = &audio();
-  audio().set_occlusion_query([this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), from, to); });
+  audio().set_occlusion_query(
+      [this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), step_in_flight_, from, to); });
   connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;

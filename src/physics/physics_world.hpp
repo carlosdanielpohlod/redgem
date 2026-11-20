@@ -12,6 +12,7 @@
 #include "physics/body_config.hpp"
 #include "physics/body_limit.hpp"
 #include "physics/debug_geometry.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -66,10 +67,12 @@ struct RaycastHit {
   float distance = 0.0f;
 };
 
-// What a query looks at: bodies on the layers of `layers`, but none of the objects in `ignore`.
+// What a query looks at: bodies on the layers of `layers`, but none of the objects in `ignore`
+// (and with `moving_only`, none of the static ones either: what moves, characters included).
 struct QueryFilter {
   LayerMask layers = kAllLayers;
   std::vector<ObjectId> ignore;
+  bool moving_only = false;
 };
 
 // The shape swept by a cast, or tested by an overlap.
@@ -140,6 +143,10 @@ class PhysicsWorld {
   // Contact and trigger enter/exit events produced by the last steps, in deterministic order.
   virtual std::vector<ContactEvent> drain_events() = 0;
 
+  // The box around an object's body (a character's too), in world space as its collider is now;
+  // none for an object without one.
+  virtual std::optional<Bounds> body_bounds(ObjectId object) const = 0;
+
   // Rigid bodies.
   virtual Vec3 velocity(ObjectId object) const = 0;
   virtual void set_velocity(ObjectId object, Vec3 velocity) = 0;
@@ -150,6 +157,9 @@ class PhysicsWorld {
   // Moves a character this much further (horizontally) during its next step, on top of its move:
   // it slides along what it meets on the way. Offsets add up until a step goes through them.
   virtual void add_character_displacement(ObjectId object, Vec3 offset) = 0;
+  // The bodies a character carries (kinematic bodies under it, such as a box in its hand): it
+  // neither bumps into them, stands on them nor is pushed by them. Replaces the ones said before.
+  virtual void set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) = 0;
   // Jumps on the next step if the character is grounded then.
   virtual void character_jump(ObjectId object, float speed) = 0;
   virtual bool character_grounded(ObjectId object) const = 0;
@@ -235,8 +245,11 @@ class PhysicsWorld {
   virtual float hinge_angle(JointId joint) const = 0;
 };
 
-// A world of at most `max_bodies` bodies (physics/body_limit.hpp; kept within its bounds).
+// A world of at most `max_bodies` bodies (physics/body_limit.hpp; kept within its bounds), whose
+// steps `threads` solve (see config::kDefaultPhysicsThreads): every count gives the same world,
+// step after step; more only finish a step of a large one sooner.
 std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {},
-                                                        std::uint32_t max_bodies = kDefaultMaxBodies);
+                                                        std::uint32_t max_bodies = kDefaultMaxBodies,
+                                                        int threads = config::kDefaultPhysicsThreads);
 
 }  // namespace redgem

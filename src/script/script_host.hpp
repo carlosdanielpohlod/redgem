@@ -17,6 +17,7 @@
 #include "scene/animation/animation_event.hpp"
 #include "script/engine_constants.hpp"
 #include "script/game_locales.hpp"
+#include "script/npc_settings.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_reload.hpp"
 #include "script/script_context.hpp"
@@ -91,11 +92,17 @@ class ScriptHost {
 
   // Cached Ruby GameObject wrapper for a scene object (stable identity).
   mrb_value object_value(ObjectId object);
+  // The settings of the NPC parts the scripts gave an object (its Interactable, Perception,
+  // Schedule and NavAgent), for the editor's Scene view; none for an object without them, or
+  // whose parts' settings are wrong (script_host_gizmos.cpp).
+  NpcSettings npc_settings(ObjectId object);
 
   ScriptContext& context() { return context_; }
   // The game's own translations (I18n), read from its locales folder as the host starts; none for
   // scripts that are not a game's.
   const GameLocales& locales() const { return locales_; }
+  // The folder of the game whose scripts these are (that holds its scripts folder).
+  std::filesystem::path game_dir() const { return scripts_dir_.parent_path(); }
   // The language the scripts' texts are shown in (I18n.locale), as a game's file or a script
   // names it: of the game's languages, the one that best serves the user's, else the engine's
   // (see core/translations.hpp), until a script picks another. Each host has its own, so each
@@ -164,7 +171,7 @@ class ScriptHost {
   // The class a top-level constant names, or nullptr when there is none or the constant is not a
   // class (a script may set `Player = 5`): asking mruby for it then raises where nothing catches it.
   RClass* class_named(const std::string& name);
-  // The engine's module of that name (Network, HTTP), or nil when a script set the name to
+  // The engine's module or class of that name (Network, Perception), or nil when a script set the name to
   // something else: calling a method on nil is then an error the call reports, not an abort.
   mrb_value module_named(const char* name);
   // Whether a Ruby class is Behaviour or inherits from it.
@@ -182,6 +189,8 @@ class ScriptHost {
   // Calls `entry` with the frame's seconds on every behaviour that is running (and, for
   // fixed_update, has one of its own).
   void update_running(const char* entry, float dt, bool fixed);
+  // Dialogue.__update: the line being spoken goes on as its clip ends.
+  void update_dialogue(float dt);
   // Enabled, on an object that is still there.
   bool runnable(const BehaviourSlot& slot) const;
   // A copy of where the object's behaviours are: callbacks may attach more while it is walked.

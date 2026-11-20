@@ -14,6 +14,7 @@
 #include <string>
 
 #include "core/texts.hpp"
+#include "script/quest_file.hpp"
 
 using namespace redgem;
 namespace fs = std::filesystem;
@@ -29,6 +30,10 @@ constexpr const char* kGamePart = "game";  // the engine's texts a game shows (i
 const std::regex kCppKey(R"re("([a-z]+(\.[a-z0-9_]+){2,})")re");
 // A key a script looks up.
 const std::regex kRubyKey(R"re(I18n\.t\("([^"]+)")re");
+// A key the engine's Ruby keeps in a constant: a frozen dotted name (not a prefix ending in "_").
+const std::regex kRubyConstantKey(R"re("([a-z]+(\.[a-z0-9_]*[a-z0-9]){2,})"\.freeze)re");
+// A key a dialogue file shows: a speaker's name, a line or a choice.
+const std::regex kDialogueKey(R"re("(?:speaker|text)"\s*:\s*"([^"]+)")re");
 
 std::string read_file(const fs::path& file) {
   std::ifstream in(file, std::ios::binary);
@@ -73,6 +78,19 @@ Keys engine_keys() {
   Keys keys = keys_in_code(kSource / "src", kCppKey, ".cpp");
   keys.merge(keys_in_code(kSource / "src", kCppKey, ".hpp"));
   keys.merge(keys_in_code(kSource / "ruby" / "engine", kRubyKey, ".rb"));
+  keys.merge(keys_in_code(kSource / "ruby" / "engine", kRubyConstantKey, ".rb"));
+  return keys;
+}
+
+Keys quest_keys(const fs::path& game) {
+  Keys keys;
+  for (const std::string& name : quest::quest_names(game)) {
+    const auto file = quest::read_quest_file(game, name);
+    const fs::path path = game / quest::shown_file(name);
+    REQUIRE_MESSAGE(file.has_value(), path.string());
+    REQUIRE_MESSAGE(file->ok(), path.string());
+    for (const auto& text : file->texts) keys.insert(text.name);
+  }
   return keys;
 }
 
@@ -143,7 +161,9 @@ TEST_CASE("every key a game or a template shows has a text in English, and every
   const Keys engine = keys_of(kSource / "locales" / kGamePart / kEnglishFile);
   for (const fs::path& game : games()) {
     const fs::path locales = game / "locales";
-    const Keys used = keys_in_code(game / "scripts", kRubyKey, ".rb");
+    Keys used = keys_in_code(game / "scripts", kRubyKey, ".rb");
+    used.merge(keys_in_code(game / "dialogues", kDialogueKey, ".json"));
+    used.merge(quest_keys(game));
     const Keys own = fs::is_directory(locales) ? keys_of(locales / kEnglishFile) : Keys();
     for (const std::string& key : used) {
       CHECK_MESSAGE(own.count(key) + engine.count(key) > 0, (game.string() + " shows " + key + " with no text"));

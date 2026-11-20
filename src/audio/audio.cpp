@@ -15,7 +15,6 @@ struct AudioVector {
   double x, y, z;
 };
 constexpr double kMinimumAudioAxis = 0.000001;  // reject nearly parallel listener directions
-constexpr std::size_t kStereoChannels = 2;
 constexpr float kMonoShare = 0.5f;
 constexpr double kSmoothFadeCubic = 3.0;
 constexpr double kSmoothFadeQuadratic = 2.0;
@@ -54,6 +53,11 @@ bool valid_doppler_scale(float scale) {
 }
 // A sound in the world that walls are let muffle.
 bool walls_muffle(const SpatialSound& sound) { return sound.positional && sound.occludable; }
+// A sound's occlusion `seconds` on: the first answer about its walls counts at once.
+float next_occlusion(const SpatialSound& sound, bool wall, float seconds, const OcclusionSettings& settings) {
+  if (!sound.occlusion_found) return wall ? kBehindWall : kOpen;
+  return occlusion_step(sound.occlusion, wall, seconds, settings);
+}
 bool valid_audio_levels(const SpatialSound& sound) {
   if (!std::isfinite(sound.volume)) return false;
   if (!std::isfinite(sound.pitch)) return false;
@@ -104,7 +108,7 @@ std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const
 void spatial_mono_frames(float* samples, unsigned frames) {
   if (samples == nullptr) return;
   for (unsigned frame = 0; frame < frames; ++frame) {
-    float* stereo = samples + static_cast<std::size_t>(frame) * kStereoChannels;
+    float* stereo = samples + static_cast<std::size_t>(frame) * kDeviceChannels;
     const float mono = stereo[0] * kMonoShare + stereo[1] * kMonoShare;
     stereo[0] = mono;
     stereo[1] = mono;
@@ -123,7 +127,9 @@ SpatialSound flat_sound(const FlatSound& sound) {
 
 SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked) {
   SpatialSound sound = asked;
-  sound.occlusion = blocked(sound) ? kBehindWall : kOpen;  // (heard as it is from the start)
+  const auto wall = blocked(sound);  // (heard as it is from the start, when that can be told now)
+  sound.occlusion_found = wall.has_value();
+  sound.occlusion = wall.value_or(false) ? kBehindWall : kOpen;
   sound.doppler = shift_of(sound);
   const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
@@ -131,15 +137,26 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked
   reap();  // (a sound that ended gives its place back)
   const auto place = place_for(sound);
   if (place == kNoSoundSource) return kNoSoundSource;
+  return start_sound(name, sound, *mix, place);
+}
+
+SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
+                                     std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
   SpatialSound heard = sound;
   heard.pitch = heard_pitch(sound);
-  if (!driver_.start(id, name, heard, *mix)) return kNoSoundSource;  // (the one it would replace goes on)
-  driver_.effects(id, effects_of(sound));
+  // (The one it would replace goes on when it cannot start.)
+  if (!driver_.start(id, name, heard, mix, effects_of(sound))) return kNoSoundSource;
   if (place) stop(*place);
-  sounds_.emplace(id, sound);
+  keep(id, sound);
   ++next_;
   return id;
+}
+void SoundPool::keep(SoundSourceId id, const SpatialSound& sound) {
+  sounds_.emplace(id, sound);
+  if (!groups_.within(sound.group, MixGroup::Voice)) return;
+  loudness_.emplace(id, EnvelopeFollower{});
+  driver_.measure(id);
 }
 std::optional<SoundSourceId> SoundPool::place_for(const SpatialSound& sound) const {
   if (sounds_.size() < kMaxSounds) return std::nullopt;
@@ -211,20 +228,38 @@ void SoundPool::set_group_volume(MixGroup group, float volume) {
 void SoundPool::set_group_gain(MixGroup group, float gain) {
   if (groups_.set_gain(group, gain)) refresh();
 }
-bool SoundPool::group_playing(MixGroup group) const {
+bool SoundPool::group_heard(MixGroup group) const {
   for (const auto& [id, sound] : sounds_) {
     if (!groups_.within(sound.group, group)) continue;
-    if (driver_.playing(id)) return true;
+    if (heard(id, sound)) return true;
   }
   return false;
 }
+bool SoundPool::heard(SoundSourceId id, const SpatialSound& sound) const {
+  const auto mix = mix_of(sound);
+  if (!mix) return false;
+  if (mix->volume <= 0.0f) return false;
+  return driver_.playing(id);
+}
 bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
+float SoundPool::loudness(SoundSourceId id) const {
+  const auto found = loudness_.find(id);
+  return found == loudness_.end() ? kSilence : found->second.value();
+}
+void SoundPool::follow(float seconds) {
+  for (auto& [id, envelope] : loudness_) envelope.update(driver_.level(id), seconds);
+}
 bool SoundPool::stop(SoundSourceId id) {
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
-  driver_.stop(id);
-  sounds_.erase(found);
+  forget(found);
   return true;
+}
+// Stops a sound and lets go of it.
+void SoundPool::forget(std::map<SoundSourceId, SpatialSound>::iterator sound) {
+  driver_.stop(sound->first);
+  loudness_.erase(sound->first);
+  sounds_.erase(sound);
 }
 void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
@@ -251,7 +286,7 @@ bool SoundPool::set_occlusion(const OcclusionSettings& settings) {
 void SoundPool::set_occlusion_query(OcclusionQuery query) { walls_ = std::move(query); }
 // Whether a wall stands between the listener and a sound that walls muffle, and that is near
 // enough to be heard (one farther away costs no ray).
-bool SoundPool::blocked(const SpatialSound& sound) const {
+std::optional<bool> SoundPool::blocked(const SpatialSound& sound) const {
   if (!looks_for_walls()) return false;
   if (!walls_muffle(sound)) return false;
   if (length(sound.position - listener_.position) >= sound.max_distance) return false;
@@ -260,7 +295,10 @@ bool SoundPool::blocked(const SpatialSound& sound) const {
 bool SoundPool::looks_for_walls() const { return walls_ && occludes(occlusion_); }
 void SoundPool::occlude(float seconds) {
   for (auto& [id, sound] : sounds_) {
-    const float level = occlusion_step(sound.occlusion, blocked(sound), seconds, occlusion_);
+    const auto wall = blocked(sound);
+    if (!wall) continue;  // (the engine updates the audio on a settled world, so this is rare)
+    const float level = next_occlusion(sound, *wall, seconds, occlusion_);
+    sound.occlusion_found = true;
     if (level == sound.occlusion) continue;
     sound.occlusion = level;
     driver_.effects(id, effects_of(sound));
@@ -285,8 +323,7 @@ void SoundPool::reap() {
       ++it;
       continue;
     }
-    driver_.stop(it->first);
-    it = sounds_.erase(it);
+    forget(it++);
   }
 }
 

@@ -17,9 +17,10 @@ class MixGroupTree {
  public:
   MixGroupTree();
 
-  // A game's group under `parent`, at `volume`; the same name again moves it and changes its
-  // volume. nullopt for an engine group's name, a parent that is under it, or no room left.
-  std::optional<MixGroup> define(const std::string& name, MixGroup parent, float volume);
+  // A game's group under `parent`, at `volume` (full when none); the same name again moves it,
+  // and changes its volume when one is given. nullopt for an engine group's name, a parent that
+  // is under it, or no room left.
+  std::optional<MixGroup> define(const std::string& name, MixGroup parent, std::optional<float> volume);
   // A group by the name scripts give it, the engine's or the game's.
   std::optional<MixGroup> find(const std::string& name) const;
   // Every group the game made goes, and every effect; the player's volumes and the gains stay.
@@ -41,7 +42,8 @@ class MixGroupTree {
   bool within(MixGroup group, MixGroup over) const;
   bool known(MixGroup group) const { return mix_group_index(group) < groups_.size(); }
 
- private:
+ public:
+  // One group as the tree keeps it.
   struct Group {
     std::string name;
     std::optional<MixGroup> parent;  // none for the engine's
@@ -49,6 +51,8 @@ class MixGroupTree {
     float gain = kFullVolume;
     GroupEffects effects;
   };
+
+ private:
   Group& at(MixGroup group) { return groups_[mix_group_index(group)]; }
   const Group& at(MixGroup group) const { return groups_[mix_group_index(group)]; }
   bool may_define(const std::string& name, MixGroup parent) const;

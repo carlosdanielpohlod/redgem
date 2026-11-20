@@ -5,6 +5,7 @@ add_executable(redgem_tests
   unit/body_limit_test.cpp
   unit/nav_settings_test.cpp
   unit/nav_path_test.cpp
+  unit/nav_steering_test.cpp
   unit/fixed_clock_test.cpp
   unit/debug_draw_test.cpp
   unit/frame_profiler_test.cpp
@@ -24,6 +25,8 @@ add_executable(redgem_tests
   unit/names_test.cpp
   unit/folder_names_test.cpp
   unit/texts_test.cpp
+  unit/dialogue_file_test.cpp
+  unit/quest_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -94,6 +97,7 @@ add_executable(redgem_tests
   unit/undo_history_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
+  unit/npc_gizmo_test.cpp
   unit/inspector_logic_test.cpp
   unit/hierarchy_rows_test.cpp
   unit/project_folders_test.cpp
@@ -114,6 +118,7 @@ add_executable(redgem_tests
   unit/project_files_test.cpp
   unit/game_scenes_test.cpp
   unit/environment_test.cpp
+  unit/auto_exposure_test.cpp
   unit/scene_lights_test.cpp
   unit/local_shadows_test.cpp
   unit/gpu_select_test.cpp
@@ -123,6 +128,8 @@ add_executable(redgem_tests
   unit/quality_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
+  unit/font_chain_test.cpp
+  unit/bidi_text_test.cpp
   unit/material_alpha_test.cpp
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
@@ -184,8 +191,10 @@ add_executable(redgem_tests
   unit/server_status_test.cpp
   unit/particle_emitters_test.cpp
   unit/particles_test.cpp
+  unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/head_aim_test.cpp
   unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp
@@ -206,10 +215,12 @@ add_executable(redgem_tests
   unit/markdown_blocks_test.cpp
   unit/session_history_test.cpp
   integration/physics_world_test.cpp
+  integration/threaded_physics_test.cpp
   integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
   integration/physics_joints_test.cpp
@@ -217,6 +228,7 @@ add_executable(redgem_tests
   integration/scene_joints_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
+  integration/symbol_cache_test.cpp
   integration/script_budget_test.cpp
   integration/script_budget_clock_test.cpp
   integration/save_budget_test.cpp
@@ -225,6 +237,7 @@ add_executable(redgem_tests
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
+  integration/npc_settings_test.cpp
   integration/water_buoyancy_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
@@ -233,8 +246,10 @@ add_executable(redgem_tests
   integration/save_migration_api_test.cpp
   integration/spawn_persistence_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/scene_reset_test.cpp
   integration/object_state_api_test.cpp
   integration/shape_key_api_test.cpp
+  integration/dialogue_voice_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/scene_activation_test.cpp
@@ -608,6 +623,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
                editor_system/prefab_preview_test.cpp
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
+               editor_system/npc_gizmos_test.cpp
                editor_system/scene_recovery_test.cpp
                editor_system/dpi_test.cpp
                editor_system/agent_panel_test.cpp
@@ -651,13 +667,15 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/display_render_test.cpp
                render_system/camera_marker_render_test.cpp
                render_system/local_shadow_render_test.cpp
+               render_system/exposure_foliage_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_GAMES_DIR="${CMAKE_SOURCE_DIR}/games"
-  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+  REDGEM_EDITOR_FONTS_DIR="${CMAKE_SOURCE_DIR}/assets/editor/fonts")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 
@@ -708,6 +726,9 @@ add_test(NAME tools.release_downloads
 # starts its programs.
 add_test(NAME tools.release_linux
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_linux_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# What opens a download's windows before a release is published, on stand-ins for its programs.
+add_test(NAME tools.release_smoke
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_smoke_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)

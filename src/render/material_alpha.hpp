@@ -10,8 +10,8 @@
 //     what is behind it, object by object, the farthest first, writing no depth. A dithered one
 //     (MaterialDesc::dithered) is drawn once instead, with the opaque surfaces: its texels are
 //     left out in a fine pattern that thins with their alpha, which needs no sorting.
-// Textured cut-out and blended materials are foliage: drawn on both sides, and swaying in the wind
-// (on objects that sway: see props::kSway).
+// Textured cut-out and blended materials are foliage: drawn on both sides, swaying in the wind
+// (on objects that sway: see props::kSway), and lit through by the sun from behind.
 
 #include <cstddef>
 #include <vector>
@@ -23,7 +23,8 @@ namespace redgem::render_math {
 inline constexpr float kNoCutoff = 0.0f;   // an alpha test that lets everything through
 inline constexpr float kNoCeiling = 2.0f;  // above any alpha: nothing is too opaque to be drawn
 inline constexpr float kNoWind = 0.0f;
-inline constexpr float kBlendCore = 0.9f;  // a blended texel this opaque is drawn with the opaque surfaces
+inline constexpr float kNoTranslucency = 0.0f;  // no light comes through from behind
+inline constexpr float kBlendCore = 0.9f;       // a blended texel this opaque is drawn with the opaque surfaces
 inline constexpr float kInvisibleAlpha = 1.0f / 255.0f;  // a texel less opaque than this shows nothing
 // Blended textures cast shadows as cut-outs, leaving out what is less opaque than this.
 inline constexpr float kBlendShadowCutoff = 0.35f;
@@ -43,6 +44,9 @@ struct AlphaTest {
   bool mixed = false;          // mixed with what is behind it by its alpha
 };
 AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass);
+// How much sunlight comes through a material lit from behind: the environment's
+// `foliage_translucency` (0 to 1) for foliage, none for everything else.
+float translucency_of(const MaterialDesc& material, float foliage_translucency);
 // Whether a material is drawn again after the opaque surfaces, mixed with what is behind them.
 bool drawn_see_through(const MaterialDesc& material);
 

@@ -43,11 +43,16 @@ nav:
       - Behaviours: scripting/behaviours.md
       - Live script reload: scripting/live_reload.md
       - Gameplay recipes: scripting/gameplay.md
+      - Animation graphs: scripting/animation.md
       - Interaction: scripting/interaction.md
+      - Dialogue: scripting/dialogue.md
+      - Quests: scripting/quests.md
+      - NPCs: scripting/npcs.md
       - Multiplayer: scripting/multiplayer.md
       - Online services: scripting/online-services.md
       - Texts in several languages: scripting/i18n.md
       - API reference: scripting/api.md
+      - API stability: scripting/stability.md
   - Finishing a game:
       - Testing your game: testing.md
       - Building and sharing: shipping.md

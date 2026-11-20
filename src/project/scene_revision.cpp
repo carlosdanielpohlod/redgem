@@ -122,6 +122,19 @@ std::optional<std::string> blob_at(const fs::path& folder, const std::string& re
   return object_name(blob) ? std::optional<std::string>(blob) : std::nullopt;
 }
 
+ToolResult compare_saved_revision(const SceneDesc& current, const std::string& name, const fs::path& scene_file,
+                                  const std::string& revision, const ScratchFolder& scratch, std::size_t limit) {
+  const fs::path folder = folder_of(scene_file);
+  const fs::path blob_answer = scratch.path() / kBlobFile;
+  const auto blob = blob_at(folder, revision, scene_file, blob_answer);
+  if (!blob) return no_revision(revision, scene_file, blob_answer);
+  // Keep warnings apart from the binary scene.
+  const fs::path before = scratch.path() / kSceneAtRevision;
+  const fs::path errors = scratch.path() / kShowErrors;
+  if (!ended_well(git_apart(folder, {kShow, *blob}, before, errors))) return no_revision(revision, scene_file, errors);
+  return compare_scene_file(current, name, before, limit);
+}
+
 }  // namespace
 
 bool names_scene_file(const std::string& against) {
@@ -148,13 +161,7 @@ ToolResult compare_scene_revision(const SceneDesc& current, const std::string& n
   const ScratchFolder scratch;  // (gone, with what git wrote in it, when this ends)
   const fs::path folder = folder_of(scene_file);
   if (!inside_repository(folder, scratch)) return failed(tr("project.scene.not_in_git", {{"folder", folder.string()}}));
-  const auto blob = blob_at(folder, revision, scene_file, scratch.path() / kBlobFile);
-  if (!blob) return no_revision(revision, scene_file, scratch.path() / kBlobFile);
-  // (Its errors apart: a warning in the scene's bytes would make it no scene.)
-  const fs::path before = scratch.path() / kSceneAtRevision;
-  const fs::path errors = scratch.path() / kShowErrors;
-  if (!ended_well(git_apart(folder, {kShow, *blob}, before, errors))) return no_revision(revision, scene_file, errors);
-  return compare_scene_file(current, name, before, limit);
+  return compare_saved_revision(current, name, scene_file, revision, scratch, limit);
 }
 
 }  // namespace redgem::tools

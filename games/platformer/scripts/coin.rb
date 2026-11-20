@@ -21,6 +21,7 @@ class Coin < Behaviour
     return unless Player.own?(other)  # another player's coin is theirs to report
 
     CoOp.instance.collected(name)
+    Quests.collected(:coin)   # (on a guest's machine, told to the host)
     collect
   end
 

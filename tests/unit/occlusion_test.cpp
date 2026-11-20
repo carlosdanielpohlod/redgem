@@ -6,7 +6,9 @@
 #include <mruby/string.h>
 
 #include <cmath>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <variant>
 
@@ -16,6 +18,7 @@
 #include "core/config.hpp"
 #include "physics/body_config.hpp"
 #include "physics/physics_world.hpp"
+#include "scene/scene_desc.hpp"
 #include "test_support.hpp"
 #include "testing/recording_audio.hpp"
 
@@ -23,7 +26,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kHalf = 0.5f;
+constexpr float kHalfWay = 0.5f;
 constexpr float kQuarter = 0.25f;
 constexpr float kThreeQuarters = 0.75f;
 constexpr float kQuarterFade = kDefaultOcclusionFade * kQuarter;
@@ -31,11 +34,17 @@ constexpr float kTwice = 2.0f;
 constexpr float kLongFrame = 10.0f;
 constexpr float kNoTime = 0.0f;
 constexpr Vec3 kListener{0, 1, 0};
-constexpr Vec3 kBehind{0, 1, -6};    // past the wall
-constexpr Vec3 kBeside{4, 1, 0};     // in the open
-constexpr Vec3 kWallAt{0, 1, -3};    // between them
+constexpr Vec3 kBehind{0, 1, -6};  // past the wall
+constexpr Vec3 kBeside{4, 1, 0};   // in the open
+constexpr Vec3 kWallAt{0, 1, -3};  // between them
 constexpr Vec3 kWallHalf{3, 2, 0.25f};
 constexpr Vec3 kCrateHalf{0.5f, 0.5f, 0.5f};
+constexpr Vec3 kGroundAt{0, 0.5f, 0};  // its top is the height of the listener and the sounds
+constexpr Vec3 kGroundHalf{10, 0.5f, 10};
+enum MoreIds : ObjectId { kGround = 3, kMachine = 4, kZone = 5, kFirstCrate = 10 };
+constexpr int kCratePile = 70;  // more crates than one query's hits (64)
+constexpr float kCrateStep = 0.03f;
+constexpr float kPileStart = 0.1f;  // in front of the listener
 
 enum Ids : ObjectId { kWall = 1, kCrate = 2 };
 
@@ -44,7 +53,7 @@ struct WalledAudio {
   testing::RecordingAudio audio;
   bool wall = false;
   WalledAudio() {
-    audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+    audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
     audio.set_occlusion_query([this](Vec3, Vec3) { return wall; });
   }
 };
@@ -83,7 +92,7 @@ TEST_CASE("a sound's occlusion moves toward what was found over the fade, and no
   CHECK(occlusion_step(kOpen, true, kQuarterFade, settings) == doctest::Approx(kQuarter));
   CHECK(occlusion_step(kOpen, true, kLongFrame, settings) == doctest::Approx(kBehindWall));
   CHECK(occlusion_step(kBehindWall, false, kQuarterFade, settings) == doctest::Approx(kThreeQuarters));
-  CHECK(occlusion_step(kHalf, false, kLongFrame, settings) == doctest::Approx(kOpen));
+  CHECK(occlusion_step(kHalfWay, false, kLongFrame, settings) == doctest::Approx(kOpen));
   OcclusionSettings at_once = settings;
   at_once.fade_seconds = kNoTime;
   CHECK(occlusion_step(kOpen, true, kNoTime, at_once) == doctest::Approx(kBehindWall));
@@ -93,10 +102,10 @@ TEST_CASE("an occluded sound is quieter and muffled, the more the further behind
   const OcclusionSettings settings;
   CHECK(occluded_volume(kOpen, settings) == doctest::Approx(kFullVolume));
   CHECK(occluded_volume(kBehindWall, settings) == doctest::Approx(kDefaultOccludedVolume));
-  CHECK(occluded_volume(kHalf, settings) == doctest::Approx((kFullVolume + kDefaultOccludedVolume) * kHalf));
+  CHECK(occluded_volume(kHalfWay, settings) == doctest::Approx((kFullVolume + kDefaultOccludedVolume) * kHalfWay));
   CHECK_FALSE(occluded_effects(VoiceEffects{}, kOpen, settings).low_pass_hz.has_value());
   CHECK(occluded_effects(VoiceEffects{}, kBehindWall, settings).low_pass_hz == doctest::Approx(kDefaultOccludedCutoff));
-  const float halfway = *occluded_effects(VoiceEffects{}, kHalf, settings).low_pass_hz;
+  const float halfway = *occluded_effects(VoiceEffects{}, kHalfWay, settings).low_pass_hz;
   CHECK(halfway == doctest::Approx(std::sqrt(kHighestCutoff * kDefaultOccludedCutoff)));  // (halfway in octaves)
   VoiceEffects lower;
   lower.low_pass_hz = kLowestCutoff;
@@ -111,13 +120,13 @@ TEST_CASE("occlusion settings are valid within their ranges, and full volume wit
   settings.low_pass_hz = std::nullopt;
   CHECK(valid_occlusion(settings));
   CHECK_FALSE(occludes(settings));
-  settings.volume = kFullVolume + kHalf;
+  settings.volume = kFullVolume + kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
-  settings.volume = kHalf;
-  settings.low_pass_hz = kLowestCutoff * kHalf;
+  settings.volume = kHalfWay;
+  settings.low_pass_hz = kLowestCutoff * kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
   settings.low_pass_hz = std::nullopt;
-  settings.fade_seconds = -kHalf;
+  settings.fade_seconds = -kHalfWay;
   CHECK_FALSE(valid_occlusion(settings));
 }
 
@@ -135,6 +144,20 @@ TEST_CASE("a sound behind a wall starts muffled, and fades open when the wall is
   walled.audio.update(kLongFrame);
   CHECK_FALSE(walled.audio.voices().at(id).effects.low_pass_hz.has_value());
   CHECK(walled.audio.voices().at(id).mix.volume == doctest::Approx(muffled / kDefaultOccludedVolume));
+}
+
+TEST_CASE("a sound whose walls cannot be told yet starts open, and the first answer counts at once") {
+  testing::RecordingAudio audio;
+  audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
+  std::optional<bool> answer;  // (a world in the middle of its step)
+  audio.set_occlusion_query([&](Vec3, Vec3) { return answer; });
+  const auto id = audio.play_spatial_sound("beep", at(kBehind));
+  CHECK_FALSE(audio.voices().at(id).effects.low_pass_hz.has_value());
+  audio.update(kNoTime);
+  CHECK_FALSE(audio.voices().at(id).effects.low_pass_hz.has_value());
+  answer = true;
+  audio.update(kNoTime);
+  CHECK(audio.voices().at(id).effects.low_pass_hz == doctest::Approx(kDefaultOccludedCutoff));
 }
 
 TEST_CASE("walls do not muffle flat sounds, sounds that say so, sounds too far to hear, or anything when off") {
@@ -160,13 +183,57 @@ TEST_CASE("a static body between two points muffles; a moving one, or one aside,
   CHECK(static_body_between(*world, kListener, kBehind));
   CHECK_FALSE(static_body_between(*world, kListener, kBeside));
   CHECK_FALSE(static_body_between(*world, kListener, kListener));
-  REQUIRE_FALSE(world->add_object(box(kCrate, {{"body", std::string("dynamic")}}, kBeside * kHalf, kCrateHalf)));
+  REQUIRE_FALSE(world->add_object(box(kCrate, {{"body", std::string("dynamic")}}, kBeside * kHalfWay, kCrateHalf)));
   CHECK_FALSE(static_body_between(*world, kListener, kBeside));
+}
+
+TEST_CASE("the ground a listener stands on is not a wall to the sounds on it") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  REQUIRE_FALSE(world->add_object(box(kGround, {{"collider", std::string("box")}}, kGroundAt, kGroundHalf)));
+  CHECK_FALSE(static_body_between(*world, kListener, kBeside));
+  CHECK_FALSE(static_body_between(*world, kListener, kBehind));
+}
+
+TEST_CASE("the static body a sound plays from, and a static trigger, are not walls") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  REQUIRE_FALSE(world->add_object(box(kMachine, {{"collider", std::string("box")}}, kBeside, kCrateHalf)));
+  CHECK_FALSE(static_body_between(*world, kListener, kBeside));
+  REQUIRE_FALSE(
+      world->add_object(box(kZone, {{"collider", std::string("box")}, {"trigger", true}}, kWallAt, kWallHalf)));
+  CHECK_FALSE(static_body_between(*world, kListener, kBehind));
+}
+
+TEST_CASE("a wall of one quad, which a ray crosses one way only, muffles from both sides") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  MeshDesc mesh;
+  PrimitiveDesc quad;
+  quad.positions = {-kWallHalf.x, -kWallHalf.y, 0, kWallHalf.x,  -kWallHalf.y, 0,
+                    kWallHalf.x,  kWallHalf.y,  0, -kWallHalf.x, kWallHalf.y,  0};
+  quad.normals = {0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1};
+  quad.indices = {0, 1, 2, 0, 2, 3};
+  mesh.primitives.push_back(quad);
+  BodyDesc desc = box(kWall, {{"collider", std::string("mesh")}}, kWallAt, kWallHalf);
+  desc.mesh = &mesh;
+  REQUIRE_FALSE(world->add_object(desc));
+  CHECK(static_body_between(*world, kListener, kBehind));
+  CHECK(static_body_between(*world, kBehind, kListener));
+  CHECK_FALSE(static_body_between(*world, kListener, kBeside));
+}
+
+TEST_CASE("a pile of moving bodies in front of a wall does not hide it") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  REQUIRE_FALSE(world->add_object(box(kWall, {{"collider", std::string("box")}}, kWallAt, kWallHalf)));
+  for (int crate = 0; crate < kCratePile; ++crate) {
+    const Vec3 place{0, kListener.y, kListener.z - kPileStart - kCrateStep * static_cast<float>(crate)};
+    REQUIRE_FALSE(world->add_object(box(static_cast<ObjectId>(kFirstCrate + crate), {{"body", std::string("dynamic")}},
+                                        place, kCrateHalf * kHalfWay * kHalfWay)));
+  }
+  CHECK(static_body_between(*world, kListener, kBehind));
 }
 
 TEST_CASE("the recording audio over a real world: a sound behind a static wall is muffled") {
   testing::RecordingAudio audio;
-  audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+  audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
   auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
   REQUIRE_FALSE(world->add_object(box(kWall, {{"collider", std::string("box")}}, kWallAt, kWallHalf)));
   audio.set_occlusion_query([&](Vec3 from, Vec3 to) { return static_body_between(*world, from, to); });

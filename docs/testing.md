@@ -58,6 +58,7 @@ runs in. They are only there while `redgem-test` plays it.
 | `t.press_button(:a)`, `t.hold_button(:a, frames: 30)` | Taps or holds gamepad buttons |
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
+| `t.wait_for(seconds: 20) { ... }` | Waits until the block is true, or fails after that many real seconds: for another program (a game that joins, a server). Its frames go at the game's pace and do not count toward the test's 3600 (a test may spend five minutes in such waits) |
 | `t.assert("message") { ... }` | Fails the test when the block is false |
 | `t.screenshot("name")` | Saves a picture of the next frame as `name.png` in the screenshots folder (`--screenshots <dir>`, `screenshots` unless said) |
 
@@ -82,6 +83,17 @@ The events go through the same input a player's devices feed, so `Input.mouse_x`
 `Input.mouse_down?`, `Input.gamepad_axis`, and actions bound to `mouse:left` or `pad:a` all see
 them. See [The command line](command-line.md) and
 [Repeating a headless session](assistants.md#repeating-a-headless-session) for every field.
+
+## Opening a window and closing it again
+
+To check that a built game or the editor starts on a machine, in a window, with nobody there to
+close it, set `REDGEM_CLOSE_AFTER_FRAMES`: every window of the engine closes itself once it has
+shown that many frames, as its close button would, and the program ends as it does then.
+
+```bash
+REDGEM_CLOSE_AFTER_FRAMES=120 ./my_game_build/my_game   # a built game: exits with 0 if all went well
+REDGEM_CLOSE_AFTER_FRAMES=120 redgem my_game            # the editor
+```
 
 ## Testing Ruby code by itself
 
@@ -181,7 +193,7 @@ jobs:
     timeout-minutes: 20
     env:
       GAME_DIR: .
-      # The latest release. To stay on one version, name it: .../releases/download/v0.5.0/...
+      # The latest release. To stay on one version, name it: .../releases/download/v0.6.1/...
       REDGEM_DOWNLOAD: https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +212,7 @@ jobs:
 It runs the system tests with no window, so it needs no display, and their `t.screenshot` calls
 take no pictures. To keep a game on one version of RedGem, name that version in `REDGEM_DOWNLOAD`
 instead of `latest` (for example
-`https://github.com/carlosdanielpohlod/redgem/releases/download/v0.5.0/redgem-linux-x86_64.tar.gz`).
-A game whose scripts use what only a newer RedGem has fails on an older one: until a release
-carries this version of the templates, a game made from them with a RedGem built from source
-needs that build in its workflow instead of the download.
+`https://github.com/carlosdanielpohlod/redgem/releases/download/v0.6.1/redgem-linux-x86_64.tar.gz`).
+A game whose scripts use what only a newer RedGem has fails on an older one: a game made from
+templates newer than the last release, with a RedGem built from source, needs that build in its
+workflow instead of the download.

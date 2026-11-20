@@ -162,12 +162,12 @@ mrb_value ScriptHost::new_wrapper(const GameObject& object) {
 }
 
 void ScriptHost::set_variable(mrb_value object, const char* name, mrb_value value) {
-  mrb_iv_set(vm_.state(), object, mrb_intern_cstr(vm_.state(), name), value);
+  mrb_iv_set(vm_.state(), object, vm_.symbol(name), value);
 }
 
 bool ScriptHost::stands_for(mrb_value wrapper, const GameObject& object) {
   if (mrb_nil_p(wrapper)) return false;
-  const mrb_value serial = mrb_iv_get(vm_.state(), wrapper, mrb_intern_cstr(vm_.state(), binding::kSerialVariable));
+  const mrb_value serial = mrb_iv_get(vm_.state(), wrapper, vm_.symbol(binding::kSerialVariable));
   return holds_serial(serial, static_cast<mrb_int>(object.serial));
 }
 

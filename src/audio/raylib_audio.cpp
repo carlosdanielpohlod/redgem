@@ -14,6 +14,7 @@
 #include <raylib.h>
 
 #include <array>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <optional>
@@ -131,7 +132,13 @@ void mix_callback(void* buffer, unsigned frames) { effect_rack().process_mix(sta
 struct PlayingVoice {
   Voice voice;
   std::optional<EffectSlot> slot;
+  float send_volume = 0.0F;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
 };
+void send_volume(PlayingVoice& playing, float volume) {
+  if (!playing.slot || playing.send_volume == volume) return;
+  playing.send_volume = volume;
+  effect_rack().set_volume(*playing.slot, volume);
+}
 std::optional<EffectSlot> attach_slot(AudioStream stream) {
   const auto slot = effect_rack().claim();
   if (slot) AttachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
@@ -156,41 +163,104 @@ void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mi
   apply_mix(stream, mix);
 }
 
+// The meters of the voices that play: raylib calls a stream's processor with no word of which
+// stream it is, so each meter has a callback of its own, and a voice takes a free one as it starts.
+// Past kVoiceMeters voices at once, a new one waits for a meter to be free (its loudness stays 0
+// until then).
+constexpr std::size_t kVoiceMeters = 8;
+std::array<LevelMeter, kVoiceMeters> voice_meters;
+
+template <std::size_t kMeter>
+void measure_voice(void* buffer, unsigned frames) {
+  voice_meters[kMeter].measure(static_cast<const float*>(buffer), static_cast<std::size_t>(frames) * kDeviceChannels);
+}
+template <std::size_t... kMeters>
+constexpr std::array<AudioCallback, kVoiceMeters> meter_callbacks(std::index_sequence<kMeters...>) {
+  return {measure_voice<kMeters>...};
+}
+constexpr std::array<AudioCallback, kVoiceMeters> kMeterCallbacks =
+    meter_callbacks(std::make_index_sequence<kVoiceMeters>{});
+
+// Which voice has which meter.
+class VoiceMeters {
+ public:
+  // False when every meter is taken: the voice can ask again.
+  bool attach(SoundSourceId id, AudioStream stream) {
+    const auto meter = free_meter();
+    if (!meter) return false;
+    voice_meters[*meter].reset();
+    taken_[*meter] = id;
+    AttachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    return true;
+  }
+  void detach(SoundSourceId id, AudioStream stream) {
+    const auto meter = meter_of(id);
+    if (!meter) return;
+    DetachAudioStreamProcessor(stream, kMeterCallbacks[*meter]);
+    taken_[*meter] = kNoSoundSource;
+  }
+  float level(SoundSourceId id) const {
+    const auto meter = meter_of(id);
+    return meter ? voice_meters[*meter].level() : kSilence;
+  }
+
+ private:
+  std::optional<std::size_t> free_meter() const { return meter_of(kNoSoundSource); }
+  std::optional<std::size_t> meter_of(SoundSourceId id) const {
+    for (std::size_t meter = 0; meter < kVoiceMeters; ++meter) {
+      if (taken_[meter] == id) return meter;
+    }
+    return std::nullopt;
+  }
+
+  std::array<SoundSourceId, kVoiceMeters> taken_{};  // kNoSoundSource: free
+};
+
 class RaylibSoundDriver final : public SoundDriver {
  public:
   explicit RaylibSoundDriver(SoundLibrary& library) : library_(library) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!library_.ready()) return false;
     auto voice = load_voice(library_, name, sound.loop);
     if (!voice) return false;
     const auto stream = voice_stream(*voice);
     prepare_stream(stream, sound, mix);
     const auto slot = attach_slot(stream);
+    if (slot) effect_rack().set_effects(*slot, effects);
     if (slot) effect_rack().set_volume(*slot, mix.volume);
-    voices_.emplace(id, PlayingVoice{*voice, slot});
+    voices_.emplace(id, PlayingVoice{*voice, slot, mix.volume});
     PlayAudioStream(stream);
     return true;
   }
   void update(SoundSourceId id) override {
+    meter(id, stream_of(id));
     if (auto* music = std::get_if<Music>(&voices_.at(id).voice)) UpdateMusicStream(*music);
   }
   bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(stream_of(id)); }
   void mix(SoundSourceId id, SpatialMix mix) override {
     apply_mix(stream_of(id), mix);
-    const auto slot = voices_.at(id).slot;
-    if (slot) effect_rack().set_volume(*slot, mix.volume);
+    send_volume(voices_.at(id), mix.volume);
   }
   void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(stream_of(id), pitch); }
   void effects(SoundSourceId id, const VoiceEffects& effects) override {
     const auto slot = voices_.at(id).slot;
     if (slot) effect_rack().set_effects(*slot, effects);
   }
+  void close_reverbs() override { effect_rack().close_buses(); }
+  void measure(SoundSourceId id) override {
+    unmetered_.insert(id);
+    meter(id, stream_of(id));
+  }
+  float level(SoundSourceId id) const override { return meters_.level(id); }
   void stop(SoundSourceId id) override {
     const auto found = voices_.find(id);
     if (found == voices_.end()) return;
     const auto stream = voice_stream(found->second.voice);
     StopAudioStream(stream);
     DetachAudioStreamProcessor(stream, spatial_mono_callback);  // (nothing to detach from a flat one)
+    meters_.detach(id, stream);
+    unmetered_.erase(id);
     detach_slot(stream, found->second.slot);
     std::visit([](const auto& voice) { unload_voice(voice); }, found->second.voice);
     voices_.erase(found);
@@ -198,9 +268,15 @@ class RaylibSoundDriver final : public SoundDriver {
 
  private:
   AudioStream stream_of(SoundSourceId id) const { return voice_stream(voices_.at(id).voice); }
+  // A voice being measured takes a meter as it starts, or as soon as one is free.
+  void meter(SoundSourceId id, AudioStream stream) {
+    if (unmetered_.count(id) != 0 && meters_.attach(id, stream)) unmetered_.erase(id);
+  }
 
   SoundLibrary& library_;
   std::map<SoundSourceId, PlayingVoice> voices_;
+  VoiceMeters meters_;
+  std::set<SoundSourceId> unmetered_;  // voices waiting for a meter
 };
 
 class RaylibMusicDriver final : public MusicDriver {

@@ -35,5 +35,19 @@
   "multiplayer.play_online": "Play online",
   "multiplayer.room": "Room {room}",
   "over.record": "New record: {seconds} s!",
-  "over.win": "You win!"
+  "over.win": "You win!",
+  "quest.tree.coin": "Collect a coin ({progress}/{count})",
+  "quest.tree.description": "An old tree by the path is thirsty.",
+  "quest.tree.done": "The tree is watered and the finish is reached.",
+  "quest.tree.go_to_goal": "Reach the finish line",
+  "quest.tree.goal": "The tree is grateful. Now on to the finish.",
+  "quest.tree.talk": "Water the old tree",
+  "quest.tree.title": "The old tree",
+  "quest.tree.water": "The old tree has not had rain in weeks.",
+  "tree.again": "My leaves have never been greener. Thank you!",
+  "tree.bye": "Goodbye",
+  "tree.hello": "Psst, traveler. It has not rained in weeks. Could you spare some water?",
+  "tree.name": "Old tree",
+  "tree.thanks": "Ahh, much better. I will remember this.",
+  "tree.water": "Water the tree"
 }

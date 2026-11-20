@@ -17,6 +17,7 @@ struct RecordedVoice {
   SpatialMix mix;
   bool playing = true;  // until RecordingAudio::finish says it came to its end
   VoiceEffects effects;
+  float level = kSilence;  // how loud its own samples are now, as RecordingAudio::speak says
 };
 
 // A music stream it would be playing, at the volume it would be heard at.
@@ -31,9 +32,10 @@ struct RecordedTrack {
 class RecordingSoundDriver final : public SoundDriver {
  public:
   explicit RecordingSoundDriver(const std::filesystem::path& dir) : dir_(dir) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
+  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
+             const VoiceEffects& effects) override {
     if (!find_sound_file(dir_, name)) return false;
-    voices.emplace(id, RecordedVoice{name, sound, mix});
+    voices.emplace(id, RecordedVoice{name, sound, mix, true, effects});
     started.push_back(name);
     return true;
   }
@@ -43,6 +45,7 @@ class RecordingSoundDriver final : public SoundDriver {
   void pitch(SoundSourceId id, float pitch) override { voices.at(id).sound.pitch = pitch; }
   void effects(SoundSourceId id, const VoiceEffects& effects) override { voices.at(id).effects = effects; }
   void stop(SoundSourceId id) override { voices.erase(id); }
+  float level(SoundSourceId id) const override { return voices.at(id).level; }
 
   std::map<SoundSourceId, RecordedVoice> voices;
   std::vector<std::string> started;  // every name that started, in order
@@ -103,6 +106,8 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   }
   // The end of a sound that does not loop.
   void finish(SoundSourceId id) { sound_driver.voices.at(id).playing = false; }
+  // How loud a sound's own samples are from now on, as a meter would measure them (0 to 1).
+  void speak(SoundSourceId id, float level) { sound_driver.voices.at(id).level = level; }
 
   const std::vector<std::string>& played() const { return sound_driver.started; }
   const std::map<SoundSourceId, RecordedVoice>& voices() const { return sound_driver.voices; }
@@ -119,7 +124,7 @@ class RecordingAudio final : private RecordingParts, public MixedAudio {
   float master_volume() const { return master_volume_; }                              // the game's
   float heard_master_volume() const { return heard_master_volume_; }                  // the game's times the player's
   float group_volume(MixGroup group) const { return groups().player_volume(group); }  // the player's
-  float music_ducked() const { return MixedAudio::music_ducked(); }                   // the gain over the music group
+  using MixedAudio::music_ducked;
 
  private:
   float master_volume_ = kFullVolume;

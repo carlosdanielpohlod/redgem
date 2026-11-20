@@ -13,7 +13,7 @@
 
 #include <Jolt/Jolt.h>
 
-#include <Jolt/Core/JobSystemSingleThreaded.h>
+#include <Jolt/Core/JobSystem.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/CastResult.h>
@@ -25,6 +25,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -55,7 +56,8 @@ struct Record {
   Vec3 desired_move;
   Vec3 pending_displacement;  // characters: root motion, gone through in the next step
   std::optional<float> pending_jump;
-  std::set<ObjectId> overlaps;  // triggers only
+  std::vector<JPH::BodyID> carried;  // characters: the bodies under them, which they pass through
+  std::set<ObjectId> overlaps;       // triggers only
 };
 
 // A joint, and what it was made between (`b` is kNoObject for the world).
@@ -80,7 +82,8 @@ inline bool is_movable_body(const Record* record) { return has_body(record) && r
 
 class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterContactListener {
  public:
-  World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodies);
+  World(Vec3 gravity, const CollisionLayers& layers, std::uint32_t max_bodies,
+        int threads = config::kDefaultPhysicsThreads);
   ~World() override;
 
   std::optional<std::string> add_object(const BodyDesc& desc) override;
@@ -95,11 +98,13 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void step(float dt) override;
   std::optional<Transform> simulated_pose(ObjectId object) const override;
   std::vector<ContactEvent> drain_events() override;
+  std::optional<Bounds> body_bounds(ObjectId object) const override;
   Vec3 velocity(ObjectId object) const override;
   void set_velocity(ObjectId object, Vec3 velocity) override;
   void add_impulse(ObjectId object, Vec3 impulse) override;
   void set_character_move(ObjectId object, Vec3 horizontal_velocity) override;
   void add_character_displacement(ObjectId object, Vec3 offset) override;
+  void set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
@@ -242,7 +247,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   ObjectPairs object_pairs_{layers_};
   BodyCapacity capacity_;  // (before what is sized by it)
   JPH::TempAllocatorImpl temp_allocator_;
-  JPH::JobSystemSingleThreaded job_system_;
+  std::unique_ptr<JPH::JobSystem> job_system_;  // one thread, or Jolt's pool of them
   JPH::PhysicsSystem system_;
   std::map<ObjectId, Record> records_;  // ordered: deterministic iteration
   std::set<ObjectId> triggers_;         // of the records, those that are triggers

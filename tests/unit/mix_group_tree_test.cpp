@@ -19,7 +19,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kHalf = 0.5f;
+constexpr float kHalfShare = 0.5f;
 constexpr float kQuarter = 0.25f;
 constexpr float kEighth = 0.125f;
 constexpr float kCaveCutoff = 1200.0f;
@@ -47,19 +47,19 @@ std::string ruby(Engine& engine, const std::string& code) {
 
 TEST_CASE("a game's group hangs under another and is heard at its volume times theirs") {
   MixGroupTree groups;
-  const auto cave = groups.define("cave", MixGroup::Effects, kHalf);
+  const auto cave = groups.define("cave", MixGroup::Effects, kHalfShare);
   REQUIRE(cave);
-  const auto drips = groups.define("drips", *cave, kHalf);
+  const auto drips = groups.define("drips", *cave, kHalfShare);
   REQUIRE(drips);
   CHECK(groups.find("drips") == drips);
   CHECK(groups.find("effects") == MixGroup::Effects);
-  groups.set_player_volume(MixGroup::Effects, kHalf);
+  groups.set_player_volume(MixGroup::Effects, kHalfShare);
   CHECK(groups.heard_volume(*drips) == doctest::Approx(kEighth));
   CHECK(groups.within(*drips, MixGroup::Effects));
   CHECK_FALSE(groups.within(*drips, MixGroup::Voice));
-  CHECK(groups.set_gain(*cave, kHalf));
-  CHECK_FALSE(groups.set_gain(*cave, kHalf));  // (no change)
-  CHECK(groups.heard_volume(*drips) == doctest::Approx(kEighth * kHalf));
+  CHECK(groups.set_gain(*cave, kHalfShare));
+  CHECK_FALSE(groups.set_gain(*cave, kHalfShare));  // (no change)
+  CHECK(groups.heard_volume(*drips) == doctest::Approx(kEighth * kHalfShare));
 }
 
 TEST_CASE("a group defined again moves and changes its volume, but never under itself") {
@@ -69,6 +69,10 @@ TEST_CASE("a group defined again moves and changes its volume, but never under i
   CHECK(groups.define("cave", MixGroup::Voice, kQuarter) == cave);
   CHECK(groups.within(*drips, MixGroup::Voice));
   CHECK(groups.heard_volume(*drips) == doctest::Approx(kQuarter));
+  CHECK(groups.define("cave", MixGroup::Effects, std::nullopt) == cave);  // (moved, its volume kept)
+  CHECK(groups.heard_volume(*drips) == doctest::Approx(kQuarter));
+  CHECK(groups.define("fresh", MixGroup::Effects, std::nullopt).has_value());
+  CHECK(groups.player_volume(*groups.find("fresh")) == doctest::Approx(kFullVolume));
   CHECK_FALSE(groups.define("cave", *drips, kFullVolume).has_value());
   CHECK_FALSE(groups.define("cave", *cave, kFullVolume).has_value());
   CHECK_FALSE(groups.define("voice", MixGroup::Music, kFullVolume).has_value());
@@ -80,12 +84,12 @@ TEST_CASE("a game has room for its own groups up to the limit, and they go when 
     REQUIRE(groups.define("group" + std::to_string(count), MixGroup::Effects, kFullVolume));
   CHECK_FALSE(groups.define("one_more", MixGroup::Effects, kFullVolume).has_value());
   REQUIRE(groups.set_effects(MixGroup::Music, GroupEffects{kCaveCutoff, kCaveReverb}));
-  groups.set_player_volume(MixGroup::Music, kHalf);
+  groups.set_player_volume(MixGroup::Music, kHalfShare);
   groups.forget_game_groups();
   CHECK_FALSE(groups.find("group3").has_value());
   CHECK(groups.define("one_more", MixGroup::Effects, kFullVolume).has_value());
   CHECK(groups.effects_of(MixGroup::Music) == VoiceEffects{});
-  CHECK(groups.player_volume(MixGroup::Music) == doctest::Approx(kHalf));  // (the player's stays)
+  CHECK(groups.player_volume(MixGroup::Music) == doctest::Approx(kHalfShare));  // (the player's stays)
 }
 
 TEST_CASE("a sound gets the lowest cutoff over it and the reverb of the nearest group with one") {
@@ -100,7 +104,7 @@ TEST_CASE("a sound gets the lowest cutoff over it and the reverb of the nearest 
   CHECK(effects.reverb_bus == *deep);
   REQUIRE(groups.set_effects(*deep, GroupEffects{}));
   CHECK(groups.effects_of(*deep).reverb_bus == *cave);
-  CHECK_FALSE(groups.set_effects(*deep, GroupEffects{kCaveCutoff, kFullReverb + kHalf}));
+  CHECK_FALSE(groups.set_effects(*deep, GroupEffects{kCaveCutoff, kFullReverb + kHalfShare}));
 }
 
 TEST_CASE("Audio.group and Audio.effects reach the sounds of a game's group and the groups over it") {
@@ -109,14 +113,18 @@ TEST_CASE("Audio.group and Audio.effects reach the sounds of a game's group and 
   ruby(*engine, "Audio.group(:cave, volume: 0.5); $drip = Audio.play(:beep, loop: true, group: :cave)");
   ruby(*engine, "Settings.effects_volume = 0.5");
   CHECK(audio.voices().at(1).mix.volume == doctest::Approx(kQuarter));
-  CHECK(ruby(*engine, "Audio.effects(:cave, low_pass: 1200, reverb: 0.4)") == "true");
+  ruby(*engine, "Audio.effects(:cave, low_pass: 1200, reverb: 0.4)");
   const VoiceEffects& effects = audio.voices().at(1).effects;
   CHECK(effects.low_pass_hz == kCaveCutoff);
   CHECK(effects.reverb == doctest::Approx(kCaveReverb));
-  CHECK(ruby(*engine, "Audio.effects(:effects, low_pass: 400)") == "true");
+  ruby(*engine, "Audio.effects(:effects, low_pass: 400)");
   CHECK(audio.voices().at(1).effects.low_pass_hz == kDeepCutoff);  // (the lower one, from over it)
   ruby(*engine, "Audio.effects(:cave); Audio.effects(:effects)");
   CHECK(audio.voices().at(1).effects == VoiceEffects{});
+  ruby(*engine, "Audio.effects(:cave, reverb: 0.4); Audio.play(:beep, group: :cave)");
+  CHECK(audio.voices().at(2).effects.reverb == doctest::Approx(kCaveReverb));  // (from its start)
+  ruby(*engine, "Audio.group(:cave, parent: :voice)");
+  CHECK(audio.voices().at(1).mix.volume == doctest::Approx(kHalfShare));  // (moved, still at 0.5)
 }
 
 TEST_CASE("a game's group under the voice ducks the music, and the game's groups end with it") {
@@ -126,7 +134,7 @@ TEST_CASE("a game's group under the voice ducks the music, and the game's groups
     ruby(*engine, "Audio.ducking(volume: 0.5, attack: 0); Audio.music(:beep, volume: 1)");
     ruby(*engine, "Audio.group(:narrator, parent: :voice); Audio.play(:beep, loop: true, group: :narrator)");
     engine->frame(config::kFixedDeltaSeconds);
-    CHECK(audio.tracks().begin()->second.volume == doctest::Approx(kHalf));
+    CHECK(audio.tracks().begin()->second.volume == doctest::Approx(kHalfShare));
   }
   CHECK_FALSE(audio.find_group("narrator").has_value());
 }

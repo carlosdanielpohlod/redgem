@@ -8,8 +8,10 @@ the same pull request.
 
 - The editor is developed and tested on Linux. The Windows download is compiled from Linux. On a
   real Windows machine (GitHub's, which has no graphics card) the engine is built with the same
-  compiler and its unit, integration and Ruby tests run on every change, but no window has been
-  opened there: the editor and the games have been seen running on Windows under Wine only.
+  compiler and its unit, integration and Ruby tests run on every change. Windows are opened there
+  only before a release, drawn by Mesa's software renderer (`tools/release/smoke.sh`): the editor
+  and a game for a few frames, and one system test. The editor and the games have not been used
+  on a Windows machine with a graphics card, only under Wine.
 - The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
   can use: there the editor is drawn by Apple's software renderer (its system test takes about
   an hour instead of a minute), and the games' system tests are not run on the Mac. Never
@@ -117,8 +119,22 @@ the same pull request.
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
-  probes or baked lighting, so interiors and deep shade are lit by the sky. Exposure is a fixed
-  environment property; there is no eye adaptation.
+  probes or baked lighting, so interiors and deep shade are lit by the sky. Baked lightmaps are a
+  planned follow-up.
+- Auto exposure (`auto_exposure = true`) measures the whole picture, every pixel alike: there is
+  no metering that favors the middle of the picture, no histogram that leaves out the darkest and
+  brightest pixels, and no exposure for a part of the screen (a minimap). It samples a 256 x 256
+  grid of the picture rather than every pixel, so at high resolutions a small, very bright spot
+  (a glint, a distant lamp) can fall between samples as the camera moves; the slow adaptation
+  hides most of it. Its state is one per
+  renderer: a game drawn through two cameras in the same frame (a split screen) shares one
+  exposure, which starts anew whenever the camera drawn changes. It has been seen on desktop
+  OpenGL only.
+- Leaves lit from behind (`foliage_translucency`) take the sun's light only, through every
+  textured cut-out or blended material alike, as if each were a thin leaf: point and spot lights
+  do not shine through, there is no per-material thickness or translucency map, and a fence
+  drawn as a cut-out glows in the sun the same way. Far-away foliage is still each copy's own
+  mesh: impostors and a separate far-grass layer are planned follow-ups.
 - A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
@@ -187,6 +203,8 @@ the same pull request.
   a vehicle are simulated in the world and keep their own motion; a static collider stays where
   it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
   and an object put under a vehicle does not become a wheel.
+- A character passes through every kinematic body under it, so it cannot stand on one it carries
+  (a board under its feet): make such a board the parent, or keep it out of the character.
 - An object that an animation clip poses keeps being posed by it under a new parent; a part taken
   out of a spawned copy is no longer posed by that copy's clip.
 - An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it
@@ -244,8 +262,42 @@ the same pull request.
 
 ## Before 1.0
 
-What a game made outside this project would run into first, roughly in order. Each line is a gap,
-not a promise of how it will be closed.
+The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, editor support
+for NPCs, dialogue and quests, a multi-level multiplayer template, the packed Android app on
+the emulator, and the test cases still on the real clock.
+
+### Gameplay API
+
+- [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
+  on-screen objective pointer. Games can build those views from `Quests.active`.
+- There is no panel that runs a dialogue or a quest without Play, and `redgem check` errors do
+  not appear in the Console.
+- [NPC gizmos](docs/editor.md#npc-gizmos) show, while editing, only the parts an object's
+  properties name (a part a script adds shows once the game runs), and while the game runs they
+  show no texts (prompts, plans).
+
+### Shipping
+
+- The packed Android app has not been run on an emulator or a phone yet: the continuous integration
+  only builds its player.
+
+### Engineering
+
+- About 130 test cases still sleep or measure the real clock (directly or through their file's
+  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
+  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
+  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
+  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
+  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
+
+### Documentation
+
+- No template is a game of several levels with multiplayer: each template has one scene.
+
+## After 1.0
+
+Gaps that do not block a professional multi-level multiplayer game. Each line is a gap, not a
+promise of how it will be closed.
 
 ### Editor
 
@@ -282,8 +334,9 @@ not a promise of how it will be closed.
   `Input.rumble?` is false. A capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
-- Text fields take single key presses: there is no input-method composition, so languages typed
-  through a composition window cannot be entered even with a game font that draws them.
+- Text fields take single key presses: there is no input-method composition (pre-edit text), so
+  languages typed through a composition window cannot be entered even with a game font that draws
+  them. raylib 5.5 and the GLFW 3.4 inside it expose no pre-edit text to build it on.
 - `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
   hyphenation, no line-breaking rules of scripts written without spaces). Sizes scale with the
   screen from one reference screen (game.json's `"ui"`) and one player multiplier
@@ -311,73 +364,102 @@ not a promise of how it will be closed.
   velocities from the game (nothing follows a body by itself). Occlusion is one ray per sound and frame through the static bodies:
   a wall is in the way or not (no thickness, no sound going round it), and moving bodies never
   muffle.
+  back later. Positional sound provides stereo panning and distance falloff; games update source
+  positions and the listener explicitly; there is no HRTF or Doppler. Occlusion is a ray each
+  way between the listener and each sound, every frame, through the static bodies: a wall is in
+  the way or not (no thickness, no sound going round it), and moving bodies never muffle. A solid
+  collider that the listener or the sound is touching or inside does not muffle (a sound buried
+  in a thick wall is heard through it); walls of a mesh past it still do. A sound played while an
+  overlapped physics step runs is heard open for its first frame.
 - One music track at a time, two while they crossfade. A game adds at most 13 mix groups of its
   own. A group's effects are a one-pole low-pass and one fixed reverb (no room size, delay or EQ);
-  they are on sounds, not on the music's tracks, and the filters are tuned for 48 kHz (a device at
-  44.1 kHz hears a cutoff about 9% higher). Only the music group ducks, and only under the voice
-  group. Fades and ducking are linear in volume, and only the music fades by itself; a sound's
-  back later. Positional sound provides stereo panning and distance falloff; games update source
-  positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
-- One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
-  effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
-  ducking, filters). Fades are linear in volume, and only the music fades by itself; a sound's
-  levels change at once.
+  they are on sounds, not on the music's tracks. The filter and the reverb's delays are tuned for
+  48 kHz: a device at 44.1 kHz hears a cutoff about 9% higher and a reverb about 9% longer. Only
+  the music group ducks, and only under the voice group. Fades and ducking are linear in volume,
+  and only the music fades by itself; a sound's levels change at once.
 
 ### Text
 
-- Text uses individual Unicode glyphs without bidirectional layout, complex-script shaping or
-  automatic font fallback chains. The built-in font supports its own glyphs; other scripts, such as
-  CJK, need a game-provided font. Each face caches at most 2048 codepoints; four named game fonts
-  can be cached at once, with at most 32 MB per font file. Unsupported glyphs show a question mark.
+- Text uses individual Unicode glyphs without complex-script shaping: Arabic letters are drawn in
+  their isolated forms (not joined), Indic scripts without their conjuncts or reordered vowels, and
+  there are no ligatures or kerning. Right-to-left text is put in its order on screen
+  (the Unicode Bidirectional Algorithm, with SheenBidi) one line at a time; the line breaks
+  `UI.wrap` chooses are made before that ordering, and each wrapped line goes the way of its own
+  first strong letter, so a line of a right-to-left paragraph that starts with a number or a Latin
+  word is laid out left to right. A right-to-left line is still placed by its left edge (use
+  `align: :right`). Texts over 64 KB are drawn as written.
+- The built-in font supports its own glyphs; other scripts, such as CJK, need a game-provided font,
+  and a fallback chain (`UI.font = [:latin, :cjk, :emoji]`) of at most four game faces, then the
+  built-in one, draws each letter with the first face that has it. Color emoji faces (bitmap or
+  color tables) are not drawn: only outline (monochrome) emoji faces. Each face caches at most 2048
+  codepoints; four named game fonts can be cached at once, with at most 32 MB per font file. The
+  faces of a chain are placed by the top of their line, not lined up on one baseline.
+  Glyphs no face of the chain has (or that a full face has no room for) show as the built-in
+  face's question mark.
 
 ### Gameplay API
 
-- NPCs can be used and talked to through [interaction](docs/scripting/interaction.md) only: there is
-  no NPC behaviour, dialogue, voice or mission system yet. An Interactor's line of sight is one ray
-  between the actor's and the target's positions (a target whose position is inside the ground or
-  a wall is never in sight, and a thin gap can show something mostly hidden), there is no
-  hold-to-use or use of an object's part, and its prompt is one line at a fixed place on the
-  screen, which names the key bound even on a phone (the engine cannot tell a touch screen from
-  the on-screen controls being turned on). Over the network the host runs every use, checking
-  sight from the hero's late pose: a client hears of what it did only through the game's own
-  messages. The built-in `:interact` takes E and a gamepad's Y in every game: a game that binds
-  them to an action of its own rebinds one.
+- A dialogue's texts take no placeholder values, and GameVariables hold only nil, true, false,
+  numbers and texts (at most 1024 of them), which a game saves itself. A machine has one
+  conversation at a time (two local players cannot talk at once), and over the network a speaker
+  without a NetworkSync is found on the client by its name. The DialogueBox has one look (a game
+  that wants another draws its own from `Dialogue.current`) and does not stop the hero while it
+  shows. A line's voice is heard only on the machine of the player in the conversation, and voice
+  clips are files (no text-to-speech). A mouth follows a voice's loudness, not its sounds (no
+  visemes or lip sync); the raylib backend measures at most 8 voices at once (another one waits for
+  a meter to be free, its mouth shut until then), and a jaw turns about its own X axis only.
+- Quests share the 1024 GameVariables entries. Each quest uses one entry and each objective
+  with progress uses another. The host accepts reports of collection, delivery, defeats and
+  arrival from its clients. A `go_to` place must have the exact target name. Custom checks
+  run where a `QuestTracker` is active.
+- NPCs have a state machine (`Brain`) and senses (`Perception`, see
+  [NPCs](docs/scripting/npcs.md)), daily schedules on a `GameClock` and head look-at, and can be
+  used and talked to through [interaction](docs/scripting/interaction.md). Head look-at turns one
+  bone (no spine or eyes), its forward is guessed from the way the character faces when it starts
+  to look, and it does not avoid turning through the body when the target is behind. Each machine
+  keeps its own `GameClock`, and the clock is not saved unless the game saves it. A Perception's
+  sight is one ray from its eyes to a point on each watched object (a body mostly behind a low wall
+  is hidden, and a thin gap shows it whole), it looks every frame for every watched object, and
+  hearing goes through walls. Brains and Perceptions work on the host only: a noise made on a
+  client is heard by nobody, so a client's footsteps reach the host's NPCs only through the game's
+  own messages. A brain's state is not saved with `Save`. An Interactor's line of sight is one ray
+  between the actor's and the target's positions (a target whose position is inside the ground or a
+  wall is never in sight, and a thin gap can show something mostly hidden), there is no hold-to-use
+  or use of an object's part, and its prompt is one line at a fixed place on the screen, which
+  names the key bound even on a phone (the engine cannot tell a touch screen from the on-screen
+  controls being turned on). Over the network the host runs every use, checking sight from the
+  hero's late pose: a client hears of what it did only through the game's own messages. The
+  built-in `:interact` takes E and a gamepad's Y in every game: a game that binds them to an action
+  of its own rebinds one.
 - A scene's joints (the editor's Joint card) find the object at their other end by its stable id:
   one whose other end is in another scene, or was deleted, is not made (the log says so). The
   editor's Joint card has no drag handles in the Scene view: its anchor and axis are typed in.
-- Animation clips have no events (footsteps, hit frames), no root motion and no IK.
-- Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
 - Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
   262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
-  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
-  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
-  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not in the grid: a
+  path goes around those it is told to `avoid:` (at most 64, each a disc around its box seen from
+  above), and a `NavAgent` steers around the rest. Agents find each other in Ruby, each looking at
+  every other one each frame, so a large crowd costs more as it grows; there are no formations or
+  queues. A level a script changes needs `Navigation.bake`; there are no off-grid links (jumps,
+  ladders, teleporters), no navigation areas with costs and no bake preview in the editor
   while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
   the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
-- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
-  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
-  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
-  longer needs.
 - `Save` supports named slots, per-object pose/appearance checkpoints, save versions with
   migration hooks, and checkpoints of spawned objects whose behaviours `persist` fields. There is
   no whole-world snapshot: objects of the scene file, a behaviour's other fields, velocities,
   timers and spawned copies under other spawned copies are not saved by a checkpoint. A migration
   hook gets the whole slot in memory at once. Slot selection and storage calls are synchronous.
-- On a dedicated server, a slot's migration runs as a `Save.update` of its version key: rooms
-  migrate it one after another. A room writing a key of that slot at the moment another room
-  writes the migrated values can make that migration fail as busy: the slot is then refused for
-  the migrating room's run, and migrated on its next first use.
+- On a dedicated server, rooms serialize migrations of the same slot, but ordinary writes to
+  other keys can still run while a migration is preparing its replacement. Those writes may be
+  overwritten. Migrate a shared slot before letting other rooms write to it.
 - A scene holds at most as many physics bodies as game.json's `"physics": {"max_bodies": N}` says
   (64 to 65,536; 4096 by default), set for the whole game, not per scene. An object spawned past
   that gets no body: no collisions, and raycasts miss it. The engine logs one error when that
   first happens. A game that keeps spawning (bullets, debris) has to destroy what it no longer
   needs.
-- `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
-  automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
-  work. Slot selection and storage calls are synchronous.
 - `Game.load_scene` is synchronous. `Game.load_scene_async` reads, parses and decodes pictures in
   a bounded shared worker and makes the scene ready over frames within a per-frame budget, but
   creating the scene's objects, its water and its navigation bake still take one frame each, and
@@ -449,11 +531,10 @@ not a promise of how it will be closed.
   that picture fails to load. Names in it are matched case included, even on Windows and macOS,
   whose own folders ignore case. A file read out of it is held twice for a moment (the archive's
   copy and the one handed to raylib or cgltf), and each read opens the archive file anew.
-- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
-  plays: raylib streams music only from a file on the disk. On Android the archive is copied out
-  of the APK into the app's storage on the first run (and after each update), so it takes its
-  room twice on the phone. The packed Android app has not been run on an emulator or a phone yet:
-  the continuous integration only builds its player.
+- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it plays:
+  raylib streams music only from a file on the disk. On Android the archive is copied out of the
+  APK into the app's storage on the first run (and after each update), so it takes its room twice
+  on the phone.
 - No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.
@@ -465,13 +546,28 @@ not a promise of how it will be closed.
   save, in a new folder, and nothing moves the old one. Two games of the same studio and title
   share it.
 - Saves, settings and bindings are plain JSON with no integrity check: a player can edit them.
-- The downloads are built and packed by the continuous integration, on GitHub's runners, and
-  checked there only by listing them and running their programs' `--version` and `--help`: no
-  one opens the Windows and Linux editors from a download before a release is published.
+- The downloads are built and packed by the continuous integration, on GitHub's runners. Before
+  a release gets them, the Linux and Windows ones open the editor and a built demo for a few
+  frames and run one system test in a window (`tools/release/smoke.sh`), drawn by Mesa's software
+  renderer, as the runners have no graphics card: what only a real card shows is not seen there.
+  On a machine with one, run `tools/release/smoke.sh` by hand. The Mac's downloads open no window
+  that is checked.
 
 ### Engineering
 
-- Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
+- Rendering and scripts run on one thread. Physics does too unless game.json's `physics.threads`
+  asks for more: then Jolt's thread pool solves each step, and each frame's last fixed step runs on
+  a thread of its own while the frame is drawn (scripts never run during it). There is no separate
+  render thread yet: drawing a frame while the next one's scripts run is a later step, as is a
+  thread count chosen from the player's machine (the setting is the game's, fixed, not "auto").
+- With `physics.threads` above 1, the frame drawn is one physics step behind the world, and
+  contact callbacks and `Time.elapsed` reach scripts at the start of the next frame. Anything that
+  asks the world something between frames (the editor's physics view, a tool) waits for the step
+  under way. The equality of results with one thread and with several is tested on the CI's Linux
+  runners; it rests on Jolt's determinism, not on a promise of the engine's across platforms.
+- The profiler's Physics phase counts only the time a frame waits for its overlapped step, not the
+  step itself on the physics thread. Every scene gets a new thread pool, made when it loads.
+  A dedicated server's rooms ignore `physics.threads`.
 - Textures are kept uncompressed on the graphics card unless a scene gives them as KTX2 (see
   Rendering and animation): PNG, JPEG and WebP are never compressed for the card, which costs most on phones.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
@@ -481,12 +577,6 @@ not a promise of how it will be closed.
   listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
   held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
   unknown, and every leak of mruby's memory is listed as known.
-- About 130 test cases still sleep or measure the real clock (directly or through their file's
-  fixtures), a source of rare timing failures. Nearly all are network tests whose fixtures pace
-  real sockets with short sleeps and generous limits (multiplayer, relay, dedicated server, lobby,
-  approvals, async scene loading); the rest check that some work ends within seconds (a flood of
-  messages, many numbers to parse, a large physics world taken apart, a stuck script stopped).
-  The scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 - Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
   string helpers.
 - A connection's send buffer copies what is left on every partial send (`socket_io.cpp`). Its
@@ -574,16 +664,15 @@ not a promise of how it will be closed.
 
 ### Documentation
 
-- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
-  across.
+- Migration notes start with the release after 0.5.0: CHANGELOG.md's earlier releases say what
+  changed, not how to move a game across. The stability marks of the API reference are set by
+  hand: nothing checks that a stable call really kept its shape between two releases.
 - The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
   and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
   the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
   and what any method returns is not checked against the engine, nor are the names of keywords.
   The signatures cover the engine's API only: a game's own classes need signatures of their own
   for a type checker, and a game made before them gets them with `redgem api --rbs`.
-- Templates are `empty` and `platformer` only; there is no example of running game tests in a
-  game's own continuous integration.
 
 ### Working with AI assistants
 
@@ -612,7 +701,10 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
   viewport images, runtime queries and event history. Live add creates empty objects only;
   asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
-  calls run serially and cannot be interrupted by a cancellation notification.
+  calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
+  answer the editor's dialogs: `status` says when the editor offers to recover an earlier
+  session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
+  again once someone answered it in the editor).
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.

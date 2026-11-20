@@ -50,9 +50,10 @@ class AudioTest < RedGemTest::Case
 
   def test_a_group_of_the_games_own_takes_sounds_and_effects
     Audio.group(:cave, volume: 0.5)
-    assert Audio.effects(:cave, low_pass: 800, reverb: 0.3)
+    assert_nil Audio.effects(:cave, low_pass: 800, reverb: 0.3)
     assert_nil Audio.play(NOT_A_SOUND, group: :cave)
-    assert Audio.effects(:cave)
+    assert_nil Audio.effects(:cave)
+    assert_nil Audio.group(:cave, parent: :voice)
     assert_raises(ArgumentError) { Audio.group(:voice) }
     assert_raises(ArgumentError) { Audio.effects(:cave, low_pass: 1) }
   end
