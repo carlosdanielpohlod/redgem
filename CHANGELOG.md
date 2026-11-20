@@ -30,6 +30,10 @@ save writes, handle errors from `Save.delete` and `Save.clear` as well.
 
 ### Added
 
+- **`t.wait_for(seconds:)` in system tests**: waits until a block is true, or fails, in real
+  seconds. A headless test runs its frames as fast as it can, so its limit of 3600 frames could
+  be gone in about a second while another program (a game joining, a proxy, a server) had yet to
+  act. The frames of such a wait go at the game's pace and do not count toward the limit.
 - **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
   `deliver`, `collect`, `defeat`, and a `check` of the game's own in Ruby) that go on to the next
   stage once they are all done, until one that ends the quest. `Quests.start`, `set_stage`,

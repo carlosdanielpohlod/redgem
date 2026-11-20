@@ -58,6 +58,7 @@ runs in. They are only there while `redgem-test` plays it.
 | `t.press_button(:a)`, `t.hold_button(:a, frames: 30)` | Taps or holds gamepad buttons |
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
+| `t.wait_for(seconds: 20) { ... }` | Waits until the block is true, or fails after that many real seconds: for another program (a game that joins, a server). Its frames go at the game's pace and do not count toward the test's 3600 (a test may spend five minutes in such waits) |
 | `t.assert("message") { ... }` | Fails the test when the block is false |
 | `t.screenshot("name")` | Saves a picture of the next frame as `name.png` in the screenshots folder (`--screenshots <dir>`, `screenshots` unless said) |
 
