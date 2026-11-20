@@ -49,7 +49,8 @@ void check_dialogues(const std::filesystem::path& game_dir, CheckReport& report)
 // names is in items/, when the game has that folder.
 void check_quests(const std::filesystem::path& game_dir, CheckReport& report);
 
-// Every check above, in that order: what `redgem check` finds (its game's tests aside).
-CheckReport check_game(const std::filesystem::path& game_dir);
+// Every check above, in that order, into `report`: what `redgem check` finds (its game's tests
+// aside). A check that throws leaves in `report` what the ones before it found.
+void check_game(const std::filesystem::path& game_dir, CheckReport& report);
 
 }  // namespace redgem::tools

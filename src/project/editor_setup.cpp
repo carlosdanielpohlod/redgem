@@ -55,11 +55,13 @@ std::vector<BuildChoice> build_choices() {
 }
 
 GameCheck check_for_editor(const std::filesystem::path& game_dir) {
+  tools::CheckReport report;
   try {
-    const tools::CheckReport report = tools::check_game(game_dir);
+    tools::check_game(game_dir, report);
     return {report.errors, report.warnings, tools::check_summary(report)};
   } catch (const std::exception& error) {  // (a scene the engine of the check cannot start with)
-    return {{error.what()}, {}, tr("project.check.stopped")};
+    report.errors.emplace_back(error.what());
+    return {report.errors, report.warnings, tr("project.check.stopped")};
   }
 }
 

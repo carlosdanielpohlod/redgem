@@ -76,7 +76,8 @@ bool went_wrong(const CheckReport& report, const std::optional<TestsRun>& tests)
 }
 
 ToolResult checked(const ToolLine& line) {
-  const CheckReport report = check_game(line.words.front());
+  CheckReport report;
+  check_game(line.words.front(), report);
   const std::optional<TestsRun> tests = tests_if_asked(line, report);
   ToolResult result{kExitSuccess, problem_lines(report, tests, line.has(kAllOption)), {}};
   if (tests) result.out += tests_line(*tests) + "\n";
