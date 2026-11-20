@@ -63,6 +63,7 @@ void EditorApp::draw_edited_scene() {
   BeginTextureMode(view.target);
   BeginMode3D(view.camera);
   draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
+  draw_npc_gizmos(selected_npc_gizmos());
   EndMode3D();
   EndTextureMode();
 }

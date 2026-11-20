@@ -225,6 +225,31 @@ limit leaves edges out, the View menu warns that the limit was reached. Curves a
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
 velocities or joints. Turning it off stops gathering the geometry.
 
+## NPC gizmos
+
+The Scene view draws the NPC parts of the selected objects (see [NPCs](scripting/npcs.md) and
+[Interaction](scripting/interaction.md)). **View > NPC gizmos** turns them on and off; they are on
+by default and never change the scene.
+
+| Part | What is drawn | Color |
+|---|---|---|
+| `Interactable` | a ring of its `range` on the ground, and its `prompt` key over it | blue |
+| `Perception` | its sight cone from its eyes, `sight` meters long and `fov` degrees wide | red |
+| `Perception` | a ring of its `hearing` on the ground | purple |
+| `Schedule` | its plan, one `HH:MM activity` a line, over the object | white text |
+| `NavAgent` | the path it still walks, through the corners ahead, and a cross where it was sent | green |
+
+While editing, the gizmos come from the object's properties, the settings each part reads when its
+script gives it none: an object with a `prompt` text shows an Interactable, and so does one with a
+`dialogue` (a Talkable's, with its "Talk" prompt); one with a `sight`, `fov`, `eyes` or `hearing`
+property shows a Perception, and one with a `plan` property a Schedule, its entries as written.
+Missing settings show the part's defaults. A NavAgent has nowhere to go before Play.
+
+During Play or Pause, they come from the parts the game's scripts gave the object, with the
+values they have now (`add_component(Perception, sight: 20)` included), and are drawn in the
+game's picture like the [physics colliders](#physics-collider-view), without the texts. Once the
+game loads another scene they are not drawn, and at most 64 selected objects show theirs.
+
 ## Story panel
 
 The **Story** tab, beside the Console, runs a dialogue or a quest of the game without Play. It reads

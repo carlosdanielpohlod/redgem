@@ -143,5 +143,12 @@ inline constexpr unsigned char kTriggerColor[4] = {60, 220, 120, 255};
 inline constexpr unsigned char kIconColor[4] = {240, 240, 240, 255};
 inline constexpr unsigned char kSunColor[4] = {255, 220, 80, 255};
 inline constexpr unsigned char kJointColor[4] = {255, 140, 60, 255};  // a joint's anchor, axis and limits
+// NPC gizmos (editor/npc_gizmo.hpp): an Interactable's reach, a Perception's sight and hearing, a
+// NavAgent's path, and the texts over them.
+inline constexpr unsigned char kInteractableColor[4] = {90, 200, 255, 255};
+inline constexpr unsigned char kSightColor[4] = {255, 90, 90, 255};
+inline constexpr unsigned char kHearingColor[4] = {200, 120, 255, 255};
+inline constexpr unsigned char kRouteColor[4] = {120, 255, 160, 255};
+inline constexpr unsigned char kNpcLabelColor[4] = {240, 240, 240, 255};
 
 }  // namespace redgem::editor_config

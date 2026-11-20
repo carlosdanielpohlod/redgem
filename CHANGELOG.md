@@ -15,8 +15,19 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sound occlusion**: a sound played from inside its own static collider is no longer muffled
+  from every side. A pile of moving bodies in front of a wall no longer hides the wall. A listener
+  touching a building made as one mesh still hears its inner walls, and a wall of one quad, or a
+  terrain over a cave, muffles from both sides. `Audio.play_at` no longer waits for an overlapped physics step: the sound's walls
+  are looked for on the next frame.
 ### Added
 
+- **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
+  Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
+  NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
+  parts the scripts gave them. **View > NPC gizmos** turns them off.
 - **Story panel** in the editor: steps through a dialogue's lines and choices, and moves a quest from
   stage to stage, without Play. It shows each choice's conditions and effects and whether they
   hold, on scratch GameVariables that Play never sees.
@@ -31,6 +42,10 @@ save writes, handle errors from `Save.delete` and `Save.clear` as well.
 
 ### Added
 
+- **`t.wait_for(seconds:)` in system tests**: waits until a block is true, or fails, in real
+  seconds. A headless test runs its frames as fast as it can, so its limit of 3600 frames could
+  be gone in about a second while another program (a game joining, a proxy, a server) had yet to
+  act. The frames of such a wait go at the game's pace and do not count toward the limit.
 - **Quests**: quest files in `quests/<name>.json`, stages of objectives (`go_to`, `talk_to`,
   `deliver`, `collect`, `defeat`, and a `check` of the game's own in Ruby) that go on to the next
   stage once they are all done, until one that ends the quest. `Quests.start`, `set_stage`,

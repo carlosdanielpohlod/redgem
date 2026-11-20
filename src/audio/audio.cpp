@@ -46,6 +46,11 @@ std::optional<AudioVector> audio_right(const AudioListener& listener) {
 }
 // A sound in the world that walls are let muffle.
 bool walls_muffle(const SpatialSound& sound) { return sound.positional && sound.occludable; }
+// A sound's occlusion `seconds` on: the first answer about its walls counts at once.
+float next_occlusion(const SpatialSound& sound, bool wall, float seconds, const OcclusionSettings& settings) {
+  if (!sound.occlusion_found) return wall ? kBehindWall : kOpen;
+  return occlusion_step(sound.occlusion, wall, seconds, settings);
+}
 bool valid_audio_levels(const SpatialSound& sound) {
   if (!std::isfinite(sound.volume)) return false;
   if (!std::isfinite(sound.pitch)) return false;
@@ -113,7 +118,9 @@ SpatialSound flat_sound(const FlatSound& sound) {
 
 SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked) {
   SpatialSound sound = asked;
-  sound.occlusion = blocked(sound) ? kBehindWall : kOpen;  // (heard as it is from the start)
+  const auto wall = blocked(sound);  // (heard as it is from the start, when that can be told now)
+  sound.occlusion_found = wall.has_value();
+  sound.occlusion = wall.value_or(false) ? kBehindWall : kOpen;
   const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
@@ -247,7 +254,7 @@ bool SoundPool::set_occlusion(const OcclusionSettings& settings) {
 void SoundPool::set_occlusion_query(OcclusionQuery query) { walls_ = std::move(query); }
 // Whether a wall stands between the listener and a sound that walls muffle, and that is near
 // enough to be heard (one farther away costs no ray).
-bool SoundPool::blocked(const SpatialSound& sound) const {
+std::optional<bool> SoundPool::blocked(const SpatialSound& sound) const {
   if (!looks_for_walls()) return false;
   if (!walls_muffle(sound)) return false;
   if (length(sound.position - listener_.position) >= sound.max_distance) return false;
@@ -256,7 +263,10 @@ bool SoundPool::blocked(const SpatialSound& sound) const {
 bool SoundPool::looks_for_walls() const { return walls_ && occludes(occlusion_); }
 void SoundPool::occlude(float seconds) {
   for (auto& [id, sound] : sounds_) {
-    const float level = occlusion_step(sound.occlusion, blocked(sound), seconds, occlusion_);
+    const auto wall = blocked(sound);
+    if (!wall) continue;  // (the engine updates the audio on a settled world, so this is rare)
+    const float level = next_occlusion(sound, *wall, seconds, occlusion_);
+    sound.occlusion_found = true;
     if (level == sound.occlusion) continue;
     sound.occlusion = level;
     driver_.effects(id, effects_of(sound));

@@ -75,6 +75,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/voice_mouth.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_preview.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/editor_gizmos.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -440,6 +441,8 @@ redgem_add_library(redgem_runtime
   script/script_host_reload.cpp
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
+  script/script_host_gizmos.cpp
+  script/npc_settings.cpp
   script/script_host_http.cpp
   script/script_host_animation.cpp
   script/script_host_input.cpp
@@ -704,6 +707,7 @@ if(NOT ANDROID)
     editor/scene_overlays.cpp
     editor/joint_gizmo.cpp
     editor/story_preview.cpp
+    editor/npc_gizmo.cpp
     editor/scene_overlays_physics.cpp
     editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
@@ -720,6 +724,7 @@ if(NOT ANDROID)
     editor/editor_viewport.cpp
     editor/editor_selection.cpp
     editor/editor_scene_view.cpp
+    editor/editor_npc_gizmos.cpp
     editor/editor_scenes.cpp
     editor/editor_agent.cpp
     editor/scripts/script_files.cpp

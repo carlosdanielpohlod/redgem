@@ -171,6 +171,7 @@ void EditorApp::draw_view_menu() {
 
 void EditorApp::draw_physics_debug_menu() {
   ImGui::Separator();
+  ImGui::MenuItem(tr("editor.menu.npc_gizmos"), nullptr, &npc_gizmos_);
   ImGui::MenuItem(tr("editor.menu.physics_colliders"), nullptr, &physics_debug_, session_->runtime() != nullptr);
   const bool showing = physics_debug_ && session_->runtime() != nullptr;
   if (!showing) return;

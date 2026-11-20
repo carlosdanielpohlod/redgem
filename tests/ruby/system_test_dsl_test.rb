@@ -3,7 +3,7 @@ class SystemTestDslTest < RedGemTest::Case
     statuses = []
     max_ticks.times do
       statuses << test.__tick
-      break unless statuses.last == :running
+      break unless %i[running waiting].include?(statuses.last)
     end
     statuses
   end
@@ -49,6 +49,20 @@ class SystemTestDslTest < RedGemTest::Case
     test = SystemTest.new(proc { |t| t.wait_until(frames: 3, message: "never") { false } })
     assert_equal :failed, run_until_done(test).last
     assert test.failure.include?("never within 3 frames")
+  end
+
+  def test_frames_of_a_wait_in_real_seconds_say_waiting
+    counter = 0
+    test = SystemTest.new(proc { |t| t.wait_for(seconds: 10) { (counter += 1) >= 3 } })
+    assert_equal %i[waiting waiting passed], run_until_done(test, 10).reject { |status| status == :running }
+  end
+
+  def test_a_wait_in_real_seconds_times_out
+    test = SystemTest.new(proc { |t| t.wait_for(seconds: 0, message: "never") { false } })
+    statuses = []
+    10.times { statuses << test.__tick }
+    assert_equal :failed, statuses.last
+    assert test.failure.include?("never within 0 s")
   end
 
   def test_ruby_errors_fail_the_test

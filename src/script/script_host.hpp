@@ -17,6 +17,7 @@
 #include "scene/animation/animation_event.hpp"
 #include "script/engine_constants.hpp"
 #include "script/game_locales.hpp"
+#include "script/npc_settings.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_reload.hpp"
 #include "script/script_context.hpp"
@@ -91,6 +92,10 @@ class ScriptHost {
 
   // Cached Ruby GameObject wrapper for a scene object (stable identity).
   mrb_value object_value(ObjectId object);
+  // The settings of the NPC parts the scripts gave an object (its Interactable, Perception,
+  // Schedule and NavAgent), for the editor's Scene view; none for an object without them, or
+  // whose parts' settings are wrong (script_host_gizmos.cpp).
+  NpcSettings npc_settings(ObjectId object);
 
   ScriptContext& context() { return context_; }
   // The game's own translations (I18n), read from its locales folder as the host starts; none for
