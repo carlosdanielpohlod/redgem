@@ -58,9 +58,11 @@ class SystemTest
   # program does (a game that joins, a server that restarts). The frames run at the game's pace
   # and do not count toward the test's limit of frames.
   def wait_for(seconds:, message: "condition not met")
+    raise ArgumentError, "wait_for takes seconds: a number" unless seconds.is_a?(Numeric)
+
     deadline = Time.now.to_f + seconds
     until yield
-      raise RedGemTest::Failure, "#{message} within #{seconds} s" if Time.now.to_f > deadline
+      raise RedGemTest::Failure, "#{message} within #{seconds} s" if Time.now.to_f >= deadline
 
       real_time_frame
     end
