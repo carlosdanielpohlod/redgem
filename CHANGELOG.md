@@ -15,6 +15,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Added
+
+- **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
+  Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
+  NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
+  parts the scripts gave them. **View > NPC gizmos** turns them off.
+
 ## [0.6.1] - 2026-11-15
 
 ### Migrating
