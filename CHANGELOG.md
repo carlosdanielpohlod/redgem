@@ -28,6 +28,8 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
   NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
   parts the scripts gave them. **View > NPC gizmos** turns them off.
+- **File > Check Game** in the editor: what `redgem check` finds goes to the Console, each error
+  and warning a line, then the summary. An error at a script's line links to it.
 
 ## [0.6.1] - 2026-11-15
 

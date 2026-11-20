@@ -56,6 +56,16 @@ struct AgentHooks {
   bool reopen_last_session = false;
 };
 
+// What `redgem check` finds in a game, as the Console shows it: a line a problem, and the summary.
+struct GameCheck {
+  std::vector<std::string> errors;
+  std::vector<std::string> warnings;
+  std::string summary;
+};
+
+// Looks a game's folder over as `redgem check` does.
+using GameChecker = std::function<GameCheck(const std::filesystem::path& game_dir)>;
+
 struct EditorOptions {
   // How long each frame counts for, for whoever drives the editor at a pace of its own. Empty:
   // the time the window measured between its last two frames.
@@ -64,6 +74,8 @@ struct EditorOptions {
   GpuChoice gpu = GpuChoice::Auto;
   // The ways of building a game, in the order Build Game lists them. None: the editor builds nothing.
   std::vector<BuildChoice> builds;
+  // File > Check Game. Empty: the editor offers no check.
+  GameChecker check;
   AgentHooks agent;
 };
 

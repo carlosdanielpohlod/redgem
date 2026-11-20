@@ -1,10 +1,13 @@
 #include "project/editor_setup.hpp"
 
+#include <exception>
 #include <string>
 
+#include "core/translations.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "project/build_steps.hpp"
+#include "project/check_command.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
@@ -51,10 +54,22 @@ std::vector<BuildChoice> build_choices() {
   return choices;
 }
 
+GameCheck check_for_editor(const std::filesystem::path& game_dir) {
+  tools::CheckReport report;
+  try {
+    tools::check_game(game_dir, report);
+    return {report.errors, report.warnings, tools::check_summary(report)};
+  } catch (const std::exception& error) {  // (a scene the engine of the check cannot start with)
+    report.errors.emplace_back(error.what());
+    return {report.errors, report.warnings, tr("project.check.stopped")};
+  }
+}
+
 EditorOptions editor_options(GpuChoice gpu) {
   EditorOptions options;
   options.gpu = gpu;
   options.builds = build_choices();
+  options.check = check_for_editor;
   return options;
 }
 

@@ -49,7 +49,12 @@ icons):
   *New script* creates a `Behaviour` from a template, *New scene* a scene; *Open folder* shows the
   files.
 * **Console**: engine and Ruby output (filter by level). Click a Ruby backtrace row to open the
-  project's script and scroll to the reported line.
+  project's script and scroll to the reported line. **File > Check Game** looks the game's files
+  on disk over as [`redgem check`](command-line.md#redgem-check-look-a-game-over) does (without
+  saving first, and without the game's tests) and puts each error and warning in the Console, then
+  the summary. An error at a script's line gets a row under it that opens that line. The editor
+  waits for the check, which starts the game's first scene as `redgem check` does; with unsaved
+  changes, the Console says first that they are not in it.
 * **Scripts**: each open Ruby file gets its own tab next to the Scene. Drag tabs to split the view
   anywhere (or press *Split right*), like a code editor's editor groups. The code is colored as
   you type: keywords, strings, symbols, comments, numbers, constants and `@variables` each have a
