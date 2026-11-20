@@ -20,7 +20,7 @@ constexpr int kWidth = 800;
 constexpr int kHeight = 600;
 constexpr int kCaptureSide = 400;
 constexpr std::size_t kPictureBytes = 1024 * 1024;
-constexpr int kRedLeast = 200;   // the sight cone's color, and not the selection's orange
+constexpr int kRedLeast = 200;  // the sight cone's color, and not the selection's orange
 constexpr int kOtherMost = 130;
 constexpr int kConePixels = 40;
 constexpr Vec3 kCameraPosition{0.0f, 14.0f, 0.5f};
