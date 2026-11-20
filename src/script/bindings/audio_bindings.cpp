@@ -3,6 +3,7 @@
 #include <mruby.h>
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <limits>
 #include <optional>
@@ -168,6 +169,7 @@ enum SpatialOption {
   Group,
   Priority,
   Occlusion,
+  Velocity,
   SpatialOptionCount
 };
 constexpr mrb_int kMaximumSourceId = std::numeric_limits<std::int32_t>::max();
@@ -178,9 +180,9 @@ struct SpatialArguments {
 };
 std::array<mrb_sym, SpatialOptionCount> spatial_option_names(mrb_state* mrb) {
   return {
-      mrb_intern_lit(mrb, "volume"),       mrb_intern_lit(mrb, "pitch"),    mrb_intern_lit(mrb, "reference_distance"),
-      mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),     mrb_intern_lit(mrb, "group"),
-      mrb_intern_lit(mrb, "priority"),     mrb_intern_lit(mrb, "occlusion")};
+      mrb_intern_lit(mrb, "volume"),       mrb_intern_lit(mrb, "pitch"),     mrb_intern_lit(mrb, "reference_distance"),
+      mrb_intern_lit(mrb, "max_distance"), mrb_intern_lit(mrb, "loop"),      mrb_intern_lit(mrb, "group"),
+      mrb_intern_lit(mrb, "priority"),     mrb_intern_lit(mrb, "occlusion"), mrb_intern_lit(mrb, "velocity")};
 }
 SpatialArguments spatial_arguments(mrb_state* mrb) {
   SpatialArguments arguments;
@@ -214,6 +216,16 @@ void check_spatial_sound(mrb_state* mrb, const SpatialSound& sound) {
             "Audio.play_at requires nonnegative volume, positive pitch and 0 < reference_distance < max_distance");
 }
 
+bool finite_velocity(Vec3 velocity) {
+  return std::isfinite(velocity.x) && std::isfinite(velocity.y) && std::isfinite(velocity.z);
+}
+
+// A velocity a script may leave out or give as nil: still then.
+Vec3 optional_velocity(mrb_state* mrb, mrb_value velocity) {
+  if (mrb_undef_p(velocity) || mrb_nil_p(velocity)) return Vec3{};
+  return to_vec3(mrb, velocity);
+}
+
 SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   SpatialSound sound;
   sound.position = to_vec3(mrb, arguments.position);
@@ -223,6 +235,7 @@ SpatialSound spatial_sound(mrb_state* mrb, const SpatialArguments& arguments) {
   sound.reference_distance = spatial_number(mrb, arguments.options[ReferenceDistance], sound.reference_distance);
   sound.max_distance = spatial_number(mrb, arguments.options[MaxDistance], sound.max_distance);
   sound.loop = spatial_flag(mrb, arguments.options[Loop], false, "Audio.play_at's loop must be true or false");
+  sound.velocity = optional_velocity(mrb, arguments.options[Velocity]);
   sound.occludable =
       spatial_flag(mrb, arguments.options[Occlusion], true, "Audio.play_at's occlusion must be true or false");
   sound.priority = spatial_priority(mrb, arguments.options[Priority]);
@@ -235,12 +248,14 @@ mrb_value audio_play_at(mrb_state* mrb, mrb_value) {
   return source_value(mrb, audio(mrb).play_spatial_sound(to_name(mrb, arguments.name), sound));
 }
 mrb_value audio_listener(mrb_state* mrb, mrb_value) {
-  mrb_value position, forward = mrb_undef_value(), up = mrb_undef_value();
-  mrb_get_args(mrb, "o|oo", &position, &forward, &up);
+  mrb_value position, forward = mrb_undef_value(), up = mrb_undef_value(), velocity = mrb_undef_value();
+  mrb_get_args(mrb, "o|ooo", &position, &forward, &up, &velocity);
   AudioListener listener;
   listener.position = to_vec3(mrb, position);
   if (!mrb_undef_p(forward)) listener.forward = to_vec3(mrb, forward);
   if (!mrb_undef_p(up)) listener.up = to_vec3(mrb, up);
+  listener.velocity = optional_velocity(mrb, velocity);
+  if (!finite_velocity(listener.velocity)) mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.listener's velocity must be finite");
   if (!valid_audio_listener(listener))
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.listener requires nonzero, nonparallel forward and up directions");
   return mrb_bool_value(audio(mrb).set_listener(listener));
@@ -255,9 +270,16 @@ SoundSourceId spatial_source_id(mrb_state* mrb, mrb_value value) {
   return static_cast<SoundSourceId>(number);
 }
 mrb_value audio_move(mrb_state* mrb, mrb_value) {
-  mrb_value id, position;
-  mrb_get_args(mrb, "oo", &id, &position);
-  return mrb_bool_value(audio(mrb).move_sound(spatial_source_id(mrb, id), to_vec3(mrb, position)));
+  mrb_value id, position, velocity = mrb_undef_value();
+  mrb_get_args(mrb, "oo|o", &id, &position, &velocity);
+  const Vec3 moving = optional_velocity(mrb, velocity);
+  return mrb_bool_value(audio(mrb).move_sound(spatial_source_id(mrb, id), to_vec3(mrb, position), moving));
+}
+// Audio.doppler = scale: 0 off, 1 real, up to kMostDoppler.
+mrb_value audio_set_doppler(mrb_state* mrb, mrb_value) {
+  const mrb_float scale = from_to(mrb, float_arg(mrb), kNoDoppler, kMostDoppler, "Audio.doppler");
+  audio(mrb).set_doppler(static_cast<float>(scale));
+  return mrb_float_value(mrb, scale);
 }
 mrb_value audio_playing(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).sound_playing(spatial_source_id(mrb, single_arg(mrb))));
@@ -286,8 +308,9 @@ mrb_value audio_stop_all(mrb_state* mrb, mrb_value) {
 void install_spatial_audio_bindings(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "play_at", audio_play_at,
                              MRB_ARGS_REQ(2) | MRB_ARGS_KEY(SpatialOptionCount, 0));
-  mrb_define_module_function(mrb, module, "listener", audio_listener, MRB_ARGS_ARG(1, 2));
-  mrb_define_module_function(mrb, module, "move", audio_move, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, module, "listener", audio_listener, MRB_ARGS_ARG(1, 3));
+  mrb_define_module_function(mrb, module, "move", audio_move, MRB_ARGS_ARG(2, 1));
+  mrb_define_module_function(mrb, module, "doppler=", audio_set_doppler, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "playing?", audio_playing, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "stop", audio_stop, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, module, "loudness", audio_loudness, MRB_ARGS_REQ(1));

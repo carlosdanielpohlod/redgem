@@ -24,6 +24,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   are looked for on the next frame.
 ### Added
 
+- **Doppler effect**: `Audio.play_at(..., velocity:)`, `Audio.move(id, position, velocity)` and
+  `Audio.listener(position, forward, up, velocity)` give the sounds and the ears a velocity, and a
+  positional sound plays higher coming nearer and lower going away. `Audio.doppler = scale` makes
+  it stronger or turns it off (0 to 10, 1 by default).
 - **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
   Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
   NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
