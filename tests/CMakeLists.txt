@@ -96,6 +96,7 @@ add_executable(redgem_tests
   unit/undo_history_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
+  unit/story_preview_test.cpp
   unit/inspector_logic_test.cpp
   unit/hierarchy_rows_test.cpp
   unit/project_folders_test.cpp
@@ -235,6 +236,7 @@ add_executable(redgem_tests
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
+  integration/story_preview_test.cpp
   integration/water_buoyancy_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
@@ -620,6 +622,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
                editor_system/prefab_preview_test.cpp
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
+               editor_system/story_panel_test.cpp
                editor_system/scene_recovery_test.cpp
                editor_system/dpi_test.cpp
                editor_system/agent_panel_test.cpp

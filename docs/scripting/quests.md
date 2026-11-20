@@ -168,3 +168,6 @@ check: 2 errors, 0 warnings (12 scripts, 2 scenes)
 ```
 
 A file the check refuses also raises when a script loads it, saying what is wrong.
+
+The editor's [Story panel](../editor.md#story-panel) starts a quest and moves it from stage to
+stage without Play.

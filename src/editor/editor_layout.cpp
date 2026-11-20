@@ -82,6 +82,7 @@ void EditorApp::build_default_layout(unsigned int dock) {
   dock_right_tabs(right);
   ImGui::DockBuilderDockWindow(kProjectWindow, bottom);
   ImGui::DockBuilderDockWindow(kConsoleWindow, bottom);
+  ImGui::DockBuilderDockWindow(kStoryWindow, bottom);
   ImGui::DockBuilderDockWindow(kViewportWindow, center);
   ImGui::DockBuilderFinish(dock);
   center_dock_ = center;
@@ -133,6 +134,7 @@ void EditorApp::draw_side_panels(ui::PanelContext& context) {
   if (!panels_.bottom) return;
   ui::draw_project(context);
   ui::draw_console(*console_, panel_state_.console, context.scripts);
+  ui::draw_story(*story_, panel_state_.story, session_->game_dir());
 }
 
 void EditorApp::draw_hierarchy_panel(ui::PanelContext& context) {

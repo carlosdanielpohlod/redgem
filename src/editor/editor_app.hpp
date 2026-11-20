@@ -27,6 +27,7 @@
 #include "editor/group_transform.hpp"
 #include "editor/project_files.hpp"
 #include "editor/scripts/script_workspace.hpp"
+#include "editor/story_preview.hpp"
 #include "editor/ui/agent_panel.hpp"
 #include "editor/ui/panels.hpp"
 
@@ -88,6 +89,8 @@ class EditorApp {
   EditorCamera& camera() { return camera_; }
   const ConsoleLog& console() const { return *console_; }
   ScriptWorkspace& scripts() { return *scripts_; }
+  // The Story panel's dialogue and quest runs.
+  StoryPreview& story() { return *story_; }
   // Side and bottom panels can be hidden to give the scene or the code more room.
   struct PanelVisibility {
     bool hierarchy = true;  // left (Ctrl+B)
@@ -379,6 +382,7 @@ class EditorApp {
   std::unique_ptr<AudioSystem> audio_;
   std::unique_ptr<EditorSession> session_;
   std::unique_ptr<ScriptWorkspace> scripts_;
+  std::unique_ptr<StoryPreview> story_;
   std::unique_ptr<ui::AgentPanel> agent_panel_;  // (its agent stops before the session goes)
   PanelVisibility panels_;
   ui::PanelState panel_state_;

@@ -74,6 +74,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/schedule.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/head_look.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/voice_mouth.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/editor_preview.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -702,6 +703,7 @@ if(NOT ANDROID)
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
     editor/joint_gizmo.cpp
+    editor/story_preview.cpp
     editor/scene_overlays_physics.cpp
     editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
@@ -745,6 +747,7 @@ if(NOT ANDROID)
     editor/ui/inspector_joint.cpp
     editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
+    editor/ui/story_panel.cpp
     editor/ui/agent_panel.cpp
     editor/ui/agent_settings_view.cpp
     editor/ui/agent_transcript_view.cpp

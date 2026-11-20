@@ -225,6 +225,27 @@ limit leaves edges out, the View menu warns that the limit was reached. Curves a
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
 velocities or joints. Turning it off stops gathering the geometry.
 
+## Story panel
+
+The **Story** tab, beside the Console, runs a dialogue or a quest of the game without Play. It reads
+the files on disk (`dialogues/` and `quests/`) each time a run starts, so a file saved in another
+program shows at once.
+
+- Pick a dialogue and press **Talk**. The panel shows the line's node, speaker and text (in the
+  game's first language, and its I18n key), the line's effects, and every choice of the line: a
+  choice whose conditions do not hold is greyed out, and each shows its `if`, its `effects` and
+  where it leads. Press a choice to take it, or **Continue** on a line with none.
+- Pick a quest and press **Start quest**: it starts at its first stage, from nothing. The panel
+  shows its stage, the stage's text and objectives, and a button for every stage to move it there.
+  A dialogue's effects move the quests too.
+- **GameVariables (scratch)** lists every variable the runs set. They are the preview's own: Play,
+  the game's saves and the edited scene never see them. **Reset variables** clears them, and the
+  conversation with them.
+
+The runs go in an engine of their own with no scene: nothing of the scene's scripts runs, so a
+`check` objective is never passed, a conversation has no speaker for a `talk_to` objective, and
+voices do not play.
+
 ## Scene recovery
 
 While editing, the editor writes changed scene data roughly once a minute, outside active
