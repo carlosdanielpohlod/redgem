@@ -26,7 +26,8 @@ constexpr const char* kBaker = R"({"start": "hello", "nodes": {
 constexpr const char* kBread = R"({"title": "bread.title", "start": "flour", "stages": {
   "flour": {"text": "bread.flour", "objectives": [{"collect": "flour", "count": 3, "text": "bread.collect"}],
             "next": "bring"},
-  "bring": {"text": "bread.bring", "next": "done"},
+  "bring": {"text": "bread.bring", "objectives": [{"deliver": "flour", "to": "Baker", "count": 3, "text": "bread.bring"}],
+            "next": "done"},
   "done": {"text": "bread.done", "end": true}}})";
 
 constexpr const char* kTexts = R"({"baker.name": "Baker", "baker.hello": "Fresh bread!", "baker.buy": "One, please",
@@ -75,12 +76,12 @@ TEST_CASE("a dialogue is stepped through without Play: its texts, conditions and
   REQUIRE(variable(preview.state(), "gold"));
   CHECK(variable(preview.state(), "gold")->value == "5");
 
-  REQUIRE(preview.choose(0));
+  REQUIRE_MESSAGE(preview.choose(0), preview.error());
   CHECK(preview.state().line->node == "thanks");
   CHECK(variable(preview.state(), "gold")->value == "0");
   REQUIRE(preview.state().quests.size() == 1);
   CHECK(preview.state().quests[0].stage == "bring");  // the choice's effect moved the quest
-  REQUIRE(preview.go_on());
+  REQUIRE_MESSAGE(preview.go_on(), preview.error());
   CHECK(preview.state().line->over);
   fs::remove_all(game);
 }
@@ -98,7 +99,7 @@ TEST_CASE("a quest is moved from stage to stage without Play") {
   REQUIRE(bread.objectives.size() == 1);
   CHECK(bread.objectives[0].text == "Flour 0/3");
   CHECK_FALSE(bread.objectives[0].done);
-  REQUIRE(preview.set_stage("bread", "done"));
+  REQUIRE_MESSAGE(preview.set_stage("bread", "done"), preview.error());
   CHECK(preview.state().quests[0].complete);
   preview.reset();
   CHECK(preview.state().quests.empty());
@@ -109,12 +110,12 @@ TEST_CASE("a quest is moved from stage to stage without Play") {
 TEST_CASE("a step that goes wrong says why and keeps the state") {
   const fs::path game = story_game();
   StoryPreview preview(game);
-  REQUIRE(preview.start_quest("bread"));
+  REQUIRE_MESSAGE(preview.start_quest("bread"), preview.error());
   CHECK_FALSE(preview.start_dialogue("nobody"));
   CHECK_FALSE(preview.error().empty());
   CHECK_FALSE(preview.set_stage("bread", "nowhere"));
   CHECK(preview.state().quests[0].stage == "flour");
-  REQUIRE(preview.start_quest("bread"));
+  REQUIRE_MESSAGE(preview.start_quest("bread"), preview.error());
   CHECK(preview.error().empty());
   fs::remove_all(game);
 }

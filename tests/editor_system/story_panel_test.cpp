@@ -39,6 +39,7 @@ std::filesystem::path story_game() {
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);
+  scene.add_empty("Guard");
   std::string error;
   REQUIRE_MESSAGE(scene.save(error), error);
   write(game / "dialogues/guard.json", kDialogue);
