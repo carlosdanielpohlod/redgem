@@ -270,8 +270,7 @@ the emulator, and the test cases still on the real clock.
 
 - [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
   on-screen objective pointer. Games can build those views from `Quests.active`.
-- There is no panel that runs a dialogue or a quest without Play, and `redgem check` errors do
-  not appear in the Console.
+- There is no panel that runs a dialogue or a quest without Play.
 - [NPC gizmos](docs/editor.md#npc-gizmos) show, while editing, only the parts an object's
   properties name (a part a script adds shows once the game runs), and while the game runs they
   show no texts (prompts, plans).

@@ -164,6 +164,29 @@ TEST_CASE("Ruby backtrace rows identify a source file and a positive line") {
   CHECK_FALSE(console_script_line("warning: guard.rb:42"));
 }
 
+TEST_CASE("a check's line about a script's line gets a backtrace row under it, which the Console links") {
+  const std::filesystem::path game = "/games/forest";
+  const std::string linked = check_message("scripts/coin.rb:5: syntax error", game);
+  CHECK(linked == "scripts/coin.rb:5: syntax error\n    from /games/forest/scripts/coin.rb:5");
+  ConsoleLog console;
+  log::error(linked);
+  const auto& rows = console.entries().back().rows;
+  REQUIRE(rows.size() == 2);
+  CHECK_FALSE(rows[0].source);
+  REQUIRE(rows[1].source);
+  CHECK(rows[1].source->file == "/games/forest/scripts/coin.rb");
+  CHECK(rows[1].source->line == 5);
+}
+
+TEST_CASE("a check's line with no script line in it stays as it is") {
+  const std::filesystem::path game = "/games/forest";
+  for (const std::string line : {"scripts/goal.rb does not define class Goal (attached in scene main #20 Goal)",
+                                 "dialogues/baker.json: node hello: it leads nowhere", "scripts/x.rb:0: nothing",
+                                 "scene main #4 door.rb:2: scripts/x.rb is not there"}) {
+    CHECK(check_message(line, game) == line);
+  }
+}
+
 TEST_CASE("opening a backtrace location focuses the tab and keeps edits") {
   const auto dir = fresh_dir("backtrace");
   const auto scripts = dir / "scripts";
