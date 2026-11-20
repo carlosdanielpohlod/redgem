@@ -28,6 +28,7 @@ std::filesystem::path broken_game() {
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);
+  scene.add_empty("Coin");
   std::string error;
   REQUIRE_MESSAGE(scene.save(error), error);
   std::ofstream(game / "scripts/coin.rb") << "class Coin < Behaviour\n  def update(dt)\n    if true\n  end\n";
