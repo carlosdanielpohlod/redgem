@@ -26,9 +26,11 @@
 namespace redgem {
 namespace {
 
-// What muffles the game's sounds, while it has a world.
-bool walls_between(const PhysicsWorld* physics, Vec3 from, Vec3 to) {
+// What muffles the game's sounds, while it has a world. A world in the middle of an overlapped
+// step would make the frame wait for it: the sound asks again on the audio's next update.
+std::optional<bool> walls_between(const PhysicsWorld* physics, bool stepping, Vec3 from, Vec3 to) {
   if (physics == nullptr) return false;
+  if (stepping) return std::nullopt;
   return static_body_between(*physics, from, to);
 }
 
@@ -283,7 +285,8 @@ void Engine::fill_context(const GameSettings& settings) {
   context_.http = &http_;
   describe_game(context_, settings);
   context_.audio = &audio();
-  audio().set_occlusion_query([this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), from, to); });
+  audio().set_occlusion_query(
+      [this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), step_in_flight_, from, to); });
   connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;

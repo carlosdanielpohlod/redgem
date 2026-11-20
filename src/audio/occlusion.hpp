@@ -30,8 +30,9 @@ bool valid_occlusion(const OcclusionSettings& settings);
 // Whether the settings change how anything is heard (a sound need not be looked at otherwise).
 bool occludes(const OcclusionSettings& settings);
 
-// Whether something stands between two points.
-using OcclusionQuery = std::function<bool(Vec3 from, Vec3 to)>;
+// Whether something stands between two points: nullopt when that cannot be told now without
+// waiting (the world is in the middle of a step), and the pool asks again next frame.
+using OcclusionQuery = std::function<std::optional<bool>(Vec3 from, Vec3 to)>;
 
 // A sound's occlusion `seconds` later, from kOpen to kBehindWall, moving toward what was found.
 float occlusion_step(float level, bool blocked, float seconds, const OcclusionSettings& settings);

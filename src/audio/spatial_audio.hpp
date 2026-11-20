@@ -50,8 +50,10 @@ struct SpatialSound {
   int priority = kDefaultSoundPriority;
   // Whether walls between it and the listener muffle it (Audio.play_at's occlusion:).
   bool occludable = true;
-  // How far behind a wall it is, from kOpen to kBehindWall: the pool keeps it.
+  // How far behind a wall it is, from kOpen to kBehindWall, and whether the pool has looked for
+  // its walls yet (until it has, the first answer counts at once, with no fade): the pool keeps them.
   float occlusion = kOpen;
+  bool occlusion_found = false;
 };
 
 // A sound with no place in the world (Audio.play): a looping hum, an alarm, a voice line.
@@ -166,7 +168,7 @@ class SoundPool {
                             std::optional<SoundSourceId> place);
   SoundSourceId weakest() const;
   VoiceEffects effects_of(const SpatialSound& sound) const;
-  bool blocked(const SpatialSound& sound) const;
+  std::optional<bool> blocked(const SpatialSound& sound) const;
   bool looks_for_walls() const;
   void occlude(float seconds);
   void reap();  // lets go of the sounds that ended
