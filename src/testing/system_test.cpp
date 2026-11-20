@@ -4,9 +4,11 @@
 #include <mruby/string.h>
 #include <mruby/variable.h>
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <variant>
 
 #include "app/engine.hpp"
@@ -31,6 +33,7 @@ constexpr const char* kTickMethod = "__tick";
 constexpr const char* kFailureMethod = "failure";
 constexpr const char* kPassed = "passed";
 constexpr const char* kFailed = "failed";
+constexpr const char* kWaiting = "waiting";  // a frame of a wait in real seconds (SystemTest#wait_for)
 
 enum class Status { Running, Passed, Failed };
 
@@ -69,6 +72,7 @@ class SystemTestRun {
  private:
   void tick();
   void heed(const std::string& said);
+  void wait_a_frame();
   void fail(const std::string& why);
   int verdict() const;
   RubyVm& vm() { return engine_.scripts().vm(); }
@@ -77,6 +81,7 @@ class SystemTestRun {
   FramePictures& pictures_;
   mrb_value test_ = mrb_nil_value();  // (the global keeps it from Ruby's garbage collector)
   Status status_ = Status::Running;
+  long long waited_frames_ = 0;  // frames of waits in real seconds, which the limit does not count
 };
 
 std::optional<std::string> SystemTestRun::load(const std::filesystem::path& file) {
@@ -99,13 +104,19 @@ int SystemTestRun::play() {
   return verdict();
 }
 
+// A frame of a wait in real seconds goes at the game's pace, for the other program to get on.
+void SystemTestRun::wait_a_frame() {
+  ++waited_frames_;
+  std::this_thread::sleep_for(std::chrono::duration<float>(engine_.presenter().frame_seconds()));
+}
+
 void SystemTestRun::fail(const std::string& why) {
   log::error(why);
   status_ = Status::Failed;
 }
 
 void SystemTestRun::tick() {
-  if (engine_.script_context().time.frame >= kMaxFrames) {
+  if (engine_.script_context().time.frame - waited_frames_ >= kMaxFrames) {
     fail("system test timed out after " + std::to_string(kMaxFrames) + " frames");
     return;
   }
@@ -121,6 +132,7 @@ void SystemTestRun::tick() {
 
 void SystemTestRun::heed(const std::string& said) {
   if (said == kPassed) status_ = Status::Passed;
+  if (said == kWaiting) wait_a_frame();
   if (said != kFailed) return;
   const RubyResult failure = vm().call(test_, kFailureMethod);
   const bool readable = failure.ok && mrb_string_p(failure.value);
