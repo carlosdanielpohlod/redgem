@@ -38,6 +38,7 @@ void EditorApp::draw_viewport_window() {
   ImGui::Begin(ui::window_title(kViewportTitle, kViewportWindow), nullptr,
                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   draw_viewport_image();
+  if (!playing) draw_npc_labels(selected_npc_gizmos());
   if (!playing) draw_viewport_drop_target();
   track_viewport_focus();
   draw_viewport_hint(playing);

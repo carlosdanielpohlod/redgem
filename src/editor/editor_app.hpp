@@ -24,6 +24,7 @@
 #include "editor/file_drop.hpp"
 #include "editor/gated_input_source.hpp"
 #include "editor/gizmo.hpp"
+#include "editor/npc_gizmo.hpp"
 #include "editor/group_transform.hpp"
 #include "editor/project_files.hpp"
 #include "editor/scripts/script_workspace.hpp"
@@ -99,6 +100,11 @@ class EditorApp {
   // Optional actual-collider overlay during Play/Pause; editor-only and off by default.
   void set_physics_debug(bool enabled) { physics_debug_ = enabled; }
   bool physics_debug_enabled() const { return physics_debug_; }
+  // The NPC gizmos of the selected objects in the Scene view (editor/npc_gizmo.hpp); on by default.
+  void set_npc_gizmos(bool shown) { npc_gizmos_ = shown; }
+  bool npc_gizmos_shown() const { return npc_gizmos_; }
+  // Those of the selection now: from their properties while editing, from their parts while the game runs.
+  std::vector<NpcGizmo> selected_npc_gizmos();
   // What the panels remember between frames (searches, half-typed names, the console's filters):
   // this editor's own, new with every game opened.
   ui::PanelState& panel_state() { return panel_state_; }
@@ -295,6 +301,7 @@ class EditorApp {
   void draw_script_tabs();
   void draw_viewport_window();
   void draw_viewport_image();
+  void draw_npc_labels(const std::vector<NpcGizmo>& gizmos);
   void draw_viewport_drop_target();
   // What was dropped on a point of the Scene view (viewport pixels).
   void drop_prefab(const char* file, float x, float y);
@@ -417,6 +424,7 @@ class EditorApp {
   long long frame_count_ = 0;
   bool layout_built_ = false;
   bool physics_debug_ = false;
+  bool npc_gizmos_ = true;
   bool gizmo_dragging_ = false;
   group_transform::Drag group_drag_;                // the gizmo drag in progress, from where it began
   std::optional<box_select::ViewPoint> box_start_;  // where the left button went down in the view, while held

@@ -25,6 +25,13 @@ constexpr int kBoxEdgeCorners[kBoxEdges][kEdgeEnds] = {{0, 1}, {2, 3}, {4, 5}, {
 // Where each channel is in a color given as four numbers.
 enum ColorChannel { kRed, kGreen, kBlue, kAlpha };
 
+constexpr float kChannelMost = 255.0f;
+
+// A raylib color as the debug pass takes it (each channel 0 to 1).
+redgem::Color linear_color(::Color color) {
+  return {color.r / kChannelMost, color.g / kChannelMost, color.b / kChannelMost, color.a / kChannelMost};
+}
+
 // Wireframe of a box given in an object's local space.
 void draw_box(const Transform& world, const Bounds& bounds, ::Color color) {
   const auto corners = editor_logic::box_corners(world, bounds);
@@ -108,6 +115,37 @@ void draw_brush(const BrushMark& brush) {
 }  // namespace
 
 ::Color rgba(const unsigned char (&c)[config::kChannelsPerColor]) { return {c[kRed], c[kGreen], c[kBlue], c[kAlpha]}; }
+
+::Color npc_gizmo_color(NpcGizmoPart part) {
+  switch (part) {
+    case NpcGizmoPart::Interactable:
+      return rgba(kInteractableColor);
+    case NpcGizmoPart::Sight:
+      return rgba(kSightColor);
+    case NpcGizmoPart::Hearing:
+      return rgba(kHearingColor);
+    case NpcGizmoPart::Route:
+      return rgba(kRouteColor);
+  }
+  return rgba(kIconColor);
+}
+
+void draw_npc_gizmos(const std::vector<NpcGizmo>& gizmos) {
+  for (const NpcGizmo& gizmo : gizmos) {
+    for (const NpcGizmoLine& line : gizmo.lines)
+      DrawLine3D(to_raylib(line.from), to_raylib(line.to), npc_gizmo_color(line.part));
+  }
+}
+
+std::vector<DebugDrawItem> npc_gizmo_debug_lines(const std::vector<NpcGizmo>& gizmos) {
+  std::vector<DebugDrawItem> items;
+  for (const NpcGizmo& gizmo : gizmos) {
+    for (const NpcGizmoLine& line : gizmo.lines) {
+      items.push_back({DebugDrawItem::Kind::Line, line.from, line.to, linear_color(npc_gizmo_color(line.part)), false});
+    }
+  }
+  return items;
+}
 
 Bounds bounds_of(const GameObject& object, const SceneDesc& desc) {
   return object.mesh != kNoIndex ? desc.meshes[object.mesh].bounds : default_collider_bounds();
