@@ -3414,6 +3414,7 @@
         },
         {
           "name": "doppler=",
+          "stability": "experimental",
           "static": true,
           "params": [
             {"name": "scale", "type": "Numeric"}

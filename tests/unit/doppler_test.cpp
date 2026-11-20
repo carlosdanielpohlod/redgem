@@ -76,7 +76,7 @@ TEST_CASE("the scale strengthens or turns off the shift, and speeds past half of
 
 TEST_CASE("the pool plays a moving sound at its pitch times its shift, and follows a new velocity") {
   testing::RecordingAudio audio;
-  audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+  audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
   SpatialSound car = moving(kApproaching);
   car.pitch = kRaisedPitch;
   const auto id = audio.play_spatial_sound("beep", car);
@@ -93,7 +93,7 @@ TEST_CASE("the pool plays a moving sound at its pitch times its shift, and follo
 
 TEST_CASE("a flat sound has no Doppler shift") {
   testing::RecordingAudio audio;
-  audio.set_sounds_dir(test::fixture("games/sandbox") / config::kSoundsDirName);
+  audio.set_sounds_dir(std::filesystem::path(test::fixture("games/sandbox")) / config::kSoundsDirName);
   AudioListener running;
   running.velocity = kApproaching;
   REQUIRE(audio.set_listener(running));
@@ -113,7 +113,8 @@ TEST_CASE("Ruby gives velocities to play_at, move and listener, and scales the e
   CHECK(audio.voices().at(1).sound.pitch > kAsRecorded);
   CHECK(ruby(*engine, "Audio.doppler = 0") == "0.0");
   CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(kAsRecorded));
-  for (const char* code : {"Audio.doppler = -1", "Audio.doppler = 11", "Audio.play_at(:beep, [0, 0, 0], velocity: 3)"}) {
+  for (const char* code :
+       {"Audio.doppler = -1", "Audio.doppler = 11", "Audio.play_at(:beep, [0, 0, 0], velocity: 3)"}) {
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_doppler.rb").ok);
   }

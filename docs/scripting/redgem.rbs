@@ -1143,6 +1143,9 @@ module Audio
   # the volume of everything
   %a{redgem:stable}
   def self.volume=: (Numeric volume) -> Numeric
+  # how strong the Doppler effect is: 0 off, 1 real (the default), up to 10
+  %a{redgem:experimental}
+  def self.doppler=: (Numeric scale) -> Numeric
   # how far and how fast the music goes down while a :voice sound plays; volume: 1 turns it off
   %a{redgem:experimental}
   def self.ducking: (?volume: Numeric, ?attack: Numeric, ?release: Numeric) -> bool
@@ -1160,13 +1163,13 @@ module Audio
   def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
   # plays a sound at a place in the world; returns its id, or nil
   %a{redgem:stable}
-  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol, ?priority: Integer, ?occlusion: bool) -> (Integer | nil)
+  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol, ?priority: Integer, ?occlusion: bool, ?velocity: Vector3) -> (Integer | nil)
   # where the ears are (move it with the camera)
   %a{redgem:stable}
-  def self.listener: (Vector3 position, Vector3 forward, Vector3 up) -> void
-  # moves a sound played with play_at
+  def self.listener: (Vector3 position, Vector3 forward, Vector3 up, ?Vector3 velocity) -> void
+  # moves a sound played with play_at, and gives it a new velocity when one is given
   %a{redgem:stable}
-  def self.move: (Integer id, Vector3 position) -> void
+  def self.move: (Integer id, Vector3 position, ?Vector3 velocity) -> bool
   # whether that sound still plays
   %a{redgem:stable}
   def self.playing?: (Integer id) -> bool
