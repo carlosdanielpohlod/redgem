@@ -17,7 +17,7 @@
 namespace redgem {
 class Renderer;
 class StoryPreview;
-}
+}  // namespace redgem
 
 namespace redgem::ui {
 

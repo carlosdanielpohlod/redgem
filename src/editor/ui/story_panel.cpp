@@ -93,19 +93,27 @@ void draw_variables(const PreviewState& state) {
   }
 }
 
-void draw_pickers(StoryPreview& preview, StoryState& story, const std::filesystem::path& game) {
-  name_picker(tr("editor.story.pick_dialogue"), "##dialogue", story.dialogues, story.dialogue,
-              dialogue::dialogue_names, game);
+void draw_dialogue_picker(StoryPreview& preview, StoryState& story, const std::filesystem::path& game) {
+  name_picker(tr("editor.story.pick_dialogue"), "##dialogue", story.dialogues, story.dialogue, dialogue::dialogue_names,
+              game);
   ImGui::SameLine();
   ImGui::BeginDisabled(story.dialogue.empty());
   if (ImGui::Button(icon_label(ICON_FA_PLAY, "editor.story.start_dialogue"))) preview.start_dialogue(story.dialogue);
   ImGui::EndDisabled();
-  ImGui::SameLine();
+}
+
+void draw_quest_picker(StoryPreview& preview, StoryState& story, const std::filesystem::path& game) {
   name_picker(tr("editor.story.pick_quest"), "##quest", story.quests, story.quest, quest::quest_names, game);
   ImGui::SameLine();
   ImGui::BeginDisabled(story.quest.empty());
   if (ImGui::Button(icon_label(ICON_FA_FLAG, "editor.story.start_quest"))) preview.start_quest(story.quest);
   ImGui::EndDisabled();
+}
+
+void draw_pickers(StoryPreview& preview, StoryState& story, const std::filesystem::path& game) {
+  draw_dialogue_picker(preview, story, game);
+  ImGui::SameLine();
+  draw_quest_picker(preview, story, game);
   ImGui::SameLine();
   if (ImGui::Button(icon_label(ICON_FA_ROTATE_LEFT, "editor.story.reset"))) preview.reset();
 }

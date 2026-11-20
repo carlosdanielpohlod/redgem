@@ -62,8 +62,12 @@ PreviewLine line_from(const nlohmann::json& json) {
 }
 
 PreviewQuest quest_from(const nlohmann::json& json) {
-  PreviewQuest quest{text_of(json, "name"), text_of(json, "stage"), flag_of(json, "complete"),
-                     text_of(json, "text"), text_of(json, "next"),  {},
+  PreviewQuest quest{text_of(json, "name"),
+                     text_of(json, "stage"),
+                     flag_of(json, "complete"),
+                     text_of(json, "text"),
+                     text_of(json, "next"),
+                     {},
                      {}};
   for (const auto& stage : list_of(json, "stages")) {
     if (stage.is_string()) quest.stages.push_back(stage.get<std::string>());
