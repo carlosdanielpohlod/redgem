@@ -131,8 +131,8 @@ class SoundPool {
   // one's: that one stops and its handle goes. Otherwise it does not play.
   SoundSourceId play(const std::string& name, const SpatialSound& sound);
   bool set_listener(const AudioListener& listener);
-  // A new velocity too, when given.
-  bool move(SoundSourceId id, Vec3 position, std::optional<Vec3> velocity = std::nullopt);
+  // Its velocity is the one given: still when none is (as the listener's is).
+  bool move(SoundSourceId id, Vec3 position, Vec3 velocity = {});
   // How strong the Doppler effect is: 0 off, 1 real, up to kMostDoppler; false out of that range.
   bool set_doppler(float scale);
   // False for a sound that no longer plays, or levels a sound cannot have (it keeps its own).

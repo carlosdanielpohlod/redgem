@@ -48,9 +48,7 @@ std::optional<AudioVector> audio_right(const AudioListener& listener) {
 float heard_pitch(const SpatialSound& sound) {
   return std::clamp(sound.pitch * sound.doppler, kMinSpatialPitch, kMaxSpatialPitch);
 }
-bool valid_doppler_scale(float scale) {
-  return std::isfinite(scale) && scale >= kNoDoppler && scale <= kMostDoppler;
-}
+bool valid_doppler_scale(float scale) { return std::isfinite(scale) && scale >= kNoDoppler && scale <= kMostDoppler; }
 // A sound in the world that walls are let muffle.
 bool walls_muffle(const SpatialSound& sound) { return sound.positional && sound.occludable; }
 // A sound's occlusion `seconds` on: the first answer about its walls counts at once.
@@ -179,13 +177,13 @@ bool SoundPool::set_listener(const AudioListener& listener) {
   refresh();
   return true;
 }
-bool SoundPool::move(SoundSourceId id, Vec3 position, std::optional<Vec3> velocity) {
+bool SoundPool::move(SoundSourceId id, Vec3 position, Vec3 velocity) {
   if (!finite_audio_vector(position)) return false;
-  if (!finite_audio_vector(velocity.value_or(Vec3{}))) return false;
+  if (!finite_audio_vector(velocity)) return false;
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
   found->second.position = position;
-  found->second.velocity = velocity.value_or(found->second.velocity);
+  found->second.velocity = velocity;
   follow_doppler(id, found->second);
   const auto mix = mix_of(found->second);
   if (mix) driver_.mix(id, *mix);

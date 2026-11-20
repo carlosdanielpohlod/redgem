@@ -3522,10 +3522,10 @@
           "params": [
             {"name": "id", "type": "Integer"},
             {"name": "position", "type": "Vector3"},
-            {"name": "velocity", "type": "Vector3", "optional": true, "default": "nil"}
+            {"name": "velocity", "type": "Vector3 | nil", "optional": true, "default": "[0, 0, 0]"}
           ],
           "returns": {"type": "bool"},
-          "about": "moves a sound played with play_at, and gives it a new velocity when one is given"
+          "about": "moves a sound played with play_at, at that velocity (m/s; still when none is given)"
         },
         {
           "name": "playing?",

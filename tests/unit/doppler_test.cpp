@@ -107,15 +107,30 @@ TEST_CASE("Ruby gives velocities to play_at, move and listener, and scales the e
   ruby(*engine, "$car = Audio.play_at(:beep, [0, 0, -10], loop: true, velocity: [0, 0, 30])");
   const float nearer = doppler_shift(kOrigin, {}, kAhead, kApproaching, kRealDoppler);
   CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(nearer));
-  CHECK(ruby(*engine, "Audio.move($car, [0, 0, -10], [0, 0, 0])") == "true");
+  CHECK(ruby(*engine, "Audio.move($car, [0, 0, -10])") == "true");  // (still: no velocity given)
   CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(kAsRecorded));
+  ruby(*engine, "Audio.move($car, [0, 0, -10], [0, 0, 30]); Audio.move($car, [0, 0, -10], nil)");
+  CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(kAsRecorded));
+  ruby(*engine, "Audio.play_at(:beep, [0, 0, -10], loop: true, velocity: nil)");
+  CHECK(audio.voices().at(2).sound.pitch == doctest::Approx(kAsRecorded));
   ruby(*engine, "Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0], [0, 0, -30])");
   CHECK(audio.voices().at(1).sound.pitch > kAsRecorded);
   CHECK(ruby(*engine, "Audio.doppler = 0") == "0.0");
   CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(kAsRecorded));
-  for (const char* code :
-       {"Audio.doppler = -1", "Audio.doppler = 11", "Audio.play_at(:beep, [0, 0, 0], velocity: 3)"}) {
+  for (const char* code : {"Audio.doppler = -1", "Audio.doppler = 11", "Audio.play_at(:beep, [0, 0, 0], velocity: 3)",
+                           "Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0], [0, 0, Float::NAN])"}) {
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_doppler.rb").ok);
   }
+}
+
+TEST_CASE("the game's moving ears end with it") {
+  testing::RecordingAudio audio;
+  {
+    auto engine = sandbox(audio);
+    ruby(*engine, "Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0], [0, 0, -30])");
+  }
+  const auto id = audio.play_spatial_sound("beep", moving({}));
+  REQUIRE(id != kNoSoundSource);
+  CHECK(audio.voices().at(id).sound.pitch == doctest::Approx(kAsRecorded));
 }

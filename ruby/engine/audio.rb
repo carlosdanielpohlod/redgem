@@ -6,7 +6,7 @@
 #   Audio.play(:line_042, group: :voice)                     # the player's voice volume applies
 #   Audio.music(:night, fade: 2.0)                           # crossfades from the track playing
 #   Audio.ducking(volume: 0.25)                              # the music goes lower under voices
-#   Audio.move(car_hum, car.position, car.velocity)          # higher coming nearer (Doppler)
+#   Audio.move(car_hum, car.position, car.rigidbody.velocity) # higher coming nearer (Doppler)
 #   Audio.group(:cave, parent: :effects)                     # a group of the game's own
 #   Audio.effects(:cave, low_pass: 2_000, reverb: 0.4)       # muffled, with an echo
 module Audio

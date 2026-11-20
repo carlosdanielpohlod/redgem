@@ -1068,9 +1068,9 @@ A sound that moves with a velocity plays higher coming nearer and lower going aw
 effect), and so does a listener that moves. Give the velocities as things move:
 
 ```ruby
-@engine = Audio.play_at(:engine, car.position, loop: true, velocity: car.body.velocity)
-Audio.move(@engine, car.position, car.body.velocity)               # every frame
-Audio.listener(Camera.main.position, forward, up, player.velocity) # the ears move too
+@engine = Audio.play_at(:engine, car.position, loop: true, velocity: car.rigidbody.velocity)
+Audio.move(@engine, car.position, car.rigidbody.velocity)          # every frame
+Audio.listener(Camera.main.position, forward, up, player.character.velocity) # the ears too
 Audio.doppler = 2.0                                                # stronger; 0 turns it off
 ```
 

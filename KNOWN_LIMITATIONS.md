@@ -361,9 +361,10 @@ promise of how it will be closed.
   positions and the listener explicitly. There is no HRTF: a light one for headphones did not fit
   the stereo mixer, since it needs per-ear delay and filtering of each sound, which a later
   backend can add. The Doppler effect needs velocities from the game (nothing follows a body by
-  itself). Occlusion is a ray each way between the listener and each sound, every frame, through
-  the static bodies: a wall is in the way or not (no thickness, no sound going round it), and
-  moving bodies never muffle. A solid collider that the listener or the sound is touching or
+  itself); its shift is not smoothed, so it jumps as a sound passes right through the listener,
+  and a pitch times its shift stops at the backend's highest pitch (8). Occlusion is a ray each
+  way between the listener and each sound, every frame, through the static bodies: a wall is in
+  the way or not (no thickness, no sound going round it), and moving bodies never muffle. A solid collider that the listener or the sound is touching or
   inside does not muffle (a sound buried in a thick wall is heard through it); walls of a mesh
   past it still do. A sound played while an overlapped physics step runs is heard open for its
   first frame.

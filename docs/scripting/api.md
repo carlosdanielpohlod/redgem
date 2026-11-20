@@ -563,7 +563,7 @@ Sounds and music from the game's sounds/ folder.
 - `Audio.set(Integer id, volume: Numeric | nil = nil, pitch: Numeric | nil = nil) -> bool`: changes the volume or pitch of a sound that plays; false once it stopped *Experimental.*
 - `Audio.play_at(String | Symbol name, Vector3 position, loop: bool = false, volume: Numeric = 1.0, pitch: Numeric = 1.0, reference_distance: Numeric = 1.0, max_distance: Numeric = 50.0, group: Symbol = :effects, priority: Integer = 128, occlusion: bool = true, velocity: Vector3 = [0, 0, 0]) -> Integer | nil`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(Vector3 position, Vector3 forward, Vector3 up, Vector3 velocity = [0, 0, 0]) -> void`: where the ears are (move it with the camera)
-- `Audio.move(Integer id, Vector3 position, Vector3 velocity = nil) -> bool`: moves a sound played with play_at, and gives it a new velocity when one is given
+- `Audio.move(Integer id, Vector3 position, Vector3 | nil velocity = [0, 0, 0]) -> bool`: moves a sound played with play_at, at that velocity (m/s; still when none is given)
 - `Audio.playing?(Integer id) -> bool`: whether that sound still plays
 - `Audio.stop(Integer id) -> void`: stops that sound
 - `Audio.loudness(Integer | nil id) -> Float`: how loud a sound of the :voice group is as it plays, 0 to 1 (the engine's envelope follower over its own samples, before its volume); 0 for other sounds and once it ended *Experimental.*

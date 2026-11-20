@@ -29,7 +29,7 @@ class AudioSystem {
   virtual SoundSourceId play_spatial_sound(const std::string&, const SpatialSound&) { return kNoSoundSource; }
   virtual bool set_listener(const AudioListener&) { return false; }
   // A positional sound's new place, and its velocity when given (for the Doppler effect).
-  virtual bool move_sound(SoundSourceId, Vec3, std::optional<Vec3> = std::nullopt) { return false; }
+  virtual bool move_sound(SoundSourceId, Vec3, Vec3 = {}) { return false; }  // (Vec3: its velocity)
   // How strong the Doppler effect is (Audio.doppler): 0 off, 1 real; false out of range.
   virtual bool set_doppler(float) { return false; }
   virtual bool set_sound_levels(SoundSourceId, const SoundLevels&) { return false; }
@@ -131,7 +131,7 @@ class MixedAudio : public AudioSystem {
   SoundSourceId play_sound(const std::string& name, const FlatSound& sound) override;
   SoundSourceId play_spatial_sound(const std::string& name, const SpatialSound& sound) override;
   bool set_listener(const AudioListener& listener) override;
-  bool move_sound(SoundSourceId id, Vec3 position, std::optional<Vec3> velocity = std::nullopt) override;
+  bool move_sound(SoundSourceId id, Vec3 position, Vec3 velocity = {}) override;
   bool set_doppler(float scale) override { return sounds_.set_doppler(scale); }
   bool set_sound_levels(SoundSourceId id, const SoundLevels& levels) override;
   bool sound_playing(SoundSourceId id) const override;

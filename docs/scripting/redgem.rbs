@@ -1167,9 +1167,9 @@ module Audio
   # where the ears are (move it with the camera)
   %a{redgem:stable}
   def self.listener: (Vector3 position, Vector3 forward, Vector3 up, ?Vector3 velocity) -> void
-  # moves a sound played with play_at, and gives it a new velocity when one is given
+  # moves a sound played with play_at, at that velocity (m/s; still when none is given)
   %a{redgem:stable}
-  def self.move: (Integer id, Vector3 position, ?Vector3 velocity) -> bool
+  def self.move: (Integer id, Vector3 position, ?Vector3 | nil velocity) -> bool
   # whether that sound still plays
   %a{redgem:stable}
   def self.playing?: (Integer id) -> bool

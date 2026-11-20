@@ -197,7 +197,8 @@ void Engine::release_audio() {
   audio().forget_game_groups();
   audio().set_occlusion(OcclusionSettings{});
   audio().set_doppler(kRealDoppler);
-  audio().set_occlusion_query(nullptr);  // (the world goes after it)
+  audio().set_listener(AudioListener{});  // (the game's ears, and how they moved, end with it)
+  audio().set_occlusion_query(nullptr);   // (the world goes after it)
 }
 
 void Engine::connect_display() {
