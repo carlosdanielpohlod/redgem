@@ -15,11 +15,12 @@
 namespace redgem {
 
 // The defaults of ruby/engine/interactable.rb and perception.rb (a test checks they agree).
-inline constexpr float kInteractableRange = 2.0f;   // meters
-inline constexpr float kPerceptionSight = 15.0f;    // meters
-inline constexpr float kPerceptionFov = 120.0f;     // degrees, the whole width of the cone
-inline constexpr float kPerceptionEyes = 1.6f;      // meters above the origin
-inline constexpr float kPerceptionHearing = 10.0f;  // meters, for a noise of loudness 1
+inline constexpr float kInteractableRange = 2.0f;                    // meters
+inline constexpr float kPerceptionSight = 15.0f;                     // meters
+inline constexpr float kPerceptionFov = 120.0f;                      // degrees, the whole width of the cone
+inline constexpr float kPerceptionEyes = 1.6f;                       // meters above the origin
+inline constexpr float kPerceptionHearing = 10.0f;                   // meters, for a noise of loudness 1
+inline constexpr const char* kTalkPromptKey = "game.dialogue.talk";  // a Talkable's (ruby/engine/talkable.rb)
 
 struct InteractableSettings {
   float range = kInteractableRange;
@@ -46,9 +47,10 @@ struct NpcSettings {
   std::optional<NavRoute> route;
 };
 
-// What an object's properties say: an Interactable when it has a `prompt` or a `range`, a
-// Perception when it has a `sight`, `fov`, `eyes` or `hearing`, a Schedule when it has a `plan`.
-// A setting that is not a number is left at its default (the game reports it as it starts).
+// What an object's properties say: an Interactable when it has a `prompt` text, or a `dialogue` (a
+// Talkable's); a Perception when it has a `sight`, `fov`, `eyes` or `hearing`; a Schedule when it
+// has a `plan`. A number may be a text of one, as the parts read it; a setting that is no number is
+// left at its default (the game reports it as it starts).
 NpcSettings npc_settings_from_props(const PropertyMap& props);
 
 // A Schedule's plan as text ("06:00 bake, 12:30 sell") in its entries, trimmed.

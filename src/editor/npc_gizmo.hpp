@@ -1,7 +1,7 @@
 #pragma once
 
 // What the Scene view draws of a selected object's NPC parts: an Interactable's reach (a ring of
-// its range, the edges of its angle) and prompt, a Perception's sight cone and hearing ring, a
+// its range) and prompt, a Perception's sight cone and hearing ring, a
 // Schedule's plan, and the path a NavAgent walks to where it was sent.
 
 #include <string>

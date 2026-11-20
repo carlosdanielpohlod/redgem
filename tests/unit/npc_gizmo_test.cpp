@@ -52,6 +52,22 @@ TEST_CASE("an object's properties say which NPC parts it has") {
   CHECK(guard.perception->hearing == doctest::Approx(kPerceptionHearing));
 }
 
+TEST_CASE("the properties of other parts with the same names make no Interactable") {
+  CHECK_FALSE(npc_settings_from_props({{"prompt", false}}).interactable);  // an Interactor's
+  CHECK_FALSE(npc_settings_from_props({{"range", 6.0}}).interactable);     // a HeadLook's
+  const NpcSettings baker = npc_settings_from_props({{"dialogue", std::string("baker")}, {"range", 3.0}});
+  REQUIRE(baker.interactable);  // a Talkable adds one
+  CHECK(baker.interactable->prompt == std::optional<std::string>(kTalkPromptKey));
+  CHECK(baker.interactable->range == doctest::Approx(3.0f));
+}
+
+TEST_CASE("a setting may be a text of a number, as the parts read it") {
+  const NpcSettings guard = npc_settings_from_props({{"sight", std::string("25")}, {"hearing", std::string("far")}});
+  REQUIRE(guard.perception);
+  CHECK(guard.perception->sight == doctest::Approx(25.0f));
+  CHECK(guard.perception->hearing == doctest::Approx(kPerceptionHearing));
+}
+
 TEST_CASE("a plan in text is its entries, trimmed, with no empty one") {
   CHECK(schedule_entries("06:00 bake, 12:30 sell ,20:00 sleep,") ==
         std::vector<std::string>{"06:00 bake", "12:30 sell", "20:00 sleep"});

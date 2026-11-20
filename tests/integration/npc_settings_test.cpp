@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.h>
 #include <mruby.h>
+#include <mruby/string.h>
 
 #include <memory>
 #include <string>
@@ -111,4 +112,7 @@ TEST_CASE("the defaults the editor draws while editing are the NPC parts' own") 
   CHECK(kPerceptionFov == doctest::Approx(ruby_number(*engine, "Perception::FOV")).epsilon(kTolerance));
   CHECK(kPerceptionEyes == doctest::Approx(ruby_number(*engine, "Perception::EYES")).epsilon(kTolerance));
   CHECK(kPerceptionHearing == doctest::Approx(ruby_number(*engine, "Perception::HEARING")).epsilon(kTolerance));
+  const RubyResult talk = engine->scripts().eval("Talkable::PROMPT", "npc_settings_test.rb");
+  REQUIRE(talk.ok);
+  CHECK(std::string(RSTRING_PTR(talk.value), RSTRING_LEN(talk.value)) == kTalkPromptKey);
 }

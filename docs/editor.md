@@ -240,13 +240,15 @@ by default and never change the scene.
 | `NavAgent` | the path it still walks, through the corners ahead, and a cross where it was sent | green |
 
 While editing, the gizmos come from the object's properties, the settings each part reads when its
-script gives it none: an object with a `prompt` or a `range` property shows an Interactable, one
-with a `sight`, `fov`, `eyes` or `hearing` property a Perception, and one with a `plan` property a
-Schedule. Missing settings show the part's defaults. A NavAgent has nowhere to go before Play.
+script gives it none: an object with a `prompt` text shows an Interactable, and so does one with a
+`dialogue` (a Talkable's, with its "Talk" prompt); one with a `sight`, `fov`, `eyes` or `hearing`
+property shows a Perception, and one with a `plan` property a Schedule, its entries as written.
+Missing settings show the part's defaults. A NavAgent has nowhere to go before Play.
 
 During Play or Pause, they come from the parts the game's scripts gave the object, with the
 values they have now (`add_component(Perception, sight: 20)` included), and are drawn in the
-game's picture like the [physics colliders](#physics-collider-view), without the texts.
+game's picture like the [physics colliders](#physics-collider-view), without the texts. Once the
+game loads another scene they are not drawn, and at most 64 selected objects show theirs.
 
 ## Scene recovery
 
