@@ -1064,6 +1064,16 @@ Audio.play_at(:radio, position, occlusion: false)        # heard through walls
 Audio.occlusion(volume: 1, low_pass: nil)                # off
 ```
 
+A sound that moves with a velocity plays higher coming nearer and lower going away (the Doppler
+effect), and so does a listener that moves. Give the velocities as things move:
+
+```ruby
+@engine = Audio.play_at(:engine, car.position, loop: true, velocity: car.rigidbody.velocity)
+Audio.move(@engine, car.position, car.rigidbody.velocity)          # every frame
+Audio.listener(Camera.main.position, forward, up, player.character.velocity) # the ears too
+Audio.doppler = 2.0                                                # stronger; 0 turns it off
+```
+
 ## A sense of speed
 
 ```ruby

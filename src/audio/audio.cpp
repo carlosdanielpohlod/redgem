@@ -44,6 +44,11 @@ std::optional<AudioVector> audio_right(const AudioListener& listener) {
   if (audio_length(right) <= kMinimumAudioAxis) return std::nullopt;
   return audio_normalized(right);
 }
+// What a sound is played at: its pitch times its Doppler shift, within what a backend may play.
+float heard_pitch(const SpatialSound& sound) {
+  return std::clamp(sound.pitch * sound.doppler, kMinSpatialPitch, kMaxSpatialPitch);
+}
+bool valid_doppler_scale(float scale) { return std::isfinite(scale) && scale >= kNoDoppler && scale <= kMostDoppler; }
 // A sound in the world that walls are let muffle.
 bool walls_muffle(const SpatialSound& sound) { return sound.positional && sound.occludable; }
 // A sound's occlusion `seconds` on: the first answer about its walls counts at once.
@@ -79,10 +84,12 @@ double audio_attenuation(double distance, const SpatialSound& sound) {
 
 bool valid_audio_listener(const AudioListener& listener) {
   if (!finite_audio_vector(listener.position)) return false;
+  if (!finite_audio_vector(listener.velocity)) return false;
   return audio_right(listener).has_value();
 }
 bool valid_spatial_sound(const SpatialSound& sound) {
   if (!finite_audio_vector(sound.position)) return false;
+  if (!finite_audio_vector(sound.velocity)) return false;
   return valid_audio_levels(sound) && valid_audio_distances(sound);
 }
 std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const SpatialSound& sound) {
@@ -121,6 +128,7 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked
   const auto wall = blocked(sound);  // (heard as it is from the start, when that can be told now)
   sound.occlusion_found = wall.has_value();
   sound.occlusion = wall.value_or(false) ? kBehindWall : kOpen;
+  sound.doppler = shift_of(sound);
   const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
@@ -133,8 +141,10 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& asked
 SoundSourceId SoundPool::start_sound(const std::string& name, const SpatialSound& sound, SpatialMix mix,
                                      std::optional<SoundSourceId> place) {
   const auto id = static_cast<SoundSourceId>(next_);
+  SpatialSound heard = sound;
+  heard.pitch = heard_pitch(sound);
   // (The one it would replace goes on when it cannot start.)
-  if (!driver_.start(id, name, sound, mix, effects_of(sound))) return kNoSoundSource;
+  if (!driver_.start(id, name, heard, mix, effects_of(sound))) return kNoSoundSource;
   if (place) stop(*place);
   keep(id, sound);
   ++next_;
@@ -167,11 +177,14 @@ bool SoundPool::set_listener(const AudioListener& listener) {
   refresh();
   return true;
 }
-bool SoundPool::move(SoundSourceId id, Vec3 position) {
+bool SoundPool::move(SoundSourceId id, Vec3 position, Vec3 velocity) {
   if (!finite_audio_vector(position)) return false;
+  if (!finite_audio_vector(velocity)) return false;
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
   found->second.position = position;
+  found->second.velocity = velocity;
+  follow_doppler(id, found->second);
   const auto mix = mix_of(found->second);
   if (mix) driver_.mix(id, *mix);
   return mix.has_value();
@@ -185,9 +198,26 @@ bool SoundPool::set_levels(SoundSourceId id, const SoundLevels& levels) {
   const auto mix = mix_of(changed);
   if (!mix) return false;
   found->second = changed;
-  driver_.pitch(id, changed.pitch);
+  driver_.pitch(id, heard_pitch(changed));
   driver_.mix(id, *mix);
   return true;
+}
+bool SoundPool::set_doppler(float scale) {
+  if (!valid_doppler_scale(scale)) return false;
+  doppler_scale_ = scale;
+  refresh();
+  return true;
+}
+float SoundPool::shift_of(const SpatialSound& sound) const {
+  if (!sound.positional) return kNoShift;
+  return doppler_shift(listener_.position, listener_.velocity, sound.position, sound.velocity, doppler_scale_);
+}
+// The sound's pitch follows its Doppler shift (told to the backend only when it changed).
+void SoundPool::follow_doppler(SoundSourceId id, SpatialSound& sound) {
+  const float shift = shift_of(sound);
+  if (shift == sound.doppler) return;
+  sound.doppler = shift;
+  driver_.pitch(id, heard_pitch(sound));
 }
 void SoundPool::set_group_volume(MixGroup group, float volume) {
   groups_.set_player_volume(group, volume);
@@ -273,7 +303,8 @@ void SoundPool::occlude(float seconds) {
   }
 }
 void SoundPool::refresh() {
-  for (const auto& [id, sound] : sounds_) {
+  for (auto& [id, sound] : sounds_) {
+    follow_doppler(id, sound);
     const auto mix = mix_of(sound);
     if (mix) driver_.mix(id, *mix);
   }

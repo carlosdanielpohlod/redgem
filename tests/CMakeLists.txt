@@ -55,6 +55,7 @@ add_executable(redgem_tests
   unit/audio_effects_test.cpp
   unit/mix_group_tree_test.cpp
   unit/occlusion_test.cpp
+  unit/doppler_test.cpp
   unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
@@ -625,6 +626,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
                editor_system/story_panel_test.cpp
+               editor_system/check_console_test.cpp
                editor_system/npc_gizmos_test.cpp
                editor_system/scene_recovery_test.cpp
                editor_system/dpi_test.cpp

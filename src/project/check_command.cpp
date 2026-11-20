@@ -55,13 +55,6 @@ std::string tests_line(const TestsRun& tests) {
             {{"passed", std::to_string(tests.passed)}, {"failed", std::to_string(tests.failures.size())}});
 }
 
-std::string summary(const CheckReport& report) {
-  return tr("project.check.summary", {{"errors", std::to_string(report.errors.size())},
-                                      {"warnings", std::to_string(report.warnings.size())},
-                                      {"scripts", std::to_string(report.scripts)},
-                                      {"scenes", std::to_string(report.scenes)}});
-}
-
 // The game's tests, run once its files are in order (a test of a broken game says nothing new).
 std::optional<TestsRun> tests_if_asked(const ToolLine& line, const CheckReport& report) {
   if (!line.has(kTestsOption) || !report.errors.empty()) return std::nullopt;
@@ -84,15 +77,11 @@ bool went_wrong(const CheckReport& report, const std::optional<TestsRun>& tests)
 
 ToolResult checked(const ToolLine& line) {
   CheckReport report;
-  check_game_file(line.words.front(), report);
-  check_scripts(line.words.front(), report);
-  check_scenes(line.words.front(), report);
-  check_dialogues(line.words.front(), report);
-  check_quests(line.words.front(), report);
+  check_game(line.words.front(), report);
   const std::optional<TestsRun> tests = tests_if_asked(line, report);
   ToolResult result{kExitSuccess, problem_lines(report, tests, line.has(kAllOption)), {}};
   if (tests) result.out += tests_line(*tests) + "\n";
-  result.out += summary(report) + "\n";
+  result.out += check_summary(report) + "\n";
   if (went_wrong(report, tests)) result.exit_code = kExitFailure;
   return result;
 }
@@ -102,6 +91,13 @@ ToolResult usage_failure(const std::string& problem) {
 }
 
 }  // namespace
+
+std::string check_summary(const CheckReport& report) {
+  return tr("project.check.summary", {{"errors", std::to_string(report.errors.size())},
+                                      {"warnings", std::to_string(report.warnings.size())},
+                                      {"scripts", std::to_string(report.scripts)},
+                                      {"scenes", std::to_string(report.scenes)}});
+}
 
 ToolResult run_check_command(const std::vector<std::string>& args) {
   std::string error;

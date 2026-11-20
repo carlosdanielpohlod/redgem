@@ -214,4 +214,12 @@ void check_scenes(const fs::path& game_dir, CheckReport& report) {
   check_classes(checks);
 }
 
+void check_game(const fs::path& game_dir, CheckReport& report) {
+  check_game_file(game_dir, report);
+  check_scripts(game_dir, report);
+  check_scenes(game_dir, report);
+  check_dialogues(game_dir, report);
+  check_quests(game_dir, report);
+}
+
 }  // namespace redgem::tools

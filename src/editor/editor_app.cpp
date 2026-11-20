@@ -39,6 +39,7 @@ std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const st
                                                                         EditorOptions options) {
   std::unique_ptr<EditorApp> app(new EditorApp());
   app->builds_ = std::move(options.builds);
+  app->check_ = std::move(options.check);
   app->console_ = std::make_unique<ConsoleLog>();
   auto opened = EditorSession::open(game_dir);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;

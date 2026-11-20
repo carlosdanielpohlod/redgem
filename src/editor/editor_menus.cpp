@@ -81,6 +81,9 @@ void EditorApp::draw_game_file_items() {
   ImGui::Separator();
   ui::menu(
       ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, build_offered());
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_LIST_CHECK, "editor.menu.check_game"), nullptr, false,
+                      editing() && check_))
+    check_game();
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_FOLDER, "editor.menu.show_game_folder")))
     platform::open_in_system(session_->game_dir());
 }

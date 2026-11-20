@@ -11,7 +11,10 @@ namespace redgem {
 // can be built for, this one's first.
 std::vector<BuildChoice> build_choices();
 
-// The editor as the program opens it: on the graphics card chosen, able to build games.
+// What `redgem check` finds in a game, for the editor's File > Check Game.
+GameCheck check_for_editor(const std::filesystem::path& game_dir);
+
+// The editor as the program opens it: on the graphics card chosen, able to build and check games.
 EditorOptions editor_options(GpuChoice gpu);
 
 }  // namespace redgem
