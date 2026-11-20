@@ -18,6 +18,7 @@
 #include "core/config.hpp"
 #include "physics/body_config.hpp"
 #include "physics/physics_world.hpp"
+#include "scene/scene_desc.hpp"
 #include "test_support.hpp"
 #include "testing/recording_audio.hpp"
 
@@ -200,6 +201,23 @@ TEST_CASE("the static body a sound plays from, and a static trigger, are not wal
   REQUIRE_FALSE(
       world->add_object(box(kZone, {{"collider", std::string("box")}, {"trigger", true}}, kWallAt, kWallHalf)));
   CHECK_FALSE(static_body_between(*world, kListener, kBehind));
+}
+
+TEST_CASE("a wall of one quad, which a ray crosses one way only, muffles from both sides") {
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  MeshDesc mesh;
+  PrimitiveDesc quad;
+  quad.positions = {-kWallHalf.x, -kWallHalf.y, 0, kWallHalf.x,  -kWallHalf.y, 0,
+                    kWallHalf.x,  kWallHalf.y,  0, -kWallHalf.x, kWallHalf.y,  0};
+  quad.normals = {0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1};
+  quad.indices = {0, 1, 2, 0, 2, 3};
+  mesh.primitives.push_back(quad);
+  BodyDesc desc = box(kWall, {{"collider", std::string("mesh")}}, kWallAt, kWallHalf);
+  desc.mesh = &mesh;
+  REQUIRE_FALSE(world->add_object(desc));
+  CHECK(static_body_between(*world, kListener, kBehind));
+  CHECK(static_body_between(*world, kBehind, kListener));
+  CHECK_FALSE(static_body_between(*world, kListener, kBeside));
 }
 
 TEST_CASE("a pile of moving bodies in front of a wall does not hide it") {

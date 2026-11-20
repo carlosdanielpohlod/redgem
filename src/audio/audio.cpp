@@ -264,7 +264,7 @@ bool SoundPool::looks_for_walls() const { return walls_ && occludes(occlusion_);
 void SoundPool::occlude(float seconds) {
   for (auto& [id, sound] : sounds_) {
     const auto wall = blocked(sound);
-    if (!wall) continue;
+    if (!wall) continue;  // (the engine updates the audio on a settled world, so this is rare)
     const float level = next_occlusion(sound, *wall, seconds, occlusion_);
     sound.occlusion_found = true;
     if (level == sound.occlusion) continue;
