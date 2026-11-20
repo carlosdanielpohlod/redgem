@@ -2,7 +2,7 @@
 // the edited scene.
 
 #include <doctest/doctest.h>
-#include <imgui.h>
+#include <imgui_internal.h>
 
 #include <filesystem>
 #include <fstream>
