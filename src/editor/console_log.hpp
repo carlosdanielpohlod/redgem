@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <deque>
+#include <filesystem>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -18,6 +19,10 @@ struct ConsoleScriptLine {
 
 // The source location at the start of a Ruby backtrace row.
 std::optional<ConsoleScriptLine> console_script_line(std::string_view row);
+
+// A line of `redgem check` ("scripts/coin.rb:3: unexpected end") as the Console shows it: with a
+// backtrace row of its script's line under it, which the Console links, when it names one.
+std::string check_message(const std::string& line, const std::filesystem::path& game_dir);
 
 struct ConsoleRow {
   std::size_t offset = 0;

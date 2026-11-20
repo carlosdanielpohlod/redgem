@@ -271,8 +271,7 @@ the emulator, and the test cases still on the real clock.
 - [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
   on-screen objective pointer. Games can build those views from `Quests.active`.
 - The editor does not show interactables, perception cones or schedules in the Scene view. There is
-  no panel that runs a dialogue or a quest without Play, and `redgem check` errors do not appear in
-  the Console.
+  no panel that runs a dialogue or a quest without Play.
 
 ### Shipping
 

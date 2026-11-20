@@ -153,6 +153,10 @@ class EditorApp {
   // The same, for the system the editor runs on.
   std::optional<std::filesystem::path> build();
   const std::vector<BuildChoice>& builds() const { return builds_; }
+  // Looks the game's files on disk over as `redgem check` does, and puts what it finds in the
+  // Console: each error, with a link to its script's line when it has one, each warning, then the
+  // summary. Saves nothing first. False when the editor was opened with no check, or the game runs.
+  bool check_game();
   // A build runs, or ended and was not taken in yet (it is at the next frame).
   bool building() const { return build_job_.busy(); }
   // How the last build ended, while the editor shows it (until closed, or another build starts).
@@ -401,6 +405,7 @@ class EditorApp {
   FrameClock clock_;
   std::function<void(EditorApp&)> frame_hook_{};
   std::vector<BuildChoice> builds_;
+  GameChecker check_;
   // The build in the background. (Its destructor waits for it: its thread only works on what the
   // job holds, and the files on disk, so it may go at any point.)
   BuildJob build_job_;

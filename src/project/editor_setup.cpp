@@ -5,6 +5,7 @@
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "project/build_steps.hpp"
+#include "project/check_command.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
@@ -51,10 +52,16 @@ std::vector<BuildChoice> build_choices() {
   return choices;
 }
 
+GameCheck check_for_editor(const std::filesystem::path& game_dir) {
+  const tools::CheckReport report = tools::check_game(game_dir);
+  return {report.errors, report.warnings, tools::check_summary(report)};
+}
+
 EditorOptions editor_options(GpuChoice gpu) {
   EditorOptions options;
   options.gpu = gpu;
   options.builds = build_choices();
+  options.check = check_for_editor;
   return options;
 }
 

@@ -14,6 +14,7 @@
 #include "core/files.hpp"
 #include "core/message_lines.hpp"
 #include "physics/body_limit.hpp"
+#include "project/editor_setup.hpp"
 #include "project/game_checks.hpp"
 #include "project/game_tests.hpp"
 #include "project/script_messages.hpp"
@@ -163,6 +164,17 @@ TEST_CASE("a check finds what keeps a game from playing, and says what to do") {
   CHECK(has(checked.out, "scripts/camera_folow.rb is not there; did you mean camera_follow.rb?"));
   CHECK(has(checked.out, "sky_image nowhere is not in images/"));
   CHECK(has(checked.out, "check: 4 errors"));
+}
+
+TEST_CASE("the editor's check finds what the command does, a problem a line") {
+  GameCopy game("editor_check");
+  game.write("scripts/coin.rb", "class Coin < Behaviour\n  def update(dt)\n    if true\n  end\n");
+  const GameCheck found = check_for_editor(game.dir());
+  REQUIRE(found.errors.size() == 1);
+  CHECK(found.errors[0].rfind("scripts/coin.rb:5: syntax error", 0) == 0);
+  CHECK(found.warnings.empty());
+  CHECK(has(found.summary, "check: 1 errors, 0 warnings"));
+  CHECK(has(tool({"check", game.dir()}).out, found.summary));
 }
 
 TEST_CASE("a sky picture is found the way the engine finds it") {

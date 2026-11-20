@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "project/game_checks.hpp"
 #include "project/tool_line.hpp"
 
 namespace redgem::tools {
@@ -17,5 +18,8 @@ namespace redgem::tools {
 inline constexpr const char* kCheckCommand = "check";
 
 ToolResult run_check_command(const std::vector<std::string>& args);
+
+// The line that ends a check: how many errors and warnings it found, and in how much.
+std::string check_summary(const CheckReport& report);
 
 }  // namespace redgem::tools

@@ -15,6 +15,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Added
+
+- **File > Check Game** in the editor: what `redgem check` finds goes to the Console, each error
+  and warning a line, then the summary. An error at a script's line links to it.
+
 ## [0.6.1] - 2026-11-15
 
 ### Migrating

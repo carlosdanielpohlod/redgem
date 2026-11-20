@@ -320,6 +320,7 @@
   "editor.menu.save_scene_as": "Save Scene As...",
   "editor.menu.show_all_panels": "Show all panels",
   "editor.menu.show_game_folder": "Show Game Folder",
+  "editor.menu.check_game": "Check Game",
   "editor.menu.undo": "Undo",
   "editor.menu.view": "View",
   "editor.project.create_script": "Create",

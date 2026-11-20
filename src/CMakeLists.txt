@@ -708,6 +708,7 @@ if(NOT ANDROID)
     editor/editor_frame.cpp
     editor/editor_commands.cpp
     editor/editor_builds.cpp
+    editor/editor_check.cpp
     editor/build_job.cpp
     editor/editor_capture.cpp
     editor/editor_input.cpp

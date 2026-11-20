@@ -40,6 +40,13 @@ std::optional<ConsoleScriptLine> console_script_line(std::string_view row) {
   return ConsoleScriptLine{std::string(row.substr(0, extension + kRubyLocation.size() - 1)), line};
 }
 
+std::string check_message(const std::string& line, const std::filesystem::path& game_dir) {
+  const auto source = console_script_line(std::string(kBacktracePrefix) + line);
+  if (!source) return line;
+  const std::string file = (game_dir / std::filesystem::u8path(source->file)).generic_u8string();
+  return line + "\n" + std::string(kBacktracePrefix) + file + ":" + std::to_string(source->line);
+}
+
 namespace {
 
 std::optional<ConsoleScriptLine> project_location(std::string_view row) {
