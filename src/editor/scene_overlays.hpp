@@ -8,8 +8,10 @@
 #include <optional>
 #include <vector>
 
+#include "editor/npc_gizmo.hpp"
 #include "scene/scene_config.hpp"
 #include "physics/debug_geometry.hpp"
+#include "render/debug_draw.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -30,6 +32,15 @@ struct BrushMark {
 // Draws the overlays (inside a 3D mode) for the scene as it is, around each of `selected`.
 void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush);
+
+// The color of each part of an NPC gizmo.
+::Color npc_gizmo_color(NpcGizmoPart part);
+
+// Draws the lines of NPC gizmos (inside a 3D mode).
+void draw_npc_gizmos(const std::vector<NpcGizmo>& gizmos);
+
+// The lines of NPC gizmos as the running game's debug pass draws them.
+std::vector<DebugDrawItem> npc_gizmo_debug_lines(const std::vector<NpcGizmo>& gizmos);
 
 class DebugDrawBuffer;
 // Estimates tessellation from free line capacity; a one-triangle probe distinguishes an empty world.

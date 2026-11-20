@@ -3,6 +3,8 @@
 #include <raylib.h>
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "app/frame_painter.hpp"
 #include "app/presenter.hpp"
@@ -60,6 +62,8 @@ class GameView final : public Presenter {
   void capture_cursor(bool wanted) override;
   void present(const FrameView& view) override;
   void set_physics_debug(Engine* engine) { physics_debug_engine_ = engine; }
+  // Lines the editor adds to the game's debug pass (the selection's NPC gizmos), until replaced.
+  void set_gizmo_lines(std::vector<DebugDrawItem> lines) { gizmo_lines_ = std::move(lines); }
   bool physics_debug_truncated() const { return physics_debug_truncated_; }
   // The view is there for as long as the editor is: closing the window is the editor's business.
   bool open() const override { return true; }
@@ -72,8 +76,10 @@ class GameView final : public Presenter {
 
  private:
   void paint_with_debug(const FrameView& view);
-  FrameView physics_view(const FrameView& view);
+  FrameView debug_view(const FrameView& view);
+  bool adds_debug() const { return physics_debug_engine_ != nullptr || !gizmo_lines_.empty(); }
   Engine* physics_debug_engine_ = nullptr;
+  std::vector<DebugDrawItem> gizmo_lines_;
   DebugDrawBuffer physics_commands_;
   bool physics_debug_truncated_ = false;
   bool pointer_granted(bool wanted) const { return input_.enabled && wanted; }
