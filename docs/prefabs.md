@@ -59,8 +59,35 @@ Include every joint of a used skeleton in the selected hierarchy and animate des
 than the selected root. The editor validates dependencies and runtime budgets before publishing
 a complete file; it never exposes an incomplete source. Export checks a conservative 512 MiB
 estimate of the edited scene's data before copying and caps the source GLB at 256 MiB.
-Overriding inherited children remains future work.
 Built games include regular files in `prefabs/` along with the other game assets.
+
+## Overrides
+
+A placement can change the parts it inherits. Its `prefab_overrides` property holds a JSON
+object with one entry per changed part:
+
+```json
+{"lid": {"position": [0, 1, 0], "props": {"tag": "open"}, "unset": ["mass"]},
+ "load/wheel": {"removed": true}}
+```
+
+A part is named by its path: the identities of the source nodes from the placement down to it,
+joined by `/`. The parts of a nested prefab add their own identities, so `load/wheel` is the
+`wheel` of the prefab placed as `load`. An entry can hold:
+
+- `position`, `rotation` (x y z w) and `scale`: each replaces that part of the local transform;
+- `props`: properties set or replaced (numbers, text, toggles), scripts included;
+- `unset`: properties the file gives and this instance drops;
+- `light` and `camera`: the whole light or camera of a part that has one;
+- `removed`: the part and everything under it are left out.
+
+Everything else comes from the file. Editing the prefab file updates every instance, except the
+fields each one overrides. An override of a part the file no longer has is reported and skipped.
+
+A child added under the placement stays under its root. Give it the string property
+`prefab_parent` with a part's path to hang it from that part instead; its transform is then
+relative to the part. The placement's own transform, name and properties still override the
+source root, as before.
 
 ## Spawning from Ruby
 

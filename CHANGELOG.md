@@ -17,6 +17,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
+  property records, per inherited part, its position, rotation or scale, properties set or
+  dropped, its light or camera, or that the part is removed. A child added under the placement
+  can hang from an inherited part with `prefab_parent`. Editing the prefab file updates every
+  instance except the fields it overrides, also inside nested prefabs. See
+  [prefab overrides](docs/prefabs.md#overrides).
+
 - **Terrains have ground layers (experimental).** An object with `terrain_layers = "island"` takes
   up to eight ground materials from the game's `terrains/island.json`, each with its color, normal,
   roughness, occlusion and height pictures, and their weights from a splat map saved beside it as
@@ -77,6 +84,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **A dedicated server keeps to the game's tick.** `redgem-server` takes its lobby's turns and
+  its rooms' frames at the game's `tick_hz`, and its status budget (`frame_ms.budget`, the
+  status line's "of N ms") is a step of it. The start line says the rate.
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is
