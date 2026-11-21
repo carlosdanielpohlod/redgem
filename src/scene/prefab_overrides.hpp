@@ -22,6 +22,8 @@ namespace redgem::prefabs {
 
 inline constexpr char kPathSeparator = '/';
 
+// Transform fields replace that field of the part's local transform as resolved: for a nested
+// placement, after its own file's root offset was combined in.
 // The fields of a part an override can hold, as the file and the tools name them.
 namespace field {
 inline constexpr const char* kPosition = "position";

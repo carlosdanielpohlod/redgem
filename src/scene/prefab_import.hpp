@@ -42,6 +42,8 @@ PartPaths part_paths(const SceneDesc& scene, int placement, const std::vector<in
                      const std::map<int, std::string>& part_ids);
 // Applies what it can; returns the parts to leave out. Missing parts are reported and skipped.
 std::vector<int> apply_part_overrides(SceneDesc& scene, const PartPaths& parts, const Overrides& overrides);
+// Whether `part` is one of `roots` or under one, below `placement`.
+bool inside_any(const SceneDesc& scene, int part, const std::vector<int>& roots, int placement);
 // A part's transform relative to the placement above it.
 Transform part_chain(const SceneDesc& scene, int placement, int part);
 // Moves `child` from its parent to under `part`.

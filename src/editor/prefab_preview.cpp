@@ -27,19 +27,21 @@ void refresh_root(NodeDesc& target, const NodeDesc& authored, const prefabs::Ori
   target.local = prefabs::inherited_local(origin, authored.local);
   target.props = prefabs::inherited_props(origin, authored.props);
   target.props.erase(props::kPrefabOverrides);
+  target.props.erase(props::kPrefabParent);
   target.parent = authored.parent;
 }
 std::string overrides_of(const NodeDesc& node) { return get_string(node.props, props::kPrefabOverrides).value_or(""); }
 std::string part_of(const NodeDesc& node) { return get_string(node.props, props::kPrefabParent).value_or(""); }
 // The transform of the part an authored child hangs from (see prefabs::resolve), if it hangs from one.
-const Transform* attachment(const prefabs::Origins& origins, int node) {
-  for (const auto& entry : origins) {
+
+}  // namespace
+const Transform* PrefabPreview::attachment(int node) const {
+  for (const auto& entry : origins_) {
     const auto found = entry.second.attached.find(node);
     if (found != entry.second.attached.end()) return &found->second;
   }
   return nullptr;
 }
-}  // namespace
 void PrefabPreview::adopt(PrefabPreview&& ready) {
   const auto next = generation_ + 1;
   *this = std::move(ready);
@@ -100,14 +102,16 @@ bool PrefabPreview::refresh_plain_node(const NodeDesc& authored, int node) {
   auto& target = resolved_->nodes.at(static_cast<std::size_t>(node));
   target = authored;
   target.props.erase(props::kPrefabParent);
-  const auto* chain = attachment(origins_, node);
+  const auto* chain = attachment(node);
   if (chain) target.local = combine(*chain, authored.local);
   return true;
 }
 bool PrefabPreview::refresh_root_node(const NodeDesc& authored, int node, const prefabs::Origin& origin) {
   if (!matches_reference(authored, origin)) return false;
   try {
-    refresh_root(resolved_->nodes.at(static_cast<std::size_t>(node)), authored, origin);
+    auto& target = resolved_->nodes.at(static_cast<std::size_t>(node));
+    refresh_root(target, authored, origin);
+    if (const auto* chain = attachment(node)) target.local = combine(*chain, target.local);
     return true;
   } catch (const std::exception&) {
     return false;  // Rebuild reports the failure and leaves a repairable authored document.

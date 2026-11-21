@@ -60,6 +60,9 @@ class EditorSession {
   const SceneDesc& preview_desc() const;
   ObjectId authored_object(ObjectId id) const;
   Transform placement_world(ObjectId id) const;
+  // The world transform an object's authored local is relative to: its parent's, and for a child
+  // hung from an inherited prefab part (props::kPrefabParent), that part's too.
+  Transform authored_parent_world(ObjectId id) const;
   void sync_preview_assets(const std::vector<int>& changed_meshes);
   std::uint64_t preview_generation() const { return prefab_preview_.generation(); }
   // After every document edit, one of these so the preview reflects it: refresh_preview makes it
@@ -194,6 +197,8 @@ class EditorSession {
   void keep_my_edits() { external_change_pending_ = false; }
 
  private:
+  // A child moved to another parent no longer hangs from a prefab part (unrecorded).
+  void unhang(int index);
   EditorSession(std::filesystem::path game_dir, SceneDocument document);
   // The document just read from its file is edited from now on: nothing selected, and the file
   // followed for changes others make to it.

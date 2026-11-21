@@ -7,6 +7,7 @@
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "editor/document/scene_document.hpp"
+#include "editor/editor_session.hpp"
 #include "scene/prefab_overrides.hpp"
 #include "scene/prefabs.hpp"
 #include "scene/props.hpp"
@@ -98,6 +99,21 @@ TEST_CASE("prefab overrides read back what they write, and malformed text names 
   CHECK_THROWS_AS(prefabs::parse_overrides("not json"), std::runtime_error);
 }
 
+TEST_CASE("prefab overrides refuse values that would break a part") {
+  const auto refused = [](const char* text, const char* message) {
+    CHECK_THROWS_WITH_AS(prefabs::parse_overrides(text), message, std::runtime_error);
+  };
+  refused(R"({"lid":{"position":[1e39,0,0]}})", "prefab_overrides: position needs finite numbers");
+  refused(R"({"lid":{"rotation":[0,0,0,0]}})", "prefab_overrides: rotation needs a nonzero quaternion");
+  refused(R"({"eye":{"camera":{"fov":1}}})", "prefab_overrides: camera needs near");
+  refused(R"({"lid":{"removed":1}})", "prefab_overrides: removed needs true or false");
+  refused(R"({"lamp":{"light":{"type":1}}})", "prefab_overrides: light type needs text");
+  const auto spot = prefabs::parse_overrides(R"({"lamp":{"light":{"type":"spot","inner_cone":1.2,"outer_cone":0.3}}})");
+  CHECK(spot.at("lamp").light->inner_cone < spot.at("lamp").light->outer_cone);
+  const auto turned = prefabs::parse_overrides(R"({"lid":{"rotation":[0,0,0,2]}})");
+  CHECK(turned.at("lid").rotation->w == doctest::Approx(1));
+}
+
 TEST_CASE("reverting one field keeps the others, and an emptied part goes away") {
   Overrides overrides;
   overrides["lid"].position = Vec3{1, 2, 3};
@@ -138,11 +154,9 @@ TEST_CASE("a removed part leaves out everything under it") {
   Overrides overrides;
   overrides["lid"].removed = true;
   auto scene = placement(overrides);
-  add_child(scene, child_of(0, "Sticker", "lid"));
   const auto resolved = prefabs::resolve(scene, game.dir);
   CHECK(resolved.find_node("lid") == kNoIndex);
   CHECK(resolved.find_node("handle") == kNoIndex);
-  CHECK(resolved.find_node("Sticker") == kNoIndex);
   CHECK(resolved.find_node("wheel") != kNoIndex);
   CHECK(resolved.nodes.size() == 2);
   CHECK(resolved.nodes[0].children == std::vector<int>{1});
@@ -169,6 +183,40 @@ TEST_CASE("a child added under an inherited part hangs from it in the game, in p
   REQUIRE(origins.count(0) == 1);
   CHECK(origins.at(0).parts.count("lid/handle") == 1);
   CHECK(origins.at(0).attached.count(1) == 1);
+}
+
+TEST_CASE("a child hung from a removed part stays under the placement") {
+  GameFolder game;
+  write_crate(game);
+  Overrides overrides;
+  overrides["lid"].removed = true;
+  auto scene = placement(overrides);
+  add_child(scene, child_of(0, "Sticker", "lid/handle"));
+  test::LogCapture log;
+  const auto played = prefabs::resolve(scene, game.dir);
+  CHECK(named(played, "Sticker").parent == 0);
+  CHECK(log.contains("names a removed part"));
+}
+
+TEST_CASE("the editor moves a child hung from a part where the preview draws it") {
+  GameFolder game;
+  write_crate(game);
+  game.write("scene.glb", {{{"name", "Crate"}, {"children", {1}}, {"extras", {{"prefab_file", "prefabs/crate.glb"}}}},
+                           {{"name", "Sticker"}, {"extras", {{"prefab_parent", "lid"}}}}});
+  auto opened = EditorSession::open(game.dir);
+  if (const auto* error = std::get_if<std::string>(&opened)) FAIL(*error);
+  auto& session = *std::get<std::unique_ptr<EditorSession>>(opened);
+  const int sticker = session.document().desc().find_node("Sticker");
+  CHECK(session.placement_world(sticker).position.y == doctest::Approx(1));
+  Transform world;
+  world.position = {0, 2.5f, 0};
+  session.place_in_world(sticker, world);
+  CHECK(session.document().node(sticker).local.position.y == doctest::Approx(1.5));
+  CHECK(session.preview_desc().nodes[sticker].local.position.y == doctest::Approx(2.5));
+  session.reparent(sticker, kNoObject);
+  const int moved = session.document().desc().find_node("Sticker");
+  CHECK(session.document().node(moved).props.count(props::kPrefabParent) == 0);
+  CHECK(session.placement_world(moved).position.y == doctest::Approx(2.5));
 }
 
 TEST_CASE("overrides reach the parts of a nested prefab by their path") {

@@ -121,6 +121,12 @@ std::vector<int> apply_part_overrides(SceneDesc& scene, const PartPaths& parts, 
   }
   return removed;
 }
+bool inside_any(const SceneDesc& scene, int part, const std::vector<int>& roots, int placement) {
+  for (int node = part; node != placement && node != kNoIndex; node = scene.nodes[node].parent) {
+    if (contains(roots, node)) return true;
+  }
+  return false;
+}
 Transform part_chain(const SceneDesc& scene, int placement, int part) {
   Transform chain = scene.nodes[part].local;
   for (int node = scene.nodes[part].parent; node != placement && node != kNoIndex; node = scene.nodes[node].parent)

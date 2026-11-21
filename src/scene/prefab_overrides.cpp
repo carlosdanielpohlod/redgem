@@ -1,6 +1,7 @@
 #include "scene/prefab_overrides.hpp"
 
 #include <array>
+#include <cmath>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <utility>
@@ -30,7 +31,8 @@ std::vector<float> floats(const Json& value, std::size_t count, const char* name
   if (!numbers) malformed(std::string(name) + " needs " + std::to_string(count) + " numbers");
   std::vector<float> result;
   for (const auto& item : value) {
-    if (!item.is_number()) malformed(std::string(name) + " needs numbers");
+    const bool finite = item.is_number() && std::isfinite(item.get<float>());
+    if (!finite) malformed(std::string(name) + " needs finite numbers");
     result.push_back(item.get<float>());
   }
   return result;
@@ -41,12 +43,16 @@ Vec3 vec3(const Json& value, const char* name) {
 }
 Quat quat(const Json& value) {
   const auto v = floats(value, kQuatSize, field::kRotation);
-  return {v[kXOffset], v[kYOffset], v[kZOffset], v[kWOffset]};
+  const Quat q{v[kXOffset], v[kYOffset], v[kZOffset], v[kWOffset]};
+  const float length = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  if (!(length > 0.0f) || !std::isfinite(length)) malformed("rotation needs a nonzero quaternion");
+  return {q.x / length, q.y / length, q.z / length, q.w / length};
 }
 float number(const Json& entry, const char* key, float fallback) {
   const auto found = entry.find(key);
   if (found == entry.end()) return fallback;
-  if (!found->is_number()) malformed(std::string(key) + " needs a number");
+  const bool finite = found->is_number() && std::isfinite(found->get<float>());
+  if (!finite) malformed(std::string(key) + " needs a finite number");
   return found->get<float>();
 }
 
@@ -61,7 +67,9 @@ Json property_json(const PropertyValue& value) {
 }
 
 LightType light_type(const Json& entry) {
-  const auto name = entry.value(kLightType, std::string(kLightTypes.front()));
+  const auto found = entry.find(kLightType);
+  if (found != entry.end() && !found->is_string()) malformed("light type needs text");
+  const std::string name = found == entry.end() ? std::string(kLightTypes.front()) : found->get<std::string>();
   for (std::size_t i = 0; i < kLightTypes.size(); ++i) {
     if (name == kLightTypes[i]) return static_cast<LightType>(i);
   }
@@ -77,6 +85,7 @@ LightDesc light(const Json& entry) {
   result.range = number(entry, kLightRange, result.range);
   result.inner_cone = number(entry, kLightInner, result.inner_cone);
   result.outer_cone = number(entry, kLightOuter, result.outer_cone);
+  sanitize_spot_cones(result);
   return result;
 }
 Json light_json(const LightDesc& value) {
@@ -87,9 +96,21 @@ Json light_json(const LightDesc& value) {
           {kLightInner, value.inner_cone},
           {kLightOuter, value.outer_cone}};
 }
+// Every field is needed: a camera with a missing one would have no projection.
+float camera_number(const Json& entry, const char* key) {
+  if (!entry.contains(key)) malformed(std::string("camera needs ") + key);
+  return number(entry, key, 0.0f);
+}
+bool usable_projection(const CameraDesc& camera) {
+  const bool far_after_near = camera.far_plane == 0.0f || camera.far_plane > camera.near_plane;
+  return camera.fov_y_radians > 0.0f && camera.near_plane > 0.0f && far_after_near;
+}
 CameraDesc camera(const Json& entry) {
   if (!entry.is_object()) malformed("camera needs an object");
-  return {number(entry, kCameraFov, 0.0f), number(entry, kCameraNear, 0.0f), number(entry, kCameraFar, 0.0f)};
+  const CameraDesc result{camera_number(entry, kCameraFov), camera_number(entry, kCameraNear),
+                          camera_number(entry, kCameraFar)};
+  if (!usable_projection(result)) malformed("camera needs fov > 0, near > 0 and far 0 or beyond near");
+  return result;
 }
 Json camera_json(const CameraDesc& value) {
   return {{kCameraFov, value.fov_y_radians}, {kCameraNear, value.near_plane}, {kCameraFar, value.far_plane}};
@@ -122,8 +143,9 @@ void read_field(const std::string& key, const Json& value, PartOverride& part) {
   if (read_transform_field(key, value, part) || read_component_field(key, value, part)) return;
   if (key == field::kProps) return read_props(value, part);
   if (key == field::kUnset) return read_unset(value, part);
-  if (key == field::kRemoved && value.is_boolean()) return void(part.removed = value.get<bool>());
-  malformed("unknown field " + key);
+  if (key != field::kRemoved) malformed("unknown field " + key);
+  if (!value.is_boolean()) malformed("removed needs true or false");
+  part.removed = value.get<bool>();
 }
 PartOverride read_part(const Json& entry) {
   if (!entry.is_object()) malformed("a part needs an object");

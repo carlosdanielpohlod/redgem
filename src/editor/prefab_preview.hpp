@@ -18,6 +18,8 @@ class PrefabPreview {
   const SceneDesc* resolved() const { return resolved_.get(); }
   // Where a placement's inherited parts are (an authored index -> its origin), empty without one.
   const prefabs::Origins& origins() const { return origins_; }
+  // The placement-relative transform of the inherited part an authored child hangs from, or null.
+  const Transform* attachment(int node) const;
   bool refresh(const SceneDesc& document, int node);
   bool sync_assets(const SceneDesc& document, const std::vector<int>& changed_meshes);
   std::uint64_t generation() const { return generation_; }

@@ -26,7 +26,10 @@ bool has_file(const NodeDesc& node) { return node.props.count(kFileProperty) != 
 // Links no placement used: a part the file no longer has, or overrides outside a placement.
 void drop_unused_links(NodeDesc& node) {
   const auto part = get_string(node.props, props::kPrefabParent);
-  if (part) log::warning("prefab_parent names a part the file no longer has: " + printable(*part));
+  if (part) {
+    log::warning("prefab_parent is read on a direct child of a prefab placement, naming one of its parts: " +
+                 printable(*part));
+  }
   node.props.erase(props::kPrefabParent);
   node.props.erase(props::kPrefabOverrides);
 }
@@ -197,7 +200,7 @@ class Resolver {
     const auto parts = part_paths(scene_, id, own, part_ids_);
     const auto removed = apply_part_overrides(scene_, parts, overrides);
     removed_.insert(removed_.end(), removed.begin(), removed.end());
-    for (const int child : own) hang_from_part(id, child, parts);
+    for (const int child : own) hang_from_part(id, child, parts, removed);
     if (const auto origin = authored_origin(id)) origin->parts = parts;
   }
   Origin* authored_origin(int id) const {
@@ -206,12 +209,15 @@ class Resolver {
     return found == origins_->end() ? nullptr : &found->second;
   }
   // A name no part has is left for the placement above (a root that is itself a placement).
-  void hang_from_part(int id, int child, const PartPaths& parts) {
+  // A child of a removed part stays under the placement, in the game as in the editor.
+  void hang_from_part(int id, int child, const PartPaths& parts, const std::vector<int>& removed) {
     auto& props = scene_.nodes[child].props;
-    const auto name = get_string(props, props::kPrefabParent);
-    const auto part = name ? parts.find(*name) : parts.end();
+    const auto name = get_string(props, props::kPrefabParent).value_or("");
+    const auto part = parts.find(name);
     if (part == parts.end()) return;
     props.erase(props::kPrefabParent);
+    if (inside_any(scene_, part->second, removed, id))
+      return log::warning("prefab_parent names a removed part, kept under the placement: " + printable(name));
     if (keeps_index(child)) return attach_in_place(id, child, part->second);
     hang_under(scene_, child, part->second);
     reordered_ = true;
