@@ -140,6 +140,9 @@ the same pull request.
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
   be drawn into): a phone that cannot draw several samples a pixel draws one, and says so.
+- `Material.set_emission` changes every material of that name at once: one object cannot glow
+  apart from the others that share its material. Each machine keeps its own glow, so a networked
+  game sets it on every machine.
 
 ## Multiplayer
 

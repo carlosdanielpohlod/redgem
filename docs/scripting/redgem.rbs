@@ -754,6 +754,20 @@ module Water
   def self.under?: (Vector3 point) -> bool
 end
 
+# The glow of the scene's materials, by name, changed while the game runs: lit windows at night.
+%a{redgem:experimental}
+module Material
+  # every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength, over what the scene's file says
+  %a{redgem:experimental}
+  def self.set_emission: (Symbol | String name, Symbol | Array[Numeric] color, ?strength: Numeric) -> nil
+  # the materials of that name glow as the scene's file says again
+  %a{redgem:experimental}
+  def self.reset_emission: (Symbol | String name) -> nil
+  # what set_emission gave the materials of that name, {color:, strength:}, or nil
+  %a{redgem:experimental}
+  def self.emission: (Symbol | String name) -> (Hash[Symbol, untyped] | nil)
+end
+
 # The body of an object with body = "character": walks, jumps, climbs steps.
 %a{redgem:stable}
 class CharacterController

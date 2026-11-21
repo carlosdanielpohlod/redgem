@@ -180,6 +180,20 @@ other objects are drawn in that order, so that surfaces lying on each other look
 screen, and of separate parts in each: join the parts of a model that share a material, and give
 heavy models lighter versions for far away with `visible_from` and `visible_to`.
 
+### Glowing materials from scripts
+
+A material's emission (Blender's *Emission* color and strength) can change while the game runs, by
+the material's name: the windows of a village that light up at dusk, a sign switched on.
+
+```ruby
+Material.set_emission("window_glass", [255, 190, 120], strength: 4.0)   # warm, bright windows
+Material.reset_emission("window_glass")                                 # as the file has them
+```
+
+Every material of that name glows, in every object that has it, copies and prefabs spawned later
+and the scenes loaded after, until `reset_emission`. Strengths above 1 glow through bloom. Each
+machine keeps its own glow, so a game played together sets it on every machine.
+
 ### Coated materials
 
 Blender's Principled BSDF coat is read through `KHR_materials_clearcoat`. A polished coating
