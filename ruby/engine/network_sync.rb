@@ -87,12 +87,14 @@ end
 # a moment behind, moving smoothly, see Snapshots; false: it closes in on the newest pose that
 # arrived instead, sooner but jerkier), delay (seconds it is shown behind, always; unset: as short
 # as the network allows), animation (true by default: its own animation is shown the same on the
-# others; false leaves each machine's to its own scripts).
+# others; false leaves each machine's to its own scripts), send_hz (poses a second its owner sends,
+# Network::MIN_SEND_HZ to Network::MAX_SEND_HZ; game.json's "network": {"send_hz": N} by default,
+# else 20: Network.send_hz). Every machine needs the same send_hz for an object: the others expect
+# its poses that often.
 #
 #   player.add_component(NetworkSync, owner: Network.id, key: "hero-#{Network.id}")
 #   return unless get_component(NetworkSync).mine?   # only the owner reads the keyboard
 class NetworkSync < Behaviour
-  SENDS_PER_SECOND = 20.0
   SMOOTHING = 14.0        # how fast a watched object closes in on where it should be (per second), not interpolated
   SNAP_DISTANCE = 6.0     # meters: further than this from where it was, it jumps there
   FULL_TURN = 360.0
@@ -104,6 +106,12 @@ class NetworkSync < Behaviour
   # Whether its own animation goes along: known from the first pose that arrives, started or not.
   def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
+  # Poses a second the owner sends.
+  def send_hz
+    @send_hz ||= prop(:send_hz, Network.send_hz).to_f.clamp(Network::MIN_SEND_HZ, Network::MAX_SEND_HZ)
+  end
+  # Seconds between two of them.
+  def send_interval = 1.0 / send_hz
   # Out of a game, everything is this machine's to move (not while it reconnects: the others'
   # objects stay theirs).
   def mine? = !Network.__in_game? || owner == Network.id
@@ -127,7 +135,7 @@ class NetworkSync < Behaviour
   # Nothing heard of the object yet: what came from an owner before says nothing of the next.
   def watch_afresh
     @position = @rotation = nil
-    @snapshots = Snapshots.new(1.0 / SENDS_PER_SECOND, prop(:delay)&.to_f) if prop(:interpolate, true)
+    @snapshots = Snapshots.new(send_interval, prop(:delay)&.to_f) if prop(:interpolate, true)
   end
 
   def on_destroy = Network.__forget(self)
@@ -145,9 +153,9 @@ class NetworkSync < Behaviour
     return unless __sends?
 
     @since_sent += dt
-    return if @since_sent < 1.0 / SENDS_PER_SECOND
+    return if @since_sent < send_interval
 
-    @since_sent = 0.0
+    @since_sent %= send_interval  # (what is over goes to the next: a frame's length never slows the rate)
     Network.__pose(key, transform.position, transform.rotation, (game_object if animated?))
   end
 

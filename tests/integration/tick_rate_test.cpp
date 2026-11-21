@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "app/game_identity.hpp"
 #include "app/game_settings.hpp"
 #include "app/presenter.hpp"
 #include "core/config.hpp"
@@ -20,6 +21,7 @@ using namespace redgem::test::physics_game;
 namespace {
 
 constexpr int kFastTick = 128;
+constexpr int kFastSends = 64;
 constexpr float kDropHeight = 20.0f;  // meters: high enough not to land within a second
 // What a body falls in one second, g t^2 / 2, give or take (a share of it) what a step's length
 // and the body's damping change of it.
@@ -135,4 +137,33 @@ TEST_CASE("on the real clock, a game at 128 Hz takes 128 steps in a second of 60
   CHECK(steps <= kFastTick);
   CHECK(played.number("$step_dt") == doctest::Approx(config::tick_seconds(kFastTick)));
   CHECK(played.number("$frame_dt") == doctest::Approx(config::tick_seconds(kRealFramesPerSecond)));
+}
+
+TEST_CASE("objects send game.json's network send_hz poses a second, else 20") {
+  CHECK(manifest_of("{}").settings.send_hz == config::kDefaultSendHz);
+  CHECK(manifest_of(R"({"network": true})").settings.send_hz == config::kDefaultSendHz);
+  CHECK(manifest_of(R"({"network": true})").send_hz_error.empty());
+  const std::string fast = "{\"network\": {\"send_hz\": " + std::to_string(kFastSends) + "}}";
+  CHECK(manifest_of(fast).settings.send_hz == kFastSends);
+  CHECK(manifest_of(fast).send_hz_error.empty());
+  for (const char* unusable : {"0", "129", "20.5", "\"often\""}) {
+    CAPTURE(unusable);
+    const GameManifest manifest = manifest_of(std::string("{\"network\": {\"send_hz\": ") + unusable + "}}");
+    CHECK(manifest.settings.send_hz == config::kDefaultSendHz);
+    CHECK(manifest.send_hz_error.find("network.send_hz must be a whole number from 1 to 128") != std::string::npos);
+  }
+}
+
+TEST_CASE("a game with network settings plays online, as one with \"network\": true does") {
+  const TempGame game(R"({"network": {"send_hz": 30}})");
+  const GameIdentityReading reading = read_game_identity(game.dir);
+  CHECK(reading.identity.network == std::optional<bool>(true));
+  CHECK(reading.error.empty());
+}
+
+TEST_CASE("Network.send_hz is what game.json says") {
+  const TempGame game("{\"network\": {\"send_hz\": " + std::to_string(kFastSends) + "}}");
+  const SceneDesc scene = scene_with({});
+  auto engine = engine_for(game, scene);
+  CHECK(ruby(*engine, "Network.send_hz") == std::to_string(kFastSends));
 }

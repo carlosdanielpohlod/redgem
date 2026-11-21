@@ -41,6 +41,10 @@ constexpr int kWithinTimeoutFrames = kTimeoutFrames / 2;
 constexpr int kPastTimeoutFrames = kTimeoutFrames * 3;
 constexpr float kWhereTheGuestLeftIt = 2.9f;  // meters along x, give or take
 constexpr int kQuarterSecondRounds = 15;      // frames
+constexpr int kOneSecondRounds = 60;          // frames of a fixed step at the default tick
+constexpr int kFasterSendHz = 30;             // poses a second: more than the default 20
+constexpr int kPosesLostOnTheWay = 3;         // the ones still on their way at the end, and the first
+constexpr float kNudge = 0.01f;               // meters the host moves the platform each frame
 constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
 constexpr float kShownBehind = 0.25f;         // seconds a watched swordsman is shown behind his owner
 constexpr float kFewFrames = 4.0f * config::kDefaultFixedDeltaSeconds;  // what a pose takes on its way, and more
@@ -416,6 +420,37 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
   lan.rounds(kSettleRounds);
   CHECK(x_of(*guest, "$platform") == doctest::Approx(80.0f).epsilon(kNear));
   CHECK(x_of(*host, "$platform") == doctest::Approx(80.0f));
+}
+
+namespace {
+
+// How many poses of the platform the guest hears in a second of the host moving it, each machine's
+// NetworkSync given `settings`.
+int poses_heard_in_a_second(const std::string& settings) {
+  Lan lan;
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
+  for (Engine* machine : {host, guest}) {
+    ruby(*machine, "$platform = Scene.find('Platform'); $sync = $platform.add_component(NetworkSync" + settings + ")");
+  }
+  ruby(*guest, "$heard = 0; def $sync.__receive(*pose) = ($heard += 1; super)");
+  for (int round = 0; round < kOneSecondRounds; ++round) {
+    ruby(*host, "$platform.transform.position = Vector3.new(" + std::to_string(round * kNudge) + ", 1, 0)");
+    lan.round();
+  }
+  return std::stoi(ruby(*guest, "$heard"));
+}
+
+}  // namespace
+
+TEST_CASE("an owner sends Network.send_hz poses a second, or what its NetworkSync's send_hz says") {
+  const int by_default = poses_heard_in_a_second("");
+  CHECK(by_default <= config::kDefaultSendHz);
+  CHECK(by_default >= config::kDefaultSendHz - kPosesLostOnTheWay);
+  const int faster = poses_heard_in_a_second(", send_hz: " + std::to_string(kFasterSendHz));
+  CHECK(faster <= kFasterSendHz);
+  CHECK(faster >= kFasterSendHz - kPosesLostOnTheWay);
 }
 
 TEST_CASE("a watched object is shown the delay it asks for behind its owner, or closes in at once without one") {
