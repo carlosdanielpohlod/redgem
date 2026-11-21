@@ -6,10 +6,13 @@ class NetworkSendRateTest < RedGemTest::Case
   FAST = 64
   SLOW = 5 # poses a second: few enough that the others are shown it further behind
   WAY_TOO_FAST = 1000
+  # The object it is on: one with no Blender properties of its own.
+  Carrier = Struct.new(:name, :props)
 
   def synced(settings = {})
     sync = NetworkSync.new
     sync.__configure(settings)
+    sync.instance_variable_set(:@game_object, Carrier.new("Lift", {}))
     sync
   end
 
@@ -36,7 +39,7 @@ class NetworkSendRateTest < RedGemTest::Case
 
   def test_the_slowest_rate_is_still_shown_smoothly
     behind = 1.0 / Network::MIN_SEND_HZ * NetworkSync::Snapshots::INTERVALS_BEHIND
-    assert_operator behind, :<=, NetworkSync::Snapshots::MAX_DELAY
+    assert behind <= NetworkSync::Snapshots::MAX_DELAY, "#{behind} s behind is past the longest delay"
   end
 
   def test_the_others_expect_its_poses_that_often
