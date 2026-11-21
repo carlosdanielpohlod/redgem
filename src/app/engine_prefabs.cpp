@@ -39,6 +39,7 @@ prefabs::Source read_prefab(const std::string& file, const std::filesystem::path
   limits.nodes = kMaxRuntimePrefabNodes;
   limits.expanded_bytes = available;
   limits.input_bytes = available;
+  limits.from_game = false;  // A spawn's budget is the runtime's, not game.json's.
   prefabs::Source prefab;
   prefab.scene = prefabs::resolve(prefab_reference(file), game_dir, limits);
   require_rigid_prefab(prefab.scene);

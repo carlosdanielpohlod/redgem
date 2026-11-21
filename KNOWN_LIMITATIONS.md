@@ -357,7 +357,9 @@ promise of how it will be closed.
   instance; use `tint`). Scripted prefab imports are synchronous and support rigid hierarchies
   only, and a running scene does not see a changed prefab file until reloaded. Export needs
   complete skeletons and descendant-only animation; it does not replace the original selection
-  with a reference or overwrite an existing source file.
+  with a reference or overwrite an existing source file. The editor reads `game.json`'s
+  `prefab_budget_mb` when it opens the game (reopen it after a change), and applying or unpacking
+  overrides still reads one prefab file of at most 256 MiB.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;

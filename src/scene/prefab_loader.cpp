@@ -3,10 +3,12 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include "core/game_files.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/scene_ids.hpp"
 #include "scene/gltf/gltf_checks.hpp"
@@ -18,10 +20,29 @@ constexpr const char* kExtension = ".glb";
 void require(bool valid, const char* reason) {
   if (!valid) throw std::runtime_error(reason);
 }
-void reserve_bytes(std::uint64_t& used, std::uint64_t amount, std::uint64_t limit) {
-  require(used <= limit && amount <= limit - used, "prefab expansion exceeds its memory budget");
+static_assert(kMostBudgetMb * Limits::kMebibyte == gltf_budget::kMaxSceneBytes, "a budget stops at a scene's own");
+constexpr const char* kSourceBudget = "source";
+constexpr const char* kDecodedBudget = "decoded";
+constexpr const char* kFixedBudgetError = "prefab expansion exceeds its memory budget";
+// What to do when the prefab files pass one of game.json's budgets ("prefab_budget_mb"): raise
+// it, or split the scene once it is at the most a scene may take.
+std::string game_budget_error(const char* which, std::uint64_t limit) {
+  const std::string passed = std::string("prefab files take more than their ") + which + " budget of " +
+                             std::to_string(limit / Limits::kMebibyte) + " MiB: ";
+  if (limit >= gltf_budget::kMaxSceneBytes) return passed + "split the scene, as no scene may take more";
+  return passed + "raise \"" + which + "\" in game.json's \"" + kBudgetKey + "\" (up to " +
+         std::to_string(kMostBudgetMb) + ")";
+}
+std::string budget_error(const Limits& limits, const char* which, std::uint64_t limit) {
+  return limits.from_game ? game_budget_error(which, limit) : kFixedBudgetError;
+}
+void reserve_bytes(std::uint64_t& used, std::uint64_t amount, const Limits& limits, const char* which) {
+  const bool source = std::string_view(which) == kSourceBudget;
+  const std::uint64_t limit = source ? limits.input_bytes : limits.expanded_bytes;
+  if (used > limit || amount > limit - used) throw std::runtime_error(budget_error(limits, which, limit));
   used += amount;
 }
+bool over_budget(const std::string& error) { return error.find(kLoadingBudgetError) != std::string::npos; }
 bool has_file(const NodeDesc& node) { return node.props.count(kFileProperty) != 0; }
 // Links no placement used: a part the file no longer has, or overrides outside a placement.
 void drop_unused_links(NodeDesc& node) {
@@ -80,7 +101,8 @@ class Resolver {
         folder_(std::move(folder)),
         limits_(limits),
         origins_(origins),
-        authored_(scene_.nodes.size()) {}
+        authored_(scene_.nodes.size()),
+        expanded_bytes_(limits.spent_bytes) {}
   SceneDesc run() {
     const auto authored = scene_.nodes.size();
     require(authored <= limits_.nodes, "prefab scene has too many nodes");
@@ -110,9 +132,12 @@ class Resolver {
   std::string key(const fs::path& path) const {
     return path.lexically_relative(fs::weakly_canonical(folder_)).generic_u8string();
   }
+  std::string decoded_error() const { return budget_error(limits_, kDecodedBudget, limits_.expanded_bytes); }
   Source read_source(const fs::path& path) {
     auto loaded = load_gltf_scene(path.u8string(), limits_.expanded_bytes - expanded_bytes_);
-    if (!loaded.ok) throw std::runtime_error(loaded.error);
+    if (!loaded.ok) {
+      throw std::runtime_error(over_budget(loaded.error) ? decoded_error() : loaded.error);
+    }
     require_root(loaded.scene);
     for (const auto& warning : loaded.warnings) log::warning(warning);
     Source entry;
@@ -126,7 +151,7 @@ class Resolver {
     const auto found = sources_.find(name);
     if (found != sources_.end()) return found->second;
     require(sources_.size() < limits_.files, "too many prefab files");
-    reserve_bytes(input_bytes_, game_files::file_size(path).value_or(0), limits_.input_bytes);
+    reserve_bytes(input_bytes_, game_files::file_size(path).value_or(0), limits_, kSourceBudget);
     return sources_.emplace(name, read_source(path)).first->second;
   }
   void enter(const fs::path& path) {
@@ -140,8 +165,10 @@ class Resolver {
     const auto added = source.scene.nodes.size() - 1;
     require(scene_.nodes.size() <= limits_.nodes && added <= limits_.nodes - scene_.nodes.size(),
             "too many prefab nodes");
-    reserve_bytes(expanded_bytes_, source.instance_bytes, limits_.expanded_bytes);
-    if (!source.transferred) reserve_bytes(expanded_bytes_, source.asset_bytes, limits_.expanded_bytes);
+    reserve_bytes(expanded_bytes_, source.instance_bytes, limits_, kDecodedBudget);
+    if (!source.transferred) {
+      reserve_bytes(expanded_bytes_, source.asset_bytes, limits_, kDecodedBudget);
+    }
   }
   void keep_identities(const Instance& instance, std::size_t count) {
     for (std::size_t i = 1; i < count; ++i) {
@@ -155,7 +182,7 @@ class Resolver {
   }
   void remember_origin(int id, const Source& source) {
     if (!origins_ || static_cast<std::size_t>(id) >= authored_) return;
-    reserve_bytes(expanded_bytes_, source.instance_bytes, limits_.expanded_bytes);
+    reserve_bytes(expanded_bytes_, source.instance_bytes, limits_, kDecodedBudget);
     record_origin(*origins_, id, scene_.nodes[id], source.scene.nodes.front());
   }
   void remember_part_ids(const Source& source, const Instance& instance) {

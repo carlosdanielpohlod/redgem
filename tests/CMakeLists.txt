@@ -45,6 +45,7 @@ unit/temp_dirs_test.cpp
   unit/object_state_test.cpp
   unit/scene_identity_test.cpp
   unit/prefabs_test.cpp
+  unit/prefab_budget_test.cpp
   unit/prefab_export_test.cpp
   unit/prefab_overrides_test.cpp
   unit/prefab_instances_test.cpp
