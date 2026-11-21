@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -166,5 +167,26 @@ class MixedAudio : public AudioSystem {
 
 // Plays through raylib. Falls back to silence when no audio device is available.
 std::unique_ptr<AudioSystem> create_raylib_audio();
+
+// What a mixdown mixes: interleaved float stereo at `sample_rate`.
+struct MixdownFormat {
+  int sample_rate = 0;
+};
+
+// A game's audio mixed with no device, the mix pulled a block at a time (a recording's sound):
+// nothing is heard, and the mix moves on only as it is rendered. One at a time in a process, as a
+// device is.
+class AudioMixdown {
+ public:
+  virtual ~AudioMixdown() = default;
+  // What the game plays its sounds through.
+  virtual AudioSystem& audio() = 0;
+  // The next `frames` frames of the mix, as a device would have played them, into `samples`
+  // (frames x kDeviceChannels of them).
+  virtual void render(float* samples, std::size_t frames) = 0;
+};
+
+// Raylib's own mix, on no device: what a player would hear through create_raylib_audio.
+std::unique_ptr<AudioMixdown> create_raylib_mixdown(const MixdownFormat& format);
 
 }  // namespace redgem

@@ -241,7 +241,8 @@ void Engine::present() {
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        context_.auto_exposure, controls_, images_dir_, context_.stop_recording_requested,
-                       &water_.snapshot(), shows_profile_stats(context_), &debug_draw_, &water_.surfaces()});
+                       &water_.snapshot(), shows_profile_stats(context_), &debug_draw_, &water_.surfaces(),
+                       &context_.material_emission});
   forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
 }
 

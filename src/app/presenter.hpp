@@ -8,6 +8,7 @@
 #include "core/config.hpp"
 #include "core/frame_budget.hpp"
 #include "render/auto_exposure.hpp"
+#include "render/material_emission.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/window.hpp"
@@ -51,6 +52,8 @@ struct FrameView {
   const DebugDrawBuffer* debug_draw = nullptr;         // frame-local world primitives, never scene objects
   // The scene's water as the simulation last found it: the camera under it looks underwater.
   const std::vector<WaterSurface>* water_surfaces = nullptr;
+  // What scripts change of the materials' glow (Material.set_emission); none: the files' own.
+  const EmissionOverrides* material_emission = nullptr;
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine
