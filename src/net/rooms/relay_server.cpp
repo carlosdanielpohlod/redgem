@@ -36,16 +36,19 @@ void RelayServer::poll(float seconds) {
 }
 
 bool RelayServer::wait(float seconds) const {
+  // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now,
+  // as is what arrived and waits in a connection's TLS.
+  const auto has_work = [](const auto& member) { return member->connection.work_waiting(); };
+  if (std::any_of(members_.begin(), members_.end(), has_work)) return true;
+  return Socket::wait(watched(), sleep_seconds(seconds));
+}
+
+std::vector<Watched> RelayServer::watched() const {
   // (A newcomer that cannot be taken would end every wait at once: it is not watched for a while.)
   std::vector<Watched> watched;
   if (!resting()) watched.push_back({&listener_, false});
-  for (const auto& member : members_) {
-    // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now,
-    // as is what arrived and waits in a connection's TLS.
-    if (member->connection.work_waiting()) return true;
-    watched.push_back(member->connection.watched());
-  }
-  return Socket::wait(watched, sleep_seconds(seconds));
+  for (const auto& member : members_) watched.push_back(member->connection.watched());
+  return watched;
 }
 
 float RelayServer::sleep_seconds(float seconds) const { return resting() ? std::min(seconds, accept_rest_) : seconds; }

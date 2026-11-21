@@ -5,16 +5,16 @@
 
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <functional>
 #include <memory>
 #include <optional>
-#include <thread>
+#include <vector>
 
 #include "integration/middleman.hpp"
 #include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
 #include "net/resume_token.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem::net;
@@ -22,8 +22,7 @@ using redgem::test::Middleman;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of polling, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kWindow = 20.0f;               // seconds the host holds a place
 constexpr float kPastWindow = kWindow + 1.0f;  // ... and a poll that crosses it
@@ -34,7 +33,7 @@ constexpr std::size_t kReadBytes = 64 * 1024;
 constexpr int kSettleRounds = 50;
 constexpr float kLongerWindow = kWindow * 2.0f;  // a window the host sets after a welcome
 constexpr float kShorterWindow = 1.0f;
-constexpr std::chrono::milliseconds kArrivalPause{20};  // for bytes sent to arrive, unpolled
+constexpr float kArrivalPatience = 5.0f;  // seconds: far longer than bytes sent here take to arrive
 
 using Kind = NetworkEvent::Kind;
 using State = NetworkSession::State;
@@ -63,9 +62,19 @@ struct Table {
     for (int round = 0; round < kMaxRounds; ++round) {
       poll_all(kRoundSeconds);
       if (done()) return true;
-      std::this_thread::sleep_for(kRoundPause);
+      wait_for_sockets();
     }
     return false;
+  }
+
+  // Until one of the sockets of the sessions or of the middlemen is ready (see socket_rounds.hpp).
+  void wait_for_sockets() const {
+    std::vector<Watched> watched;
+    for (const Middleman* middleman : middlemen) {
+      const std::vector<Watched> theirs = middleman->watched();
+      watched.insert(watched.end(), theirs.begin(), theirs.end());
+    }
+    redgem::test::wait_for_sessions(sessions, watched);
   }
 
   // Polls everyone a while, for anything still on its way to arrive.
@@ -173,6 +182,13 @@ struct Stranger {
     });
   }
 };
+
+// Until every machine connected to `host` has sent it something it can read, unpolled.
+void wait_for_every_connection(const NetworkSession& host) {
+  const std::vector<Watched> watched = host.watched();
+  // (The first is what the host listens on.)
+  for (std::size_t i = 1; i < watched.size(); ++i) REQUIRE(Socket::wait({{watched[i].socket}}, kArrivalPatience));
+}
 
 bool refused_for_its_token(const nlohmann::json& answer) {
   return answer.value(wire::kKind, std::string()) == wire::kRefused &&
@@ -432,7 +448,7 @@ TEST_CASE("the token of a machine that said goodbye gets nothing back, even hear
   held.table.settle();
   held.holder->say_unpolled(wire::word(wire::kBye));
   asking.say_unpolled(wire::resume_hello(held.token));
-  std::this_thread::sleep_for(kArrivalPause);
+  wait_for_every_connection(held.host);
   CHECK(refused_for_its_token(asking.hear()));
   CHECK(held.host.peers().empty());
   CHECK(held.table.count(0, Kind::Reconnected) == 0);

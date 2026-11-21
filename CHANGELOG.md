@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **Network tests count rounds, not real time**: the tests of connections, sessions, relays,
+  lobbies, approvals, reconnecting and multiplayer games no longer sleep between rounds. A round
+  waits for one of its sockets to be ready (a millisecond at most), and the machines' networks
+  count the seconds each round tells them, so a timeout depends on rounds, not on how fast the
+  computer is. `NetworkSession::watched`, `RelayServer::watched`, `Datagrams::wait` and
+  `SocketDialer::watched` say what such a wait watches.
 - **Sound occlusion**: a sound played from inside its own static collider is no longer muffled
   from every side. A pile of moving bodies in front of a wall no longer hides the wall. A listener
   touching a building made as one mesh still hears its inner walls, and a wall of one quad, or a

@@ -42,6 +42,17 @@ class Middleman {
   void block(bool blocked) { blocked_ = blocked; }
   std::size_t carried() const { return lines_.size(); }
 
+  // What a wait for its next turn watches: calls coming in, and both ends of every line (the far
+  // one for its call going through, either one while bytes wait for it).
+  std::vector<net::Watched> watched() const {
+    std::vector<net::Watched> watched{{&listener_}};
+    for (const Line& line : lines_) {
+      watched.push_back({&line.near, !line.to_near.empty()});
+      watched.push_back({&line.far, !line.far_ready || !line.to_far.empty()});
+    }
+    return watched;
+  }
+
  private:
   struct Line {
     net::Socket near, far;

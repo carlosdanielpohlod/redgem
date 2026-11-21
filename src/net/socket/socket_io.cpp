@@ -75,6 +75,10 @@ bool Socket::wait(const std::vector<Watched>& sockets, float seconds, Clock& clo
   for (const Watched& watched : sockets) {
     if (can_be_watched(watched)) waiting.push_back({native(watched.socket->handle_), events_of(watched), 0});
   }
+  return wait_or_sleep(waiting, seconds, clock);
+}
+
+bool os::wait_or_sleep(std::vector<Waiting>& waiting, float seconds, Clock& clock) {
   const int milliseconds = wait_milliseconds(seconds);
   if (waiting.empty()) {
     // With nothing to watch only the time can end the wait (and Windows refuses an empty list).

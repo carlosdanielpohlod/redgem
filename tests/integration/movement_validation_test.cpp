@@ -3,20 +3,18 @@
 
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <functional>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "net/network_session.hpp"
+#include "socket_rounds.hpp"
 
 using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of polling, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr float kRoundSeconds = 0.001f;
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr int kMover = kHostId + 1;
@@ -48,7 +46,7 @@ struct Game {
         for (NetworkEvent& event : sessions[i]->poll(kRoundSeconds)) events[i].push_back(std::move(event));
       }
       if (done()) return true;
-      std::this_thread::sleep_for(kRoundPause);
+      redgem::test::wait_for_sessions(sessions);
     }
     return false;
   }

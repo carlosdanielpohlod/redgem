@@ -172,6 +172,10 @@ class NetworkSession {
 
   // Moves messages in and out. `seconds` since the last call, for giving up on a join.
   std::vector<NetworkEvent> poll(float seconds);
+  // What a wait for this machine's network watches (see Socket::wait): the socket a game hosted
+  // here listens on first, then every connection, in the order they were made. For a loop with
+  // nothing to do until something arrives (machines on one computer, in a test), between polls.
+  std::vector<Watched> watched() const;
   // This machine stood still for `seconds` past what its polls were told (a level loading): what
   // the machines that joined it sent meanwhile is not held against them (up to
   // kMostForgivenStallSeconds).

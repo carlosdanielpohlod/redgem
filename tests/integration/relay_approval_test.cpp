@@ -3,26 +3,24 @@
 
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <functional>
 #include <optional>
 #include <string>
-#include <thread>
+#include <vector>
 
 #include "integration/wire_text.hpp"
 #include "net/frame_buffer.hpp"
 #include "net/network_session.hpp"
 #include "net/rooms/relay_server.hpp"
+#include "socket_rounds.hpp"
 
 using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
-constexpr std::chrono::milliseconds kOnTheWire{100};  // for what was written to be there to read
+constexpr int kMaxRounds = 3000;          // of polling, each after a wait for the sockets (see socket_rounds.hpp)
+constexpr float kArrivalPatience = 5.0f;  // seconds: far longer than what was written takes to be there
 constexpr float kRoundSeconds = 0.001f;
-constexpr int kFlushRounds = 50;
 constexpr const char* kLocalhost = "127.0.0.1";
 
 // A relay, the sessions joining its room, and an opener that is a raw connection.
@@ -54,10 +52,23 @@ struct GuardedRoom {
       relay.poll(kRoundSeconds);
       poll_sessions();
       if (done()) return true;
-      std::this_thread::sleep_for(kRoundPause);
+      wait_for_sockets();
     }
     return false;
   }
+
+  // Polls only the sessions until `done`.
+  bool sessions_until(const std::function<bool()>& done) {
+    for (int round = 0; round < kMaxRounds; ++round) {
+      poll_sessions();
+      if (done()) return true;
+      wait_for_sockets();
+    }
+    return false;
+  }
+
+  // Until one of the sockets of the relay or of the sessions is ready (see socket_rounds.hpp).
+  void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions, relay.watched()); }
 
   // The next message the relay sent the opener, waited for.
   nlohmann::json next_message() {
@@ -100,11 +111,11 @@ TEST_CASE("the id of a newcomer who gives up waiting is nobody else's until the 
   leaving.leave();
   room.sessions.clear();
   room.join(next);
-  for (int round = 0; round < kFlushRounds; ++round) {
-    room.poll_sessions();
-    std::this_thread::sleep_for(kRoundPause);
-  }
-  std::this_thread::sleep_for(kOnTheWire);
+  // Its hello is written out (once its call is through) ...
+  REQUIRE(room.sessions_until([&next] { return !next.watched().front().sending; }));
+  // ... and it waits at the relay's door, after the goodbye (what the relay listens on is the first
+  // socket a wait on it watches).
+  REQUIRE(Socket::wait({room.relay.watched().front()}, kArrivalPatience));
   const nlohmann::json asked = room.next_message();
   CHECK(asked["k"] == wire::kAsking);
   CHECK(asked["f"] == kFirstGuestId + 1);

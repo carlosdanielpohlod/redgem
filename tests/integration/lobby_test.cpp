@@ -1,22 +1,20 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
-#include <chrono>
 #include <functional>
 #include <optional>
-#include <thread>
 #include <vector>
 
 #include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
 #include "net/rooms/lobby.hpp"
+#include "socket_rounds.hpp"
 
 using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of polling, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = kJoinTimeoutSeconds + 1.0f;
 constexpr int kSettleRounds = 50;
@@ -26,7 +24,6 @@ constexpr int kPartyGuesses = 2 * kMaxPeers;
 constexpr int kTooManyGuesses = kPartyGuesses + 2;
 constexpr float kIdleStep = kPingEverySeconds;  // seconds: a ping each way every step, nothing else
 constexpr int kIdleSteps = static_cast<int>(kServedIdleSeconds / kIdleStep) + 1;
-constexpr std::chrono::milliseconds kArrivalPause{20};  // for what was written to be there to read
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr const char* kSomeRoom = "K7QM3P";
 
@@ -47,8 +44,12 @@ struct Door {
     for (Arrival& arrival : lobby.poll(seconds, [this](const std::string&) { return in_rooms; })) {
       arrivals.push_back(std::move(arrival));
     }
-    std::this_thread::sleep_for(kRoundPause);
+    wait_for_sockets();
   }
+
+  // Until one of the sessions' sockets is ready: each talks to the lobby or to a room, and the
+  // lobby's own end is the other end of one of them.
+  void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions); }
 
   bool until(const std::function<bool()>& done) {
     for (int i = 0; i < kMaxRounds; ++i) {
@@ -179,13 +180,23 @@ TEST_CASE("a server's room lets go of a player who says nothing to the game for 
   for (Arrival& arrival : door.arrivals) room.admit_arrival(std::move(arrival.connection));
   door.sessions.push_back(&room);
   REQUIRE(door.until([&] { return online(idle) && online(playing); }));
+  // The room's turn, the step's time going by, once the player's move is there for it.
+  const auto room_hears_the_move = [&room] {
+    bool moved = false;
+    float seconds = kIdleStep;
+    for (int round = 0; round < kMaxRounds && !moved; ++round) {
+      for (const NetworkEvent& event : room.poll(seconds)) moved = moved || event.kind == NetworkEvent::Kind::Message;
+      seconds = 0.0f;
+      if (!moved) redgem::test::wait_for_sockets({room.watched()});
+    }
+    REQUIRE(moved);
+  };
   const auto play_for = [&](int steps) {
     for (int step = 0; step < steps; ++step) {
       playing.send("move", step);
       idle.poll(kIdleStep);
       playing.poll(kIdleStep);
-      std::this_thread::sleep_for(kArrivalPause);
-      room.poll(kIdleStep);
+      room_hears_the_move();
     }
   };
   play_for(kIdleSteps - 2);

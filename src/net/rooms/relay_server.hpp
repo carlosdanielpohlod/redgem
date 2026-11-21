@@ -79,6 +79,8 @@ class RelayServer {
   // does by the clock, letting silent machines go and asking the quiet ones if they are there,
   // still needs calling now and then). True when it was not the time that ended the wait.
   bool wait(float seconds) const;
+  // What that wait watches: the socket it listens on (not while it rests) and every machine's.
+  std::vector<Watched> watched() const;
   // The longest wait(`seconds`) sleeps: `seconds`, or less while the relay rests from a newcomer it
   // could not take (see kAcceptRestSeconds), whose call does not end a wait meanwhile.
   float sleep_seconds(float seconds) const;

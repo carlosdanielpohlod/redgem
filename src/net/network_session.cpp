@@ -55,6 +55,13 @@ bool NetworkSession::host(std::uint16_t port, std::string& error, int waiting_pe
   return true;
 }
 
+std::vector<Watched> NetworkSession::watched() const {
+  std::vector<Watched> watched;
+  if (listener_.valid()) watched.push_back({&listener_, false});
+  for (const Link& link : links_) watched.push_back(link.connection.watched());
+  return watched;
+}
+
 std::string NetworkSession::fingerprint() const {
   return identity_ != nullptr ? identity_->fingerprint() : std::string();
 }
