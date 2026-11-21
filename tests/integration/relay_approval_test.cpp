@@ -57,16 +57,6 @@ struct GuardedRoom {
     return false;
   }
 
-  // Polls only the sessions until `done`.
-  bool sessions_until(const std::function<bool()>& done) {
-    for (int round = 0; round < kMaxRounds; ++round) {
-      poll_sessions();
-      if (done()) return true;
-      wait_for_sockets();
-    }
-    return false;
-  }
-
   // Until one of the sockets of the relay or of the sessions is ready (see socket_rounds.hpp).
   void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions, relay.watched()); }
 
@@ -83,10 +73,33 @@ struct GuardedRoom {
     return redgem::test::message_in(*text);
   }
 
-  // Whether `session`'s one connection has written out all it was told to send.
-  static bool said_all(const NetworkSession& session) {
-    const std::vector<Watched> watched = session.watched();
-    return watched.size() == 1 && !watched.front().sending;
+  // A raw connection the relay took in, that has said nothing yet.
+  Socket knock() {
+    std::string error;
+    const std::size_t watched_before = relay.watched().size();
+    Socket newcomer = Socket::connect_to(kLocalhost, relay.port(), error);
+    REQUIRE(newcomer.valid());
+    REQUIRE(until([&] { return relay.watched().size() > watched_before; }));
+    REQUIRE(until([&newcomer] { return newcomer.connect_status() == IoStatus::Ok; }));
+    return newcomer;
+  }
+
+  // Until the relay has something to read from each of its last `count` machines.
+  void wait_until_relay_can_read_last(std::size_t count) const {
+    const std::vector<Watched> watched = relay.watched();
+    REQUIRE(watched.size() >= count);
+    for (std::size_t i = watched.size() - count; i < watched.size(); ++i) {
+      REQUIRE(Socket::wait(std::vector<Watched>{Watched{watched[i].socket, false}}, kArrivalPatience));
+    }
+  }
+
+  // Writes all of `bytes` on `socket`, waiting on it alone: the relay is not polled meanwhile.
+  static bool write_out(Socket& socket, std::vector<std::uint8_t> bytes) {
+    for (int round = 0; round < kMaxRounds; ++round) {
+      if (socket.write(bytes) == IoStatus::Ok && bytes.empty()) return true;
+      Socket::wait(std::vector<Watched>{Watched{&socket, true}}, redgem::test::kSocketPatience);
+    }
+    return false;
   }
 
   void join(NetworkSession& session) {
@@ -110,19 +123,18 @@ TEST_CASE("a room whose opener's hello says its game decides is guarded from the
 
 TEST_CASE("the id of a newcomer who gives up waiting is nobody else's until the opener heard it left") {
   GuardedRoom room;
-  NetworkSession leaving, next;
+  NetworkSession leaving;
   room.join(leaving);
   REQUIRE(room.next_message()["f"] == kFirstGuestId);
-  // The first leaves and the next one's hello is on its way: the relay hears both in one poll.
+  // The next one is taken in before the first leaves, and says hello only after.
+  Socket next = room.knock();
   leaving.leave();
   room.sessions.clear();
-  room.join(next);
-  // Its hello is written out (once its call is through) ...
-  REQUIRE(room.sessions_until([&next] { return GuardedRoom::said_all(next); }));
-  // ... and it waits at the relay's door, after the goodbye (what the relay listens on is the first
-  // socket a wait on it watches, while it does not rest from a newcomer it could not take).
-  REQUIRE(room.relay.sleep_seconds(kArrivalPatience) == kArrivalPatience);
-  REQUIRE(Socket::wait({room.relay.watched().front()}, kArrivalPatience));
+  // (Written without polling the relay, which would hear the goodbye alone.)
+  REQUIRE(GuardedRoom::write_out(next, redgem::test::wire_frame(nlohmann::json{{"k", "h"}, {"r", room.code}}.dump())));
+  // The relay hears the goodbye and the hello in one poll: both wait to be read before it polls.
+  constexpr std::size_t kLeaverAndNewcomer = 2;  // the relay's last machines, taken in in that order
+  room.wait_until_relay_can_read_last(kLeaverAndNewcomer);
   const nlohmann::json asked = room.next_message();
   CHECK(asked["k"] == wire::kAsking);
   CHECK(asked["f"] == kFirstGuestId + 1);

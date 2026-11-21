@@ -43,6 +43,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **The relay approval test of a reused id no longer fails on a slow machine**: it counted on the
+  relay hearing a goodbye and a newcomer's hello in one poll, but a Mac can hand the relay the
+  newcomer before its hello. The relay then rightly tells the room of the leave first, and may give
+  the id again. The test now has the relay take the newcomer in first, and waits until both the
+  goodbye and the hello are there to read before the relay polls.
 - **An Android game no longer aborts when it is closed while it plays sound**: closing the audio
   device (raylib's `CloseAudioDevice`) destroyed the lock the device's playing thread takes before
   it stopped the device, so a sound asked for in that moment locked a destroyed lock. Android
