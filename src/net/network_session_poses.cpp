@@ -92,6 +92,7 @@ void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed
     queue_for_everyone_but(link.peer, passed);  // nothing to check it against: as without validation
     return;
   }
+  if (placed_.from_before(link.peer, update->key, claimed->position)) return drop_late_pose(link.peer, update->key);
   const MovementVerdict verdict = movement_.check(link.peer, update->key, claimed->position);
   if (verdict.ignored) return;  // more objects than are followed: nobody hears of it
   const Pose shown{verdict.position, claimed->rotation};
@@ -124,8 +125,18 @@ void NetworkSession::correct(Link& link, const std::string& key, Vec3 position, 
   if (struck_out) kick(link, "too many moves the host did not believe (movement validation, kick_after)");
 }
 
+void NetworkSession::place_object(int owner, const std::string& key, Vec3 position) {
+  movement_.place(owner, key, position);
+  placed_.place(owner, key, position);
+}
+
+void NetworkSession::drop_late_pose(int peer, const std::string& key) {
+  if (diverged_of(peer) < kMaxDivergedObjects) diverged_.insert({peer, key});
+}
+
 void NetworkSession::forget_movement_of(int peer) {
   movement_.forget(peer);
+  placed_.forget(peer);
   diverged_.erase(first_diverged_of(peer), first_diverged_of(peer + 1));
 }
 

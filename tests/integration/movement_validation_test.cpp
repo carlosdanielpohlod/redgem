@@ -120,6 +120,35 @@ TEST_CASE("a teleport is not believed: everyone sees the object where it was, an
   CHECK(game.host.movement_violations(kMover) == 1);
 }
 
+TEST_CASE("an object the host placed is believed from there: no violation, everyone sees it there") {
+  // A respawn: the host's game moves a player's hero far, on purpose (Network.teleport, which also
+  // tells every machine; here the host's side alone).
+  Game game;
+  game.host.validate_movement(teleport_rules(1));
+  game.move_to(0.0f);
+  game.host.place_object(kMover, kHero, {kFar, 0.0f, 0.0f});
+  // A pose its machine sent before it heard: nobody hears of it, and its machine is not put back.
+  const std::size_t before = game.heard(kWatcherSeat, kPoseMessageName).size();
+  REQUIRE(game.mover.send_pose(kHero, {0.0f, 0.0f, 0.0f}, redgem::Quat::identity()));
+  game.move_to(kFar + kNearby);
+  CHECK(game.heard(kWatcherSeat, kPoseMessageName).size() == before + 1);
+  for (const std::size_t seat : {kHostSeat, kWatcherSeat}) CHECK(game.hero_x(seat) == doctest::Approx(kFar + kNearby));
+  CHECK(game.heard(kMoverSeat, kCorrectionMessageName).empty());
+  CHECK(game.host.movement_violations(kMover) == 0);
+  CHECK_FALSE(game.any(kHostSeat, NetworkEvent::Kind::PeerLeft));  // (kick_after 1: one count would let it go)
+}
+
+TEST_CASE("without movement validation too, a placed object does not go back where it was") {
+  Game game;
+  game.move_to(0.0f);
+  game.host.place_object(kMover, kHero, {kFar, 0.0f, 0.0f});
+  const std::size_t before = game.heard(kWatcherSeat, kPoseMessageName).size();
+  REQUIRE(game.mover.send_pose(kHero, {0.0f, 0.0f, 0.0f}, redgem::Quat::identity()));
+  game.move_to(kFar + kNearby);
+  CHECK(game.heard(kWatcherSeat, kPoseMessageName).size() == before + 1);
+  for (const std::size_t seat : {kHostSeat, kWatcherSeat}) CHECK(game.hero_x(seat) == doctest::Approx(kFar + kNearby));
+}
+
 TEST_CASE("a machine past the violations the game allows is let go") {
   Game game;
   game.host.validate_movement(teleport_rules(1));

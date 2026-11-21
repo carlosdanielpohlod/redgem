@@ -80,7 +80,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/voice_mouth.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_preview.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_gizmos.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/material.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
 add_custom_command(
@@ -257,6 +258,7 @@ redgem_add_library(redgem_net
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
   net/movement_validator.cpp
+  net/placed_objects.cpp
   net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
@@ -476,6 +478,7 @@ redgem_add_library(redgem_runtime
   script/bindings/navigation_bindings.cpp
   script/bindings/navigation_crowd_bindings.cpp
   script/bindings/water_bindings.cpp
+  script/bindings/material_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -565,6 +568,7 @@ redgem_add_library(redgem_runtime
   render/shader_source.cpp
   render/environment.cpp
   render/auto_exposure.cpp
+  render/material_emission.cpp
   render/scene_lights.cpp
   render/local_shadows.cpp
   render/renderer_local_shadows.cpp
@@ -595,6 +599,7 @@ redgem_add_library(redgem_runtime
   app/window_presenter.cpp
   app/recording.cpp
   app/video_recorder.cpp
+  app/sound_track.cpp
   app/encoder_process.cpp
   app/engine.cpp
   app/sound_walls.cpp

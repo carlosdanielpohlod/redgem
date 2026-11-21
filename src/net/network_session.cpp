@@ -170,6 +170,7 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   if (offline()) return events;
   events.swap(pending_events_);
   movement_.advance(seconds);
+  placed_.advance(seconds);
   tend_newcomers(seconds);
   on_the_way(seconds, events);
   // By index: handling a message may add nothing to links_, but keep it obvious. (And any of
