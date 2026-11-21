@@ -177,7 +177,7 @@ module Network
     def on_fail(&block) = listen(:failed, block)              # |reason| the join did not work out (reason may be nil)
     def on_disconnect(&block) = listen(:disconnected, block)  # the game is gone
     def on_join(&block) = listen(:joined, block)              # |peer| someone arrived
-    def on_leave(&block) = listen(:left, block)               # |peer| someone left
+    def on_leave(&block) = listen(:left, block)               # |peer, why| someone left (on the host: why it let it go)
     def on_reconnecting(&block) = listen(:reconnecting, block) # |peer| a connection dropped: the place is held
     def on_reconnected(&block) = listen(:reconnected, block)   # |peer| it is back in its place, with its id
     def on_lost(&block) = listen(:lost, block)                 # |reason| this machine could not get back in
@@ -221,10 +221,15 @@ module Network
     # hear of it (a failed join's with its reason, when there is one).
     def happened(kind, peer, name)
       REACTIONS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
-      told = told_about(kind, peer, name)
-      (@listeners[kind] || []).dup.each { |block| block.call(told) }
+      told = [told_about(kind, peer, name)]
+      told << (name.to_s.empty? ? nil : name) if kind == :left # (why the host let it go)
+      (@listeners[kind] || []).dup.each { |block| block.call(*told.first(arguments_for(block, told))) }
       AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
     end
+
+    # How many of what an event tells a handler takes: a lambda or a method that takes the peer
+    # alone gets the peer alone.
+    def arguments_for(block, told) = block.arity.between?(1, told.size) ? block.arity : told.size
 
     # What the handlers of an event get: the peer, or why a join failed or this machine could not
     # get back in (nil when nobody said).

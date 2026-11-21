@@ -117,12 +117,11 @@ bool NetworkSession::passes_as_sent(const std::pair<int, std::string>& source, c
   return valid && (update.whole() || diverged_.count(source) == 0);
 }
 
-void NetworkSession::correct(Link& link, const std::string& key, Vec3 position, bool kick) {
+void NetworkSession::correct(Link& link, const std::string& key, Vec3 position, bool struck_out) {
   link.connection.send(
       game_message(kCorrectionMessageName, nlohmann::json::array({key, numbers_of(position)}), kHostId, link.peer));
-  if (!kick) return;
-  link.connection.flush();  // (a last try: told where its object is, then let go past kick_after)
-  link.connection.close();
+  // (Told where its object is, as a last try, then let go past kick_after.)
+  if (struck_out) kick(link, "too many moves the host did not believe (movement validation, kick_after)");
 }
 
 void NetworkSession::forget_movement_of(int peer) {

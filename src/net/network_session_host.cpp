@@ -5,6 +5,9 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string>
+
+#include "core/log.hpp"
 
 namespace redgem::net {
 
@@ -124,7 +127,7 @@ void NetworkSession::farewell_closed_links(std::vector<NetworkEvent>& events) {
     if (place_held_for(link)) {
       hold_place(link, events);
     } else {
-      farewell(link.peer, events);
+      farewell(link.peer, events, let_go_for(link));
     }
   }
 }
@@ -135,10 +138,26 @@ void NetworkSession::let_go(Link& link) {
   link.connection.close();
 }
 
-void NetworkSession::farewell(int peer, std::vector<NetworkEvent>& events) {
+void NetworkSession::farewell(int peer, std::vector<NetworkEvent>& events, const std::string& why) {
   queue_for_everyone_but(peer, word_about(kGone, peer));
   for (Held& held : held_) held.departed.push_back(peer);  // (they hear when they are back)
-  peer_left(peer, events);
+  peer_left(peer, events, why);
+}
+
+std::string NetworkSession::let_go_for(const Link& link) {
+  if (!link.let_go_for.empty() || link.connection.closed_for().empty()) return link.let_go_for;
+  log::warning("let go of machine " + std::to_string(link.peer) + ": " + link.connection.closed_for());
+  return link.connection.closed_for();
+}
+
+void NetworkSession::kick(Link& link, const std::string& why) {
+  if (link.connection.closed()) return;
+  // (A newcomer that never got in is let go quietly: anyone may knock.)
+  if (link.let_in()) log::warning("let go of machine " + std::to_string(link.peer) + ": " + why);
+  link.let_go_for = why;
+  link.token.clear();
+  link.connection.flush();
+  link.connection.close();
 }
 
 std::vector<NetworkSession::Link> NetworkSession::take_closed_links() {

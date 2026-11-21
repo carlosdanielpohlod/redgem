@@ -108,7 +108,7 @@ std::optional<nlohmann::json> Connection::next_message() {
   if (!takes_more()) return std::nullopt;
   const auto text = incoming_.next();
   if (!text) {
-    if (incoming_.broken()) close();
+    if (incoming_.broken()) close_for("it sent bytes that are not the game's messages");
     return std::nullopt;
   }
   ++taken_this_poll_;
@@ -124,7 +124,7 @@ std::optional<nlohmann::json> Connection::understood(const std::optional<nlohman
 }
 
 std::optional<nlohmann::json> Connection::not_ours() {
-  close();
+  close_for("it sent a message that is not well formed");
   return std::nullopt;
 }
 
@@ -147,7 +147,7 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
   outgoing_.insert(outgoing_.end(), message.begin(), message.end());
   since_said_ = 0.0f;
   if (outgoing_.size() > pending_limit_) {
-    close();       // it stopped listening: messages are not piled up for it forever
+    close_for("it stopped taking what it was sent");  // messages are not piled up for it forever
     lost_ = true;  // (its network stalled, most likely: what reconnecting is for too)
     return;
   }
@@ -166,7 +166,7 @@ void Connection::keep_in_touch(float seconds) {
   quiet_for_ += seconds;
   since_said_ += seconds;
   if (quiet_for_ > kSilenceTimeoutSeconds) {
-    close();  // gone without a goodbye
+    close_for("it said nothing for too long");  // gone without a goodbye
     lost_ = true;
   } else if (since_said_ >= kPingEverySeconds) {
     send({{wire::kKind, wire::kPing}});
@@ -187,6 +187,11 @@ void Connection::hang_up() {
 void Connection::refuse(const std::string& reason) {
   send(wire::refusal(reason));
   flush();
+  close();
+}
+
+void Connection::close_for(const std::string& why) {
+  closed_for_ = why;
   close();
 }
 

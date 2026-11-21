@@ -232,6 +232,7 @@ class NetworkSession {
     float asking_for = 0.0f;
     std::string token{};  // what gets its place back should it drop (empty: none is held for it)
     float window = 0.0f;  // ... and for how long, as its welcome said
+    std::string let_go_for{};  // why the host let it go, when it did (see kick)
 
     bool let_in() const { return peer != 0; }
     bool asking() const { return asking_as != 0; }
@@ -252,6 +253,7 @@ class NetworkSession {
     float held_for = 0.0f;
     std::vector<int> departed{};  // who left meanwhile (an id may be someone else's by its return)
     float window = 0.0f;          // how long it is held, as the machine was told
+    std::string dropped_for{};    // why the host let its connection go, if it did (Connection::closed_for)
   };
 
   // How a guest calls its host again, with what, and for how long (allow_reconnect).
@@ -376,8 +378,9 @@ class NetworkSession {
   // Whether a checked pose goes on as its machine sent it: believed, and the others place the
   // object where its machine does (or will, from this whole pose on).
   bool passes_as_sent(const std::pair<int, std::string>& source, const PoseUpdate& update, bool valid) const;
-  // Tells the machine at `link` where its object `key` is believed to be; lets it go on `kick`.
-  static void correct(Link& link, const std::string& key, Vec3 position, bool kick);
+  // Tells the machine at `link` where its object `key` is believed to be; lets it go when it
+  // `struck_out` (went past kick_after).
+  void correct(Link& link, const std::string& key, Vec3 position, bool struck_out);
   // Forgets what was checked of the moves of a machine that left.
   void forget_movement_of(int peer);
   // How many objects of `peer` the others place where the host believes them, and where they start.
@@ -389,7 +392,8 @@ class NetworkSession {
   // when the two speak different versions of the protocol).
   void turned_away(const nlohmann::json& refusal);
   void peer_arrived(int peer, std::vector<NetworkEvent>& events);
-  void peer_left(int peer, std::vector<NetworkEvent>& events);
+  // `peer` is gone; `why` the host let it go, if it did (the game's on_leave hears it).
+  void peer_left(int peer, std::vector<NetworkEvent>& events, const std::string& why = {});
   void drop_closed_links(std::vector<NetworkEvent>& events);
   // What a poll does while this machine is on its way into the game (joining, or reconnecting).
   void on_the_way(float seconds, std::vector<NetworkEvent>& events);
@@ -410,9 +414,17 @@ class NetworkSession {
   void hold_place(const Link& link, std::vector<NetworkEvent>& events);
   // A machine that said goodbye.
   void let_go(Link& link);
-  // Tells the others `peer` left, and the game.
-  void farewell(int peer, std::vector<NetworkEvent>& events);
+  // Tells the others `peer` left, and the game (with why the host let it go, if it did).
+  void farewell(int peer, std::vector<NetworkEvent>& events, const std::string& why = {});
+  // On the host: lets a machine go for `why` (too many moves not believed, a flood, silence),
+  // saying so in the log as a warning; the game hears why in on_leave. No place is held for it.
+  void kick(Link& link, const std::string& why);
+  // Why a link that closed was let go (kick's reason, else its connection's, said in the log
+  // then); empty when it left by itself.
+  static std::string let_go_for(const Link& link);
   void expire_held_places(float seconds, std::vector<NetworkEvent>& events);
+  // A held place ran out: the machine is gone for good, said in the log and to the game.
+  void let_go_after_drop(const Held& held, std::vector<NetworkEvent>& events);
   // A newcomer that asks for a held place back with `token`.
   void resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events);
   // The place `token` gets back (held, or of a link still open the host has not seen drop yet,

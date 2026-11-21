@@ -93,6 +93,9 @@ class Connection {
   // failed, it went silent for too long, or stopped taking what was sent to it), and was not let
   // go for anything else nor said goodbye. What reconnecting is for.
   bool lost() const { return lost_ || (gone_ && !dropped_); }
+  // Why this side let the other go, when it did for something the other side did (a message that
+  // is not the game's, not taking what was sent, silence); empty otherwise.
+  const std::string& closed_for() const { return closed_for_; }
   // Whether next_message has something to give without anything more arriving.
   bool message_waiting() const { return incoming_.message_waiting(); }
   // Whether the next pump and next_message have something to do without anything more arriving:
@@ -164,6 +167,10 @@ class Connection {
   bool gone_ = false;
   bool dropped_ = false;
   bool lost_ = false;  // let go for its silence, or for not listening: gone without a goodbye
+  std::string closed_for_{};
+
+  // Lets go of the other side for `why` (see closed_for).
+  void close_for(const std::string& why);
 };
 
 }  // namespace redgem::net

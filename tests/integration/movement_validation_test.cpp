@@ -9,6 +9,7 @@
 
 #include "net/network_session.hpp"
 #include "socket_rounds.hpp"
+#include "test_support.hpp"
 
 using namespace redgem::net;
 
@@ -128,4 +129,23 @@ TEST_CASE("a machine past the violations the game allows is let go") {
   CHECK(game.until([&game] { return game.mover.state() == NetworkSession::State::Offline; }));
   // Gone, its count is forgotten with it.
   CHECK(game.host.movement_violations(kMover) == 0);
+}
+
+TEST_CASE("a machine let go says why: in the host's log, and to the host's game") {
+  // A load test lost a player on a dedicated server with nothing in the log to say why.
+  const redgem::test::LogCapture log;
+  Game game;
+  game.host.validate_movement(teleport_rules(1));
+  game.move_to(0.0f);
+  REQUIRE(game.mover.send_pose(kHero, {kFar, 0.0f, 0.0f}, redgem::Quat::identity()));
+  REQUIRE(game.until([&game] { return game.any(kHostSeat, NetworkEvent::Kind::PeerLeft); }));
+  CHECK(log.contains("let go of machine 2: too many moves the host did not believe"));
+  for (const NetworkEvent& event : game.events[kHostSeat]) {
+    if (event.kind == NetworkEvent::Kind::PeerLeft) CHECK(event.name.find("movement validation") != std::string::npos);
+  }
+  // A machine that leaves by itself leaves with no reason.
+  game.watcher.leave();
+  REQUIRE(game.until([&game] { return game.host.peers().empty(); }));
+  CHECK(game.events[kHostSeat].back().kind == NetworkEvent::Kind::PeerLeft);
+  CHECK(game.events[kHostSeat].back().name.empty());
 }

@@ -3,6 +3,8 @@
 #include "net/network_session.hpp"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 
 namespace redgem::net {
 
@@ -212,19 +214,21 @@ void NetworkSession::handle(Link& link, const nlohmann::json& message, std::vect
       handle_as_guest(message, events);
     }
   } catch (const nlohmann::json::exception&) {
-    link.connection.close();  // (well_formed should have caught it: a peer never takes the game down)
+    kick(link, "it sent a message that is not well formed");  // (well_formed should have caught it)
   }
 }
 
 bool NetworkSession::knows(int peer) const { return std::find(peers_.begin(), peers_.end(), peer) != peers_.end(); }
 
-void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
+void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events, const std::string& why) {
   const auto gone = std::remove(peers_.begin(), peers_.end(), peer);
   if (gone == peers_.end()) return;  // nobody the game heard of
   peers_.erase(gone, peers_.end());
   poses_.heard.forget(peer);
   forget_movement_of(peer);
-  events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer));
+  NetworkEvent left = NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer);
+  left.name = why;
+  events.push_back(std::move(left));
 }
 
 void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
