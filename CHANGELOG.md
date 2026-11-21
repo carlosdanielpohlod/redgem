@@ -23,6 +23,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
   1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
   alone.
+- **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
+  `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
+  fog, light and effects of the environment object, and the next frame shows them. A day that
+  turns to night needed a scene of its own for every hour.
 - **Menu and interface themes (experimental).** A game gives its menus its own look in
   game.json's `"menu": {"theme": {...}, "screens": {...}}`, or from a script with `UI.theme=`,
   `GameMenu.theme=` and `screen.theme=`. A theme sets the fonts (body and heading), sizes, colors

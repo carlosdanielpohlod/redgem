@@ -2272,6 +2272,58 @@
       "notes": "Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game."
     },
     {
+      "name": "Environment",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them.",
+      "methods": [
+        {
+          "name": "[]",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "Float | String | bool | nil"},
+          "about": "what the environment object says of a setting (a color as \"#rrggbb\"), or nil when it says nothing and the default applies",
+          "example": "Environment[:sky_intensity]"
+        },
+        {
+          "name": "[]=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String"},
+            {"name": "value", "type": "Numeric | String | Symbol | Array[Numeric] | bool | nil"}
+          ],
+          "returns": {"type": "Numeric | String | Symbol | Array[Numeric] | bool | nil"},
+          "about": "changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or \"#rrggbb\"; nil gives the setting back to its default",
+          "example": "Environment[:fog_color] = [40, 50, 70]"
+        },
+        {
+          "name": "set",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "nil"},
+          "about": "changes several settings at once, as []= does each: all of them, or none when one is refused",
+          "example": "Environment.set(sky_image: \"night_sky\", sky_intensity: 0.3, ambient: 0.6)"
+        },
+        {
+          "name": "present?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the scene has an environment object (environment = true) for scripts to change"
+        }
+      ],
+      "guide": "../levels.md#changing-the-look-while-the-game-runs",
+      "notes": "The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file."
+    },
+    {
       "name": "Material",
       "stability": "experimental",
       "kind": "module",

@@ -73,6 +73,26 @@ always does). When more lights want shadows than are allowed, the ones nearest t
 them, and a light that drops out of the budget loses its shadow at once. A light's intensity and color can change while the game runs (see
 [Gameplay recipes](scripting/gameplay.md#light-that-flickers-and-fades)).
 
+### Changing the look while the game runs
+
+A script changes the environment object's settings with `Environment`, and the next frame drawn
+shows them: a day that turns to night, fog rolling in, a flash of lightning.
+
+```ruby
+Environment[:sky_intensity] = 0.15                      # dusk: the sky picture and its light dim
+Environment.set(sky_image: "night_sky", ambient: 0.5,   # a picture of its own for the night
+                fog_color: [20, 26, 40], fog_density: 0.004)
+Environment[:fog_color]                                 # => "#141a28"
+Environment[:bloom] = nil                               # back to the default
+```
+
+Every property of the table above can be changed. Colors take a name (`:orange`), `[r, g, b]`
+from 0 to 255 or `"#rrggbb"`. A number or a color costs nothing; a new `sky_image` loads that
+picture and works out its light, which takes a moment, so swap skies at a cut or keep the swap for
+when it is dark. The scene needs an environment object (`Environment.present?`); a scene without
+one refuses changes. Each machine keeps its own look, so a game played together changes it on
+every machine, and a scene loaded anew starts from its own file.
+
 ### See-through materials and wind
 
 Blender's material settings decide how a material shows what is behind it (the glTF exporter
