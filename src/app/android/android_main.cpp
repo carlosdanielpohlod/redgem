@@ -14,6 +14,7 @@
 #include <fstream>
 #include <new>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -60,19 +61,18 @@ std::string read_asset(AAssetManager* assets, const std::string& name) {
 }
 
 // Streams an open asset into `to`; false when not all of it was written.
+// (A read that failed partway: AAsset_read gives a negative count.)
 bool stream_asset(AAsset* asset, const std::filesystem::path& to) {
   std::ofstream out(to, std::ios::binary);
   std::vector<char> chunk(kCopyChunkBytes);
-  for (int count = AAsset_read(asset, chunk.data(), chunk.size()); count > 0;
-       count = AAsset_read(asset, chunk.data(), chunk.size())) {
-    out.write(chunk.data(), count);
-  }
+  int count = AAsset_read(asset, chunk.data(), chunk.size());
+  for (; count > 0; count = AAsset_read(asset, chunk.data(), chunk.size())) out.write(chunk.data(), count);
   out.close();
-  return !out.fail();
+  return count == 0 && !out.fail();
 }
 
-// Copies an asset into `to` and pushes it to the disk, with its place in its folder: the stamp
-// written after it can never outlive it in a power cut, or the app killed with the phone.
+// Copies an asset into `to` and pushes it to the disk: the stamp written after it can never
+// outlive it in a power cut, or the app killed with the phone (its folders: sync_folders).
 bool copy_asset(AAssetManager* assets, const std::string& name, const std::filesystem::path& to) {
   AAsset* asset = AAssetManager_open(assets, name.c_str(), AASSET_MODE_STREAMING);
   if (asset == nullptr) return false;
@@ -80,7 +80,25 @@ bool copy_asset(AAssetManager* assets, const std::string& name, const std::files
   std::filesystem::create_directories(to.parent_path(), ignored);
   const bool written = stream_asset(asset, to);
   AAsset_close(asset);
-  return written && durable::flush_file(to) && durable::sync_folder(to.parent_path());
+  return written && durable::flush_file(to);
+}
+
+// The folders a copy of `path` (one the APK's list names) may have made or added to inside `home`:
+// its own and each one above it, `home` too.
+void add_folders_of(const std::string& path, const std::filesystem::path& home,
+                    std::set<std::filesystem::path>& folders) {
+  for (auto inside = std::filesystem::path(path).parent_path(); !inside.empty(); inside = inside.parent_path()) {
+    folders.insert(home / inside);
+  }
+  folders.insert(home);
+}
+
+// Pushes the lists of files of `folders` to the disk, each once, so that the files copied stay
+// where they are. (A folder that cannot be flushed is only a warning, as for durable::replace_file.)
+void sync_folders(const std::set<std::filesystem::path>& folders) {
+  for (const auto& folder : folders) {
+    if (!durable::sync_folder(folder)) log::warning("the folder " + folder.string() + " could not be flushed to disk");
+  }
 }
 
 // What a file says; nothing when it is not there.
@@ -95,6 +113,7 @@ std::string read_file(const std::filesystem::path& file) {
 // logged, when the game could not be unpacked.
 int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
   std::istringstream manifest(read_asset(assets, kAndroidManifestAsset));
+  std::set<std::filesystem::path> folders;
   int copied = 0;
   for (std::string path; std::getline(manifest, path);) {
     if (path.empty()) continue;
@@ -102,9 +121,11 @@ int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
       log::error("cannot unpack " + path);
       return 0;
     }
+    add_folders_of(path, home, folders);
     ++copied;
   }
   if (copied == 0) log::error("the app carries no game files");
+  sync_folders(folders);
   return copied;
 }
 
