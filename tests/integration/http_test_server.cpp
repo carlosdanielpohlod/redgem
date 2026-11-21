@@ -224,6 +224,25 @@ std::string HttpTestServer::last_request() const {
   return last_request_;
 }
 
+void HttpTestServer::note_hang_up() {
+  {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    ++hang_ups_;
+  }
+  heard_.notify_all();
+}
+
+bool HttpTestServer::wait_for_requests(int count) const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  return heard_.wait_for(lock, std::chrono::duration<float>(kTestServerPatience),
+                         [this, count] { return requests_.load() >= count; });
+}
+
+bool HttpTestServer::wait_for_hang_up() const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  return heard_.wait_for(lock, std::chrono::duration<float>(kTestServerPatience), [this] { return saw_hang_up(); });
+}
+
 void HttpTestServer::serve() {
   while (!stopping()) {
     net::Socket::wait({{&listener_, false}}, kLookSeconds);
@@ -240,17 +259,16 @@ void HttpTestServer::serve_one(net::Socket socket) {
     channel.wait();
     if (!channel.read(request)) return;
   }
+  int index = 0;
   {
     const std::lock_guard<std::mutex> lock(mutex_);
     last_request_ = request;
+    index = requests_++;
   }
-  const int index = requests_++;
+  heard_.notify_all();
   while (quiet_.load() && !stopping()) {
     channel.wait();
-    if (!channel.read(request)) {
-      ++hang_ups_;
-      return;
-    }
+    if (!channel.read(request)) return note_hang_up();
   }
   channel.write_all(answer_to(index), stop_);
   if (goodbye_.load()) channel.say_goodbye();

@@ -32,6 +32,10 @@ class AgentConnection {
 
   // Takes in what the agent sent since the last call (on the editor's thread).
   void poll();
+  // Sleeps until the next poll has something to take in (a message, or the agent's end),
+  // `seconds` at most: for a program with nothing else to do meanwhile (the editor's frames never
+  // wait). Whether it has.
+  bool wait(float seconds);
   AgentClient& client() { return client_; }
   const AgentClient& client() const { return client_; }
   // The last lines of the agent's standard error (its own messages: a login it wants, a crash).
@@ -47,6 +51,10 @@ class AgentConnection {
   void write_messages();
   void keep_error_line(const std::string& line);
   bool take_inbox(std::deque<Json>& messages, bool& ended);
+  // Whether a poll has something to take in (under lock_, on the editor's thread): a message, or
+  // the agent's end not reported yet.
+  bool news_waiting() const { return !inbox_.empty() || end_to_report(); }
+  bool end_to_report() const { return (output_ended_ || unreadable_) && !end_reported_; }
   std::string why_it_ended() const;
 
   AgentClient client_;
@@ -58,6 +66,7 @@ class AgentConnection {
   mutable std::mutex lock_;  // guards everything below, which the threads share
   std::condition_variable outbox_ready_;
   std::condition_variable errors_ended_signal_;
+  std::condition_variable news_;    // told when a message is read, or the agent's output ends
   std::deque<std::string> outbox_;  // lines to write
   std::deque<Json> inbox_;          // messages read
   std::deque<std::string> error_lines_;

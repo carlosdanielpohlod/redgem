@@ -3,10 +3,8 @@
 
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <filesystem>
 #include <functional>
-#include <thread>
 
 #include <mruby.h>
 #include <mruby/string.h>
@@ -25,8 +23,10 @@ using redgem::test::HttpTestServer;
 
 namespace {
 
-constexpr std::chrono::milliseconds kFramePause{2};
-constexpr std::chrono::seconds kLongestWait{10};
+// A frame waits this long for an answer at most before it plays; there are that many frames at
+// most (a bound for an answer that never comes, never a measure).
+constexpr float kAnswerLook = 0.002f;
+constexpr int kMostFrames = 5000;
 
 std::filesystem::path save_file() { return std::filesystem::temp_directory_path() / "redgem-http-game-test.json"; }
 
@@ -46,11 +46,11 @@ std::string ruby(Engine& engine, const std::string& code) {
   return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
 }
 
-bool eventually(const std::function<bool()>& done, const std::function<void()>& meanwhile = [] {}) {
-  const auto give_up = std::chrono::steady_clock::now() + kLongestWait;
-  while (!done() && std::chrono::steady_clock::now() < give_up) {
-    meanwhile();
-    std::this_thread::sleep_for(kFramePause);
+// Plays frames of `game` until `done`, each once an answer waits for it (or a moment went by).
+bool frames_until(Engine& game, const std::function<bool()>& done) {
+  for (int frame = 0; frame < kMostFrames && !done(); ++frame) {
+    game.http().wait(kAnswerLook);
+    game.frame(config::kFixedDeltaSeconds);
   }
   return done();
 }
@@ -65,8 +65,7 @@ TEST_CASE("a script's request is answered in its block, on a frame of the game, 
        "$got = nil; HTTP.post('" + server.url("/scores") +
            "', json: { player: 'ana', points: 120 }) { |r| $got = [r.ok?, r.status, r.json[:rank], r.json[:top]] }");
   CHECK(ruby(*game, "$got.inspect") == "nil");  // the frame never waits
-  REQUIRE(eventually([&game] { return ruby(*game, "$got.nil?") == "false"; },
-                     [&game] { game->frame(config::kFixedDeltaSeconds); }));
+  REQUIRE(frames_until(*game, [&game] { return ruby(*game, "$got.nil?") == "false"; }));
   CHECK(ruby(*game, "$got.inspect") == "[true, 200, 3, [\"ana\"]]");
   const std::string seen = server.last_request();
   CHECK(seen.find("\r\nContent-Type: application/json\r\n") != std::string::npos);
@@ -81,8 +80,7 @@ TEST_CASE("a script's answer says where it came from once redirects were followe
       {http_answer("308 Permanent Redirect", "", "Location: /v2/news\r\n"), http_answer("200 OK", "{\"news\":1}")});
   auto game = sandbox_game();
   ruby(*game, "$got = nil; HTTP.get('" + server.url("/news") + "') { |r| $got = [r.ok?, r.url, r.json[:news]] }");
-  REQUIRE(eventually([&game] { return ruby(*game, "$got.nil?") == "false"; },
-                     [&game] { game->frame(config::kFixedDeltaSeconds); }));
+  REQUIRE(frames_until(*game, [&game] { return ruby(*game, "$got.nil?") == "false"; }));
   CHECK(ruby(*game, "$got.inspect") == "[true, \"" + server.url("/v2/news") + "\", 1]");
   remove_save(save_file());
 }
@@ -94,9 +92,9 @@ TEST_CASE("a game that ends gives its requests up: no block of it is ever called
   {
     auto game = sandbox_game();
     ruby(*game, "HTTP.get('" + server.url("/slow") + "') { raise 'never' }");
-    REQUIRE(eventually([&server] { return server.requests() == 1; }));
+    REQUIRE(server.wait_for_requests(1));
   }
-  CHECK(eventually([&server] { return server.saw_hang_up(); }));
+  CHECK(server.wait_for_hang_up());
   remove_save(save_file());
 }
 
@@ -111,7 +109,7 @@ TEST_CASE("stopping a game played in the editor gives its requests up") {
   std::string error;
   REQUIRE_MESSAGE(session->play({input}, error), error);
   REQUIRE(session->runtime()->scripts().eval("HTTP.get('" + server.url("/") + "') { raise 'never' }", "t.rb").ok);
-  REQUIRE(eventually([&server] { return server.requests() == 1; }));
+  REQUIRE(server.wait_for_requests(1));
   session->stop();
-  CHECK(eventually([&server] { return server.saw_hang_up(); }));
+  CHECK(server.wait_for_hang_up());
 }

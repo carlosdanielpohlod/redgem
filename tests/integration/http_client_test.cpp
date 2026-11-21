@@ -16,6 +16,7 @@
 #include "net/http/http_redirect.hpp"
 #include "net/http/http_stream.hpp"
 #include "net/socket/socket.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 using redgem::test::http_answer;
@@ -26,8 +27,11 @@ namespace {
 constexpr int kOk = 200;
 constexpr int kCreated = 201;
 constexpr int kFound = 302;
-constexpr std::chrono::milliseconds kPollPause{5};
-constexpr std::chrono::seconds kLongestWait{10};
+// A poll for an answer waits this long for one at most before the next poll; there are that many
+// polls at most (a bound for an answer that never comes, never a measure).
+constexpr float kAnswerLook = 0.005f;
+constexpr int kMostPolls = 2000;
+constexpr float kConnectPatience = 10.0f;  // seconds: a bound for a call to this machine, never a measure
 constexpr float kShortTimeout = 0.3f;
 constexpr int kTimeoutSteps = 10;  // the fake clock passes a short timeout in this many polls
 
@@ -47,22 +51,15 @@ int start(net::HttpClient& client, net::HttpRequest made) {
 
 // The answer to request `id`, polled for as a game does every frame; `between` runs between polls.
 net::HttpResponse answer(net::HttpClient& client, int id, const std::function<void()>& between = [] {}) {
-  const auto give_up = std::chrono::steady_clock::now() + kLongestWait;
-  while (std::chrono::steady_clock::now() < give_up) {
+  for (int poll = 0; poll < kMostPolls; ++poll) {
     for (net::HttpResult& result : client.poll()) {
       if (result.id == id) return std::move(result.response);
     }
     between();
-    std::this_thread::sleep_for(kPollPause);
+    client.wait(kAnswerLook);
   }
   FAIL("no answer came");
   return {};
-}
-
-bool eventually(const std::function<bool()>& done) {
-  const auto give_up = std::chrono::steady_clock::now() + kLongestWait;
-  while (!done() && std::chrono::steady_clock::now() < give_up) std::this_thread::sleep_for(kPollPause);
-  return done();
 }
 
 bool contains(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
@@ -79,6 +76,19 @@ TEST_CASE("a game's request to a server on this machine gets its answer, headers
   CHECK(response.headers.back() == std::make_pair(std::string("content-type"), std::string("application/json")));
   CHECK(server.last_request().rfind("GET /news?page=2 HTTP/1.1\r\n", 0) == 0);
   CHECK(client.in_flight() == 0);
+}
+
+TEST_CASE("a wait for an answer ends once one waits for the poll, and only then") {
+  constexpr float kLongWait = 10.0f;  // (a bound for an answer that never comes)
+  HttpTestServer server(HttpTestServer::Kind::Plain, http_answer("200 OK", "{}"));
+  net::HttpClient client;
+  CHECK_FALSE(client.wait(0.0f));  // nothing sent: nothing comes
+  const int id = start(client, request("GET", server.url("/")));
+  REQUIRE(client.wait(kLongWait));
+  const std::vector<net::HttpResult> results = client.poll();
+  REQUIRE(results.size() == 1);
+  CHECK(results.front().id == id);
+  CHECK_FALSE(client.wait(0.0f));  // collected
 }
 
 TEST_CASE("what a request carries reaches the server as it was given") {
@@ -173,9 +183,9 @@ TEST_CASE("requests still on their way when the game ends are given up, and thei
   {
     net::HttpClient client;
     start(client, request("GET", server.url("/forever")));
-    REQUIRE(eventually([&server] { return server.requests() == 1; }));
+    REQUIRE(server.wait_for_requests(1));
   }
-  CHECK(eventually([&server] { return server.saw_hang_up(); }));
+  CHECK(server.wait_for_hang_up());
 }
 
 TEST_CASE("a game has only so many requests on their way: one more is answered with an error") {
@@ -396,11 +406,12 @@ TEST_CASE("a game that ends while a request waits on a slow server ends at once,
   net::HttpRequest slow = request("GET", server.url("/slow"));
   slow.timeout_seconds = net::kLongestHttpTimeoutSeconds;
   start(*client, slow);
-  REQUIRE(eventually([&server] { return server.requests() == 1; }));
-  const auto ending = std::chrono::steady_clock::now();
+  REQUIRE(server.wait_for_requests(1));
+  test::LogCapture log;
   client.reset();
-  CHECK(std::chrono::steady_clock::now() - ending < net::kHttpShutdownWait);
-  CHECK(eventually([&server] { return server.saw_hang_up(); }));
+  // Its thread was joined: had it not ended by kHttpShutdownWait, the log would say it was left behind.
+  CHECK_FALSE(log.contains("left behind"));
+  CHECK(server.wait_for_hang_up());
 }
 
 TEST_CASE("requests answered just as their game ends, collected or not, end with it safely") {
@@ -432,31 +443,30 @@ net::Socket connected_to(const net::Socket& listener) {
   std::string error;
   net::Socket socket = net::Socket::connect_to(net::kThisMachine, listener.local_port(), error);
   REQUIRE_MESSAGE(socket.valid(), error);
-  REQUIRE(eventually([&socket] { return socket.connect_status() == net::IoStatus::Ok; }));
+  REQUIRE(net::Socket::wait({{&socket, true}}, kConnectPatience));  // (the call went through, or was refused)
+  REQUIRE(socket.connect_status() == net::IoStatus::Ok);
   return socket;
 }
 
 }  // namespace
 
 TEST_CASE("giving a request up hangs up the connection it waits on, so the wait ends at once") {
-  constexpr float kLongWaitSeconds = 10.0f;  // (far past the bound checked below)
+  constexpr float kLongWaitSeconds = 10.0f;  // (far past the hang-up)
   constexpr std::chrono::milliseconds kWhileItWaits{100};
   std::string error;
   const net::Socket listener = net::Socket::listen_local(0, error);
   REQUIRE_MESSAGE(listener.valid(), error);
   net::Socket socket = connected_to(listener);
   net::HttpCancel cancel;
-  const auto started = std::chrono::steady_clock::now();
   bool woken = false;
   std::thread waiting([&] {
     const net::HeldConnection held(cancel, socket);
     woken = net::Socket::wait({{&socket, false}}, kLongWaitSeconds);
   });
-  std::this_thread::sleep_for(kWhileItWaits);
+  std::this_thread::sleep_for(kWhileItWaits);  // (most likely while it waits; before, it is the case below)
   cancel.cancel();
   waiting.join();
-  CHECK(woken);
-  CHECK(std::chrono::steady_clock::now() - started < net::kHttpShutdownWait);
+  CHECK(woken);  // the hang-up ended the wait, not its ten seconds
   // Given up before it waits, a connection is hung up as soon as it is held.
   net::Socket later = connected_to(listener);
   const net::HeldConnection held(cancel, later);
