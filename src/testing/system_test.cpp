@@ -35,9 +35,11 @@ constexpr const char* kFailureMethod = "failure";
 constexpr const char* kPassed = "passed";
 constexpr const char* kFailed = "failed";
 constexpr const char* kWaiting = "waiting";  // a frame of a wait in real seconds (SystemTest#wait_for)
-// Waits in real seconds a test may spend in all, and as frames at the game's pace.
-constexpr float kMaxWaitedSeconds = 300.0f;
-constexpr long long kMaxWaitedFrames = static_cast<long long>(kMaxWaitedSeconds / config::kFixedDeltaSeconds);
+
+// The frames at the game's pace that `seconds` of waits in real seconds take.
+long long frames_in(int seconds) {
+  return static_cast<long long>(static_cast<float>(seconds) / config::kFixedDeltaSeconds);
+}
 
 enum class Status { Running, Passed, Failed };
 
@@ -66,7 +68,8 @@ EngineOptions engine_options(const SystemTestOptions& options, const RunFiles& f
 // One system test playing one game, from the first frame to the verdict.
 class SystemTestRun {
  public:
-  SystemTestRun(Engine& engine, FramePictures& pictures) : engine_(engine), pictures_(pictures) {}
+  SystemTestRun(Engine& engine, FramePictures& pictures, int wait_limit_seconds)
+      : engine_(engine), pictures_(pictures), max_waited_frames_(frames_in(wait_limit_seconds)) {}
 
   // Reads the test's file. Returns what is wrong with it, if anything is.
   std::optional<std::string> load(const std::filesystem::path& file);
@@ -86,6 +89,7 @@ class SystemTestRun {
   FramePictures& pictures_;
   mrb_value test_ = mrb_nil_value();  // (the global keeps it from Ruby's garbage collector)
   Status status_ = Status::Running;
+  long long max_waited_frames_;  // frames of waits in real seconds the test may spend in all
   long long waited_frames_ = 0;  // frames of waits in real seconds, which the limit does not count
   std::chrono::steady_clock::time_point last_waited_;  // when the last of them started
 };
@@ -132,8 +136,9 @@ bool SystemTestRun::timed_out() {
     fail("system test timed out after " + std::to_string(kMaxFrames) + " frames");
     return true;
   }
-  if (waited_frames_ >= kMaxWaitedFrames) {
-    fail("system test timed out after " + std::to_string(kMaxWaitedFrames) + " frames of waits in real seconds");
+  if (waited_frames_ >= max_waited_frames_) {
+    fail("system test timed out after " + std::to_string(max_waited_frames_) +
+         " frames of waits in real seconds (--wait-limit raises it)");
     return true;
   }
   return false;
@@ -175,10 +180,10 @@ int SystemTestRun::verdict() const {
 
 // The test's file, loaded into a game that is ready to play, and played.
 int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& pictures,
-              const std::filesystem::path& test_file) {
-  SystemTestRun run(engine, pictures);
+              const SystemTestOptions& options) {
+  SystemTestRun run(engine, pictures, options.wait_limit_seconds);
   std::optional<std::string> error = load_test_library(engine.scripts(), input, &pictures);
-  if (!error) error = run.load(test_file);
+  if (!error) error = run.load(options.test_file);
   if (error) {
     log::error(*error);
     return kExitFailure;
@@ -205,7 +210,7 @@ int play_with(const SystemTestOptions& options, const RunFiles& files) {
     log::error(*error);
     return kExitFailure;
   }
-  return play_test(*std::get<std::unique_ptr<Engine>>(created), input, pictures, options.test_file);
+  return play_test(*std::get<std::unique_ptr<Engine>>(created), input, pictures, options);
 }
 
 }  // namespace

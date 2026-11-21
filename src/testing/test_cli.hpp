@@ -20,6 +20,7 @@ struct TestCliOptions {
   std::filesystem::path work_dir;        // --work: a folder of this run's own (see SystemTestOptions)
   std::filesystem::path after;           // --after: the earlier test this run goes on from (the same)
   std::optional<std::string> gpu;        // --gpu auto|dedicated|integrated (overrides the saved setting)
+  std::optional<int> wait_limit_seconds;  // --wait-limit: real seconds of t.wait_for a system test may spend
 };
 
 struct TestCliResult {

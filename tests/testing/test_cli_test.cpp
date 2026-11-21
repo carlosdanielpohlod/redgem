@@ -118,3 +118,20 @@ TEST_CASE("a system test can go on from an earlier one run in the same folder, a
   CHECK(parse_test_cli({"games/demo", "a/t.rb", "--work", "/tmp/run", "--after", "b/t.rb"}).error ==
         "--after names an earlier test, not this one (they would share their files)");
 }
+
+TEST_CASE("a system test may wait longer for other programs than the usual five minutes") {
+  CHECK_FALSE(parse_test_cli({"games/demo", "t.rb"}).options.wait_limit_seconds.has_value());
+  const TestCliResult result = parse_test_cli({"games/demo", "t.rb", "--wait-limit", "900"});
+  REQUIRE(result.ok);
+  CHECK(result.options.wait_limit_seconds == 900);
+  const std::string refused = "--wait-limit needs a whole number of seconds from 1 to 86400";
+  for (const char* bad : {"0", "-5", "ten", "86401"}) {
+    CAPTURE(bad);
+    CHECK(parse_test_cli({"games/demo", "t.rb", "--wait-limit", bad}).error == refused);
+  }
+  CHECK(parse_test_cli({"games/demo", "t.rb", "--wait-limit"}).error == refused);
+  CHECK(parse_test_cli({"--ruby", "x_test.rb", "--wait-limit", "60"}).error ==
+        "--wait-limit is for system tests (Ruby tests do not wait for other programs)");
+  CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--wait-limit", "60"}).ok);
+  CHECK(test_usage().find("--wait-limit <seconds>") != std::string::npos);
+}

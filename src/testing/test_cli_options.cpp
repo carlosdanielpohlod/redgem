@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
+#include <string>
 
 #include "core/command_line.hpp"
 #include "core/files.hpp"
 #include "core/translations.hpp"
 #include "render/gpu_select.hpp"
 #include "testing/test_cli_reading.hpp"
+#include "testing/testing_config.hpp"
 
 namespace redgem::testing::cli {
 namespace {
@@ -21,6 +23,7 @@ constexpr const char* kWorkOption = "--work";
 constexpr const char* kGameOption = "--game";
 constexpr const char* kAllOption = "--all";
 constexpr const char* kAfterOption = "--after";
+constexpr const char* kWaitLimitOption = "--wait-limit";
 
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
@@ -89,6 +92,19 @@ void read_all(Reading& reading) {
   reading.result.options.game_dir = normalized_folder(*folder);
 }
 
+// --wait-limit <seconds>: the real seconds a system test may spend waiting for another program.
+void read_wait_limit(Reading& reading) {
+  const auto word = value(reading);
+  const auto seconds =
+      word ? command_line::number_between(*word, 1, config::kMostWaitLimitSeconds) : std::optional<int>{};
+  if (!seconds) {
+    const std::string most = std::to_string(config::kMostWaitLimitSeconds);
+    fail(reading, tr("testing.cli.wait_limit_needs_seconds", {{"most", most}}));
+    return;
+  }
+  reading.result.options.wait_limit_seconds = *seconds;
+}
+
 void read_headless(Reading& reading) { reading.result.options.headless = true; }
 
 void read_gpu(Reading& reading) {
@@ -112,6 +128,7 @@ constexpr Option kOptions[] = {
     {kGameOption, read_game},
     {kAllOption, read_all},
     {kAfterOption, read_after},
+    {kWaitLimitOption, read_wait_limit},
 };
 
 }  // namespace
