@@ -1,4 +1,39 @@
 {
   "studio": "My Studio",
-  "network": true
+  "version": "0.1.0",
+  "network": true,
+  "menu": {
+    "theme": {
+      "colors": {
+        "heading": "#ffd166",
+        "caption": "#ffd166",
+        "button": "#1d3557",
+        "button_alpha": 235,
+        "hover": "#e76f51",
+        "focused": "#e76f51",
+        "focus_ring": "#ffd166",
+        "accent": "#f4a261",
+        "shade": "#0b1526",
+        "shade_alpha": 140
+      },
+      "button": { "radius": 22, "border": 2, "width": 300 },
+      "layout": { "align": "left", "margins": [0, 0, 0, 72] },
+      "transition": { "kind": "slide", "seconds": 0.25 }
+    },
+    "screens": {
+      "title": {
+        "logo": { "image": "logo", "anchor": "top_left", "x": 72, "y": 64 },
+        "footer": { "text": "{title} v{version}" },
+        "background": {
+          "kind": "scene",
+          "blur": 0.5,
+          "camera_path": {
+            "points": [[-6, 4, 6], [6, 5, 2], [4, 6, -18], [-5, 4, -10]],
+            "look_at": [0, 1.5, -7],
+            "seconds": 24
+          }
+        }
+      }
+    }
+  }
 }

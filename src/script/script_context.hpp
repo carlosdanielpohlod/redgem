@@ -103,6 +103,10 @@ struct ScriptContext {
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
   std::string ui_font;  // selected game face or chain (render/font_chain.hpp); empty uses the built-in font
+  // Where UI.image finds the game's pictures (its images/ folder), for UI.image_size; none outside a game.
+  std::filesystem::path images_dir;
+  // game.json's "menu" section, as its JSON text (empty without one): how GameMenu looks.
+  std::string menu_settings;
   // Called when a player's bindings changed (Input.bind, unbind, reset_bindings), so that they are
   // kept for the next run; null when nobody keeps them.
   std::function<void()> on_bindings_changed;
@@ -117,6 +121,8 @@ struct ScriptContext {
   bool keyboard_visible = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // Camera.backdrop_blur: how much the whole picture is blurred, 0 to 1 (a menu's backdrop).
+  float backdrop_blur = 0.0f;
   // Camera.auto_exposure and the others: what the game changes of the scene's auto exposure.
   AutoExposureOverrides auto_exposure;
   // Material.set_emission: the glow of the materials of each name, over what the scene's file says.

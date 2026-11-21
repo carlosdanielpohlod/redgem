@@ -37,6 +37,7 @@ constexpr const char* kPhysicsKey = "physics";
 constexpr const char* kUiKey = "ui";
 constexpr const char* kUiReferenceKey = "reference";
 constexpr const char* kUiMatchKey = "match";
+constexpr const char* kMenuKey = "menu";
 constexpr std::size_t kReferenceSides = 2;  // [width, height]
 constexpr int kJsonIndent = 2;
 constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
@@ -229,7 +230,13 @@ void read_movement(const nlohmann::json& json, GameManifest& manifest) {
 }
 
 // game.json's sections, each with the warnings of what it says that cannot be used.
+// The menu's look, as the file has it: GameMenu reads it (and `redgem check` checks it) in Ruby.
+void read_menu(const nlohmann::json& json, GameSettings& settings) {
+  if (json.contains(kMenuKey)) settings.menu = json[kMenuKey].dump();
+}
+
 void read_sections(const nlohmann::json& json, GameManifest& manifest) {
+  read_menu(json, manifest.settings);
   read_physics(json, manifest);
   read_servers(json, manifest);
   read_navigation(json, manifest);

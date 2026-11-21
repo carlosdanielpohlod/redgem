@@ -36,6 +36,18 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
+// A gradient from its top color to its bottom one.
+void draw_hud_gradient(const HudItem& item) {
+  DrawRectangleGradientV(item.x, item.y, item.width, item.height, to_raylib(item.color), to_raylib(item.bottom));
+}
+
+// The part of a picture an item draws: the whole of it unless the item names one.
+Rectangle part_of(const HudItem& item, const Texture2D& picture) {
+  const PicturePart& part = item.part;
+  if (part.width > 0.0f && part.height > 0.0f) return {part.x, part.y, part.width, part.height};
+  return {0.0f, 0.0f, static_cast<float>(picture.width), static_cast<float>(picture.height)};
+}
+
 // A side of an image drawn at its own size, in pixels at the interface's scale: never less than one.
 int scaled_side(int side, float scale) {
   return std::max(1, static_cast<int>(std::lround(static_cast<float>(side) * scale)));
@@ -75,11 +87,12 @@ void Renderer::Impl::draw_hud_text(const HudItem& item) {
 void Renderer::Impl::draw_hud_image(const HudItem& item) {
   const Texture2D* picture = ui_image(item.text);
   if (picture == nullptr) return;
-  const render_math::Size size = render_math::image_size(
-      item.width, item.height, scaled_side(picture->width, item.scale), scaled_side(picture->height, item.scale));
-  DrawTexturePro(*picture, {0.0f, 0.0f, static_cast<float>(picture->width), static_cast<float>(picture->height)},
-                 {static_cast<float>(item.x), static_cast<float>(item.y), size.width, size.height}, {0.0f, 0.0f}, 0.0f,
-                 to_raylib(item.color));
+  const Rectangle part = part_of(item, *picture);
+  const render_math::Size size =
+      render_math::image_size(item.width, item.height, scaled_side(static_cast<int>(part.width), item.scale),
+                              scaled_side(static_cast<int>(part.height), item.scale));
+  DrawTexturePro(*picture, part, {static_cast<float>(item.x), static_cast<float>(item.y), size.width, size.height},
+                 {0.0f, 0.0f}, 0.0f, to_raylib(item.color));
 }
 
 bool Renderer::Impl::draw_hud_item(const HudItem& item, bool clipped) {
@@ -95,6 +108,9 @@ void Renderer::Impl::draw_hud_picture(const HudItem& item) {
       break;
     case HudItem::Kind::Rect:
       draw_hud_rect(item);
+      break;
+    case HudItem::Kind::Gradient:
+      draw_hud_gradient(item);
       break;
     default:  // an image (clips are not pictures)
       draw_hud_image(item);

@@ -110,8 +110,9 @@ class GameMenuTest < RedGemTest::Case
   def test_buttons_are_stacked_in_the_middle_of_the_screen
     stacked = menu
     x, y, width, height = stacked.button_box(0)
-    assert_equal [(UI.width - width) / 2, GameMenu::BUTTON_WIDTH, GameMenu::BUTTON_HEIGHT], [x, width, height]
-    assert_equal y + height + GameMenu::BUTTON_GAP, stacked.button_box(1)[1]
+    button = UI::Theme.default[:button]
+    assert_equal [(UI.width - width) / 2, button[:width], button[:height]], [x, width, height]
+    assert_equal y + height + button[:gap], stacked.button_box(1)[1]
   end
 
   def test_the_settings_screen_goes_back_to_where_it_was_opened_from
@@ -147,9 +148,9 @@ class GameMenuTest < RedGemTest::Case
     opened.show(:settings)
     settings = opened.screens[:settings]
     assert settings.focus.at?(0)
-    x, y, = opened.button_box(0)
+    y = opened.button_box(0)[1]
     assert_equal (UI.height * GameMenu::SettingsScreen::BUTTONS_SHARE).to_i, y, "the Back button sits under the rows"
-    settings.draw([x, y, GameMenu::BUTTON_WIDTH, GameMenu::BUTTON_HEIGHT]) # (draws every row, as Settings has them)
+    settings.draw(opened.button_box(0)) # (draws every row, as Settings has them)
     assert_equal :ultra, Settings.quality, "drawing them changes nothing"
   end
 
