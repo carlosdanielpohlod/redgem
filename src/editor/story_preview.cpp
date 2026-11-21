@@ -89,22 +89,36 @@ std::vector<PreviewVariable> variables_from(const nlohmann::json& json) {
   return variables;
 }
 
-// What a method of EditorPreview answers (the state, as JSON text), or nothing with `error` saying why.
-std::optional<std::string> answer_of(RubyVm& vm, const std::string& method, const std::vector<std::string>& args,
-                                     std::string& error) {
-  const int arena = mrb_gc_arena_save(vm.state());
+// A method of EditorPreview called with these texts (the module's own error when it is not there).
+RubyResult called(RubyVm& vm, const std::string& method, const std::vector<std::string>& args) {
   const RubyResult module = vm.eval(kPreviewModule, kWhere);
-  const RubyResult answer = vm.call_with(module.value, method.c_str(), [&args](mrb_state* mrb) {
+  if (!module.ok) return module;
+  return vm.call_with(module.value, method.c_str(), [&args](mrb_state* mrb) {
     std::vector<mrb_value> values;
     for (const std::string& arg : args) values.push_back(mrb_str_new(mrb, arg.data(), arg.size()));
     return values;
   });
+}
+
+// What a method of EditorPreview answers (the state, as JSON text), or nothing with `error` saying why.
+std::optional<std::string> answer_of(RubyVm& vm, const std::string& method, const std::vector<std::string>& args,
+                                     std::string& error) {
+  const int arena = mrb_gc_arena_save(vm.state());
+  const RubyResult answer = called(vm, method, args);
   const bool told = answer.ok && mrb_string_p(answer.value);
   std::optional<std::string> text;
   if (told) text = std::string(RSTRING_PTR(answer.value), static_cast<std::size_t>(RSTRING_LEN(answer.value)));
   mrb_gc_arena_restore(vm.state(), arena);
   if (!told) error = answer.ok ? tr("editor.story.no_answer") : answer.error;
   return text;
+}
+
+// The JSON of an answer, or nothing for none or a text that is not JSON.
+std::optional<nlohmann::json> parsed(const std::optional<std::string>& text) {
+  if (!text) return std::nullopt;
+  nlohmann::json json = nlohmann::json::parse(*text, nullptr, false);
+  if (json.is_discarded()) return std::nullopt;
+  return json;
 }
 
 }  // namespace
@@ -139,14 +153,22 @@ bool StoryPreview::ready() {
   }
 }
 
+// A step that went wrong may have made some of its effects happen: the state is then asked for and
+// shown as it is, and error() keeps why the step went wrong. A state that is not JSON is not shown.
 bool StoryPreview::ask(const std::string& method, const std::vector<std::string>& args) {
   if (!ready()) return false;
-  const std::optional<std::string> answer = answer_of(engine_->scripts().vm(), method, args, error_);
-  // A step that went wrong may have made some of its effects happen: the state is shown as it is.
-  const std::optional<std::string> now = answer ? answer : answer_of(engine_->scripts().vm(), "__state", {}, error_);
-  if (now) state_ = preview_state_from(nlohmann::json::parse(*now, nullptr, false));
-  if (answer) error_.clear();
-  return answer.has_value();
+  RubyVm& vm = engine_->scripts().vm();
+  error_.clear();
+  const std::optional<std::string> answer = answer_of(vm, method, args, error_);
+  std::string state_error;
+  const std::optional<std::string> now = answer ? answer : answer_of(vm, "__state", {}, state_error);
+  const std::optional<nlohmann::json> json = parsed(now);
+  if (json) {
+    state_ = preview_state_from(*json);
+  } else if (answer) {
+    error_ = tr("editor.story.no_answer");
+  }
+  return error_.empty();
 }
 
 bool StoryPreview::start_dialogue(const std::string& name) { return ask("__dialogue", {name}); }

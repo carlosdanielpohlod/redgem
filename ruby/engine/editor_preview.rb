@@ -13,9 +13,9 @@ module EditorPreview
     end
 
     # Takes a choice of the line (its index among the node's choices, as text), or goes on from a
-    # line with none.
-    def __choose(index) = act { @conversation&.choose(Integer(index)) }
-    def __continue = act { @conversation&.continue }
+    # line with none. Raises when the conversation cannot take that step.
+    def __choose(index) = act { stepped(@conversation&.choose(Integer(index))) }
+    def __continue = act { stepped(@conversation&.continue) }
 
     # Starts a quest at its first stage (read again from its file, and from nothing when it had
     # started), or moves it to a stage.
@@ -36,6 +36,10 @@ module EditorPreview
     def act
       yield
       __state
+    end
+
+    def stepped(moved)
+      raise ArgumentError, "the conversation cannot take that step" unless moved
     end
 
     # The dialogues and quests read so far: the next step reads their files again.

@@ -78,8 +78,8 @@ class StoryPreview {
   StoryPreview& operator=(const StoryPreview&) = delete;
 
   // Each returns false, with error() saying why, when the files or the step went wrong (the state
-  // then shows what the step's effects did before it went wrong). The dialogues and quests are read
-  // again from their files at each step.
+  // then shows what the step's effects did before it went wrong). Starting a dialogue or a quest,
+  // or moving a quest, reads their files again; a choice goes on with the dialogue as it was read.
   bool start_dialogue(const std::string& name);
   bool choose(int index);
   bool go_on();  // a line with no choices: on to what follows

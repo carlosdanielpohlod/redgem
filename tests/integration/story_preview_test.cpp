@@ -115,6 +115,11 @@ TEST_CASE("a step that goes wrong says why and keeps the state") {
   CHECK_FALSE(preview.error().empty());
   CHECK_FALSE(preview.set_stage("bread", "nowhere"));
   CHECK(preview.state().quests[0].stage == "flour");
+  REQUIRE(preview.start_dialogue("baker"));
+  CHECK_FALSE(preview.choose(1));  // 5 gold is not 100: the choice is not offered
+  CHECK_FALSE(preview.error().empty());
+  CHECK_FALSE(preview.go_on());  // the line waits for a choice
+  CHECK(preview.state().line->node == "hello");
   REQUIRE_MESSAGE(preview.start_quest("bread"), preview.error());
   CHECK(preview.error().empty());
   fs::remove_all(game);

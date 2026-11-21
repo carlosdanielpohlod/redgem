@@ -262,7 +262,7 @@ the files on disk (`dialogues/` and `quests/`) each time a run starts, so a file
 program shows at once.
 
 - Pick a dialogue and press **Talk**. The panel shows the line's node, speaker and text (in the
-  game's first language, and its I18n key), the line's effects, and every choice of the line: a
+  language the game would start in, and its I18n key), the line's effects, and every choice of the line: a
   choice whose conditions do not hold is greyed out, and each shows its `if`, its `effects` and
   where it leads. Press a choice to take it, or **Continue** on a line with none.
 - Pick a quest and press **Start quest**: it starts at its first stage, from nothing. The panel
