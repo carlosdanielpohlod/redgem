@@ -97,9 +97,12 @@ void set_alpha_to_coverage(bool on) {
 
 void set_clockwise_front_faces(bool clockwise) { glFrontFace(clockwise ? GL_CW : GL_CCW); }
 
-void clear_depth() {
-  glDepthMask(GL_TRUE);
-  glClear(GL_DEPTH_BUFFER_BIT);
+void set_depth_range(float nearest, float farthest) {
+#if defined(GRAPHICS_API_OPENGL_ES3)
+  glDepthRangef(nearest, farthest);
+#else
+  glDepthRange(nearest, farthest);
+#endif
 }
 
 void filter_cube_maps_across_seams() {

@@ -57,6 +57,8 @@ the same pull request.
   for temporal anti-aliasing: where it is, the frames before count for less, so its edges are
   smoothed less. The world's ambient occlusion may darken its edges a little. Point and spot
   lights of the scene do not light it, and its own fill light is fixed (white, from the eye).
+  `Camera.from_view_model` works from the steady camera: while it shakes, what starts there is
+  off the muzzle by as much as the shake moves the picture.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot

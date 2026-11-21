@@ -123,9 +123,9 @@ void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem
   draw_sky(camera);
   draw_surfaces(to_vec3(camera.position), sampled);
   draw_scene_particles(particles, camera);
-  draw_view_model(camera);
   EndMode3D();
   if (glow_gathered) add_gathered_glow();
+  draw_view_model(camera);
   EndTextureMode();
   if (sampled) resolve_samples();
 }

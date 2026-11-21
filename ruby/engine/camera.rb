@@ -25,7 +25,8 @@ module Camera
   # A muzzle flash or a tracer drawn in the world starts there.
   #   Particles.burst(Camera.from_view_model(muzzle.transform.position), count: 6, glow: true)
   def self.from_view_model(point)
-    eye = main.transform
+    point = __vector(point, "Camera.from_view_model point")
+    eye = __main("Camera.from_view_model").transform
     offset = point - eye.position
     eye.position + eye.forward * offset.dot(eye.forward) + __across(eye, offset) * __view_model_widening
   end
@@ -102,11 +103,12 @@ module Camera
 
   # The main camera's rig, put on it the first time a helper is asked for.
   def self.__rig(asker)
-    camera = main
-    raise ArgumentError, "#{asker}: the scene has no camera" if camera.nil?
-
+    camera = __main(asker)
     camera.get_component(Rig) || camera.add_component(Rig)
   end
+
+  # The main camera: an ArgumentError when the scene has none.
+  def self.__main(asker) = main || raise(ArgumentError, "#{asker}: the scene has no camera")
 
   # The rig of the main camera, when it has one (a new scene's camera has none yet).
   def self.__current_rig = main&.get_component(Rig)

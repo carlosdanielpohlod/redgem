@@ -43,9 +43,9 @@ void set_alpha_to_coverage(bool on);
 // Which way round a triangle's corners go when it faces the viewer: counter-clockwise as glTF
 // says, or clockwise for a mirrored copy (its placement turned its triangles the other way).
 void set_clockwise_front_faces(bool clockwise);
-// Clears the depth of the framebuffer being drawn into, and nothing else: what is drawn next is
-// in front of everything drawn before.
-void clear_depth();
+// Squeezes the depths drawn from now on into [nearest, farthest] of the depth buffer (0 to 1 is
+// the whole of it, as everything is drawn but the view model).
+void set_depth_range(float nearest, float farthest);
 // The most pixels a side of a texture or a render buffer may have on the card: of a picture drawn
 // off screen.
 int largest_target_side();

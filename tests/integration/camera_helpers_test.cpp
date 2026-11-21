@@ -516,4 +516,5 @@ TEST_CASE("the view model: its property, its own field of view, and where its so
   const float widening = std::tan(degrees_to_radians(kWorldFov) / 2) / std::tan(degrees_to_radians(kWeaponFov) / 2);
   CHECK(number(*engine, "Camera.from_view_model(Vector3.new(0.3, -0.2, -1)).x") == doctest::Approx(0.3f * widening));
   CHECK(number(*engine, "Camera.from_view_model(Vector3.new(0.3, -0.2, -1)).y") == doctest::Approx(-0.2f * widening));
+  CHECK(error_of(*engine, "Camera.from_view_model(5)").find("must be a Vector3") != std::string::npos);
 }

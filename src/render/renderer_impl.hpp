@@ -666,7 +666,7 @@ struct Renderer::Impl {
   void light_view_model(Vec3 viewer);
   // Its objects and their see-through parts; returns where their record numbers start in `slots`.
   std::size_t draw_view_model_objects(Vec3 viewer);
-  void gather_view_model(bool mirrored);
+  void gather_view_model(bool mirrored, Vec3 viewer);
   // Where it covers the picture, into the motion target's alpha: the frames before count for less
   // there (its motion is not the world's).
   void mark_view_model_cover(std::size_t first, Vec3 viewer);

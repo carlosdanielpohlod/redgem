@@ -1,6 +1,7 @@
 // The view model: a first-person weapon or hands (objects with `view_model = true`, and what is
-// under them). It is drawn after the world, over a cleared depth, so it never goes into a wall
-// the player presses against. It has a field of view of its own (Camera.view_model_fov), is lit
+// under them). It is drawn after the world, its depths squeezed in front of all of the world's, so
+// it never goes into a wall the player presses against (and the world's depth stays, for ambient
+// occlusion, underwater fog and overlays). It has a field of view of its own (Camera.view_model_fov), is lit
 // by the sun without the world's shadows and by a fill light from the eye (readable indoors), and
 // casts no shadow on the world (the world's passes leave it out: see `seen`). No frustum culls
 // it: it is always in front of the camera.
@@ -24,8 +25,21 @@ constexpr float kFillIntensity = 0.08f;
 constexpr float kFillRange = 3.0f;
 constexpr float kNoShadow = 0.0f;
 constexpr int kNoLocalShadows = 0;
+// The share of the depth buffer, at its near end, the view model's depths are squeezed into. The
+// world's are behind it but for what is closer to the eye than a thousandth of the near distance
+// past the near plane (and is clipped about there anyway).
+constexpr float kNearest = 0.0f;
+constexpr float kViewModelDepths = 0.001f;
+constexpr float kFarthest = 1.0f;
 
 bool in_view_model(const ObjectSight& sight) { return sight.drawn && sight.view_model; }
+
+// In the view model and within its distance range from the eye (a level of detail is one of them):
+// no frustum or size culls it (an empty frustum takes everything).
+bool held_in_sight(const ObjectSight& sight, Vec3 viewer) {
+  const render_math::View everywhere{{}, viewer};
+  return in_view_model(sight) && render_math::sighted(everywhere, sight.sight, sight.visible_from, sight.visible_to);
+}
 
 PointLight fill_light(Vec3 eye) {
   PointLight fill;
@@ -37,17 +51,19 @@ PointLight fill_light(Vec3 eye) {
 
 }  // namespace
 
+// (In a 3D mode of its own: after the world's particles' glow, so glow behind it does not cover it.)
 void Renderer::Impl::draw_view_model(const Camera3D& camera) {
   if (std::none_of(sights.begin(), sights.end(), in_view_model)) return;
-  rlDrawRenderBatchActive();
-  clear_depth();
-  const Matrix world_projection = rlGetMatrixProjection();
-  rlSetMatrixProjection(view_model_projection());
+  BeginMode3D(camera);
+  set_depth_range(kNearest, kViewModelDepths);
+  rlSetMatrixProjection(view_model_projection());  // (EndMode3D puts the world's back)
   const Vec3 viewer = to_vec3(camera.position);
   light_view_model(viewer);
   const std::size_t first = draw_view_model_objects(viewer);
   if (motion_needed()) mark_view_model_cover(first, viewer);
-  rlSetMatrixProjection(world_projection);
+  rlDrawRenderBatchActive();
+  set_depth_range(kNearest, kFarthest);
+  EndMode3D();
 }
 
 Matrix Renderer::Impl::view_model_projection() const {
@@ -69,8 +85,8 @@ void Renderer::Impl::light_view_model(Vec3 viewer) {
 
 std::size_t Renderer::Impl::draw_view_model_objects(Vec3 viewer) {
   batches.start();
-  gather_view_model(false);
-  gather_view_model(true);
+  gather_view_model(false, viewer);
+  gather_view_model(true, viewer);
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects = object_pass(false, render_math::View{});
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
@@ -80,10 +96,10 @@ std::size_t Renderer::Impl::draw_view_model_objects(Vec3 viewer) {
   return first;
 }
 
-void Renderer::Impl::gather_view_model(bool mirrored) {
+void Renderer::Impl::gather_view_model(bool mirrored, Vec3 viewer) {
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
     const ObjectSight& sight = sights[slot];
-    if (in_view_model(sight) && sight.mirrored == mirrored) batches.add(sight.mesh, scattered_records + slot, mirrored);
+    if (sight.mirrored == mirrored && held_in_sight(sight, viewer)) batches.add(sight.mesh, scattered_records + slot, mirrored);
   }
 }
 
