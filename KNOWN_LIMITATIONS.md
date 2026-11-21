@@ -278,8 +278,13 @@ real clock.
 
 ### Shipping
 
-- The packed Android app has not been run on an emulator or a phone yet: the continuous integration
-  only builds its player.
+- The packed Android app runs on a phone or emulator: not yet confirmed; the emulator crashes on
+  this host. A packed game (Proving Ground, 0.6.1) unpacked, started and showed its title screen on
+  the emulator with SwiftShader graphics, then the emulator itself crashed: with the computer's
+  graphics card, in the emulator's own memory allocator (tcmalloc) as the computer's C library
+  (glibc 2.39) makes room for a new thread's storage; with SwiftShader, in its compiled drawing
+  code. Emulators 37.1.11 and 37.3.10, cold boots and wiped data alike. The continuous
+  integration only builds the player.
 
 ### Engineering
 
