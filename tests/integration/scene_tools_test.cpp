@@ -21,6 +21,7 @@
 #include "project/tool_commands.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -38,7 +39,7 @@ constexpr int kFrames = 30;
 // A copy of the platformer of the test's own, gone with it.
 class GameCopy {
  public:
-  explicit GameCopy(const std::string& name) : dir_(fs::temp_directory_path() / ("redgem_scene_tools_" + name)) {
+  explicit GameCopy(const std::string& name) : dir_(redgem::test::temp_root() / ("redgem_scene_tools_" + name)) {
     fs::remove_all(dir_);
     fs::copy(kPlatformer, dir_, fs::copy_options::recursive);
   }

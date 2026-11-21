@@ -21,6 +21,7 @@
 #include "net/rooms/relay_server.hpp"
 #include "socket_rounds.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -75,7 +76,7 @@ std::string ruby(Engine& engine, const std::string& code) {
 // Machines running the same game, each with its own engine and save file.
 struct Lan {
   SceneDesc scene = small_scene();
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-multiplayer-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-multiplayer-test";
   std::vector<std::unique_ptr<Engine>> machines;
   // With this, machines play the fixture game's own level from its files (which a restart loads
   // again) instead of the small scene above.
@@ -85,7 +86,9 @@ struct Lan {
   // The real time as the machines' networks read it (set before they start). Unless a test says
   // otherwise, a round's frame of it: the seconds the network counts (a join that gets no answer,
   // a place held for a machine that dropped) are the rounds', however fast the computer plays them.
-  Stopwatch::Reading network_time = [this] { return rounds_played * static_cast<double>(config::kDefaultFixedDeltaSeconds); };
+  Stopwatch::Reading network_time = [this] {
+    return rounds_played * static_cast<double>(config::kDefaultFixedDeltaSeconds);
+  };
   long rounds_played = 0;
 
   Lan() { std::filesystem::remove_all(dir); }

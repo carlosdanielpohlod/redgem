@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/build_id.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -129,7 +130,7 @@ Picture pe_loaded_picture() {
 }
 
 std::filesystem::path written(const Picture& picture, const std::string& name) {
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / name;
+  const std::filesystem::path file = redgem::test::temp_root() / name;
   std::ofstream(file, std::ios::binary)
       .write(reinterpret_cast<const char*>(picture.bytes.data()), static_cast<std::streamsize>(picture.bytes.size()));
   return file;

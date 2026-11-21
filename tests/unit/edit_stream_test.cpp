@@ -5,6 +5,7 @@
 #include "editor/edit_stream.hpp"
 #include "editor/document/scene_document.hpp"
 #include "editor/ui/panel_state.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -15,7 +16,7 @@ constexpr float kStep = 0.5f;
 
 // A document with two objects and no undo steps yet.
 struct TwoObjects {
-  SceneDocument doc = SceneDocument::create_empty(std::filesystem::temp_directory_path() / "redgem_edit_stream.glb");
+  SceneDocument doc = SceneDocument::create_empty(redgem::test::temp_root() / "redgem_edit_stream.glb");
   int first = doc.add_empty("First");
   int second = doc.add_empty("Second");
   int steps_before = undo_steps(doc);

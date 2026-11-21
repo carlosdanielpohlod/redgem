@@ -13,6 +13,7 @@
 #include "core/config.hpp"
 #include "core/image_header.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -24,7 +25,7 @@ constexpr int kSplashSide = 8;
 
 // A game folder of the test's own, with the game.json given.
 std::filesystem::path game_saying(const std::string& json) {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_game_identity_test" / "game";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_game_identity_test" / "game";
   std::filesystem::remove_all(dir.parent_path());
   std::filesystem::create_directories(dir);
   std::ofstream(dir / config::kSceneFileName) << "scene";

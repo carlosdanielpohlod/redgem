@@ -14,6 +14,7 @@
 #include "core/config.hpp"
 #include "editor/editor_app.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::save_window_picture;
@@ -34,7 +35,7 @@ constexpr const char* kStatusWindow = "##build_status";
 constexpr const char* kWaitDialog = "###build_wait";
 
 std::filesystem::path copy_game() {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_editor_build" / "game";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_editor_build" / "game";
   std::filesystem::remove_all(dir.parent_path());
   std::filesystem::create_directories(dir.parent_path());
   std::filesystem::copy(REDGEM_PLATFORMER_DIR, dir, std::filesystem::copy_options::recursive);

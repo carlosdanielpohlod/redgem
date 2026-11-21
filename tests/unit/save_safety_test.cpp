@@ -17,6 +17,7 @@
 #include "storage/durable_file.hpp"
 #include "storage/save_file.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -42,7 +43,7 @@ constexpr const char* kBackupDamagedAside = ".bak.damaged";
 
 // A save file in a folder of its own that does not exist yet, removed when the test ends.
 struct TempSave {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-save-safety-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-save-safety-test";
   std::filesystem::path file = dir / "nested" / "game.json";
   TempSave() { std::filesystem::remove_all(dir); }
   ~TempSave() { std::filesystem::remove_all(dir); }

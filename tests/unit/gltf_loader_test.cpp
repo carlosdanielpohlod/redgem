@@ -12,6 +12,7 @@
 #include "scene/props.hpp"
 #include "scene/scene_ids.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -70,8 +71,7 @@ TEST_CASE("loads meshes, materials, camera and light") {
 TEST_CASE("a spot light's cones are read from the file, and a light's cast_shadow from its extras") {
   constexpr float kInner = 0.25f;  // radians, as the file below says
   constexpr float kOuter = 0.5f;
-  const std::filesystem::path file =
-      std::filesystem::temp_directory_path() / ("redgem-spot-" + make_scene_id() + ".glb");
+  const std::filesystem::path file = redgem::test::temp_root() / ("redgem-spot-" + make_scene_id() + ".glb");
   GlbFile glb;
   glb.json = nlohmann::json::parse(R"({
     "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0, 1]}],
@@ -151,8 +151,7 @@ TEST_CASE("skeletons, vertex weights and animations are loaded") {
 TEST_CASE("a clip's markers are read from the redgem_events property of its extras") {
   constexpr std::size_t kFloats = 8;  // two key times, then two positions
   const std::array<float, kFloats> keys{0, 1, 0, 0, 0, 1, 0, 0};
-  const std::filesystem::path file =
-      std::filesystem::temp_directory_path() / ("redgem-markers-" + make_scene_id() + ".glb");
+  const std::filesystem::path file = redgem::test::temp_root() / ("redgem-markers-" + make_scene_id() + ".glb");
   GlbFile glb;
   glb.bin.resize(sizeof(keys));
   std::memcpy(glb.bin.data(), keys.data(), sizeof(keys));

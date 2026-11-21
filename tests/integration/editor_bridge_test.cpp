@@ -19,6 +19,7 @@
 #include "project/editor_live_tools.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_lookup.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -43,7 +44,7 @@ class Game {
   }
   Game(const Game&) = delete;
   Game& operator=(const Game&) = delete;
-  fs::path root = fs::temp_directory_path() / "redgem-editor-bridge-test";
+  fs::path root = redgem::test::temp_root() / "redgem-editor-bridge-test";
   fs::path path = root / "game";
   std::unique_ptr<EditorSession> session;
 };
@@ -244,7 +245,8 @@ TEST_CASE("live MCP catalog exposes status only under read-only and narrows edit
   options.read_only = false;
   for (const auto& tool : mcp::catalog(options)) {
     if (tool["name"] == "scene_edit")
-      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set", "add", "duplicate", "group", "remove"}));
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] ==
+            Json::array({"set", "add", "duplicate", "group", "remove"}));
   }
 }
 

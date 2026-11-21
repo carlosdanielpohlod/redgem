@@ -20,6 +20,7 @@ add_executable(redgem_tests
   unit/log_test.cpp
   unit/event_journal_test.cpp
   unit/files_test.cpp
+unit/temp_dirs_test.cpp
   unit/game_archive_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
@@ -689,6 +690,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
 add_dependencies(redgem_editor_system_tests redgem_player redgem_fake_acp_agent)
+target_include_directories(redgem_editor_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(redgem_editor_system_tests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:redgem_player>)
 target_compile_definitions(redgem_editor_system_tests PRIVATE

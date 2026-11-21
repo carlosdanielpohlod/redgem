@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "app/json_file.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -11,7 +12,7 @@ namespace {
 
 // A file of the test's own, removed when the test ends.
 struct ScratchFile {
-  std::filesystem::path path = std::filesystem::temp_directory_path() / "redgem-json-file-test.json";
+  std::filesystem::path path = redgem::test::temp_root() / "redgem-json-file-test.json";
   explicit ScratchFile(const std::string& text) { std::ofstream(path) << text; }
   ~ScratchFile() { std::filesystem::remove(path); }
 };

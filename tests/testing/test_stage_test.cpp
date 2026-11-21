@@ -6,6 +6,7 @@
 #include "app/game_display.hpp"
 #include "testing/frame_pictures.hpp"
 #include "testing/test_stage.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -34,7 +35,7 @@ TEST_CASE("a headless test shows its game to nobody, and still gives it somethin
 }
 
 TEST_CASE("a run starts with the display settings its settings file kept, and keeps them there") {
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem-testing-stage-settings.json";
+  const std::filesystem::path file = redgem::test::temp_root() / "redgem-testing-stage-settings.json";
   std::filesystem::remove(file);
   FramePictures pictures("");
   const Stage fresh(headless_run(), file, pictures);
