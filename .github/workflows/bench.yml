@@ -69,7 +69,7 @@ jobs:
           path: |
             .deps/fetch/*-src
             .deps/fetch/*-subbuild
-          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/Patch*.cmake') }}
 
       - name: Configure
         run: >

@@ -103,7 +103,7 @@ jobs:
           path: |
             .deps/fetch/*-src
             .deps/fetch/*-subbuild
-          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/Patch*.cmake') }}
 
       # (Without warnings as errors: GCC's flow analysis of instrumented code reports bounds and
       # uninitialized values that are not there, inside the standard library. The Linux workflow

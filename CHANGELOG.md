@@ -32,6 +32,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **An Android game no longer aborts when it is closed while it plays sound**: closing the audio
+  device (raylib's `CloseAudioDevice`) destroyed the lock the device's playing thread takes before
+  it stopped the device, so a sound asked for in that moment locked a destroyed lock. Android
+  ends the app for that ("pthread_mutex_lock called on a destroyed mutex", seen when the system
+  closed Proving Ground on the emulator). raylib's sources are now patched when they are fetched
+  (`cmake/PatchRaylibAudioClose.cmake`) to stop the device first, and a test checks the raylib
+  built has it. The fetch caches in CI are keyed on every patch script, not only the Mac one.
 - **Network tests count rounds, not real time**: the tests of connections, sessions, relays,
   lobbies, approvals, reconnecting and multiplayer games no longer sleep between rounds. A round
   waits for one of its sockets to be ready (a millisecond at most), and the machines' networks

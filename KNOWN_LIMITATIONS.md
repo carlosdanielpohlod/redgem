@@ -30,8 +30,9 @@ the same pull request.
 - Android games have been run on an emulator only, not on phones. The touch controls have one
   fixed layout (a stick and three buttons). The continuous integration builds the Android player
   but runs nothing on Android.
-- Once, right after an emulator cold boot, an Android game stopped in its audio thread. It did
-  not happen again in the runs that followed and has no fix.
+- Once, right after an emulator cold boot, an Android game stopped in its audio thread. The one
+  such stop caught since, with its stack, came from closing the audio device while it played (now
+  fixed); whether the first was the same is not known.
 
 ## Rendering and animation
 
