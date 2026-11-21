@@ -128,7 +128,8 @@ std::string about(const std::string& file, const std::string& text) {
 
 void check_resolved_scene(SceneChecks& checks, const std::string& name, const std::string& file, SceneDesc scene) {
   try {
-    check_objects(checks, name, prefabs::resolve(std::move(scene), checks.game_dir));
+    const prefabs::Limits limits = read_prefab_limits(checks.game_dir);
+    check_objects(checks, name, prefabs::resolve(std::move(scene), checks.game_dir, limits));
   } catch (const std::exception& error) {
     checks.report.errors.push_back(about(file, error.what()));
   }
@@ -195,6 +196,7 @@ void check_game_file(const fs::path& game_dir, CheckReport& report) {
   if (!manifest.max_bodies_error.empty()) report.errors.push_back(manifest.max_bodies_error);
   if (!manifest.tick_hz_error.empty()) report.errors.push_back(manifest.tick_hz_error);
   if (!manifest.send_hz_error.empty()) report.errors.push_back(manifest.send_hz_error);
+  if (!manifest.prefab_budget_error.empty()) report.errors.push_back(manifest.prefab_budget_error);
   for (const std::string& warning : manifest.physics_warnings) report.warnings.push_back(warning);
 }
 

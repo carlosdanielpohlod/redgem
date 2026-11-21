@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "render_system/render_stage.hpp"
+#include "scene/ground/ground_rules.hpp"
 #include "scene/ground/splat_map.hpp"
 #include "scene/props.hpp"
 #include "scene/shapes/terrain.hpp"
@@ -343,4 +344,16 @@ TEST_CASE("a terrain whose mesh another object also draws gets no layers") {
   RenderStage stage;
   stage.upload(desc);
   CHECK_FALSE(reddish(stage.draw(Scene::from_desc(desc), "terrain_layers_shared_mesh").at(kCenter, kGroundRow)));
+}
+
+TEST_CASE("weights a script painted reach the drawn terrain on the next frame") {
+  RenderStage stage;
+  SceneDesc desc = layered_terrain(layers_of({kRed, kBlue}));
+  stage.upload(desc);
+  CHECK(reddish(stage.draw(Scene::from_desc(desc), "terrain_layers_unpainted").at(kCenter, kGroundRow)));
+  GroundRule blue;
+  blue.layer = 1;
+  CHECK(paint_ground(desc.terrains[0], {blue}, desc.meshes[0]) > 0);
+  stage.follow_terrain_weights(desc);
+  CHECK(bluish(stage.draw(Scene::from_desc(desc), "terrain_layers_painted").at(kCenter, kGroundRow)));
 }

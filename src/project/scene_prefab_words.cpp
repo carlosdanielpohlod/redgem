@@ -2,6 +2,7 @@
 
 #include <exception>
 
+#include "app/game_settings.hpp"
 #include "core/translations.hpp"
 #include "project/scene_assignments.hpp"
 #include "scene/prefabs.hpp"
@@ -98,7 +99,7 @@ std::optional<NodeDesc> inherited_part(const SceneDocument& document, int placem
   try {
     prefabs::Origins origins;
     const auto scene = own ? document.desc() : without_override(document, placement, path);
-    const auto resolved = prefabs::resolve(scene, game_dir, {}, &origins);
+    const auto resolved = prefabs::resolve(scene, game_dir, read_prefab_limits(game_dir), &origins);
     const auto origin = origins.find(placement);
     const auto part = origin == origins.end() ? nullptr : &origin->second.parts;
     if (part && part->count(path) != 0) return resolved.nodes.at(static_cast<std::size_t>(part->at(path)));

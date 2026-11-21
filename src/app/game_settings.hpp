@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "app/android/android_settings.hpp"
+#include "app/prefab_budget.hpp"
 #include "core/config.hpp"
 #include "net/movement_rules.hpp"
 #include "net/secure/server_pins.hpp"
@@ -76,6 +77,9 @@ struct GameSettings {
   // for a game that has none.
   //   "menu": {"theme": {"colors": {"button": "#203040"}}, "screens": {"title": {...}}}
   std::string menu;
+  // How big a scene's prefab files may be (see app/prefab_budget.hpp):
+  //   "prefab_budget_mb": {"source": 1024, "decoded": 2048}
+  PrefabBudget prefab_budget;
 };
 
 // Everything game.json says, read once.
@@ -101,6 +105,9 @@ struct GameManifest {
   // What is wrong with the "network" section's "send_hz"; empty when it can be used or there is
   // none. (Objects send config::kDefaultSendHz poses a second instead; `redgem check` refuses it.)
   std::string send_hz_error;
+  // What is wrong with "prefab_budget_mb"; empty when it can be used or the file has none. (The
+  // prefabs get the engine's budgets instead; `redgem check` refuses it.)
+  std::string prefab_budget_error;
   // What is wrong with the "physics" section; each problem is left out, the rest is used.
   std::vector<std::string> physics_warnings;
   // What is wrong with the "physics" section's "max_bodies"; empty when it can be used or the
@@ -125,6 +132,8 @@ inline constexpr std::size_t kMaxGameIdLength = 100;
 bool valid_game_id(const std::string& id);
 // The settings alone, for whoever has no use for what is wrong with the file.
 GameSettings read_game_settings(const std::filesystem::path& game_dir);
+// The limits the game's scenes expand their prefabs within (its "prefab_budget_mb").
+prefabs::Limits read_prefab_limits(const std::filesystem::path& game_dir);
 // Writes the title, the window's size, the studio and the id (when the settings have them), and the
 // physics' threads (taken out of the file for the default). What else the file holds (its "android"
 // section, an id the settings have none for...) stays as it is.

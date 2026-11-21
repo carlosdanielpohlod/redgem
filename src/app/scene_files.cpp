@@ -5,6 +5,7 @@
 #include <exception>
 #include <utility>
 
+#include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "core/game_files.hpp"
 #include "core/log.hpp"
@@ -24,7 +25,7 @@ std::variant<SceneDesc, std::string> read_scene_file(const std::filesystem::path
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   try {
-    SceneDesc scene = prefabs::resolve(std::move(loaded.scene), game_dir);
+    SceneDesc scene = prefabs::resolve(std::move(loaded.scene), game_dir, read_prefab_limits(game_dir));
     attach_terrain_layers(scene, game_dir, reading);
     return scene;
   } catch (const std::exception& error) {

@@ -294,6 +294,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
   manifest.send_hz_error = read_send_hz(json, manifest.settings);
+  manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
   read_sections(json, manifest);
   return manifest;
 }
@@ -312,6 +313,10 @@ bool valid_game_id(const std::string& id) {
 }
 
 GameSettings read_game_settings(const std::filesystem::path& game_dir) { return read_game_manifest(game_dir).settings; }
+
+prefabs::Limits read_prefab_limits(const std::filesystem::path& game_dir) {
+  return prefab_limits(read_game_settings(game_dir).prefab_budget);
+}
 
 bool write_game_settings(const std::filesystem::path& game_dir, const GameSettings& settings, std::string& error) {
   // What else the file holds (its "android" section, an id these settings have none for...) stays

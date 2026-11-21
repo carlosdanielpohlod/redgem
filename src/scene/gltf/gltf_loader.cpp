@@ -103,8 +103,7 @@ cgltf_options game_file_options() {
 // The file parsed; null (and why, in `error`) when it cannot be, or is too big for memory alone.
 CgltfPtr parsed_gltf(const std::string& path, std::string& error, std::uint64_t max_bytes) {
   if (!sound(gltf_budget::file_problem(path), path, error)) return nullptr;
-  if (!sound(file_exceeds_budget(path, max_bytes) ? "scene exceeds its loading byte budget" : "", path, error))
-    return nullptr;
+  if (!sound(file_exceeds_budget(path, max_bytes) ? kLoadingBudgetError : "", path, error)) return nullptr;
   cgltf_options options = game_file_options();
   cgltf_data* raw = nullptr;
   const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
@@ -122,8 +121,7 @@ bool loaded_and_checked(cgltf_data& data, const gltf_checks::NamedFiles& files, 
   cgltf_options options = game_file_options();
   return sound(gltf_checks::buffer_file_problem(data, files), path, error) &&
          sound(gltf_budget::scene_problem(data, path, files), path, error) &&
-         sound(gltf_budget::scene_bytes(data, path, files) > max_bytes ? "scene exceeds its loading byte budget" : "",
-               path, error) &&
+         sound(gltf_budget::scene_bytes(data, path, files) > max_bytes ? kLoadingBudgetError : "", path, error) &&
          succeeded(cgltf_load_buffers(&options, &data, path.c_str()), "cannot load buffers of", path, error) &&
          sound(gltf_checks::data_problem(data), path, error) &&
          succeeded(cgltf_validate(&data), "invalid glTF", path, error);
@@ -133,7 +131,7 @@ bool pictures_checked(const cgltf_data& data, const gltf_checks::NamedFiles& fil
                       LoadResult& result, std::uint64_t max_bytes) {
   if (!sound(gltf_budget::pictures_problem(data, path, files, result.scene.images), path, result.error)) return false;
   const auto bytes = gltf_budget::scene_bytes(data, path, files) + gltf_budget::decoded_bytes(result.scene.images);
-  return sound(bytes > max_bytes ? "scene exceeds its loading byte budget" : "", path, result.error);
+  return sound(bytes > max_bytes ? kLoadingBudgetError : "", path, result.error);
 }
 
 }  // namespace
@@ -167,8 +165,7 @@ LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes) {
 LoadResult load_gltf_snapshot(const std::string& path, const std::vector<std::uint8_t>& bytes,
                               std::uint64_t max_bytes) {
   LoadResult result;
-  if (!sound(bytes.size() > max_bytes ? "scene exceeds its loading byte budget" : "", path, result.error))
-    return result;
+  if (!sound(bytes.size() > max_bytes ? kLoadingBudgetError : "", path, result.error)) return result;
   cgltf_options options = game_file_options();
   cgltf_data* raw = nullptr;
   const auto parsed = cgltf_parse(&options, bytes.data(), bytes.size(), &raw);

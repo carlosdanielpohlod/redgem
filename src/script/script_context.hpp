@@ -86,6 +86,9 @@ struct ScriptContext {
   std::function<nlohmann::json(ObjectHandle)> capture_object_state;
   std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;
+  // What the running scene is made of: its terrains' ground layers and weights (Terrain). Null
+  // outside a running engine.
+  SceneDesc* scene_desc = nullptr;
   PhysicsWorld* physics = nullptr;
   SceneJoints scene_joints;  // made with the scene's bodies, and with those of what is spawned
   InputState* input = nullptr;

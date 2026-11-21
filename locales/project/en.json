@@ -266,6 +266,12 @@
   "project.scene.override_refused":
       "{word}: a prefab part overrides only its transform, properties, scripts, light, camera, or removed=true",
   "project.scene.out_of_reach": "{key} takes numbers from -{largest} to {largest}, not {value}",
+  "project.scene.paint_bad_option": "scene paint does not accept {option}",
+  "project.scene.paint_no_layers":
+      "{object} has no ground layers: give it prop.terrain_layers=<name> and write the game's terrains/<name>.json",
+  "project.scene.paint_no_mesh": "{object} has no mesh to paint the ground layers over",
+  "project.scene.paint_no_rules": "terrains/{name}.json has no \"rules\": nothing to paint (see docs/levels.md)",
+  "project.scene.painted": "painted {texels} texels of {object} by {rules} rules: {files}",
   "project.scene.read_only": "{key} says what the object is ({value}): it is not changed from the command line",
   "project.scene.removed": "removed {object} ({count} objects with its children)",
   "project.scene.scale_out_of_range":
@@ -286,6 +292,7 @@
     "  redgem scene add    <game> <name> [--from <object>] [--parent <object>] [key=value...] [--scene name]",
     "  redgem scene remove <game> <object> [--scene name]",
     "  redgem scene compact <game> [--scene name]",
+    "  redgem scene paint     <game> <object> [--scene name]   (experimental) paints its ground layers by rules",
     "  redgem scene overrides <game> <placement> [--scene name]",
     "  redgem scene override  <game> <placement> <part> key=value... [--scene name]",
     "  redgem scene revert    <game> <placement> [<part> [<field>]] [--scene name]",

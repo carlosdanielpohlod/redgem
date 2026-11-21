@@ -17,6 +17,15 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
+  Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
+  own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
+  not. Its log reaches `events`.
+- **A large world raises its prefab budgets.** `"prefab_budget_mb": {"source": 1024, "decoded": 2048}`
+  in `game.json` lets a scene's prefab files take more than 256 MiB as read and 512 MiB decoded, up
+  to a scene's own 4096 MiB. When a scene's prefabs pass a budget, the error (and `redgem check`)
+  names the one to raise. A big level split into prefabs could not load before.
+
 - **Prefab overrides can be reverted, applied to the prefab file, or unpacked.**
   `redgem scene overrides`, `override`, `revert`, `apply` and `unpack` list and change a prefab
   placement's overrides from the command line, each change one undo step in the editor's
@@ -46,6 +55,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   by height: sand fills the cracks between rocks. Each layer has its own `tiling`, large patches of
   `variation`, and can break up its repeats (`stochastic`) or project along three axes on cliffs
   (`triplanar`). A scene without a layered terrain draws as before, with no extra cost.
+- **Ground layers painted by rules (experimental).** A layers file's `"rules"` paint each layer by
+  height, slope and noise, with soft edges: `redgem scene paint <game> <object>` writes the
+  weights, and `Terrain.paint_by_rules` repaints them while the game runs.
+  `Terrain.layer_at(ground, position)` and `Terrain.weights_at` say which ground is under a point
+  (footsteps).
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that

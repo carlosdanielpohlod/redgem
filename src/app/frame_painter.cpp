@@ -27,6 +27,7 @@ void FramePainter::follow_game(const FrameView& view) {
   renderer_.set_backdrop_blur(view.backdrop_blur);
   renderer_.set_auto_exposure(view.auto_exposure);
   if (view.material_emission != nullptr) renderer_.set_material_emission(*view.material_emission);
+  renderer_.follow_terrain_weights(view.scene_desc);  // (Terrain.paint_by_rules)
 }
 
 void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {

@@ -69,6 +69,20 @@ class McpStdioTest(unittest.TestCase):
             self.assertIn("position", replies[1]["result"]["content"][0]["text"])
             self.assertIn("+0 -0 ~1 objects", replies[2]["result"]["content"][0]["text"])
 
+    def test_build_makes_the_game_next_to_it_and_status_says_what_it_made(self):
+        with tempfile.TemporaryDirectory() as folder:
+            game = Path(folder) / "game"
+            shutil.copytree(GAME, game)
+            replies, _ = exchange(game, [modern_call(1, "build", {"action": "start", "folder": "shipped"}),
+                                         modern_call(2, "build", {"action": "status", "wait": 25}),
+                                         modern_call(3, "events", {})])
+            self.assertFalse(replies[0]["result"]["isError"], replies[0])
+            status = replies[1]["result"]["content"][0]["text"]
+            self.assertFalse(replies[1]["result"]["isError"], status)
+            self.assertIn("built for", status)
+            self.assertTrue((Path(folder) / "shipped" / "game.rgpak").is_file(), status)
+            self.assertIn("built for", replies[2]["result"]["content"][0]["text"])
+
     def test_shot_without_a_display_is_a_tool_error_and_the_server_keeps_answering(self):
         env = {key: value for key, value in os.environ.items() if key not in ("DISPLAY", "WAYLAND_DISPLAY")}
         replies, _ = exchange(GAME, [modern_call(1, "game_shot", {"width": 128}),
