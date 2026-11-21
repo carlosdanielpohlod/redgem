@@ -14,9 +14,19 @@ set(device_first
         ma_mutex_uninit(&AUDIO.System.lock);
 ")
 
+# raylib, already stopping the device first by itself: nothing to do.
+set(upstream_device_first
+"        ma_device_uninit(&AUDIO.System.device);
+        ma_mutex_uninit(&AUDIO.System.lock);
+")
+
 file(READ "${audio_file}" code)
+# (raylib has no .gitattributes: a Windows checkout may end its lines with CR LF. Matched, and written,
+# with LF alone, which every compiler reads the same.)
+string(REPLACE "\r\n" "\n" code "${code}")
 string(FIND "${code}" "${device_first}" patched)
-if(patched EQUAL -1)
+string(FIND "${code}" "${upstream_device_first}" fixed_upstream)
+if(patched EQUAL -1 AND fixed_upstream EQUAL -1)
   string(FIND "${code}" "${lock_first}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "${audio_file} is not the raylib this patch was written for: look at it again")
