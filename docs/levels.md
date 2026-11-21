@@ -385,6 +385,10 @@ tint still multiplies their color, so a terrain painted with the old tint brush 
 terrain object without `terrain_layers` is drawn exactly as before, and a scene without any
 layered terrain compiles none of the layer code into its shader.
 
+![Top: the vertex tint alone, two layers meeting at a hard edge, and fading by weight. Bottom: the
+same fade blended by height, a striped layer seen from above on a cube, and the same layer
+triplanar.](images/terrain-layers/blending.png)
+
 How the layers meet:
 
 - **By weight.** With `sharpness` 0, two layers fade into each other over the width where their
