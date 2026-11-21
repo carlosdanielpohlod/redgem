@@ -5,22 +5,22 @@
 # of a quest under way (Enter, A, a click or a tap) tracks that quest: this machine's markers show
 # its places (see QuestMarkers). Its Back button, Esc or a gamepad's Start go back to the pause
 # menu. The pause menu of a game with quest files offers it (GameMenu's setting journal: false
-# leaves it out).
+# leaves it out). It is drawn as the menu's theme says (UI::Theme): its lines in sizes.text, a
+# section's caption in colors.caption, a quest's on the buttons' look, an objective's box in
+# colors.done or colors.to_do, what is over in colors.muted.
 class GameMenu < Behaviour
   class JournalScreen < Screen
     ROW_WIDTH = 640
     ROW_HEIGHT = 30
     ROW_GAP = 4
     VISIBLE_ROWS = 11          # lines shown at once; more scroll
-    TEXT_SIZE = 20
     INDENT = 24                # units a stage's text and an objective sit right of a quest's title
     BOX_SIZE = 14              # units across an objective's box
     BOX_BORDER = 2
     BUTTONS_SHARE = 0.86       # where its Back button sits, as a share of the screen's height
-    DONE_COLOR = :green
-    TO_DO_COLOR = :gray
-    # How each kind of line is drawn: its text's color, and whether it sits on a bar as a button does.
-    COLORS = { section: :gold, quest: :white, stage: :white, objective: :white, none: :gray, completed: :gray }.freeze
+    # How each kind of line is drawn: its text's color (one of the theme's), and whether it sits on
+    # a bar as a button does.
+    COLORS = { section: :caption, quest: :text, stage: :text, objective: :text, none: :muted, completed: :muted }.freeze
     BARS = %i[quest completed].freeze
     INDENTED = %i[stage objective].freeze
 
@@ -54,7 +54,7 @@ class GameMenu < Behaviour
     private
 
     def row_step = @menu.scaled(ROW_HEIGHT + ROW_GAP)
-    def row_x = (UI.width - @menu.scaled(ROW_WIDTH)) / 2
+    def row_x = @menu.column_x(@menu.scaled(ROW_WIDTH))
 
     def list_box(y)
       { x: row_x, y: y, width: @menu.scaled(ROW_WIDTH), height: VISIBLE_ROWS * row_step, row_height: row_step,
@@ -66,16 +66,16 @@ class GameMenu < Behaviour
       UI.focus_ring(box) if focused
       bar(box) if focused || BARS.include?(line.kind)   # (the ring shows around a bar)
       x = text_x(line, box)
-      size = @menu.scaled(TEXT_SIZE)
+      size = @menu.scaled(UI.theme[:sizes, :text])
       UI.text(line.text, x: x, y: UI.centered(box[:y], box[:height], size), size: size, color: color_of(line))
       Quests.track(line.quest.name) if tracking?(line, box, focused)
     end
 
-    def bar(box) = UI.rect(**box, color: UI::BUTTON_COLOR, alpha: UI::BUTTON_ALPHA, radius: UI::BUTTON_RADIUS)
+    def bar(box) = UI.plain_face(box)
 
     # Where a line's text starts: indented under its quest's title, past an objective's box.
     def text_x(line, box)
-      x = box[:x] + UI::FIELD_PADDING + (INDENTED.include?(line.kind) ? @menu.scaled(INDENT) : 0)
+      x = box[:x] + UI.padding + (INDENTED.include?(line.kind) ? @menu.scaled(INDENT) : 0)
       line.kind == :objective ? objective_box(x, box, line.done) : x
     end
 
@@ -83,15 +83,20 @@ class GameMenu < Behaviour
     def objective_box(x, row, done)
       size = @menu.scaled(BOX_SIZE)
       y = UI.centered(row[:y], row[:height], size)
-      UI.rect(x: x, y: y, width: size, height: size, color: done ? DONE_COLOR : TO_DO_COLOR)
-      border = [@menu.scaled(BOX_BORDER), 1].max
-      inner = size - 2 * border
-      UI.rect(x: x + border, y: y + border, width: inner, height: inner, color: :dark) unless done
+      UI.rect(x: x, y: y, width: size, height: size, color: UI.theme[:colors, done ? :done : :to_do])
+      hollow(x, y, size) unless done
       x + size + @menu.scaled(ROW_GAP) * 2
     end
 
+    # The inside of an objective's box that is not done.
+    def hollow(x, y, size)
+      border = [@menu.scaled(BOX_BORDER), 1].max
+      inner = size - 2 * border
+      UI.rect(x: x + border, y: y + border, width: inner, height: inner, color: UI.theme[:colors, :button])
+    end
+
     # (An objective done is grayed.)
-    def color_of(line) = line.kind == :objective && line.done ? TO_DO_COLOR : COLORS.fetch(line.kind)
+    def color_of(line) = UI.theme[:colors, line.kind == :objective && line.done ? :to_do : COLORS.fetch(line.kind)]
 
     # Whether a line of a quest under way is worked this frame (clicked, tapped, or picked while focused).
     def tracking?(line, box, focused) = trackable?(line) && UI.worked?(box, focused)

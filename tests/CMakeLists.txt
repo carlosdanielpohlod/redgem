@@ -293,6 +293,7 @@ add_executable(redgem_tests
   integration/scene_tools_test.cpp
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
+  integration/menu_checks_test.cpp
   integration/api_reference_test.cpp
   integration/api_types_test.cpp
   integration/error_hints_test.cpp
@@ -552,6 +553,19 @@ foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
     set_tests_properties(system.${game}.${restarted_name} PROPERTIES LABELS system RUN_SERIAL TRUE
                          FIXTURES_REQUIRED restart.${game}.${test_name})
   endif()
+endforeach()
+
+# tests/system_fixtures/<game>/*_test.rb runs against tests/fixtures/games/<game>: small games made
+# for one look at the engine (the menus' pictures, compared with the baselines in the game's folder).
+file(GLOB REDGEM_FIXTURE_SYSTEM_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_fixtures/*/*_test.rb)
+foreach(test_file IN LISTS REDGEM_FIXTURE_SYSTEM_TESTS)
+  get_filename_component(test_name ${test_file} NAME_WE)
+  get_filename_component(game_dir ${test_file} DIRECTORY)
+  get_filename_component(game ${game_dir} NAME)
+  add_test(NAME system.fixture.${game}.${test_name}
+           COMMAND redgem_test_tool ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/${game} ${test_file}
+                   --screenshots ${REDGEM_SCREENSHOT_DIR}/fixtures/${game})
+  set_tests_properties(system.fixture.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 
 # The templates (the folders of templates/ with a template.json): a game is made from each as

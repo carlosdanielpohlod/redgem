@@ -50,6 +50,7 @@ struct FrameView {
   const DebugDrawBuffer* debug_draw = nullptr;         // frame-local world primitives, never scene objects
   // The scene's water as the simulation last found it: the camera under it looks underwater.
   const std::vector<WaterSurface>* water_surfaces = nullptr;
+  float backdrop_blur = 0.0f;  // Camera.backdrop_blur: 0 (none) to 1
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

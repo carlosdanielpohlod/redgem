@@ -27,9 +27,6 @@ module UI
   SCROLLBAR_WIDTH = 6
   SCROLLBAR_GAP = 6              # pixels between a list and its bar
   SCROLLBAR_MIN = 16             # the shortest a bar's handle gets
-  SCROLLBAR_COLOR = :gray
-  SCROLLBAR_TRACK_ALPHA = 70
-  SCROLLBAR_HANDLE_ALPHA = 200
 
   # Rows in a box that scrolls (see above).
   class ScrollList
@@ -148,21 +145,24 @@ module UI
     # much as the gap a row leaves under it (the ring of the top row; the next row's top stays
     # hidden below, where the gap of the last one shown already makes room).
     def clip_box(gap)
-      above = [FOCUS_RING, gap].min
-      { x: @box[:x] - FOCUS_RING, y: @box[:y] - above, width: @box[:width] + 2 * FOCUS_RING,
-        height: @box[:height] + above }
+      ring = UI.theme[:button, :focus_ring]
+      above = [ring, gap].min
+      { x: @box[:x] - ring, y: @box[:y] - above, width: @box[:width] + 2 * ring, height: @box[:height] + above }
     end
 
     # Beside its right edge: a track as tall as the box, and a handle as far down it as it is scrolled.
     def scrollbar
       track = { x: @box[:x] + @box[:width] + SCROLLBAR_GAP, y: @box[:y], width: SCROLLBAR_WIDTH, height: @box[:height] }
-      bar(track, SCROLLBAR_TRACK_ALPHA)
-      handle = handle_height
-      bar(track.merge(y: track[:y] + ((@box[:height] - handle) * @offset / most).to_i, height: handle),
-          SCROLLBAR_HANDLE_ALPHA)
+      bar(track, UI.theme[:colors, :scrollbar_alpha])
+      bar(handle_box(track), UI.theme[:colors, :handle_alpha])
     end
 
-    def bar(box, alpha) = UI.rect(**box, color: SCROLLBAR_COLOR, alpha: alpha, radius: SCROLLBAR_WIDTH / 2)
+    def handle_box(track)
+      handle = handle_height
+      track.merge(y: track[:y] + ((@box[:height] - handle) * @offset / most).to_i, height: handle)
+    end
+
+    def bar(box, alpha) = UI.rect(**box, color: UI.theme[:colors, :track], alpha: alpha, radius: SCROLLBAR_WIDTH / 2)
 
     # The handle's share of the track is the box's of the rows (never shorter than SCROLLBAR_MIN,
     # nor than the track).

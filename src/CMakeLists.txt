@@ -18,12 +18,19 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_theme.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_theme_kinds.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_button.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/debug.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_layout.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_scroll.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_theme.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_camera_path.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/input.rb
@@ -866,6 +873,7 @@ if(NOT ANDROID)
   project/dialogue_checks.cpp
   project/text_checks.cpp
   project/quest_checks.cpp
+  project/menu_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
     project/api_types.cpp

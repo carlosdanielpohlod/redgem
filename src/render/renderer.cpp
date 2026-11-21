@@ -145,6 +145,10 @@ void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
 
+void Renderer::set_backdrop_blur(float amount) {
+  impl_->backdrop_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
+}
+
 void Renderer::set_auto_exposure(const AutoExposureOverrides& overrides) { impl_->exposure_overrides = overrides; }
 void Renderer::set_underwater(const UnderwaterView& view) { impl_->underwater = view; }
 

@@ -84,7 +84,7 @@ class UiWidgetsTest < RedGemTest::Case
 
   def test_a_sliders_track_is_on_the_right_of_its_row
     track = UI.slider_track(BOX)
-    assert_equal BOX[:x] + BOX[:width] - UI::FIELD_PADDING, track[:x] + track[:width]
+    assert_equal BOX[:x] + BOX[:width] - UI.padding, track[:x] + track[:width]
     assert_equal [BOX[:y], BOX[:height]], [track[:y], track[:height]]
   end
 

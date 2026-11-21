@@ -24,6 +24,7 @@ void FramePainter::follow_game(const FrameView& view) {
     renderer_.set_images_dir(images_dir_);
   }
   renderer_.set_motion_blur(view.motion_blur);
+  renderer_.set_backdrop_blur(view.backdrop_blur);
   renderer_.set_auto_exposure(view.auto_exposure);
 }
 

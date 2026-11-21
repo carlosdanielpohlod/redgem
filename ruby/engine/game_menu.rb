@@ -19,21 +19,18 @@
 #
 #   menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 #   menu.screens[:credits] = GameMenu::Screen.new(heading: "Credits", back: -> { menu.show(:pause) })
+#
+# How it looks is its theme's (see game_menu_theme.rb and UI::Theme): game.json's "menu" section,
+# GameMenu.theme = and each screen's own (screen.theme =). A game that draws its buttons or its
+# background itself says so with on_draw_button and on_draw_background, here or on a screen.
 class GameMenu < Behaviour
-  BUTTON_WIDTH = 280
-  BUTTON_HEIGHT = 58
-  BUTTON_GAP = 16
-  TITLE_SIZE = 72
-  TITLE_ABOVE_BUTTONS = 130   # pixels from the title's top to the first button
-  FIRST_BUTTON_SHARE = 0.46   # where the first button sits, as a share of the screen's height
-  SHADE_ALPHA = 170           # how dark the game gets behind a menu
   PAUSE_KEYS = %i[escape p].freeze
   BACK_KEY = :escape
   PAUSE_BUTTON = :start
   RUNNING = 1.0
   FROZEN = 0.0
   LAST = -1                   # where an option is added unless said: after the others
-  REFERENCE_HEIGHT = 720      # the interface's height (UI.height) the sizes above are for
+  REFERENCE_HEIGHT = 720      # the interface's height (UI.height) the sizes of its theme are for
   REFERENCE_WIDTH = 800       # the width its widest rows need, with room beside them
 
   # The name of the open screen; nil while the game goes on.
@@ -52,11 +49,9 @@ class GameMenu < Behaviour
     super
     @screen = nil
     @focus = UI::Focus.new
-    quit = @quit = [-> { I18n.t("game.menu.quit") }, -> { Game.quit }]
-    title = [[-> { I18n.t("game.menu.play") }, -> { resume }], settings_option, quit]
-    @screens = { title: Screen.new(options: title), pause: pause_screen(quit),
-                 over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]),
-                 **pages }
+    @look = Look.new(self)
+    @quit = [-> { I18n.t("game.menu.quit") }, -> { Game.quit }, { id: :quit }]
+    @screens = { title: title_screen, pause: pause_screen(@quit), over: over_screen, **pages }
   end
 
   def start
@@ -77,6 +72,7 @@ class GameMenu < Behaviour
     @focus.reset
     open_screen.focus = @focus
     open_screen.opened
+    @look.shown(theme_of(name))
   end
 
   # Opens the settings screen, which goes back to the screen open now.
@@ -90,11 +86,13 @@ class GameMenu < Behaviour
     open_screen&.closed
     @screen = nil
     Time.scale = RUNNING
+    @look.left
   end
 
   # Starts the scene over.
   def restart
     Time.scale = RUNNING
+    @look.left
     Game.load_scene(Game.scene_name)
   end
 
@@ -109,12 +107,16 @@ class GameMenu < Behaviour
     draw(open_screen) if open?
   end
 
+  # (The camera and the picture are the game's again: the scene ends, or the menu goes.)
+  def on_destroy = @look.left
+
   # Where the button at `index` of the open screen is: [x, y, width, height].
   def button_box(index)
-    width = scaled(BUTTON_WIDTH)
-    height = scaled(BUTTON_HEIGHT)
-    y = (UI.height * first_button_share).to_i + index * (height + scaled(BUTTON_GAP))
-    [(UI.width - width) / 2, y, width, height]
+    theme = theme_of(@screen)
+    width = button_width(theme)
+    height = scaled(theme[:button, :height])
+    y = (UI.height * first_button_share).to_i + index * (height + scaled(theme[:button, :gap]))
+    [column_x(width), y, width, height]
   end
 
   # How much larger than their sizes the menu's things are, in the interface's units (which grow
@@ -138,7 +140,9 @@ class GameMenu < Behaviour
 
   def width_share = UI.width.positive? ? UI.width.to_f / REFERENCE_WIDTH : nil
 
-  def first_button_share = open_screen&.first_button_share || FIRST_BUTTON_SHARE
+  # Where the first button sits: as the screen's own theme says, else as the screen does, else as
+  # the menu's theme does.
+  def first_button_share = own_top || open_screen&.first_button_share || theme_of(@screen)[:layout, :top]
 
   # The screens that are pages of their own.
   def pages
@@ -148,14 +152,24 @@ class GameMenu < Behaviour
   # The journal goes on the pause menu, before Quit (last, if the game took Quit away).
   def add_journal
     pause = @screens[:pause]
-    pause.add_option(-> { I18n.t("game.menu.journal") }, index: pause.__index(@quit) || LAST) { show(:journal) }
+    pause.add_option(-> { I18n.t("game.menu.journal") }, index: pause.__index(@quit) || LAST,
+                                                         id: :journal) { show(:journal) }
   end
 
-  def settings_option = [-> { I18n.t("game.menu.settings") }, -> { show_settings }]
+  def settings_option = [-> { I18n.t("game.menu.settings") }, -> { show_settings }, { id: :settings }]
+
+  def title_screen
+    Screen.new(options: [[-> { I18n.t("game.menu.play") }, -> { resume }, { id: :play }],
+                         settings_option, @quit])
+  end
+
+  def over_screen
+    Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }, { id: :play_again }], @quit])
+  end
 
   def pause_screen(quit)
-    options = [[-> { I18n.t("game.menu.resume") }, -> { resume }], [-> { I18n.t("game.menu.restart") }, -> { restart }],
-               settings_option, quit]
+    options = [[-> { I18n.t("game.menu.resume") }, -> { resume }, { id: :resume }],
+               [-> { I18n.t("game.menu.restart") }, -> { restart }, { id: :restart }], settings_option, quit]
     Screen.new(heading: -> { I18n.t("game.menu.paused") }, options: options, back: -> { resume })
   end
 
@@ -172,35 +186,59 @@ class GameMenu < Behaviour
   def go_back
     return show(:pause) unless open?
 
-    open_screen.back&.call
+    back = open_screen.back
+    @look.sound(theme_of(@screen), :back) if back
+    back&.call
   end
 
   def draw(screen)
-    UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :black, alpha: SHADE_ALPHA)
+    UI.with_theme(theme_of(@screen)) do
+      @look.backdrop(background_drawer(screen))
+      @look.coming_in { draw_page(screen) }
+    end
+  end
+
+  def draw_page(screen)
     draw_heading(screen)
-    @focus.update(screen.rows + screen.options.size)
+    move_focus(screen.rows + screen.options.size)
     screen.draw(button_box(0))
-    clicked(screen.options, screen.rows)&.call
+    pick(clicked(screen))
+  end
+
+  # Up and down move the focus (with the theme's sound, when it moved).
+  def move_focus(count)
+    was = @focus.index
+    @focus.update(count)
+    @look.sound(UI.theme, :move) unless @focus.index == was
+  end
+
+  def pick(action)
+    return unless action
+
+    @look.sound(UI.theme, :pick)
+    action.call
   end
 
   # On a screen letters are typed into, Enter is the text's: only a gamepad's A picks.
   def confirm_controls = typing? ? UI::GAMEPAD_CONFIRM : UI::CONFIRM
 
-  def draw_heading(screen)
-    heading_y = button_box(0)[1] - screen.space_above - scaled(TITLE_ABOVE_BUTTONS)
-    UI.text(screen.heading, x: UI.width / 2, y: heading_y, size: scaled(TITLE_SIZE), align: :center)
-  end
-
-  # Draws the options as buttons, after the screen's `rows` in the focus; returns what the clicked
+  # Draws the options as buttons, after the screen's rows in the focus; returns what the clicked
   # (or picked) one does, if one was.
-  def clicked(options, rows)
+  def clicked(screen)
     chosen = nil
-    options.each_with_index { |(label, action), index| chosen = action if button?(label, index, rows + index) }
+    extras = screen.option_extras
+    screen.options.each_with_index do |(label, action), index|
+      chosen = action if button?(screen, label, index, extras[index] || {})
+    end
     chosen
   end
 
-  def button?(label, index, place)
+  def button?(screen, label, index, extra)
     x, y, width, height = button_box(index)
-    UI.button(label, x: x, y: y, width: width, height: height, focused: @focus.at?(place), confirm: confirm_controls)
+    box = { x: x, y: y, width: width, height: height }
+    focused = @focus.at?(screen.rows + index)
+    disabled = Screen.disabled?(extra)
+    draw_option(screen, label, box, UI.button_state(box, focused, disabled: disabled, id: extra[:id]))
+    !disabled && UI.worked?(box, focused, confirm_controls)
   end
 end

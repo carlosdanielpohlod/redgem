@@ -64,6 +64,10 @@ struct GameSettings {
   // What the host holds the others' moves to, an anti-cheat: the "movement_validation" section
   // (see net/movement_rules.hpp). A game without it checks nothing.
   net::MovementRules movement;
+  // How the game's menus look (GameMenu, UI::Theme): the "menu" section, as its JSON text; empty
+  // for a game that has none.
+  //   "menu": {"theme": {"colors": {"button": "#203040"}}, "screens": {"title": {...}}}
+  std::string menu;
 };
 
 // Everything game.json says, read once.

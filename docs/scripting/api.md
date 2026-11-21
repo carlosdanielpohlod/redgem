@@ -36,6 +36,8 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. | [Stable](stability.md) |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. | [Stable](stability.md) |
 | [`UI::ScrollList`](#uiscrolllist) | Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus. | [Experimental](stability.md) |
+| [`UI::Theme`](#uitheme) | How the interface and the menus look: fonts, sizes, colors, buttons, layout, background, logo, footer, transitions, sounds and music. Made of layers over the engine's defaults. | [Experimental](stability.md) |
+| [`UI::ButtonState`](#uibuttonstate) | What a button is this frame: focused, under the pointer, held down, disabled; and the id of the option it is of. | [Experimental](stability.md) |
 | [`Debug`](#debug) | Developer diagnostics: console messages, frame timings and immediate world drawing. | [Stable](stability.md) |
 | [`Game`](#game) | The game itself. | [Stable](stability.md) |
 | [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. | [Stable](stability.md) |
@@ -465,6 +467,8 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.shake(Numeric strength, duration: Numeric = 0.5) -> Float`: shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds *Experimental.*
 - `Camera.trauma -> Float`: how much it shakes now, 0 to 1 *Experimental.*
 - `Camera.stop_shaking -> void`: stops the shake at once *Experimental.*
+- `Camera.backdrop_blur -> Float`: how much the whole picture is blurred evenly, 0 to 1 (a menu over the scene) *Experimental.*
+- `Camera.backdrop_blur = Numeric amount`: sets it *Experimental.*
 
 ## Camera::Orbit
 
@@ -577,11 +581,11 @@ Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `s
 
 What a script draws over the game this frame: texts, rectangles, pictures, buttons. See [gameplay.md](gameplay.md).
 
-- `UI.text(String str, x: Numeric, y: Numeric, size: Numeric = 24, color: Color = :white, alpha: Integer = 255, align: Symbol = :left, width: Numeric | nil = nil, anchor: Symbol | nil = nil) -> void`: draws a text; width: wraps it at word boundaries
+- `UI.text(String str, x: Numeric, y: Numeric, size: Numeric = 24, color: Color | nil = nil, alpha: Integer = 255, align: Symbol = :left, width: Numeric | nil = nil, anchor: Symbol | nil = nil) -> void`: draws a text; width: wraps it at word boundaries; color: the theme's text color unless given
 - `UI.rect(x: Numeric, y: Numeric, width: Numeric, height: Numeric, color: Color = :black, alpha: Integer = 255, radius: Numeric = 0, anchor: Symbol | nil = nil) -> void`: draws a rectangle
-- `UI.image(String | Symbol name, x: Numeric, y: Numeric, width: Numeric = 0, height: Numeric = 0, alpha: Integer = 255, anchor: Symbol | nil = nil) -> void`: draws a picture of images/
-- `UI.button(String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, color: Color = :dark, hover_color: Color = :ruby, text_color: Color = :white, size: Numeric | nil = nil, focused: bool = false, confirm: Array[Array[Symbol]] = [[:enter], [:a]], anchor: Symbol | nil = nil) -> bool`: draws a button; true the frame it is clicked
-- `UI.text_field(String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, max_length: Integer = 64, color: Color = :dark, text_color: Color = :white, secret: bool = false, anchor: Symbol | nil = nil) -> String`: a field to type in; returns the new value
+- `UI.image(String | Symbol name, x: Numeric, y: Numeric, width: Numeric = 0, height: Numeric = 0, alpha: Integer = 255, anchor: Symbol | nil = nil, part: Array[Numeric] = [0, 0, 0, 0], tint: Color = :white) -> void`: draws a picture of images/; part: [x, y, width, height] of it; tint: a color it is multiplied by
+- `UI.button(String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, color: Color | nil = nil, hover_color: Color | nil = nil, text_color: Color | nil = nil, size: Numeric | nil = nil, focused: bool = false, confirm: Array[Array[Symbol]] = [[:enter], [:a]], anchor: Symbol | nil = nil, disabled: bool = false, icon: String | Symbol | nil = nil) -> bool`: draws a button; true the frame it is clicked; disabled: grayed, does nothing; icon: a picture before its label
+- `UI.text_field(String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, max_length: Integer = 64, color: Color | nil = nil, text_color: Color | nil = nil, secret: bool = false, anchor: Symbol | nil = nil) -> String`: a field to type in; returns the new value
 - `UI.keyboard_visible? -> bool`: whether a phone's on-screen keyboard covers the bottom of the screen *Experimental.*
 - `UI.width -> Integer`: the width of the screen, in the interface's units (UI.scale pixels each)
 - `UI.height -> Integer`: the height of the screen, in the interface's units: the reference's height when it is matched
@@ -602,6 +606,14 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.slider(String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, min: Numeric = 0.0, max: Numeric = 1.0, step: Numeric = 0.05, focused: bool = false, anchor: Symbol | nil = nil) -> Float`: a row with a slider; returns the value
 - `UI.font -> String | Array[String] | nil`: the face texts are drawn with: a file name of fonts/, a list of them (a fallback chain; a list of one is its name), or nil for the built-in one
 - `UI.font = String | Array[String] | nil name`: draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
+- `UI.gradient(x: Numeric, y: Numeric, width: Numeric, height: Numeric, top: Color, bottom: Color, alpha: Integer = 255, anchor: Symbol | nil = nil) -> void`: draws a rectangle that goes from the top color to the bottom one *Experimental.*
+- `UI.image_size(String | Symbol name) -> [Integer, Integer] | nil`: a picture's [width, height] in its own pixels; nil when there is none *Experimental.*
+- `UI.theme -> UI::Theme`: the theme widgets are drawn with now *Experimental.*
+- `UI.theme = Hash[Symbol, untyped] | nil changes`: changes the engine's look for every widget; nil goes back to it; raises ArgumentError on a wrong key or value *Experimental.*
+- `UI.with_theme(UI::Theme theme) { () -> void } -> void`: draws what the block draws with another theme *Experimental.*
+- `UI.shifted(x: Numeric = 0, y: Numeric = 0, alpha: Numeric = 1.0) { () -> void } -> void`: draws what the block draws moved and at a share of its opacity; the pointer follows *Experimental.*
+- `UI.draw_button(String label, Hash[Symbol, Numeric] box, UI::ButtonState state, Hash[Symbol, untyped] look = {}) -> void`: draws a button in a box as the theme says, without hearing the mouse or the keys *Experimental.*
+- `UI.button_state(Hash[Symbol, Numeric] box, bool focused, disabled: bool = false, id: Symbol | nil = nil) -> UI::ButtonState`: what a button in a box is this frame: focused, under the pointer, held down *Experimental.*
 
 A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. An anchor (`:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of the screen, and puts the matching corner of what is drawn there: `UI.text("Lives", anchor: :top_right, x: -20, y: 20)`. With an anchor, a text's box is as wide as `width:` or its widest line, and `align:` lays its lines out inside it; an image is placed by the width and height given. A text breaks at its own line breaks, and with `width:` also at spaces; a word longer than a line is cut between letters. Lines are `UI.line_height(size)` apart (1.25 times the size). Inside `UI.clip`, the pointer outside the box is over nothing drawn in it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. For several scripts, set a fallback chain: `UI.font = [:latin, :cjk, :emoji]`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs no face has show as the built-in face's `?`. Right-to-left text (Arabic, Hebrew) is drawn in its order on screen, line by line, with its brackets mirrored; Arabic letters are not joined (there is no shaping), and only outline (not color) emoji faces are drawn.
 
@@ -629,6 +641,30 @@ Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gam
 - `reset -> void`: back to its first row *Experimental.*
 
 Given a focus (`UI::Focus`), the list scrolls to the row the focus moves to, and Page Up and Page Down move the focus a page; row 0 is the focus' `first`, so rows may come after other widgets. Without one, up and down (arrows, D-pad) scroll a row. The wheel scrolls it while the pointer is over it, and scrolling away from the focused row stays until the focus moves. `input: false` leaves the keys and the wheel to something else that frame. A bar beside its right edge shows how far it is scrolled.
+
+## UI::Theme
+
+How the interface and the menus look: fonts, sizes, colors, buttons, layout, background, logo, footer, transitions, sounds and music. Made of layers over the engine's defaults. *Experimental.*
+
+- `UI::Theme.default -> UI::Theme`: the engine's own look *Experimental.*
+- `UI::Theme.read!(Hash[Symbol, untyped] | nil layer) -> Hash[Symbol, untyped]`: a layer read from symbols or from game.json strings; raises ArgumentError on a wrong key or value *Experimental.*
+- `UI::Theme.merge(Hash[Symbol, untyped] base, Hash[Symbol, untyped] over) -> Hash[Symbol, untyped]`: two layers in one, the second over the first *Experimental.*
+- `[*Symbol path] -> untyped`: a section or a setting: theme[:colors, :button] *Experimental.*
+- `color(Symbol name) -> Color | nil`: one of its colors *Experimental.*
+- `merged(Hash[Symbol, untyped] layer) -> UI::Theme`: this theme with a layer over it *Experimental.*
+- `to_h -> Hash[Symbol, untyped]`: all its settings *Experimental.*
+
+## UI::ButtonState
+
+What a button is this frame: focused, under the pointer, held down, disabled; and the id of the option it is of. *Experimental.*
+
+- `UI::ButtonState.new(focused: bool = false, hover: bool = false, pressed: bool = false, disabled: bool = false, id: Symbol | nil = nil) -> UI::ButtonState`: a state *Experimental.*
+- `focused? -> bool`: whether it has the focus *Experimental.*
+- `hover? -> bool`: whether the pointer is over it *Experimental.*
+- `pressed? -> bool`: whether the pointer holds it down *Experimental.*
+- `disabled? -> bool`: whether it cannot be picked *Experimental.*
+- `id -> Symbol | nil`: the id of its menu option *Experimental.*
+- `name -> Symbol`: the one that shows most: :disabled, :pressed, :hover, :focused or :normal *Experimental.*
 
 ## Debug
 
@@ -743,13 +779,21 @@ A behaviour: title screen, pause menu, end screen, settings screen with its cont
 - `screen -> Symbol | nil`: the screen open
 - `screens -> Hash[Symbol, GameMenu::Screen]`: the screens, by name (:title, :pause, :over, :settings, :controls, :journal and the game's own)
 - `button_box(Integer index) -> [Integer, Integer, Integer, Integer]`: where the menu's button of that index is: [x, y, width, height]
+- `GameMenu.theme -> UI::Theme`: the menus' theme, before any screen's own *Experimental.*
+- `GameMenu.theme = Hash[Symbol, untyped] | nil changes`: changes how the menus look (over game.json's menu theme); nil takes it away *Experimental.*
+- `theme_of(Symbol name) -> UI::Theme`: the theme a screen is drawn with *Experimental.*
+- `on_draw_button { (String, Hash[Symbol, Numeric], UI::ButtonState) -> void } -> void`: draws the menu's buttons with a block instead of the theme's look *Experimental.*
+- `on_draw_background { () -> void } -> void`: draws the menu's background with a block instead of the theme's *Experimental.*
+- `column_x(Numeric width) -> Numeric`: where a box that wide starts, as the theme aligns the menu *Experimental.*
+- `column_text_x -> [Numeric, Symbol]`: where texts aligned with the menu start: [x, align] *Experimental.*
+- `margin(Symbol side) -> Numeric`: one of the theme's margins (:top, :right, :bottom, :left), scaled *Experimental.*
 
 ## GameMenu::Screen
 
 A screen of the GameMenu. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
 
 - `GameMenu::Screen.new(heading: String | Proc, options: Array[[String | Proc, Proc]], back: Symbol | nil) -> GameMenu::Screen`: a screen with a heading and options: [[label, action], ...]
-- `add_option(String | Proc label, index: Integer = -1) { () -> void } -> void`: adds an option
+- `add_option(String | Proc label, index: Integer = -1, id: Symbol | nil = nil, enabled: Proc | nil = nil) { () -> void } -> void`: adds an option; id: its name for icons and drawn buttons; enabled: a lookup, grayed while false
 - `heading -> String`: its heading
 - `heading = String | Proc text`: changes its heading
 - `options -> Array[[String, Proc]]`: its options
@@ -763,6 +807,11 @@ A screen of the GameMenu. See [gameplay.md#pause-and-the-flow-between-screens](g
 - `first_button_share -> Float | nil`: where its first button sits, a share of the height (nil: the menu's)
 - `focus -> UI::Focus | nil`: its UI::Focus, which the menu gives it
 - `focus = UI::Focus | nil focus`: sets it
+- `option_extras -> Array[Hash[Symbol, untyped]]`: what each option says besides: {id:, enabled:} *Experimental.*
+- `theme = Hash[Symbol, untyped] | nil changes`: this screen's own changes over the menu's theme *Experimental.*
+- `theme_layer -> Hash[Symbol, untyped]`: what this screen changes of the menu's theme *Experimental.*
+- `on_draw_button { (String, Hash[Symbol, Numeric], UI::ButtonState) -> void } -> void`: draws this screen's buttons with a block *Experimental.*
+- `on_draw_background { () -> void } -> void`: draws this screen's background with a block *Experimental.*
 
 ## Particles
 

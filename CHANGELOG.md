@@ -17,6 +17,23 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Menu and interface themes (experimental).** A game gives its menus its own look in
+  game.json's `"menu": {"theme": {...}, "screens": {...}}`, or from a script with `UI.theme=`,
+  `GameMenu.theme=` and `screen.theme=`. A theme sets the fonts (body and heading), sizes, colors
+  (text, buttons in each state, border, focus ring, accent, the shade or none), buttons (radius,
+  border, padding, width, a 9-slice skin, an icon per option), the layout (align, top, gap,
+  margins, where the heading goes), the title's background (the scene, a color, a gradient, a
+  picture that fits or covers, or the live scene blurred, with a camera path), a logo and a
+  footer, a fade or slide between screens, and sounds and music through the audio groups. A game
+  that sets no theme looks as before. `on_draw_button { |label, box, state| }` and
+  `on_draw_background` let a game draw the buttons or the background itself, on the menu or one
+  screen. An option can have an `id:` and an `enabled:` lookup (grayed while it is false). The
+  settings rows, the controls cells and the journal take the theme too. `redgem check` names an
+  unknown theme key, a wrong value, and a font or picture the game does not have. New calls:
+  `UI.gradient`, `UI.image(part:, tint:)`, `UI.image_size`, `UI.draw_button`, `UI.shifted` and
+  `Camera.backdrop_blur`. The platformer template has a theme of its own: a logo, a footer, and
+  the level seen through a blur as the camera flies over it. The manual's gameplay page has
+  "Giving the menu your game's look".
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is
