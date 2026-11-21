@@ -279,12 +279,14 @@ real clock.
 
 ### Shipping
 
-- The packed Android app runs on a phone or emulator: not yet confirmed; the emulator crashes on
-  this host. A packed game (Proving Ground, 0.6.1) unpacked, started and showed its title screen on
-  the emulator with SwiftShader graphics, then the emulator itself crashed: with the computer's
-  graphics card, in the emulator's own memory allocator (tcmalloc) as the computer's C library
-  (glibc 2.39) makes room for a new thread's storage; with SwiftShader, in its compiled drawing
-  code. Emulators 37.1.11 and 37.3.10, cold boots and wiped data alike. The continuous
+- The packed Android app has been run on the emulator only, not on a phone: a packed game
+  (Proving Ground, 0.6.1) unpacked, showed its title screen and played a level with the
+  computer's graphics card. On a computer whose C library is glibc 2.39 (Ubuntu 24.04) the
+  emulator itself crashes as soon as a game draws, whatever its graphics mode (emulators 37.1.11
+  and 37.3.10): its bundled memory allocator, `emulator/lib64/libtcmalloc_minimal.so.4`, calls
+  itself without end while glibc makes room for a new thread's storage. An emulator bug, not the
+  engine's; the run above replaced that library with an empty one that exports the two
+  `MallocHook_Set*Replacement` functions qemu calls, so memory comes from glibc. The continuous
   integration only builds the player.
 
 ### Engineering
