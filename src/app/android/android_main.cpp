@@ -34,6 +34,7 @@
 #include "input/raylib_input_source.hpp"
 #include "input/soft_keyboard_input_source.hpp"
 #include "input/touch_input_source.hpp"
+#include "storage/durable_file.hpp"
 
 // The running activity, kept by raylib's Android layer.
 extern "C" struct android_app* GetAndroidApp(void);
@@ -58,19 +59,28 @@ std::string read_asset(AAssetManager* assets, const std::string& name) {
   return text;
 }
 
-bool copy_asset(AAssetManager* assets, const std::string& name, const std::filesystem::path& to) {
-  AAsset* asset = AAssetManager_open(assets, name.c_str(), AASSET_MODE_STREAMING);
-  if (asset == nullptr) return false;
-  std::error_code ignored;
-  std::filesystem::create_directories(to.parent_path(), ignored);
+// Streams an open asset into `to`; false when not all of it was written.
+bool stream_asset(AAsset* asset, const std::filesystem::path& to) {
   std::ofstream out(to, std::ios::binary);
   std::vector<char> chunk(kCopyChunkBytes);
   for (int count = AAsset_read(asset, chunk.data(), chunk.size()); count > 0;
        count = AAsset_read(asset, chunk.data(), chunk.size())) {
     out.write(chunk.data(), count);
   }
+  out.close();
+  return !out.fail();
+}
+
+// Copies an asset into `to` and pushes it to the disk, with its place in its folder: the stamp
+// written after it can never outlive it in a power cut, or the app killed with the phone.
+bool copy_asset(AAssetManager* assets, const std::string& name, const std::filesystem::path& to) {
+  AAsset* asset = AAssetManager_open(assets, name.c_str(), AASSET_MODE_STREAMING);
+  if (asset == nullptr) return false;
+  std::error_code ignored;
+  std::filesystem::create_directories(to.parent_path(), ignored);
+  const bool written = stream_asset(asset, to);
   AAsset_close(asset);
-  return static_cast<bool>(out);
+  return written && durable::flush_file(to) && durable::sync_folder(to.parent_path());
 }
 
 // What a file says; nothing when it is not there.
@@ -113,8 +123,9 @@ bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
   std::filesystem::remove(home / kArchiveFileName, ignored);
   const int copied = copy_game_files(assets, home);
   if (copied == 0) return false;
-  // (If the stamp cannot be written the game still runs: it is only unpacked again next time.)
-  std::ofstream(stamp_file) << stamp;
+  // Only now, the game on the disk whole, the stamp (if it cannot be written the game still runs:
+  // it is only unpacked again next time).
+  if (!durable::replace_file(stamp_file, stamp)) log::warning("cannot keep the stamp of the unpacked game");
   log::info("unpacked " + std::to_string(copied) + " game files");
   return true;
 }

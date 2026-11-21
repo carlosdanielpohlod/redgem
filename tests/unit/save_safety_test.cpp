@@ -271,6 +271,24 @@ TEST_CASE("a file written flushed holds exactly the text, bytes as they are") {
   CHECK_FALSE(durable::write_flushed(temp.dir / "missing" / "flushed.json", text));
 }
 
+TEST_CASE("a file another writer streamed out is flushed to the disk in place, unchanged") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "game.rgpak";
+  write_text(file, kUserText);
+  int flushes = 0;
+  const durable::Flush counting = [&flushes](std::FILE* opened) {
+    ++flushes;
+    return durable::flush_to_disk(opened);
+  };
+  REQUIRE(durable::flush_file(file, counting));
+  CHECK(flushes == 1);
+  CHECK(contents_of(file) == kUserText);
+  CHECK_FALSE(durable::flush_file(file, [](std::FILE*) { return false; }));
+  CHECK_FALSE(durable::flush_file(temp.dir / "missing.rgpak", counting));
+  CHECK_FALSE(std::filesystem::exists(temp.dir / "missing.rgpak"));
+  CHECK(flushes == 1);
+}
+
 TEST_CASE("a file replaced whole leaves nothing beside it, and its folder is flushed to the disk") {
   const TempSave temp;
   std::filesystem::create_directories(temp.dir);

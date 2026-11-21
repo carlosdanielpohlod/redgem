@@ -29,6 +29,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **An Android game cut off on its first start no longer stays broken**: the app copies its game
+  out of the APK on the first start, then writes a stamp so that later starts skip the copy. The
+  stamp could reach the storage before the game did, so a phone switched off (or an emulator
+  stopped) in the next seconds kept an empty `game.rgpak` and its stamp, and the game said its
+  archive was damaged on every start until its data was cleared. Each file copied is now flushed
+  to the storage with its folder before the stamp is written, whole, the same way
+  (`durable::flush_file`).
 - **Network tests count rounds, not real time**: the tests of connections, sessions, relays,
   lobbies, approvals, reconnecting and multiplayer games no longer sleep between rounds. A round
   waits for one of its sockets to be ready (a millisecond at most), and the machines' networks

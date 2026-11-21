@@ -20,17 +20,22 @@ constexpr const char* kPartialSuffix = ".part";  // of a file still being writte
 #ifdef _WIN32
 // Bytes as they are: a save written on Windows reads the same everywhere.
 constexpr const wchar_t* kWriteBytes = L"wb";
+// An existing file opened to be written, kept as it is (a flush needs it open for writing on Windows).
+constexpr const wchar_t* kUpdateBytes = L"r+b";
 #else
 constexpr const char* kWriteBytes = "wb";
+constexpr const char* kUpdateBytes = "r+b";
 #endif
 
-std::FILE* open_for_writing(const std::filesystem::path& file) {
+std::FILE* open_with(const std::filesystem::path& file, decltype(kWriteBytes) mode) {
 #ifdef _WIN32
-  return _wfopen(file.c_str(), kWriteBytes);  // (a wide name: any user's folder opens)
+  return _wfopen(file.c_str(), mode);  // (a wide name: any user's folder opens)
 #else
-  return std::fopen(file.c_str(), kWriteBytes);
+  return std::fopen(file.c_str(), mode);
 #endif
 }
+
+std::FILE* open_for_writing(const std::filesystem::path& file) { return open_with(file, kWriteBytes); }
 
 #ifdef __APPLE__
 // Whether F_FULLFSYNC failed only because the file system does not take it (a network or FAT
@@ -69,6 +74,13 @@ bool write_flushed(const std::filesystem::path& file, const std::string& text, c
   std::FILE* out = open_for_writing(file);
   if (out == nullptr) return false;
   return staging::write_and_close(out, text, flush);
+}
+
+bool flush_file(const std::filesystem::path& file, const Flush& flush) {
+  std::FILE* existing = open_with(file, kUpdateBytes);
+  if (existing == nullptr) return false;
+  const bool flushed = flush(existing);
+  return std::fclose(existing) == 0 && flushed;
 }
 
 bool sync_folder(const std::filesystem::path& folder) {
