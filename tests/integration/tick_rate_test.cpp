@@ -11,6 +11,7 @@
 #include "app/presenter.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
+#include "physics/physics_config.hpp"
 #include "physics_game.hpp"
 
 using namespace redgem;
@@ -19,10 +20,10 @@ using namespace redgem::test::physics_game;
 namespace {
 
 constexpr int kFastTick = 128;
-constexpr float kDropHeight = 10.0f;
+constexpr float kDropHeight = 20.0f;  // meters: high enough not to land within a second
 // What a body falls in one second, g t^2 / 2, give or take (a share of it) what a step's length
 // and the body's damping change of it.
-constexpr float kFallInOneSecond = 4.9f;
+constexpr float kFallInOneSecond = -config::kGravityY / 2.0f;
 constexpr float kFallTolerance = 0.04f;
 constexpr int kRealFramesPerSecond = 60;  // frames of a window at 60 fps, on the real clock
 constexpr int kMissedStepAtMost = 1;      // what the real clock's rounding may leave for the next frame
