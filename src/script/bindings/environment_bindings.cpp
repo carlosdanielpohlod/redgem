@@ -6,6 +6,7 @@
 #include <mruby/string.h>
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <string>
 
@@ -73,10 +74,9 @@ const Setting& setting_named(mrb_state* mrb, const std::string& key) {
   return *found;
 }
 
-// Whether an object is the one whose properties describe the environment.
-bool is_environment(const GameObject& object) {
-  return get_bool(object.props, props::kEnvironment).value_or(false) && !object.pending_destroy;
-}
+// Whether an object is one whose properties describe the environment (scene_environment() takes
+// the first, until it is gone).
+bool is_environment(const GameObject& object) { return get_bool(object.props, props::kEnvironment).value_or(false); }
 
 // The scene's environment object, as scene_environment() finds it, or nullptr.
 GameObject* environment_object(mrb_state* mrb) {
@@ -93,9 +93,11 @@ GameObject& required_environment(mrb_state* mrb) {
   return *found;
 }
 
+// A name given as a String or a Symbol.
 std::string text_of(mrb_state* mrb, mrb_value value, const char* key) {
-  if (!mrb_string_p(value)) mrb_raisef(mrb, E_ARGUMENT_ERROR, "Environment %s takes a String, not %v", key, value);
-  return std::string(RSTRING_PTR(value), static_cast<std::size_t>(RSTRING_LEN(value)));
+  const bool named = mrb_string_p(value) || mrb_symbol_p(value);
+  if (!named) mrb_raisef(mrb, E_ARGUMENT_ERROR, "Environment %s takes a String or a Symbol, not %v", key, value);
+  return to_name(mrb, value);
 }
 
 std::string color_of(mrb_state* mrb, mrb_value value, const char* key) {
@@ -110,6 +112,14 @@ bool flag_of(mrb_state* mrb, mrb_value value, const char* key) {
   return mrb_true_p(value);
 }
 
+double number_of(mrb_state* mrb, mrb_value value, const char* key) {
+  const mrb_float number = mrb_as_float(mrb, value);
+  if (!std::isfinite(number)) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "Environment %s takes a finite number, not %v", key, value);
+  }
+  return static_cast<double>(number);
+}
+
 PropertyValue value_of(mrb_state* mrb, const Setting& setting, mrb_value value) {
   switch (setting.kind) {
     case Kind::Color: return color_of(mrb, value, setting.key);
@@ -117,10 +127,13 @@ PropertyValue value_of(mrb_state* mrb, const Setting& setting, mrb_value value) 
     case Kind::Flag: return flag_of(mrb, value, setting.key);
     case Kind::Number: break;
   }
-  return static_cast<double>(finite(mrb, mrb_as_float(mrb, value)));
+  return number_of(mrb, value, setting.key);
 }
 
-mrb_value shown(mrb_state* mrb, const PropertyValue& value) {
+// A setting as its kind shows it (a scene from Blender keeps a flag as 0 or 1).
+mrb_value shown(mrb_state* mrb, const Setting& setting, const PropertyMap& props) {
+  const PropertyValue& value = props.at(setting.key);
+  if (setting.kind == Kind::Flag) return mrb_bool_value(get_bool(props, setting.key).value_or(false));
   if (const auto* flag = std::get_if<bool>(&value)) return mrb_bool_value(*flag);
   if (const auto* number = std::get_if<double>(&value)) return mrb_float_value(mrb, *number);
   return text_value(mrb, std::get<std::string>(value));
@@ -131,8 +144,8 @@ mrb_value environment_get(mrb_state* mrb, mrb_value) {
   const Setting setting = setting_named(mrb, name_arg(mrb));
   const GameObject* object = environment_object(mrb);
   if (object == nullptr) return mrb_nil_value();
-  const auto found = object->props.find(setting.key);
-  return found == object->props.end() ? mrb_nil_value() : shown(mrb, found->second);
+  if (object->props.count(setting.key) == 0) return mrb_nil_value();
+  return shown(mrb, setting, object->props);
 }
 
 // __set(key, value): changes a setting; nil gives it back to the default.
@@ -150,7 +163,9 @@ mrb_value environment_set(mrb_state* mrb, mrb_value) {
   return value;
 }
 
-mrb_value environment_present_p(mrb_state* mrb, mrb_value) { return mrb_bool_value(environment_object(mrb) != nullptr); }
+mrb_value environment_present_p(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(environment_object(mrb) != nullptr);
+}
 
 }  // namespace
 

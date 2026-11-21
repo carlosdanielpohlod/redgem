@@ -763,7 +763,7 @@ module Environment
   # changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or "#rrggbb"; nil gives the setting back to its default
   %a{redgem:experimental}
   def self.[]=: (Symbol | String key, Numeric | String | Symbol | Array[Numeric] | bool | nil value) -> (Numeric | String | Symbol | Array[Numeric] | bool | nil)
-  # changes several settings at once, as []= does each
+  # changes several settings at once, as []= does each: all of them, or none when one is refused
   %a{redgem:experimental}
   def self.set: (**untyped settings) -> nil
   # whether the scene has an environment object (environment = true) for scripts to change

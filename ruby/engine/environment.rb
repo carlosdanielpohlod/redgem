@@ -7,7 +7,7 @@
 #
 # Each machine keeps its own: over the network, change it on every machine.
 module Environment
-  COLORS = %i[sky_top sky_horizon ground_color fog_color].freeze
+  COLORS = %w[sky_top sky_horizon ground_color fog_color].freeze
   HEX = "#%02x%02x%02x".freeze
   CHANNELS = 0..255 # each of a color's red, green and blue
   RGB = 3
@@ -15,18 +15,33 @@ module Environment
   def self.[](key) = __get(key.to_s)
 
   def self.[]=(key, value)
-    __set(key.to_s, COLORS.include?(key.to_sym) ? __hex(value) : value)
+    __set(key.to_s, COLORS.include?(key.to_s) ? __hex(value, key) : value)
   end
 
+  # Changes several settings: all of them, or none when one is refused.
   def self.set(**settings)
+    kept = settings.keys.map { |key| [key, self[key]] }.to_h
     settings.each { |key, value| self[key] = value }
     nil
+  rescue StandardError
+    kept.each { |key, value| __set(key.to_s, value) } if kept
+    raise
   end
 
-  # A color as the environment object keeps it: "#rrggbb" (nil stays nil).
-  def self.__hex(color)
+  # A color as the environment object keeps it: "#rrggbb" (nil and Strings as they are).
+  def self.__hex(color, key)
     return color if color.nil? || color.is_a?(String)
 
-    format(HEX, *UI.rgb(color).first(RGB).map { |channel| channel.round.clamp(CHANNELS.min, CHANNELS.max) })
+    channels = UI.rgb(color)
+    refused = "Environment #{key} takes [r, g, b] from 0 to 255, not #{color.inspect}"
+    raise ArgumentError, refused unless __rgb?(channels)
+
+    format(HEX, *channels.first(RGB).map(&:round))
   end
+
+  def self.__rgb?(channels)
+    channels.is_a?(Array) && channels.size >= RGB && channels.first(RGB).all? { |channel| __channel?(channel) }
+  end
+
+  def self.__channel?(channel) = channel.is_a?(Numeric) && channel.to_f.finite? && CHANNELS.cover?(channel)
 end

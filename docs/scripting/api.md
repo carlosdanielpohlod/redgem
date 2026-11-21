@@ -394,7 +394,7 @@ The scene's look while the game runs: sky, fog, light and effects, as its enviro
 
 - `Environment[Symbol | String key] -> Float | String | bool | nil`: what the environment object says of a setting (a color as "#rrggbb"), or nil when it says nothing and the default applies *Experimental.*
 - `Environment[Symbol | String key] = Numeric | String | Symbol | Array[Numeric] | bool | nil value`: changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or "#rrggbb"; nil gives the setting back to its default *Experimental.*
-- `Environment.set(**untyped settings) -> nil`: changes several settings at once, as []= does each *Experimental.*
+- `Environment.set(**untyped settings) -> nil`: changes several settings at once, as []= does each: all of them, or none when one is refused *Experimental.*
 - `Environment.present? -> bool`: whether the scene has an environment object (environment = true) for scripts to change *Experimental.*
 
 The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file.

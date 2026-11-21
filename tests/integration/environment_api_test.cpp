@@ -7,6 +7,7 @@
 
 #include "physics_game.hpp"
 #include "render/environment.hpp"
+#include "scene/props.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -57,7 +58,28 @@ TEST_CASE("Environment refuses a setting it does not have and a value of the wro
   CHECK(error_of(*engine, "Environment[:ambient] = 'bright'").find("TypeError") != std::string::npos);
   CHECK(error_of(*engine, "Environment[:fog_color] = '#zz0000'").find("#rrggbb") != std::string::npos);
   CHECK(error_of(*engine, "Environment[:auto_exposure] = 1").find("true or false") != std::string::npos);
-  CHECK(error_of(*engine, "Environment[:ambient] = Float::INFINITY").find("ArgumentError") != std::string::npos);
+  CHECK(error_of(*engine, "Environment[:ambient] = Float::INFINITY").find("Environment ambient") != std::string::npos);
+  CHECK(error_of(*engine, "Environment[:fog_color] = [300, 128, -5]").find("0 to 255") != std::string::npos);
+  CHECK(error_of(*engine, "Environment[:fog_color] = [255, 0]").find("0 to 255") != std::string::npos);
+  CHECK(ruby(*engine, "Environment[:fog_color]") == "#ffffff");
+}
+
+TEST_CASE("Environment.set changes every setting it is given, or none when one is refused") {
+  const TempGame game(R"({"title": "Look"})");
+  auto engine = engine_for(game, scene_with({environment_node()}));
+  error_of(*engine, "Environment.set(sky_intensity: 0.2, fog_color: '#zz0000', ambient: 0.1)");
+  CHECK(ruby(*engine, "Environment[:sky_intensity]") == "1.0");
+  CHECK(ruby(*engine, "Environment[:ambient].inspect") == "nil");
+}
+
+TEST_CASE("Environment takes a picture's name as a Symbol and shows a flag kept as a number as true or false") {
+  const TempGame game(R"({"title": "Look"})");
+  NodeDesc node = environment_node();
+  node.props[props::environment::kAutoExposure] = 1.0;  // as Blender keeps a toggle
+  auto engine = engine_for(game, scene_with({node}));
+  CHECK(ruby(*engine, "Environment[:auto_exposure]") == "true");
+  ruby(*engine, "Environment[:sky_image] = :night_sky");
+  CHECK(scene_environment(engine->scene()).sky_image == "night_sky");
 }
 
 TEST_CASE("Environment in a scene without an environment object reads nil and refuses changes") {

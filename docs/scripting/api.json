@@ -2303,7 +2303,7 @@
             {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
           ],
           "returns": {"type": "nil"},
-          "about": "changes several settings at once, as []= does each",
+          "about": "changes several settings at once, as []= does each: all of them, or none when one is refused",
           "example": "Environment.set(sky_image: \"night_sky\", sky_intensity: 0.3, ambient: 0.6)"
         },
         {
