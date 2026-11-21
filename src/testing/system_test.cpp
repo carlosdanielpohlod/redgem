@@ -75,6 +75,7 @@ class SystemTestRun {
 
  private:
   void tick();
+  bool timed_out();
   void heed(const std::string& said);
   void wait_a_frame();
   void fail(const std::string& why);
@@ -125,15 +126,21 @@ void SystemTestRun::fail(const std::string& why) {
   status_ = Status::Failed;
 }
 
-void SystemTestRun::tick() {
+// Whether the test ran out of frames, its own or its waits in real seconds (it fails then).
+bool SystemTestRun::timed_out() {
   if (engine_.script_context().time.frame - waited_frames_ >= kMaxFrames) {
     fail("system test timed out after " + std::to_string(kMaxFrames) + " frames");
-    return;
+    return true;
   }
   if (waited_frames_ >= kMaxWaitedFrames) {
     fail("system test timed out after " + std::to_string(kMaxWaitedFrames) + " frames of waits in real seconds");
-    return;
+    return true;
   }
+  return false;
+}
+
+void SystemTestRun::tick() {
+  if (timed_out()) return;
   const RubyResult result = vm().call(test_, kTickMethod);
   if (!result.ok) {
     fail("system test crashed: " + result.error);

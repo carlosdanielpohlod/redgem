@@ -34,6 +34,12 @@ bool runs_another_scene(Engine* runtime, const EditorSession& session) {
   return runtime != nullptr && runtime->scene_name() != session.scene_name();
 }
 
+// An object's NPC settings: the running scripts' while the game runs, else the ones its props give.
+NpcSettings npc_settings_of(Engine* runtime, const Scene& scene, ObjectId id) {
+  if (runtime != nullptr) return runtime->scripts().npc_settings(id);
+  return npc_settings_from_props(scene.at(id).props);
+}
+
 ImU32 label_color() {
   const ::Color color = rgba(kNpcLabelColor);
   return IM_COL32(color.r, color.g, color.b, color.a);
@@ -49,9 +55,7 @@ std::vector<NpcGizmo> EditorApp::selected_npc_gizmos() {
   for (const ObjectId id : session_->selected().ids()) {
     if (gizmos.size() == kMostNpcGizmos) break;
     if (!scene.is_alive(id)) continue;
-    const NpcSettings settings =
-        runtime != nullptr ? runtime->scripts().npc_settings(id) : npc_settings_from_props(scene.at(id).props);
-    gizmos.push_back(npc_gizmo(settings, scene.world_transform(id)));
+    gizmos.push_back(npc_gizmo(npc_settings_of(runtime, scene, id), scene.world_transform(id)));
   }
   return gizmos;
 }

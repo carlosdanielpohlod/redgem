@@ -38,8 +38,7 @@ void EditorApp::draw_viewport_window() {
   ImGui::Begin(ui::window_title(kViewportTitle, kViewportWindow), nullptr,
                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   draw_viewport_image();
-  if (!playing) draw_npc_labels(selected_npc_gizmos());
-  if (!playing) draw_viewport_drop_target();
+  if (!playing) draw_editing_overlays();
   track_viewport_focus();
   draw_viewport_hint(playing);
   brush_point_.reset();
@@ -47,6 +46,11 @@ void EditorApp::draw_viewport_window() {
   playing ? draw_play_border() : use_viewport_tools();
   ImGui::End();
   ImGui::PopStyleVar();
+}
+
+void EditorApp::draw_editing_overlays() {
+  draw_npc_labels(selected_npc_gizmos());
+  draw_viewport_drop_target();
 }
 
 // Whether the mouse and the keyboard are in the Scene view. Flying (right mouse) takes the keyboard.
