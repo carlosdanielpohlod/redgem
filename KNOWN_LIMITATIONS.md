@@ -63,9 +63,9 @@ the same pull request.
   than its surface (white paint on a dark wall) cannot be made, and they do not shine or reflect.
   They are cut from the surfaces' triangles when placed, on the machine's main thread: a mark on a
   dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
-  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them with distance. A
-  mesh that changes shape after a mark is placed (a sculpted terrain in the editor) leaves the mark
-  as it was. Skinned meshes and meshes with shape keys take none.
+  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
+  with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
+  editor) leaves the mark as it was. Skinned meshes and meshes with shape keys take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
