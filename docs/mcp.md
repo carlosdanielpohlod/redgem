@@ -135,7 +135,7 @@ changed, with its id, so the next call can name it by `#id`.
 
 | Action | Result |
 |--------|--------|
-| `settings` | `game.json`, then the problems the game would have with it. |
+| `settings` | `game.json`, or only its `section` (such as `menu`), then the problems the game would have with it. |
 | `set_settings` | Merges `changes` into `game.json`: a key replaces the file's, an object merges into its object, `null` removes a key. |
 | `texts` | The texts of `locales/<language>.json` (`language` defaults to `en`) whose keys start with `prefix`, `limit` of them (default 50). |
 | `set_texts` | Sets `texts` (`{"key": "text"}`) in that language; `null` removes one. |
@@ -147,12 +147,14 @@ changed, with its id, so the next call can name it by `#id`.
 
 ```json
 {"action": "set_settings", "changes": {"window": {"title": "Coast"}, "input": {"actions": {"jump": ["key:space", "pad:a"]}}}}
+{"action": "set_settings", "changes": {"menu": {"theme": {"colors": {"button": "#203040"}, "transition": {"kind": "fade", "seconds": 0.25}}}}}
 {"action": "set_texts", "language": "pt-BR", "texts": {"hud.coins": "Moedas {coins}/{total}"}}
 {"action": "set_story", "kind": "dialogue", "name": "npcs/baker", "content": {"start": "hi", "nodes": {"hi": {"speaker": "baker.name", "text": "baker.hi", "end": true}}}}
 ```
 
-Every write is checked as `game_check` checks the game: `game.json` for its physics and input
-sections, the locales, dialogues and quests for what they name of each other. A write that brings a
+Every write is checked as `game_check` checks the game: `game.json` for its physics, input and
+menu sections (the menu theme's keys and values, and the fonts, pictures and sounds it names; see
+[Giving the menu your game's look](scripting/gameplay.md#giving-the-menu-your-games-look)), the locales, dialogues and quests for what they name of each other. A write that brings a
 problem the game did not have is refused, with the problems, and the file stays as it was. The
 `changes`, `texts` and `content` objects are free-form; the checks, not the schema, judge them.
 

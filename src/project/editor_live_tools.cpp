@@ -238,7 +238,7 @@ void validate(const EditorSession& session, const std::string& name, const Json&
   const auto tool = std::find_if(tools.begin(), tools.end(), [&](const Json& value) { return value["name"] == name; });
   if (tool == tools.end()) throw std::invalid_argument("unknown editor tool");
   validate_arguments(tool->at("inputSchema"), args);
-  require_current_scene(session, args);
+  if (name != "editor") require_current_scene(session, args);  // (the editor's scene is one to open or save as)
 }
 
 // Events of the editor's own process, with paths shown relative to its game.

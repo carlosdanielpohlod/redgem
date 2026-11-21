@@ -44,6 +44,7 @@ std::string text_of(const Json& args, const char* key, const char* fallback) {
 Lines settings_problems(const fs::path& game) {
   CheckReport report;
   check_game_file(game, report);
+  check_menu(game, report);
   Lines problems = report.errors;
   problems.insert(problems.end(), report.warnings.begin(), report.warnings.end());
   const Json settings = project_files::read_object(game / kGameSettingsFile);
@@ -51,10 +52,18 @@ Lines settings_problems(const fs::path& game) {
   return problems;
 }
 
-Json settings(const Options& options) {
+// The whole file, or the one section asked for ("menu": how the game's menus look).
+Json settings_shown(const Json& file, const Json& args) {
+  if (!args.contains("section")) return file;
+  const std::string section = args["section"];
+  if (!file.contains(section)) throw wrong("game.json has no " + section + " section");
+  return file[section];
+}
+
+Json settings(const Options& options, const Json& args) {
   const Json file = project_files::read_object(options.game / kGameSettingsFile);
   const Lines problems = settings_problems(options.game);
-  std::string text = file.dump(kIndent) + "\n";
+  std::string text = settings_shown(file, args).dump(kIndent) + "\n";
   if (!problems.empty()) text += "problems:\n" + joined(problems);
   return tool_result(text);
 }
@@ -218,7 +227,7 @@ struct Known {
   bool reads;
 };
 constexpr Known kActions[] = {
-    {"settings", [](const Options& o, const Json&) { return settings(o); }, true},
+    {"settings", settings, true},
     {"set_settings", set_settings, false},
     {"texts", texts, true},
     {"set_texts", set_texts, false},

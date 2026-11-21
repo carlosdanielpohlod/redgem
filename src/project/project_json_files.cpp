@@ -14,8 +14,10 @@ namespace fs = std::filesystem;
 using mcp::Json;
 
 constexpr int kIndent = 2;
-const std::regex kFileName("[a-z0-9_-]+(/[a-z0-9_-]+)*");
-const std::regex kLanguage("[a-z]{2,3}(-[A-Za-z0-9]{2,8})?");
+constexpr const char* kFileName = "[a-z0-9_-]+(/[a-z0-9_-]+)*";
+constexpr const char* kLanguage = "[a-z]{2,3}(-[A-Za-z0-9]{2,8})?";
+
+bool matches(const std::string& text, const char* pattern) { return std::regex_match(text, std::regex(pattern)); }
 
 std::optional<std::string> contents(const fs::path& file) {
   std::error_code missing;
@@ -74,8 +76,8 @@ void write_checked(const fs::path& file, const Json& value, const Problems& prob
   throw std::invalid_argument("not written, as it would make the game wrong:\n" + lines(added));
 }
 
-bool valid_file_name(const std::string& name) { return std::regex_match(name, kFileName); }
+bool valid_file_name(const std::string& name) { return matches(name, kFileName); }
 
-bool valid_language(const std::string& language) { return std::regex_match(language, kLanguage); }
+bool valid_language(const std::string& language) { return matches(language, kLanguage); }
 
 }  // namespace redgem::tools::project_files

@@ -66,6 +66,18 @@ TEST_CASE("project settings reads game.json, and set_settings merges into it or 
   CHECK_THROWS_AS(copy.call({{"action", "set_settings"}}), std::invalid_argument);
 }
 
+TEST_CASE("project reads and writes the menu theme, refusing what no theme takes") {
+  const GameCopy copy;
+  const Json button{{"menu", {{"theme", {{"colors", {{"button", "#203040"}}}}}}}};
+  copy.call({{"action", "set_settings"}, {"changes", button}});
+  CHECK(has(copy.call({{"action", "settings"}, {"section", "menu"}}), "#203040"));
+  const Json wrong_key{{"menu", {{"theme", {{"colours", {{"button", "#203040"}}}}}}}};
+  CHECK_THROWS_WITH_AS(copy.call({{"action", "set_settings"}, {"changes", wrong_key}}),
+                       doctest::Contains("not written"), std::invalid_argument);
+  CHECK_FALSE(has(copy.call({{"action", "settings"}, {"section", "menu"}}), "colours"));
+  CHECK_THROWS_AS(copy.call({{"action", "settings"}, {"section", "nothing"}}), std::invalid_argument);
+}
+
 TEST_CASE("project texts lists a language's texts by prefix, bounded, and set_texts adds and removes them") {
   const GameCopy copy;
   const Json hud = copy.call({{"action", "texts"}, {"prefix", "hud."}});
