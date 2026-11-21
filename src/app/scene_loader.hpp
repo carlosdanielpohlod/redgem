@@ -26,6 +26,8 @@ class SceneLoad {
   };
   std::optional<Result> take();
   void wait_until_ready();
+  // The same, `seconds` at most: whether it is ready.
+  bool wait_until_ready_for(float seconds);
   void finish(LoadResult result, Messages messages = {});
 
  private:

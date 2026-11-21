@@ -8,6 +8,11 @@
 #include "core/log.hpp"
 namespace redgem::test {
 inline constexpr auto kSceneWaitLimit = std::chrono::seconds(10);
+// The most a test waits for another thread to read a scene: a bound for a reader that died, never a
+// measure (how long a read takes is the computer's).
+inline constexpr float kSceneReadPatience = 10.0f;
+// Frames a scene read takes at most to be made ready, once read (see kActivationSecondsPerFrame).
+inline constexpr int kMostActivationFrames = 600;
 // A parser held at a condition variable, with RAII release even after a failed assertion.
 class HeldSceneReader {
   std::mutex mutex_;

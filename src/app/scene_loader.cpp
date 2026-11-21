@@ -1,6 +1,7 @@
 #include "app/scene_loader.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <utility>
 
@@ -61,6 +62,10 @@ void SceneLoad::finish(LoadResult result, Messages messages) {
 void SceneLoad::wait_until_ready() {
   std::unique_lock<std::mutex> hold(mutex_);
   ready_.wait(hold, [this] { return result_.has_value(); });
+}
+bool SceneLoad::wait_until_ready_for(float seconds) {
+  std::unique_lock<std::mutex> hold(mutex_);
+  return ready_.wait_for(hold, std::chrono::duration<float>(seconds), [this] { return result_.has_value(); });
 }
 
 SceneLoader::SceneLoader(Reader reader) : reader_(std::move(reader)), worker_([this] { run(); }) {}

@@ -166,6 +166,10 @@ class Engine {
   ScriptedInputSource& scripted_input() { return scripted_input_; }
   // Scene currently running ("main" is scene.glb).
   const std::string& scene_name() const { return context_.scene_name; }
+  // Sleeps until the scene being read in the background is read, `seconds` at most: for a tool or
+  // a test with nothing to do until then. Whether it is (true when none is being read: the next
+  // frames make it ready, or nothing loads).
+  bool wait_for_scene_read(float seconds);
   AudioSystem& audio();
   bool audio_open() const;  // whether audio() has something to sound through
   // Who shows the game: the presenter of its options, or the nobody it made for itself.

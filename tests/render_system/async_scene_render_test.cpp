@@ -79,9 +79,9 @@ TEST_CASE("async loading draws a live loading screen in the player's window") {
   CHECK(seen.r > kRedDominance * seen.g);
   CHECK(engine.scene_name() == "main");
   reader.release();
-  const auto deadline = std::chrono::steady_clock::now() + test::kSceneWaitLimit;
   double activation_frame = 0.0;
-  while (engine.scene_name() != "level2" && std::chrono::steady_clock::now() < deadline) {
+  for (int i = 0; i < test::kMostActivationFrames && engine.scene_name() != "level2"; ++i) {
+    REQUIRE(engine.wait_for_scene_read(test::kSceneReadPatience));
     const auto frame_start = std::chrono::steady_clock::now();
     engine.frame(config::kFixedDeltaSeconds);
     activation_frame =

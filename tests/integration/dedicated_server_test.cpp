@@ -23,6 +23,7 @@
 #include "server/game_server.hpp"
 #include "server/server_program.hpp"
 #include "server/stop_signals.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -30,8 +31,7 @@ using redgem::test::fixture;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of one frame on every machine, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of one frame on every machine (see Online::round)
 constexpr server::RoomLimits kOneRoomOfTwo{2, 1};
 constexpr server::RoomLimits kTwoRoomsOfTwo{2, 2};
 constexpr server::RoomLimits kRoomy{4, 2};
@@ -74,7 +74,6 @@ constexpr double kOversleep = kTick;
 constexpr double kFloatRounding = 1e-3;
 constexpr double kStepTolerance = kTick + kFloatRounding;
 constexpr double kClockTolerance = 1e-9;
-constexpr std::chrono::milliseconds kHalfASecond{500};
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
 constexpr const char* kHeadEnd = "\r\n\r\n";
@@ -172,10 +171,23 @@ struct Online {
     return player;
   }
 
+  // The lobby's turn and a frame of every player, then a wait for what they sent to arrive (the
+  // server's sockets are the other ends of the players').
   void round() {
     server.tick(config::kFixedDeltaSeconds);
     for (auto& player : players) player->frame(config::kFixedDeltaSeconds);
-    std::this_thread::sleep_for(kRoundPause);
+    wait_for_sockets();
+  }
+
+  void wait_for_sockets() const {
+    std::vector<net::NetworkSession*> sessions;
+    for (const auto& player : players) sessions.push_back(&player->network());
+    test::wait_for_sessions(sessions);
+  }
+
+  // Whether the room with the code `room` closed (its thread let it go).
+  bool closed(const std::string& room) {
+    return !server.visit(room, [](Engine&) {});
   }
 
   bool until(const std::function<bool()>& done) {
@@ -353,14 +365,17 @@ TEST_CASE("a room that closed between two turns of the lobby holds no place: its
   test::LogCapture said;
   Online online_game(kOneRoomOfTwo);
   Engine& first = online_game.join();
+  const std::string old_room = first.network().room();
   ruby(first, "Network.leave");
   // The next player's hello waits at the lobby while the old room closes, before the lobby's turn.
   Engine& next = online_game.knock();
   for (int frame = 0; frame < kFramesToSayHello; ++frame) {
     next.frame(config::kFixedDeltaSeconds);
-    std::this_thread::sleep_for(kRoundPause);
+    online_game.wait_for_sockets();
   }
-  std::this_thread::sleep_for(kHalfASecond);
+  bool closed = false;
+  for (int visit = 0; visit < kMaxRounds && !closed; ++visit) closed = online_game.closed(old_room);
+  REQUIRE(closed);
   // (Its TLS handshake takes the lobby a few turns, all of them after the old room closed.)
   REQUIRE(online_game.until([&next] { return online(next); }));
   CHECK(online_game.server.room_count() == 1);
