@@ -171,18 +171,19 @@ struct Online {
     return player;
   }
 
-  // The lobby's turn and a frame of every player, then a wait for what they sent to arrive (the
-  // server's sockets are the other ends of the players').
+  // The lobby's turn and a frame of every player, then a wait for something to reach a player.
   void round() {
     server.tick(config::kFixedDeltaSeconds);
     for (auto& player : players) player->frame(config::kFixedDeltaSeconds);
     wait_for_sockets();
   }
 
+  // A room's frame at most: the rooms play on the real clock, on threads of their own, so a round
+  // with nothing on its way lasts as long as one of their frames, as it did when it slept.
   void wait_for_sockets() const {
     std::vector<net::NetworkSession*> sessions;
     for (const auto& player : players) sessions.push_back(&player->network());
-    test::wait_for_sessions(sessions);
+    test::wait_for_sessions(sessions, {}, config::kFixedDeltaSeconds);
   }
 
   // Whether the room with the code `room` closed (its thread let it go).
@@ -366,6 +367,8 @@ TEST_CASE("a room that closed between two turns of the lobby holds no place: its
   Online online_game(kOneRoomOfTwo);
   Engine& first = online_game.join();
   const std::string old_room = first.network().room();
+  REQUIRE_FALSE(old_room.empty());
+  REQUIRE_FALSE(online_game.closed(old_room));
   ruby(first, "Network.leave");
   // The next player's hello waits at the lobby while the old room closes, before the lobby's turn.
   Engine& next = online_game.knock();

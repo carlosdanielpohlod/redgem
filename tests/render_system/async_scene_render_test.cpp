@@ -20,6 +20,7 @@ constexpr SurfaceSize kLoadingWindow{640, 360};
 constexpr int kPicturePoint = 8;  // inside the loading screen's opaque red rectangle
 constexpr int kFramesWhileBlocked = 5;
 constexpr int kRedDominance = 3;
+constexpr int kMostRealActivationFrames = 100 * test::kMostActivationFrames;
 
 void ruby(Engine& engine, const char* source) {
   const auto result = engine.scripts().eval(source, "loading_window.rb");
@@ -80,7 +81,9 @@ TEST_CASE("async loading draws a live loading screen in the player's window") {
   CHECK(engine.scene_name() == "main");
   reader.release();
   double activation_frame = 0.0;
-  for (int i = 0; i < test::kMostActivationFrames && engine.scene_name() != "level2"; ++i) {
+  // (Made ready on the real clock, whose frame times this test reports: how many frames that takes
+  // is the computer's, far fewer than this on any.)
+  for (int i = 0; i < kMostRealActivationFrames && engine.scene_name() != "level2"; ++i) {
     REQUIRE(engine.wait_for_scene_read(test::kSceneReadPatience));
     const auto frame_start = std::chrono::steady_clock::now();
     engine.frame(config::kFixedDeltaSeconds);

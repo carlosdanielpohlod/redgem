@@ -24,6 +24,7 @@ std::unique_ptr<Engine> game(SceneLoader* loader = nullptr, bool fixed = false, 
   options.fixed_step = fixed;
   options.server_room = room;
   options.scene_loader = loader;
+  options.activation_time = test::ticking_activation_clock();
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   return std::move(std::get<std::unique_ptr<Engine>>(created));
