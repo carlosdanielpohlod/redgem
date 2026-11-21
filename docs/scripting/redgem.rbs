@@ -1490,13 +1490,13 @@ module Settings
   def self.save: () -> bool
 end
 
-# A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.
+# A behaviour: title screen, pause menu, end screen, settings screen with its controls page, and the quest journal; arrows or the D-pad move the focus, Enter or A picks.
 %a{redgem:stable}
 class GameMenu < Behaviour
   # the menu of the scene, or nil
   %a{redgem:stable}
   def self.instance: () -> (GameMenu | nil)
-  # opens a screen: :title, :pause, :over, :settings or one of the game's
+  # opens a screen: :title, :pause, :over, :settings, :journal or one of the game's
   %a{redgem:stable}
   def show: (Symbol screen) -> void
   # opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)
@@ -1517,7 +1517,7 @@ class GameMenu < Behaviour
   # the screen open
   %a{redgem:stable}
   def screen: () -> (Symbol | nil)
-  # the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)
+  # the screens, by name (:title, :pause, :over, :settings, :controls, :journal and the game's own)
   %a{redgem:stable}
   def screens: () -> Hash[Symbol, GameMenu::Screen]
   # where the menu's button of that index is: [x, y, width, height]
@@ -2145,6 +2145,15 @@ module Quests
   # the quest file of that name, read once (raises for one that is not there or not well made)
   %a{redgem:experimental}
   def self.load: (String | Symbol name) -> Quests::Definition
+  # the quest this machine's journal and markers follow: the one tracked while it is under way, else the first one under way
+  %a{redgem:experimental}
+  def self.tracked: () -> (Quests::Quest | nil)
+  # tracks a quest on this machine (nil: the first one under way)
+  %a{redgem:experimental}
+  def self.track: (String | Symbol | nil name) -> (String | nil)
+  # whether the game has quest files (its menu then has a journal)
+  %a{redgem:experimental}
+  def self.any?: () -> bool
   # every quest that started, completed ones too
   %a{redgem:experimental}
   def self.started: () -> Array[Quests::Quest]
@@ -2312,9 +2321,64 @@ class Quests::Definition
   def objectives: (String | nil id) -> Array[Hash[String, untyped]]
 end
 
-# A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host.
+# A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, asks the game's checks on the host, and shows where the tracked quest's objectives happen (QuestMarkers).
 %a{redgem:experimental}
 class QuestTracker < Behaviour
+end
+
+# Where the tracked quest's objectives happen, on this machine's screen: a marker over each place the camera sees and a pointer at the edge toward one it does not; the game turns them off, restyles them, locates objectives or draws them.
+%a{redgem:experimental}
+module QuestMarkers
+  # whether this machine shows the markers and pointers (true unless the game said)
+  %a{redgem:experimental}
+  def self.enabled: () -> bool
+  # shows them or not, for the whole run
+  %a{redgem:experimental}
+  def self.enabled=: (bool shown) -> bool
+  # changes some of the looks (color:, size:, pointer_size:, margin:, height:, distance:, image:); returns them all
+  %a{redgem:experimental}
+  def self.style: (**untyped changes) -> Hash[Symbol, untyped]
+  # the looks back to the engine's
+  %a{redgem:experimental}
+  def self.reset_style: () -> Hash[Symbol, untyped]
+  # |objective| where it happens: a GameObject, a Vector3, or nil for the object it names (until the next level)
+  %a{redgem:experimental}
+  def self.locate: () { (Quests::Objective) -> untyped } -> void
+  # |mark| draws each mark as the game wants, in the place of the engine's dots (until the next level)
+  %a{redgem:experimental}
+  def self.draw: () { (QuestMarkers::Mark) -> void } -> void
+  # what shows now: a mark for each objective under way of the tracked quest that has a place
+  %a{redgem:experimental}
+  def self.marks: () -> Array[QuestMarkers::Mark]
+  # where a pointer sits toward a direction from the middle of a screen: on the way to it, margin inside the edge
+  %a{redgem:experimental}
+  def self.edge_point: ([Float, Float] direction, Numeric width, Numeric height, ?Numeric margin) -> [Float, Float]
+  # whether a point (nil: behind the camera) is on a screen of that size
+  %a{redgem:experimental}
+  def self.on_screen?: ([Numeric, Numeric] | nil spot, Numeric width, Numeric height) -> bool
+end
+
+# One place QuestMarkers shows: a marker on the screen, or a pointer at its edge.
+%a{redgem:experimental}
+class QuestMarkers::Mark
+  # the objective it shows
+  %a{redgem:experimental}
+  def objective: () -> Quests::Objective
+  # where it is drawn, across (the interface's units)
+  %a{redgem:experimental}
+  def x: () -> Float
+  # where it is drawn, down
+  %a{redgem:experimental}
+  def y: () -> Float
+  # true for a pointer at the edge of the screen (the camera does not show the place)
+  %a{redgem:experimental}
+  def pointer: () -> bool
+  # a pointer's way to its place on the screen, of length 1 (nil for a marker)
+  %a{redgem:experimental}
+  def direction: () -> ([Float, Float] | nil)
+  # from the hero to the place
+  %a{redgem:experimental}
+  def meters: () -> Float
 end
 
 # A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave.

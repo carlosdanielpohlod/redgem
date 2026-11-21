@@ -8,13 +8,14 @@
 #   GameMenu.instance.finish("You win!")       # from any script: the end screen
 #
 # Settings: title (shown on the title screen: the game's own title unless given), start_open
-# (false starts the game right away). On a dedicated server nobody is there to see a menu, and the
+# (false starts the game right away), journal (false leaves the journal page off the pause menu of
+# a game with quest files, see GameMenu::JournalScreen). On a dedicated server nobody is there to see a menu, and the
 # game must never freeze: none opens. Its labels are the engine's texts (see I18n), looked up in the
 # language in use each time they are drawn, so I18n.locale= relabels them; a game's own translation
 # files may change them. A game's own label or heading may be a text, or a lookup that is drawn the
 # same way: -> { I18n.t("menu.credits") }.
 #
-# The screens are :title, :pause, :over, :settings and :controls. A game changes them and adds its own:
+# The screens are :title, :pause, :over, :settings, :controls and :journal. A game changes them and adds its own:
 #
 #   menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 #   menu.screens[:credits] = GameMenu::Screen.new(heading: "Credits", back: -> { menu.show(:pause) })
@@ -55,11 +56,12 @@ class GameMenu < Behaviour
     title = [[-> { I18n.t("game.menu.play") }, -> { resume }], settings_option, quit]
     @screens = { title: Screen.new(options: title), pause: pause_screen(quit),
                  over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]),
-                 settings: SettingsScreen.new(self), controls: ControlsScreen.new(self) }
+                 **pages }
   end
 
   def start
     @screens[:title].heading = prop(:title, Game.title)
+    add_journal if prop(:journal, Quests.any?)
     show(:title) if prop(:start_open, true)
   end
 
@@ -137,6 +139,17 @@ class GameMenu < Behaviour
   def width_share = UI.width.positive? ? UI.width.to_f / REFERENCE_WIDTH : nil
 
   def first_button_share = open_screen&.first_button_share || FIRST_BUTTON_SHARE
+
+  # The screens that are pages of their own.
+  def pages
+    { settings: SettingsScreen.new(self), controls: ControlsScreen.new(self), journal: JournalScreen.new(self) }
+  end
+
+  # The journal goes on the pause menu, before its last option (Quit).
+  def add_journal
+    pause = @screens[:pause]
+    pause.add_option(-> { I18n.t("game.menu.journal") }, index: pause.options.size - 1) { show(:journal) }
+  end
 
   def settings_option = [-> { I18n.t("game.menu.settings") }, -> { show_settings }]
 

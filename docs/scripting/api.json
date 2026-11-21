@@ -14,6 +14,9 @@
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
     "GameMenu::ControlsScreen",
+    "GameMenu::Journal",
+    "GameMenu::Journal::Line",
+    "GameMenu::JournalScreen",
     "GameMenu::SettingsScreen",
     "Network::Level",
     "Network::Said",
@@ -4607,7 +4610,7 @@
       "stability": "stable",
       "kind": "class",
       "superclass": "Behaviour",
-      "about": "A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.",
+      "about": "A behaviour: title screen, pause menu, end screen, settings screen with its controls page, and the quest journal; arrows or the D-pad move the focus, Enter or A picks.",
       "methods": [
         {
           "name": "instance",
@@ -4624,7 +4627,7 @@
             {"name": "screen", "type": "Symbol"}
           ],
           "returns": {"type": "void"},
-          "about": "opens a screen: :title, :pause, :over, :settings or one of the game's"
+          "about": "opens a screen: :title, :pause, :over, :settings, :journal or one of the game's"
         },
         {
           "name": "show_settings",
@@ -4675,7 +4678,7 @@
           "stability": "stable",
           "params": [],
           "returns": {"type": "Hash[Symbol, GameMenu::Screen]"},
-          "about": "the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)"
+          "about": "the screens, by name (:title, :pause, :over, :settings, :controls, :journal and the game's own)"
         },
         {
           "name": "button_box",
@@ -6493,6 +6496,32 @@
           "about": "the quest file of that name, read once (raises for one that is not there or not well made)"
         },
         {
+          "name": "tracked",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Quests::Quest | nil"},
+          "about": "the quest this machine's journal and markers follow: the one tracked while it is under way, else the first one under way"
+        },
+        {
+          "name": "track",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol | nil"}
+          ],
+          "returns": {"type": "String | nil"},
+          "about": "tracks a quest on this machine (nil: the first one under way)"
+        },
+        {
+          "name": "any?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the game has quest files (its menu then has a journal)"
+        },
+        {
           "name": "started",
           "stability": "experimental",
           "static": true,
@@ -6946,12 +6975,161 @@
       "stability": "experimental",
       "kind": "class",
       "superclass": "Behaviour",
-      "about": "A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host.",
+      "about": "A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, asks the game's checks on the host, and shows where the tracked quest's objectives happen (QuestMarkers).",
       "methods": [],
       "internal": [
         "update"
       ],
       "guide": "quests.md"
+    },
+    {
+      "name": "QuestMarkers",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "Where the tracked quest's objectives happen, on this machine's screen: a marker over each place the camera sees and a pointer at the edge toward one it does not; the game turns them off, restyles them, locates objectives or draws them.",
+      "methods": [
+        {
+          "name": "enabled",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether this machine shows the markers and pointers (true unless the game said)"
+        },
+        {
+          "name": "enabled=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "shown", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "shows them or not, for the whole run"
+        },
+        {
+          "name": "style",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "changes", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "changes some of the looks (color:, size:, pointer_size:, margin:, height:, distance:, image:); returns them all"
+        },
+        {
+          "name": "reset_style",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "the looks back to the engine's"
+        },
+        {
+          "name": "locate",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(Quests::Objective) -> untyped", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "|objective| where it happens: a GameObject, a Vector3, or nil for the object it names (until the next level)"
+        },
+        {
+          "name": "draw",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "block", "type": "^(QuestMarkers::Mark) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "|mark| draws each mark as the game wants, in the place of the engine's dots (until the next level)"
+        },
+        {
+          "name": "marks",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Array[QuestMarkers::Mark]"},
+          "about": "what shows now: a mark for each objective under way of the tracked quest that has a place"
+        },
+        {
+          "name": "edge_point",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "direction", "type": "[Float, Float]"},
+            {"name": "width", "type": "Numeric"},
+            {"name": "height", "type": "Numeric"},
+            {"name": "margin", "type": "Numeric", "optional": true, "default": "QuestMarkers.style[:margin]"}
+          ],
+          "returns": {"type": "[Float, Float]"},
+          "about": "where a pointer sits toward a direction from the middle of a screen: on the way to it, margin inside the edge"
+        },
+        {
+          "name": "on_screen?",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "spot", "type": "[Numeric, Numeric] | nil"},
+            {"name": "width", "type": "Numeric"},
+            {"name": "height", "type": "Numeric"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "whether a point (nil: behind the camera) is on a screen of that size"
+        }
+      ],
+      "guide": "quests.md#markers-and-pointers"
+    },
+    {
+      "name": "QuestMarkers::Mark",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "One place QuestMarkers shows: a marker on the screen, or a pointer at its edge.",
+      "methods": [
+        {
+          "name": "objective",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Quests::Objective"},
+          "about": "the objective it shows"
+        },
+        {
+          "name": "x",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "where it is drawn, across (the interface's units)"
+        },
+        {
+          "name": "y",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "where it is drawn, down"
+        },
+        {
+          "name": "pointer",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "true for a pointer at the edge of the screen (the camera does not show the place)"
+        },
+        {
+          "name": "direction",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "[Float, Float] | nil"},
+          "about": "a pointer's way to its place on the screen, of length 1 (nil for a marker)"
+        },
+        {
+          "name": "meters",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "from the hero to the place"
+        }
+      ],
+      "guide": "quests.md#markers-and-pointers"
     },
     {
       "name": "DialogueBox",

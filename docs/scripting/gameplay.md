@@ -921,7 +921,9 @@ end
 GameMenu.instance.finish("You win!")
 ```
 
-Its screens are `:title`, `:pause`, `:over`, `:settings` and `:controls`. A game adds options and screens of its own:
+Its screens are `:title`, `:pause`, `:over`, `:settings`, `:controls` and `:journal` (the quests
+under way and completed, offered by the pause menu of a game with quest files: see
+[Quests](quests.md#the-journal)). A game adds options and screens of its own:
 
 ```ruby
 menu = GameMenu.instance

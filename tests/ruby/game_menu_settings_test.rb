@@ -26,7 +26,7 @@ class GameMenuSettingsTest < RedGemTest::Case
 
   def settings_screen
     menu = GameMenu.new
-    menu.__configure({ title: "Coin Rush", start_open: false })
+    menu.__configure({ title: "Coin Rush", start_open: false, journal: false })
     menu.start
     menu.screens[:settings]
   end

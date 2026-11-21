@@ -39,7 +39,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Debug`](#debug) | Developer diagnostics: console messages, frame timings and immediate world drawing. | [Stable](stability.md) |
 | [`Game`](#game) | The game itself. | [Stable](stability.md) |
 | [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. | [Stable](stability.md) |
-| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. | [Stable](stability.md) |
+| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen, settings screen with its controls page, and the quest journal; arrows or the D-pad move the focus, Enter or A picks. | [Stable](stability.md) |
 | [`GameMenu::Screen`](#gamemenuscreen) | A screen of the GameMenu. | [Stable](stability.md) |
 | [`Particles`](#particles) | Short-lived sparks, smoke and dust. | [Stable](stability.md) |
 | [`Particles::Emitter`](#particlesemitter) | A continuous particle effect attached to an object, returned by Particles.emitter. | [Experimental](stability.md) |
@@ -63,7 +63,9 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Quests::Quest`](#questsquest) | One quest and where the party is in it (Quests[name] gives one). | [Experimental](stability.md) |
 | [`Quests::Objective`](#questsobjective) | One thing the party does in a stage of a quest. | [Experimental](stability.md) |
 | [`Quests::Definition`](#questsdefinition) | A quest file as it was read. | [Experimental](stability.md) |
-| [`QuestTracker`](#questtracker) | A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. | [Experimental](stability.md) |
+| [`QuestTracker`](#questtracker) | A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, asks the game's checks on the host, and shows where the tracked quest's objectives happen (QuestMarkers). | [Experimental](stability.md) |
+| [`QuestMarkers`](#questmarkers) | Where the tracked quest's objectives happen, on this machine's screen: a marker over each place the camera sees and a pointer at the edge toward one it does not; the game turns them off, restyles them, locates objectives or draws them. | [Experimental](stability.md) |
+| [`QuestMarkers::Mark`](#questmarkersmark) | One place QuestMarkers shows: a marker on the screen, or a pointer at its edge. | [Experimental](stability.md) |
 | [`DialogueBox`](#dialoguebox) | A behaviour: shows the player's conversation at the bottom of the screen, with its choices; keyboard, gamepad and touch go on, choose and leave. | [Experimental](stability.md) |
 | [`Interaction`](#interaction) | Who uses what: the choice of a target, uses, and the game's handlers; over the network the host decides. | [Experimental](stability.md) |
 | [`LineOfSight`](#lineofsight) | Whether one thing can see another: a ray to it hits nothing else first. | [Experimental](stability.md) |
@@ -729,17 +731,17 @@ Until the player chooses, everything is what `game.json` says. `Settings.save` k
 
 ## GameMenu
 
-A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
+A behaviour: title screen, pause menu, end screen, settings screen with its controls page, and the quest journal; arrows or the D-pad move the focus, Enter or A picks. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
 
 - `GameMenu.instance -> GameMenu | nil`: the menu of the scene, or nil
-- `show(Symbol screen) -> void`: opens a screen: :title, :pause, :over, :settings or one of the game's
+- `show(Symbol screen) -> void`: opens a screen: :title, :pause, :over, :settings, :journal or one of the game's
 - `show_settings -> void`: opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)
 - `resume -> void`: closes the menu and goes on
 - `restart -> void`: starts the scene again
 - `finish(String message) -> void`: opens the end screen with a message
 - `open? -> bool`: whether the menu is open
 - `screen -> Symbol | nil`: the screen open
-- `screens -> Hash[Symbol, GameMenu::Screen]`: the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)
+- `screens -> Hash[Symbol, GameMenu::Screen]`: the screens, by name (:title, :pause, :over, :settings, :controls, :journal and the game's own)
 - `button_box(Integer index) -> [Integer, Integer, Integer, Integer]`: where the menu's button of that index is: [x, y, width, height]
 
 ## GameMenu::Screen
@@ -1019,6 +1021,9 @@ The game's quests, written in quest files (quests/<name>.json): stages with obje
 
 - `Quests[String | Symbol name] -> Quests::Quest`: the quest of that name, started or not (raises for one with no file) *Experimental.*
 - `Quests.load(String | Symbol name) -> Quests::Definition`: the quest file of that name, read once (raises for one that is not there or not well made) *Experimental.*
+- `Quests.tracked -> Quests::Quest | nil`: the quest this machine's journal and markers follow: the one tracked while it is under way, else the first one under way *Experimental.*
+- `Quests.track(String | Symbol | nil name) -> String | nil`: tracks a quest on this machine (nil: the first one under way) *Experimental.*
+- `Quests.any? -> bool`: whether the game has quest files (its menu then has a journal) *Experimental.*
 - `Quests.started -> Array[Quests::Quest]`: every quest that started, completed ones too *Experimental.*
 - `Quests.active -> Array[Quests::Quest]`: every quest under way: started, and not complete *Experimental.*
 - `Quests.completed -> Array[Quests::Quest]`: every quest that is complete *Experimental.*
@@ -1087,8 +1092,33 @@ A quest file as it was read. *Experimental.* See [quests.md](quests.md).
 
 ## QuestTracker
 
-A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, and asks the game's checks on the host. *Experimental.* See [quests.md](quests.md).
+A behaviour on the player's hero: tells the quests when it reaches a go_to objective's place, asks the game's checks on the host, and shows where the tracked quest's objectives happen (QuestMarkers). *Experimental.* See [quests.md](quests.md).
 
+
+## QuestMarkers
+
+Where the tracked quest's objectives happen, on this machine's screen: a marker over each place the camera sees and a pointer at the edge toward one it does not; the game turns them off, restyles them, locates objectives or draws them. *Experimental.* See [quests.md#markers-and-pointers](quests.md#markers-and-pointers).
+
+- `QuestMarkers.enabled -> bool`: whether this machine shows the markers and pointers (true unless the game said) *Experimental.*
+- `QuestMarkers.enabled = bool shown`: shows them or not, for the whole run *Experimental.*
+- `QuestMarkers.style(**untyped changes) -> Hash[Symbol, untyped]`: changes some of the looks (color:, size:, pointer_size:, margin:, height:, distance:, image:); returns them all *Experimental.*
+- `QuestMarkers.reset_style -> Hash[Symbol, untyped]`: the looks back to the engine's *Experimental.*
+- `QuestMarkers.locate { (Quests::Objective) -> untyped } -> void`: |objective| where it happens: a GameObject, a Vector3, or nil for the object it names (until the next level) *Experimental.*
+- `QuestMarkers.draw { (QuestMarkers::Mark) -> void } -> void`: |mark| draws each mark as the game wants, in the place of the engine's dots (until the next level) *Experimental.*
+- `QuestMarkers.marks -> Array[QuestMarkers::Mark]`: what shows now: a mark for each objective under way of the tracked quest that has a place *Experimental.*
+- `QuestMarkers.edge_point([Float, Float] direction, Numeric width, Numeric height, Numeric margin = QuestMarkers.style[:margin]) -> [Float, Float]`: where a pointer sits toward a direction from the middle of a screen: on the way to it, margin inside the edge *Experimental.*
+- `QuestMarkers.on_screen?([Numeric, Numeric] | nil spot, Numeric width, Numeric height) -> bool`: whether a point (nil: behind the camera) is on a screen of that size *Experimental.*
+
+## QuestMarkers::Mark
+
+One place QuestMarkers shows: a marker on the screen, or a pointer at its edge. *Experimental.* See [quests.md#markers-and-pointers](quests.md#markers-and-pointers).
+
+- `objective -> Quests::Objective`: the objective it shows *Experimental.*
+- `x -> Float`: where it is drawn, across (the interface's units) *Experimental.*
+- `y -> Float`: where it is drawn, down *Experimental.*
+- `pointer -> bool`: true for a pointer at the edge of the screen (the camera does not show the place) *Experimental.*
+- `direction -> [Float, Float] | nil`: a pointer's way to its place on the screen, of length 1 (nil for a marker) *Experimental.*
+- `meters -> Float`: from the hero to the place *Experimental.*
 
 ## DialogueBox
 

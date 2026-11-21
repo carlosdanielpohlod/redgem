@@ -11,7 +11,7 @@ class GameMenuTest < RedGemTest::Case
 
   def menu(**settings)
     menu = GameMenu.new
-    menu.__configure({ title: "Coin Rush", start_open: false }.merge(settings))
+    menu.__configure({ title: "Coin Rush", start_open: false, journal: false }.merge(settings))
     menu.start
     menu
   end

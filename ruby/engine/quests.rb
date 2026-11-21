@@ -123,6 +123,17 @@ module Quests
       to_h
     end
 
+    # The quest this machine's journal and markers follow (see GameMenu::JournalScreen and
+    # QuestMarkers): the one tracked while it is under way, else the first one under way; nil when
+    # none is. Each machine tracks its own, though the party shares the quests.
+    def tracked = active.find { |quest| quest.name == @tracked } || active.first
+
+    # Tracks a quest by its name (nil: the first one under way).
+    def track(name) = @tracked = name&.to_s
+
+    # Whether the game has quest files at all (its menu then has a journal).
+    def any? = !__names.empty?
+
     def save(key = SAVE_KEY) = Save.set(key, to_h)
     def restore(key = SAVE_KEY) = replace(Save.get(key, {}))
 
