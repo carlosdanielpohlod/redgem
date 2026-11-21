@@ -5,8 +5,9 @@
 // `parent=` for the top of the scene), `prop.speed=2.5` (`prop.speed=` removes it), and the
 // scripts: `script+=Door`, `script-=Door`, `script=Door,Sound`. A line of `redgem scene list` is
 // taken back word for word: `pos`, `rot`, `scripts`, a property as `speed=2.5` (a key that is a
-// typo of one of these is refused, not made a property), and `mesh=`, `light=` and `camera` as
-// they already are (they say what an object is, and are not changed here).
+// typo of one of these is refused, not made a property), and `mesh=` and `camera` as they already
+// are (they say what an object is, and are not changed here). A light's and a camera's fields are
+// words too (`light=spot`, `light_color=#ffcc88`, `camera_fov=60`: see component_words.hpp).
 
 #include <filesystem>
 #include <string>

@@ -6,9 +6,11 @@ class UiTest < RedGemTest::Case
   end
 
   def test_a_held_button_is_darker
-    assert_equal UI::COLORS[:ruby], UI.button_fill(:ruby, pressed: false)
-    assert_equal UI.shade(:ruby, UI::PRESSED_SHADE), UI.button_fill(:ruby, pressed: true)
-    assert_equal [10, 20, 30], UI.button_fill([10, 20, 30], pressed: false)
+    over = UI::ButtonState.new(hover: true)
+    held = UI::ButtonState.new(hover: true, pressed: true)
+    assert_equal UI::COLORS[:ruby], UI.button_fill(over)
+    assert_equal UI.shade(:ruby, UI.theme[:colors, :pressed_shade]), UI.button_fill(held)
+    assert_equal [10, 20, 30], UI.button_fill(UI::ButtonState.new, color: [10, 20, 30])
   end
 
   def test_label_size_is_a_share_of_the_height

@@ -971,6 +971,12 @@ module Camera
   # stops the shake at once
   %a{redgem:experimental}
   def self.stop_shaking: () -> void
+  # how much the whole picture is blurred evenly, 0 to 1 (a menu over the scene)
+  %a{redgem:experimental}
+  def self.backdrop_blur: () -> Float
+  # sets it
+  %a{redgem:experimental}
+  def self.backdrop_blur=: (Numeric amount) -> Numeric
 end
 
 # What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.
@@ -1221,21 +1227,21 @@ end
 # What a script draws over the game this frame: texts, rectangles, pictures, buttons.
 %a{redgem:stable}
 module UI
-  # draws a text; width: wraps it at word boundaries
+  # draws a text; width: wraps it at word boundaries; color: the theme's text color unless given
   %a{redgem:stable}
-  def self.text: (String str, x: Numeric, y: Numeric, ?size: Numeric, ?color: RedGem::color, ?alpha: Integer, ?align: Symbol, ?width: Numeric | nil, ?anchor: Symbol | nil) -> void
+  def self.text: (String str, x: Numeric, y: Numeric, ?size: Numeric, ?color: RedGem::color | nil, ?alpha: Integer, ?align: Symbol, ?width: Numeric | nil, ?anchor: Symbol | nil) -> void
   # draws a rectangle
   %a{redgem:stable}
   def self.rect: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?alpha: Integer, ?radius: Numeric, ?anchor: Symbol | nil) -> void
-  # draws a picture of images/
+  # draws a picture of images/; part: [x, y, width, height] of it; tint: a color it is multiplied by
   %a{redgem:stable}
-  def self.image: (String | Symbol name, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric, ?alpha: Integer, ?anchor: Symbol | nil) -> void
-  # draws a button; true the frame it is clicked
+  def self.image: (String | Symbol name, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric, ?alpha: Integer, ?anchor: Symbol | nil, ?part: Array[Numeric], ?tint: RedGem::color) -> void
+  # draws a button; true the frame it is clicked; disabled: grayed, does nothing; icon: a picture before its label
   %a{redgem:stable}
-  def self.button: (String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?hover_color: RedGem::color, ?text_color: RedGem::color, ?size: Numeric | nil, ?focused: bool, ?confirm: Array[Array[Symbol]], ?anchor: Symbol | nil) -> bool
+  def self.button: (String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color | nil, ?hover_color: RedGem::color | nil, ?text_color: RedGem::color | nil, ?size: Numeric | nil, ?focused: bool, ?confirm: Array[Array[Symbol]], ?anchor: Symbol | nil, ?disabled: bool, ?icon: String | Symbol | nil) -> bool
   # a field to type in; returns the new value
   %a{redgem:stable}
-  def self.text_field: (String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?max_length: Integer, ?color: RedGem::color, ?text_color: RedGem::color, ?secret: bool, ?anchor: Symbol | nil) -> String
+  def self.text_field: (String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?max_length: Integer, ?color: RedGem::color | nil, ?text_color: RedGem::color | nil, ?secret: bool, ?anchor: Symbol | nil) -> String
   # whether a phone's on-screen keyboard covers the bottom of the screen
   %a{redgem:experimental}
   def self.keyboard_visible?: () -> bool
@@ -1296,6 +1302,30 @@ module UI
   # draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)
   %a{redgem:stable}
   def self.font=: (String | Array[String] | nil name) -> (String | Array[String] | nil)
+  # draws a rectangle that goes from the top color to the bottom one
+  %a{redgem:experimental}
+  def self.gradient: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, top: RedGem::color, bottom: RedGem::color, ?alpha: Integer, ?anchor: Symbol | nil) -> void
+  # a picture's [width, height] in its own pixels; nil when there is none
+  %a{redgem:experimental}
+  def self.image_size: (String | Symbol name) -> ([Integer, Integer] | nil)
+  # the theme widgets are drawn with now
+  %a{redgem:experimental}
+  def self.theme: () -> UI::Theme
+  # changes the engine's look for every widget (a font it names becomes UI.font); nil goes back to it; raises ArgumentError on a wrong key or value
+  %a{redgem:experimental}
+  def self.theme=: (Hash[Symbol, untyped] | nil changes) -> (Hash[Symbol, untyped] | nil)
+  # draws what the block draws with another theme
+  %a{redgem:experimental}
+  def self.with_theme: (UI::Theme theme) { () -> void } -> void
+  # draws what the block draws moved and at a share of its opacity; the pointer follows
+  %a{redgem:experimental}
+  def self.shifted: (?x: Numeric, ?y: Numeric, ?alpha: Numeric) { () -> void } -> void
+  # draws a button in a box as the theme says, without hearing the mouse or the keys
+  %a{redgem:experimental}
+  def self.draw_button: (String label, Hash[Symbol, Numeric] box, UI::ButtonState state, ?Hash[Symbol, untyped] look) -> void
+  # what a button in a box is this frame: focused, under the pointer, held down
+  %a{redgem:experimental}
+  def self.button_state: (Hash[Symbol, Numeric] box, bool focused, ?disabled: bool, ?id: Symbol | nil) -> UI::ButtonState
 end
 
 # Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
@@ -1345,6 +1375,58 @@ class UI::ScrollList
   # back to its first row
   %a{redgem:experimental}
   def reset: () -> void
+end
+
+# How the interface and the menus look: fonts, sizes, colors, buttons, layout, background, logo, footer, transitions, sounds and music. Made of layers over the engine's defaults.
+%a{redgem:experimental}
+class UI::Theme
+  # the engine's own look
+  %a{redgem:experimental}
+  def self.default: () -> UI::Theme
+  # a layer read from symbols or from game.json strings; raises ArgumentError on a wrong key or value
+  %a{redgem:experimental}
+  def self.read!: (Hash[Symbol, untyped] | nil layer) -> Hash[Symbol, untyped]
+  # two layers in one, the second over the first
+  %a{redgem:experimental}
+  def self.merge: (Hash[Symbol, untyped] base, Hash[Symbol, untyped] over) -> Hash[Symbol, untyped]
+  # a section or a setting: theme[:colors, :button]
+  %a{redgem:experimental}
+  def []: (*Symbol path) -> untyped
+  # one of its colors
+  %a{redgem:experimental}
+  def color: (Symbol name) -> (RedGem::color | nil)
+  # this theme with a layer over it
+  %a{redgem:experimental}
+  def merged: (Hash[Symbol, untyped] layer) -> UI::Theme
+  # all its settings
+  %a{redgem:experimental}
+  def to_h: () -> Hash[Symbol, untyped]
+end
+
+# What a button is this frame: focused, under the pointer, held down, disabled; and the id of the option it is of.
+%a{redgem:experimental}
+class UI::ButtonState
+  # a state
+  %a{redgem:experimental}
+  def initialize: (?focused: bool, ?hover: bool, ?pressed: bool, ?disabled: bool, ?id: Symbol | nil) -> void
+  # whether it has the focus
+  %a{redgem:experimental}
+  def focused?: () -> bool
+  # whether the pointer is over it
+  %a{redgem:experimental}
+  def hover?: () -> bool
+  # whether the pointer holds it down
+  %a{redgem:experimental}
+  def pressed?: () -> bool
+  # whether it cannot be picked
+  %a{redgem:experimental}
+  def disabled?: () -> bool
+  # the id of its menu option
+  %a{redgem:experimental}
+  def id: () -> (Symbol | nil)
+  # the one that shows most: :disabled, :pressed, :hover, :focused or :normal
+  %a{redgem:experimental}
+  def name: () -> Symbol
 end
 
 # Developer diagnostics: console messages, frame timings and immediate world drawing.
@@ -1557,6 +1639,33 @@ class GameMenu < Behaviour
   # where the menu's button of that index is: [x, y, width, height]
   %a{redgem:stable}
   def button_box: (Integer index) -> [Integer, Integer, Integer, Integer]
+  # the menus' theme, before any screen's own
+  %a{redgem:experimental}
+  def self.theme: () -> UI::Theme
+  # changes how the menus look (over game.json's menu theme); nil takes it away
+  %a{redgem:experimental}
+  def self.theme=: (Hash[Symbol, untyped] | nil changes) -> (Hash[Symbol, untyped] | nil)
+  # the theme a screen is drawn with
+  %a{redgem:experimental}
+  def theme_of: (Symbol name) -> UI::Theme
+  # draws the menu's buttons with a block instead of the theme's look
+  %a{redgem:experimental}
+  def on_draw_button: () { (String, Hash[Symbol, Numeric], UI::ButtonState) -> void } -> void
+  # draws the menu's background with a block instead of the theme's
+  %a{redgem:experimental}
+  def on_draw_background: () { () -> void } -> void
+  # where a box that wide starts, as the theme aligns the menu
+  %a{redgem:experimental}
+  def column_x: (Numeric width) -> Numeric
+  # where texts aligned with the menu start: [x, align]
+  %a{redgem:experimental}
+  def column_text_x: () -> [Numeric, Symbol]
+  # one of the theme's margins (:top, :right, :bottom, :left), scaled
+  %a{redgem:experimental}
+  def margin: (Symbol side) -> Numeric
+  # whether any menu is open now; a HUD can hide while one is
+  %a{redgem:experimental}
+  def self.open?: () -> bool
 end
 
 # A screen of the GameMenu.
@@ -1565,9 +1674,9 @@ class GameMenu::Screen
   # a screen with a heading and options: [[label, action], ...]
   %a{redgem:stable}
   def initialize: (heading: String | Proc, options: Array[[String | Proc, Proc]], back: Symbol | nil) -> void
-  # adds an option
+  # adds an option; id: its name for icons and drawn buttons; enabled: a lookup, grayed while false
   %a{redgem:stable}
-  def add_option: (String | Proc label, ?index: Integer) { () -> void } -> void
+  def add_option: (String | Proc label, ?index: Integer, ?id: Symbol | nil, ?enabled: Proc | nil) { () -> void } -> void
   # its heading
   %a{redgem:stable}
   def heading: () -> String
@@ -1607,6 +1716,21 @@ class GameMenu::Screen
   # sets it
   %a{redgem:stable}
   def focus=: (UI::Focus | nil focus) -> (UI::Focus | nil)
+  # what each option says besides: {id:, enabled:}
+  %a{redgem:experimental}
+  def option_extras: () -> Array[Hash[Symbol, untyped]]
+  # this screen's own changes over the menu's theme
+  %a{redgem:experimental}
+  def theme=: (Hash[Symbol, untyped] | nil changes) -> (Hash[Symbol, untyped] | nil)
+  # what this screen changes of the menu's theme
+  %a{redgem:experimental}
+  def theme_layer: () -> Hash[Symbol, untyped]
+  # draws this screen's buttons with a block
+  %a{redgem:experimental}
+  def on_draw_button: () { (String, Hash[Symbol, Numeric], UI::ButtonState) -> void } -> void
+  # draws this screen's background with a block
+  %a{redgem:experimental}
+  def on_draw_background: () { () -> void } -> void
 end
 
 # Short-lived sparks, smoke and dust.
