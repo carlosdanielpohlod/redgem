@@ -242,7 +242,8 @@ the same pull request.
 
 - Recording a video (`redgem <game> --record out.mp4`) needs `ffmpeg` on the PATH, is only on the
   development program `redgem` (not on a built game's `redgem-player`), and cannot start on
-  Android.
+  Android. While it records the sound, nothing is heard, and after `Game.stop_recording` the game
+  stays silent for the rest of the run.
 
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change
   between runs), so regenerating a demo scene shows up as a change.

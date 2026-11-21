@@ -219,6 +219,10 @@ endforeach()
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)
+# Raylib's audio module is compiled from src/audio/raylib_mixdown.c, which takes raudio.c in whole
+# and adds a mix pulled with no device (a recording's sound): raylib's own raudio.c is left out.
+set_source_files_properties(${raylib_SOURCE_DIR}/src/raudio.c TARGET_DIRECTORY raylib PROPERTIES HEADER_FILE_ONLY ON)
+target_sources(raylib PRIVATE ${CMAKE_SOURCE_DIR}/src/audio/raylib_mixdown.c)
 if(ANDROID)
   # raylib asks for OpenGL ES 3 but calls one of its functions by the old extension's name (and
   # links against ES 2: the engine's own target adds ES 3, see src/CMakeLists.txt).

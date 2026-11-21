@@ -19,6 +19,13 @@ constexpr const char* kPreset = "medium";
 constexpr const char* kPlayablePixels = "yuv420p";
 constexpr const char* kFlip = "vflip";  // a framebuffer's rows come bottom first
 constexpr const char* kScaleFilter = ",scale={w}:{h}:flags=lanczos";
+constexpr const char* kSoundOn = "on";
+constexpr const char* kSoundOff = "off";
+constexpr const char* kRawSound = "f32le";  // float samples, interleaved, as the mix is rendered
+constexpr const char* kSoundCodec = "aac";
+constexpr const char* kSoundBitrate = "192k";
+constexpr const char* kPicturesSuffix = ".pictures";
+constexpr const char* kSoundExtension = ".sound.f32";
 
 std::optional<int> whole_number(const std::string& text) {
   int value = 0;
@@ -68,10 +75,30 @@ std::vector<std::string> input_arguments(const RecordOptions& options, FrameSize
           "-"};
 }
 
+// Where the encoder writes the pictures: the video itself, unless the sound joins them after.
+std::filesystem::path encoded_file(const RecordOptions& options) {
+  return options.sound ? pictures_file(options) : options.file;
+}
+
 // Flipped (and scaled), encoded, into the video.
 std::vector<std::string> output_arguments(const RecordOptions& options) {
-  return {"-vf",   filters(options), "-c:v",          kVideoCodec,          "-crf", kQuality, "-preset",
-          kPreset, "-pix_fmt",       kPlayablePixels, options.file.string()};
+  return {"-vf",
+          filters(options),
+          "-c:v",
+          kVideoCodec,
+          "-crf",
+          kQuality,
+          "-preset",
+          kPreset,
+          "-pix_fmt",
+          kPlayablePixels,
+          encoded_file(options).string()};
+}
+
+// A file next to the video, named after it: `suffix` before its extension, or `extension` for it.
+std::filesystem::path beside(const RecordOptions& options, const std::string& suffix, const std::string& extension) {
+  std::filesystem::path file = options.file;
+  return file.replace_filename(options.file.stem().string() + suffix + extension);
 }
 
 }  // namespace
@@ -127,11 +154,62 @@ bool recording_complete(const RecordOptions& options, std::int64_t frames) {
   return wanted && frames >= *wanted;
 }
 
+std::optional<bool> record_sound_from(const std::string& text) {
+  if (text == kSoundOn) return true;
+  if (text == kSoundOff) return false;
+  return std::nullopt;
+}
+
+// (A whole count of frames from the first picture on: no fraction is lost from one to the next.)
+std::int64_t SoundClock::next() {
+  ++pictures_;
+  const std::int64_t through = pictures_ * sample_rate_ / fps_;
+  const std::int64_t frames = through - total_;
+  total_ = through;
+  return frames;
+}
+
+int most_sound_frames(int sample_rate, int fps) { return (sample_rate + fps - 1) / fps; }
+
+std::filesystem::path pictures_file(const RecordOptions& options) {
+  return beside(options, kPicturesSuffix, options.file.extension().string());
+}
+
+std::filesystem::path sound_file(const RecordOptions& options) { return beside(options, "", kSoundExtension); }
+
 std::vector<std::string> encoder_arguments(const RecordOptions& options, FrameSize source) {
   std::vector<std::string> arguments = input_arguments(options, source);
   const std::vector<std::string> output = output_arguments(options);
   arguments.insert(arguments.end(), output.begin(), output.end());
   return arguments;
+}
+
+std::vector<std::string> muxer_arguments(const RecordOptions& options) {
+  return {kEncoderProgram,
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          pictures_file(options).string(),
+          "-f",
+          kRawSound,
+          "-ar",
+          std::to_string(kRecordSampleRate),
+          "-ac",
+          std::to_string(kRecordChannels),
+          "-i",
+          sound_file(options).string(),
+          "-map",
+          "0:v:0",
+          "-map",
+          "1:a:0",
+          "-c:v",
+          "copy",
+          "-c:a",
+          kSoundCodec,
+          "-b:a",
+          kSoundBitrate,
+          options.file.string()};
 }
 
 std::string shell_command(const std::vector<std::string>& arguments) {

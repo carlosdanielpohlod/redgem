@@ -10,9 +10,12 @@
 // Each sound goes through a slot of the effect rack (its group's low-pass and reverb send), and
 // the buses' reverbs go into the device's mix after every sound of a period. Raylib's processors
 // take no context, so each slot has a function of its own.
+//
+// A mixdown (a recording's sound) opens no device: the same mix is pulled a block at a time.
 
 #include <raylib.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <map>
@@ -25,6 +28,7 @@
 #include "audio/audio.hpp"
 #include "audio/effect_rack.hpp"
 #include "audio/game_music.hpp"
+#include "audio/raylib_mixdown.h"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -310,16 +314,29 @@ class RaylibMusicDriver final : public MusicDriver {
   std::map<MusicTrackId, Music> tracks_;
 };
 
-// The device, opened first and closed last.
+// What raylib's streams hold when nothing else is asked for: its own size (a 30th of a second).
+constexpr int kRaylibStreamFrames = 0;
+// The most frames a mixdown mixes at once: what a device asks for at once, about.
+constexpr std::size_t kMixdownBlockFrames = 1024;
+
+// Opens raylib's audio for a mixdown: its streams hold every frame asked for between two updates.
+void open_mixdown(const MixdownFormat& format) {
+  InitAudioMixdown(static_cast<unsigned int>(format.sample_rate));
+  SetAudioStreamBufferSizeDefault(format.most_frames_per_update);
+}
+
+// The device, opened first and closed last: the machine's, or none for a mixdown.
 class RaylibDevice {
  public:
-  RaylibDevice() {
-    InitAudioDevice();
+  explicit RaylibDevice(const std::optional<MixdownFormat>& mixdown) {
+    if (mixdown) open_mixdown(*mixdown);
+    if (!mixdown) InitAudioDevice();
     ready_ = IsAudioDeviceReady();
     if (!ready_) log::warning("no audio device: the game runs silently");
     if (ready_) AttachAudioMixedProcessor(mix_callback);
   }
   ~RaylibDevice() {
+    SetAudioStreamBufferSizeDefault(kRaylibStreamFrames);
     if (!ready_) return;
     DetachAudioMixedProcessor(mix_callback);
     CloseAudioDevice();
@@ -335,6 +352,7 @@ class RaylibDevice {
 // What the pool and the music player play through, made before them and gone after them (in
 // reverse: the drivers, the decoded sounds, then the device).
 struct RaylibParts {
+  explicit RaylibParts(const std::optional<MixdownFormat>& mixdown) : device(mixdown) {}
   RaylibDevice device;
   SoundLibrary library;
   RaylibSoundDriver sound_driver{library};
@@ -343,7 +361,11 @@ struct RaylibParts {
 
 class RaylibAudio final : private RaylibParts, public MixedAudio {
  public:
-  RaylibAudio() : MixedAudio(sound_driver, music_driver) { library.open(device.ready()); }
+  explicit RaylibAudio(const std::optional<MixdownFormat>& mixdown)
+      : RaylibParts(mixdown), MixedAudio(sound_driver, music_driver) {
+    library.open(device.ready());
+  }
+  bool ready() const { return device.ready(); }
 
   void set_master_volume(float volume) override {
     const float heard = heard_volume(volume);
@@ -357,8 +379,31 @@ class RaylibAudio final : private RaylibParts, public MixedAudio {
   }
 };
 
+class RaylibMixdown final : public AudioMixdown {
+ public:
+  explicit RaylibMixdown(const MixdownFormat& format) : audio_(format) {}
+  AudioSystem& audio() override { return audio_; }
+  // In blocks of what a device asks for at once: the reverb buses hold a device's period, no more.
+  // Silence when raylib's audio did not open.
+  void render(float* samples, std::size_t frames) override {
+    if (!audio_.ready()) std::fill(samples, samples + frames * kDeviceChannels, kSilence);
+    if (!audio_.ready()) return;
+    for (std::size_t done = 0; done < frames; done += kMixdownBlockFrames) {
+      const std::size_t block = std::min(kMixdownBlockFrames, frames - done);
+      RenderAudioMix(samples + done * kDeviceChannels, static_cast<unsigned int>(block));
+    }
+  }
+
+ private:
+  RaylibAudio audio_;
+};
+
 }  // namespace
 
-std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(); }
+std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(std::nullopt); }
+
+std::unique_ptr<AudioMixdown> create_raylib_mixdown(const MixdownFormat& format) {
+  return std::make_unique<RaylibMixdown>(format);
+}
 
 }  // namespace redgem

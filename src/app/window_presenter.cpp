@@ -203,6 +203,7 @@ void WindowPresenter::present_recorded(const FrameView& view) {
   point_into_recorded();
   painter_.paint(view, &recorded_);
   recorder_->add_frame(recorded_.id);
+  if (mixdown_ != nullptr) recorder_->add_sound(*mixdown_);
   if (recorder_->failed()) stop_recording();  // (the game goes on in the window)
   window_.begin_frame();
   show_picture(recorded_);
@@ -238,18 +239,35 @@ std::optional<SceneDesc> first_scene(const std::filesystem::path& game_dir) {
   return std::nullopt;
 }
 
-// Plays the game of `window` in it from `scene`, read from `input`, with the machine's sound.
+// The game's sound: the machine's, or, for a recording that takes it in, a mixdown the recording
+// pulls each frame's sound from (nothing is heard then).
+struct GameSound {
+  std::unique_ptr<AudioSystem> device;
+  std::unique_ptr<AudioMixdown> mixdown;
+  AudioSystem& audio() const { return mixdown ? mixdown->audio() : *device; }
+};
+
+GameSound game_sound(WindowPresenter& window, const GameWindowOptions& options) {
+  if (!window.records_sound()) return {create_raylib_audio(), nullptr};
+  const int fps = options.record->fps;
+  GameSound sound{nullptr, create_raylib_mixdown({kRecordSampleRate, most_sound_frames(kRecordSampleRate, fps)})};
+  window.record_sound(sound.mixdown.get());
+  return sound;
+}
+
+// Plays the game of `window` in it from `scene`, read from `input`, with its sound.
 int play(WindowPresenter& window, InputSource& input, const GameWindowOptions& options, SceneDesc scene) {
-  const std::unique_ptr<AudioSystem> audio = create_raylib_audio();
+  const GameSound sound = game_sound(window, options);
   EngineOptions game;
   game.game_dir = options.game_dir;
   game.presenter = &window;
   game.input = &input;
-  game.audio = audio.get();
+  game.audio = &sound.audio();
   game.display = window.shown();
   game.display_kept_in = options.display_kept_in;
   game.data_folder = options.data_folder;
   const int status = Engine::create(game, std::move(scene))->run();
+  window.record_sound(nullptr);
   return window.recording_failed() ? kExitFailure : status;
 }
 

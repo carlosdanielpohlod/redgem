@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Recorded videos have the game's sound.** `redgem <game> --record out.mp4` now puts the game's
+  mix in the video as AAC. It is mixed by the engine's own mixer, not taken from the sound card,
+  in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
+  over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
+  are all in it. `--record-audio off` records the pictures alone.
 - **`redgem-test --wait-limit <seconds>`.** A system test may wait for other programs
   (`t.wait_for`) longer than five minutes in all, up to a day: a load test whose bots play for
   five minutes and more on a dedicated server ran out of waits before the end.
