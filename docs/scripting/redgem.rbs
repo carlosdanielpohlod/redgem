@@ -172,6 +172,12 @@ class GameObject
   # shows or hides it
   %a{redgem:stable}
   def visible=: (bool value) -> bool
+  # whether it is drawn as the view model (its view_model property), with what is under it
+  %a{redgem:experimental}
+  def view_model?: () -> bool
+  # makes it (and what is under it) the view model: a first-person weapon drawn over the world (never into a wall), with Camera.view_model_fov, its own light, no shadow on the world
+  %a{redgem:experimental}
+  def view_model=: (bool value) -> bool
   # its behaviours
   %a{redgem:stable}
   def behaviours: () -> Array[Behaviour]
@@ -903,6 +909,15 @@ module Camera
   # sets the field of view
   %a{redgem:stable}
   def self.fov=: (Numeric degrees) -> Numeric
+  # the view model's own vertical field of view in degrees (50 unless set), apart from the world's; nil without a camera
+  %a{redgem:experimental}
+  def self.view_model_fov: () -> (Float | nil)
+  # sets the view model's field of view (10 to 150 degrees); the world's (fov) does not change it
+  %a{redgem:experimental}
+  def self.view_model_fov=: (Numeric degrees) -> Numeric
+  # where a point of the view model (a muzzle socket under the weapon) shows in the world, through the world's field of view: where a muzzle flash or a tracer drawn in the world starts
+  %a{redgem:experimental}
+  def self.from_view_model: (Vector3 point) -> Vector3
   # how much the picture streaks with speed, 0 to 1
   %a{redgem:stable}
   def self.motion_blur: () -> Float

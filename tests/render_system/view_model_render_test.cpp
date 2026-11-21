@@ -4,12 +4,14 @@
 // shadow on the world.
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <string>
 
 #include "render_system/render_stage.hpp"
 #include "scene/props.hpp"
+#include "scene/scene_config.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -43,17 +45,18 @@ enum Materials : int {
 // with a barrel along it and a muzzle at its end. The wall's face is nearer than the weapon.
 constexpr Vec3 kWeaponAt{0.15f, -0.12f, -0.55f};
 constexpr Vec3 kBarrelSize{0.08f, 0.08f, 0.4f};
-constexpr Vec3 kMuzzleAt{0.0f, 0.0f, -0.22f};
+constexpr Vec3 kMuzzleAt{0.0f, 0.07f, -0.17f};  // on top of the barrel's far end, in sight
 constexpr float kMuzzleSize = 0.06f;
 constexpr Vec3 kWallAt{0.0f, 0.0f, -0.4f};
 constexpr Vec3 kWallSize{4.0f, 4.0f, 0.2f};  // its face 0.3 m in front of the camera
-constexpr Vec3 kTargetAt{1.5f, 0.0f, -6.0f};
+constexpr Vec3 kTargetAt{1.5f, 1.0f, -6.0f};  // above the weapon, never behind it
 constexpr float kTargetSize = 0.5f;
 constexpr float kWideFov = 80.0f;  // degrees
 
 // The dark room: a closed box around the camera, no ambient light.
 constexpr float kRoomSize = 6.0f;
 constexpr int kReadable = 120;  // the sum of a pixel's channels on a lit weapon, at least
+constexpr int kTinted = 10;     // a gray pixel's channels are closer than this to each other
 
 // The shadow test: the camera high above a white ground, a plate under it in the sun's way.
 constexpr Vec3 kHighUp{0.0f, 12.0f, 1.0f};
@@ -71,8 +74,9 @@ bool green(::Color c) { return over(c.g, c.r, c.b); }
 bool blue(::Color c) { return over(c.b, c.r, c.g); }
 bool yellow(::Color c) { return c.r > c.b + kStrongly && c.g > c.b + kStrongly; }
 bool in_sun_shadow(::Color c) { return luma(c) < kInShadow; }
-// The barrel, lit: bright, and not the muzzle's glow.
-bool lit_barrel(::Color c) { return luma(c) >= kReadable && !yellow(c); }
+bool gray(::Color c) { return std::max({c.r, c.g, c.b}) - std::min({c.r, c.g, c.b}) < kTinted; }
+// The barrel, lit: bright and gray, unlike the muzzle's glow (and its soft edge).
+bool lit_barrel(::Color c) { return luma(c) >= kReadable && gray(c); }
 
 bool about_the_same(std::size_t a, std::size_t b) {
   return std::fabs(static_cast<float>(a) - static_cast<float>(b)) <= static_cast<float>(b) * kSameSize;

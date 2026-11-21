@@ -143,6 +143,8 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `destroy -> void`: removes it at the end of the step
 - `visible -> bool`: whether it is drawn
 - `visible = bool value`: shows or hides it
+- `view_model? -> bool`: whether it is drawn as the view model (its view_model property), with what is under it *Experimental.*
+- `view_model = bool value`: makes it (and what is under it) the view model: a first-person weapon drawn over the world (never into a wall), with Camera.view_model_fov, its own light, no shadow on the world *Experimental.*
 - `behaviours -> Array[Behaviour]`: its behaviours
 - `parent -> GameObject | nil`: the object it is under, or nil
 - `parent = GameObject | nil object`: puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries *Experimental.*
@@ -460,6 +462,9 @@ The camera the game is seen through, and what it does on its own: follow, orbit,
 - `Camera.world_to_screen(Vector3 | GameObject point) -> [Float, Float] | nil`: [x, y]: where a Vector3 (or an object) is on the screen, in the units UI draws in; nil behind the camera *Experimental.*
 - `Camera.fov -> Float | nil`: its vertical field of view, in degrees
 - `Camera.fov = Numeric degrees`: sets the field of view
+- `Camera.view_model_fov -> Float | nil`: the view model's own vertical field of view in degrees (50 unless set), apart from the world's; nil without a camera *Experimental.*
+- `Camera.view_model_fov = Numeric degrees`: sets the view model's field of view (10 to 150 degrees); the world's (fov) does not change it *Experimental.*
+- `Camera.from_view_model(Vector3 point) -> Vector3`: where a point of the view model (a muzzle socket under the weapon) shows in the world, through the world's field of view: where a muzzle flash or a tracer drawn in the world starts *Experimental.*
 - `Camera.motion_blur -> Float`: how much the picture streaks with speed, 0 to 1
 - `Camera.motion_blur = Numeric amount`: sets it
 - `Camera.auto_exposure -> bool | nil`: whether the picture adapts to how bright the scene is, as eyes do: true or false when the game said, nil when the scene's environment decides *Experimental.*
