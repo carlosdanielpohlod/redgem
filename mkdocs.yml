@@ -32,6 +32,7 @@ nav:
   - Getting started:
       - Install: install.md
       - Your first game: first-game.md
+      - A game of levels played together: multiplayer-levels.md
   - Using the editor:
       - The editor: editor.md
       - Prefab files: prefabs.md

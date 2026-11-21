@@ -17,6 +17,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A manual page for the `multiplayer-levels` template**, "A game of levels played together":
+  what it plays like, its scripts, its levels, playing together, its save and its tests. The
+  first-game, command-line and testing pages and the README list the template.
 - **A `multiplayer-levels` template**: `redgem new my_game --template multiplayer-levels` makes a
   game of two levels played together. The title screen offers Play (alone, from the save) and Play
   together: host a game, join one by its address, or join the game's dedicated server. Each
