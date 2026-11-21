@@ -1,0 +1,23 @@
+{
+  "start": [
+    { "if": [{ "quest": "beacon", "is": "done" }], "next": "thanks" },
+    { "if": [{ "quest": "beacon", "is": "report" }], "next": "report" },
+    { "if": [{ "quest": "beacon", "is": "find" }], "next": "waiting" },
+    { "next": "hello" }
+  ],
+  "nodes": {
+    "hello": { "speaker": "guide.name", "text": "guide.hello", "next": "ask" },
+    "ask": {
+      "speaker": "guide.name",
+      "text": "guide.ask",
+      "choices": [
+        { "text": "guide.accept", "effects": [{ "quest": "beacon", "to": "find" }], "next": "go" },
+        { "text": "guide.later", "end": true }
+      ]
+    },
+    "go": { "speaker": "guide.name", "text": "guide.go", "end": true },
+    "waiting": { "speaker": "guide.name", "text": "guide.waiting", "end": true },
+    "report": { "speaker": "guide.name", "text": "guide.report", "end": true },
+    "thanks": { "speaker": "guide.name", "text": "guide.thanks", "end": true }
+  }
+}

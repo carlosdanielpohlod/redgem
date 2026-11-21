@@ -20,6 +20,15 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 - **A manual page for the `multiplayer-levels` template**, "A game of levels played together":
   what it plays like, its scripts, its levels, playing together, its save and its tests. The
   first-game, command-line and testing pages and the README list the template.
+- **A `multiplayer-levels` template**: `redgem new my_game --template multiplayer-levels` makes a
+  game of two levels played together. The title screen offers Play (alone, from the save) and Play
+  together: host a game, join one by its address, or join the game's dedicated server. Each
+  player's hero starts on a spawn point of its own, and a door takes the whole party to the other
+  level. A guide (an NPC with a short dialogue) gives a quest that goes through both levels. The
+  host keeps the save (the level and the quest), which lasts across each change of level. It is
+  built from the editor's primitives only, and each part is a small script of its own. Its own
+  tests play the quest alone; the engine's tests play it with two players, hosted and on a
+  dedicated server. The project hub shows it with an icon of its own.
 
 ### Fixed
 
