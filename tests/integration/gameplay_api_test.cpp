@@ -82,7 +82,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem
 }
 
 void frames(Engine& engine, int count) {
-  for (int i = 0; i < count; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < count; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
 }
 
 std::string ruby(Engine& engine, const std::string& code) {

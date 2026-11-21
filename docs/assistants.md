@@ -116,7 +116,7 @@ parameters of the methods written in Ruby).
 
 ## Repeating a headless session
 
-`redgem run` uses fixed steps of 1/60 s and a random seed of 0. Use `--seed N` to repeat another
+`redgem run` uses the game's fixed steps (1/60 s unless `game.json` sets `tick_hz`) and a random seed of 0. Use `--seed N` to repeat another
 Ruby and particle random stream, including random values read while scripts first load. A seed
 is a whole number from 0 to 2147483647. Scatter requests keep their own explicit seeds. Network
 traffic, web responses and scripts that read external clocks or files are outside this replay.

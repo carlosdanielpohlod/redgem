@@ -98,7 +98,7 @@ void picture(EditorApp& app, const std::string& name) {
 TEST_CASE("prefabs render in the editor through selection play stop and same-count source replacements") {
   const auto game = game_files();
   EditorOptions options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   auto created = EditorApp::create(game, options);
   if (const auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);

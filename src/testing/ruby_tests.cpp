@@ -56,6 +56,7 @@ struct BareWorld {
     context.network = &network;
     context.discovery = &discovery;
     context.http = &http;
+    context.time.fixed_delta = config::tick_seconds(game.tick_hz);
   }
 };
 
@@ -104,8 +105,8 @@ std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& te
   return std::nullopt;
 }
 
-// The game's game.json, for its physics (warning of what is wrong with them, as the game does);
-// just the default layer and body limit without a game.
+// The game's game.json, for its physics and its tick (warning of what is wrong with its physics,
+// as the game does); just the default layer, body limit and tick without a game.
 GameSettings game_physics(const std::filesystem::path& game_dir) {
   if (game_dir.empty()) return {};
   GameManifest manifest = read_game_manifest(game_dir);

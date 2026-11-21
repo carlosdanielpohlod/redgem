@@ -392,6 +392,28 @@ steps. That last step is taken after `update`, so it is a little later than with
 
 A dedicated server's rooms solve their physics on one thread whatever the setting.
 
+## Tick rate
+
+A game takes 60 fixed steps a second unless its `game.json` asks for another number, from 30 to
+128:
+
+```json
+{ "title": "Arena", "tick_hz": 128 }
+```
+
+Everything that runs on the fixed step follows it: the physics (bodies, characters, vehicles,
+water), every behaviour's `fixed_update`, and `Time.fixed_delta`, which is `1.0 / tick_hz`. So do
+the tools that play a game a step a frame: a frame of `redgem run`, `redgem shot`, `redgem-test`
+and the editor's Step is one step of the game, and `--seconds 1` plays `tick_hz` frames. `update`
+still runs once per drawn frame, whatever the tick.
+
+A faster tick makes movement and contacts finer and costs more: each step solves the whole world,
+so 128 Hz takes about twice the physics time of 60 Hz. Keep anything that must keep pace with the
+physics in `fixed_update`, and anything that counts frames to measure time in `Time.delta` or
+`Time.fixed_delta` instead. After a long frame (a hitch), a game catches up on at most about
+133 ms of steps, whatever its tick. `redgem check` refuses a `tick_hz` out of bounds; a game played
+with one ticks at 60.
+
 ## How many bodies a scene holds
 
 A scene's physics world holds 4096 bodies unless `game.json` asks for another number, from 64 to

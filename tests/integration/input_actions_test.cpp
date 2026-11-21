@@ -49,7 +49,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const TempFiles& file
   return Engine::create(options, scene);
 }
 
-void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+void frame(Engine& engine) { engine.frame(config::kDefaultFixedDeltaSeconds); }
 
 std::string ruby(Engine& engine, const std::string& code) {
   const RubyResult result = engine.scripts().eval(code, "test.rb");

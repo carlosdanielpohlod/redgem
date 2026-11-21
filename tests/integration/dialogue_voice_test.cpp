@@ -61,7 +61,7 @@ std::string ruby(Engine& engine, const std::string& code) {
 }
 
 void frames(Engine& engine, int count) {
-  for (int frame = 0; frame < count; ++frame) engine.frame(config::kFixedDeltaSeconds);
+  for (int frame = 0; frame < count; ++frame) engine.frame(config::kDefaultFixedDeltaSeconds);
 }
 
 // The handle of the voice playing, the only one of the voice group; 0 when none plays.

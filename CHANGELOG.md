@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A game's tick rate.** `game.json`'s `"tick_hz"` (30 to 128, 60 by default) sets how many
+  fixed steps the game takes a second: the physics, `fixed_update` and `Time.fixed_delta` follow
+  it, and so do the tools that play a step a frame (`redgem run`, `redgem shot`, `redgem-test`,
+  the editor's Step, the MCP game tools). A game without it plays as before. `redgem check`
+  refuses a number out of bounds. A competitive shooter needs a 64 or 128 Hz step; RedGem had a
+  fixed 60.
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is

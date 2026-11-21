@@ -57,9 +57,13 @@ inline constexpr long long kMostSteps = 60LL * 60LL * 60LL;
 
 // How many fixed steps of play `--seconds` or `--frames` ask for; `otherwise` seconds when they
 // say nothing. Nothing when what they say is no length (one step at least, kMostSteps at most).
-std::optional<long long> frames_asked(const ToolLine& line, double otherwise);
+std::optional<long long> frames_asked(const ToolLine& line, double otherwise, double steps_per_second);
 // The moment `--frames`, else `seconds_option`, ask for, in steps from the start (0 is the start);
 // `otherwise` seconds when they say nothing. Nothing when it is before the start or past kMostSteps.
-std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise);
+std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise,
+                                      double steps_per_second);
+// How many fixed steps the game in that folder plays a second (its game.json's "tick_hz"): a
+// tool's steps are the game's.
+double steps_per_second(const std::filesystem::path& game_dir);
 
 }  // namespace redgem::tools

@@ -76,7 +76,7 @@ void checked(ScriptHost& host, const std::string& code) {
 TEST_CASE("saved behaviour changes reach a running editor game without replacing its instances") {
   const auto game = game_files();
   auto options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   auto created = EditorApp::create(game, options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);

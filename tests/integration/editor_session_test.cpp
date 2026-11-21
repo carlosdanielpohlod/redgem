@@ -47,7 +47,7 @@ std::unique_ptr<EditorSession> open(const std::filesystem::path& dir) {
 }
 
 void play_frames(EditorSession& session, int frames) {
-  for (int i = 0; i < frames; ++i) session.tick(config::kFixedDeltaSeconds);
+  for (int i = 0; i < frames; ++i) session.tick(config::kDefaultFixedDeltaSeconds);
 }
 
 float y_of(const EditorSession& session, const std::string& name) {

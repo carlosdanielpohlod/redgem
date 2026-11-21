@@ -82,6 +82,24 @@ TEST_CASE("a game that plays well says so in one line") {
   CHECK(ran.out == "ran main for 60 frames (1 s): 0 errors, 0 warnings\n");
 }
 
+TEST_CASE("a run's frames are the game's steps: a second at 128 Hz is 128 of them") {
+  const GameCopy game("run_fast_tick");
+  game.write("game.json", R"({"title":"Fast tick","tick_hz":128})");
+  const char* times = "[Time.fixed_delta * 128, Time.elapsed].map { |t| t.round(3) }";
+  const ToolResult ran = tool({"run", game.dir(), "--seconds", "1", "--print", times, "--every", "128"});
+  CHECK(ran.exit_code == kExitSuccess);
+  CHECK(has(ran.out, "ran main for 128 frames (1 s)"));
+  CHECK(has(ran.out, "[1.0, 1.0]"));
+}
+
+TEST_CASE("a check refuses a tick_hz the engine cannot take") {
+  const GameCopy game("check_bad_tick");
+  game.write("game.json", R"({"title":"Too fast","tick_hz":500})");
+  const ToolResult checked = tool({"check", game.dir()});
+  CHECK(checked.exit_code == kExitFailure);
+  CHECK(has(checked.out, "tick_hz must be a whole number from 30 to 128"));
+}
+
 TEST_CASE("a run says each script error once, where it happened, and fails") {
   const ToolResult ran = tool({"run", kSandbox.string(), "--frames", "30"});
   CHECK(ran.exit_code == kExitFailure);

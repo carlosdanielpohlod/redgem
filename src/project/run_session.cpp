@@ -6,7 +6,6 @@
 #include <string_view>
 #include <utility>
 
-#include "core/config.hpp"
 #include "core/message_lines.hpp"
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
@@ -110,7 +109,7 @@ class RunSession {
 
   void step() {
     input();
-    engine_.frame(config::kFixedDeltaSeconds);
+    engine_.frame(engine_.fixed_delta());
     ++outcome_.frames;
     assertion();
     if (plan_.print && !outcome_.failed && outcome_.frames % plan_.every == 0) print_value();

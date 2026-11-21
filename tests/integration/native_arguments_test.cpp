@@ -202,7 +202,7 @@ TEST_CASE("an object that was destroyed still says its name, and refuses the res
   ScriptHost& scripts = engine->scripts();
   REQUIRE(ruby(scripts, "$host = Scene.find('Host'); $host.alive?") == "true");
   REQUIRE(ruby(scripts, "$host.destroy; $host.alive?") == "false");  // on its way out
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(scripts, "$host.name") == "Host");
   CHECK(ruby(scripts, "$host.alive?") == "false");
   CHECK(refuses(scripts, "$host.transform.position", "was destroyed"));
