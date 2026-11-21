@@ -16,7 +16,8 @@
 
 namespace redgem {
 class Renderer;
-}
+class StoryPreview;
+}  // namespace redgem
 
 namespace redgem::ui {
 
@@ -75,6 +76,9 @@ void draw_prefab_tools(PanelContext& context);
 bool save_prefab(PanelContext& context, const std::string& name);
 
 void draw_console(ConsoleLog& console, ConsoleState& state, ScriptWorkspace& scripts);
+
+// A dialogue stepped through and a quest moved on without Play, on the game's files on disk.
+void draw_story(StoryPreview& preview, StoryState& story, const std::filesystem::path& game_dir);
 
 // One code editor tab per open script (dockable: drag tabs to split, like a code editor). Ctrl+S
 // saves with a syntax check. New tabs dock into `new_tab_dock`.

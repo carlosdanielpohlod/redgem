@@ -228,3 +228,6 @@ check: 1 errors, 1 warnings (12 scripts, 2 scenes)
 ```
 
 A file the check refuses also raises when a script loads it, saying what is wrong.
+
+The editor's [Story panel](../editor.md#story-panel) steps through a dialogue without Play,
+showing each choice's conditions and effects on scratch GameVariables.

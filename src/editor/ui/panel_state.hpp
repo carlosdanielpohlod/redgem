@@ -63,6 +63,14 @@ struct ConsoleState {
   ConsoleFilters filters;
 };
 
+// The Story panel: the dialogues and quests its lists showed when last opened, and those picked.
+struct StoryState {
+  std::vector<std::string> dialogues;
+  std::vector<std::string> quests;
+  std::string dialogue;
+  std::string quest;
+};
+
 struct ScriptTabsState {
   std::string pending_close;  // a tab closed with unsaved changes, waiting for the dialog
 };
@@ -72,6 +80,7 @@ struct PanelState {
   InspectorState inspector;
   ProjectState project;
   ConsoleState console;
+  StoryState story;
   ScriptTabsState script_tabs;
 };
 
