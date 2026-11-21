@@ -750,6 +750,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `build` runs in the MCP server's process, from the files on disk: an open editor's
+  unsaved edits are not in it, and its progress is not shown in the editor. A build cannot be
+  cancelled, and a server asked to quit waits for its build to end.
 - MCP's `project` tool checks a write as `redgem check` does: `game.json`'s physics, input and
   menu sections, and what the locales, dialogues and quests name of each other. Other sections of
   `game.json` and items no quest names are written as given. It edits files only: an open editor

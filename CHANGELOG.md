@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
+  Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
+  own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
+  not. Its log reaches `events`.
 - **Prefab overrides can be reverted, applied to the prefab file, or unpacked.**
   `redgem scene overrides`, `override`, `revert`, `apply` and `unpack` list and change a prefab
   placement's overrides from the command line, each change one undo step in the editor's
