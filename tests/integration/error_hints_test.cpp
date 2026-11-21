@@ -10,6 +10,7 @@
 #include "project/error_hints.hpp"
 #include "project/tool_commands.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -72,7 +73,7 @@ TEST_CASE("a message of any length gets its hint, or none, and never ends the to
 }
 
 TEST_CASE("redgem run says the hint after the error") {
-  const fs::path game = fs::temp_directory_path() / "redgem_error_hints_game";
+  const fs::path game = redgem::test::temp_root() / "redgem_error_hints_game";
   fs::remove_all(game);
   fs::copy(kPlatformer, game, fs::copy_options::recursive);
   std::string error;
@@ -89,7 +90,7 @@ TEST_CASE("redgem run says the hint after the error") {
 }
 
 TEST_CASE("a method mistyped on one of the engine's modules is answered from the line that called it") {
-  const fs::path game = fs::temp_directory_path() / "redgem_error_hints_module";
+  const fs::path game = redgem::test::temp_root() / "redgem_error_hints_module";
   fs::remove_all(game);
   fs::copy(kPlatformer, game, fs::copy_options::recursive);
   std::string error;
@@ -105,7 +106,7 @@ TEST_CASE("a method mistyped on one of the engine's modules is answered from the
 }
 
 TEST_CASE("a script looked for in a folder of scripts is answered with the paths there") {
-  const fs::path game = fs::temp_directory_path() / "redgem_error_hints_folders";
+  const fs::path game = redgem::test::temp_root() / "redgem_error_hints_folders";
   fs::remove_all(game);
   fs::copy(kPlatformer, game, fs::copy_options::recursive);
   std::string error;

@@ -24,6 +24,7 @@
 #include "project/editor_setup.hpp"
 #include "window_mouse.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -37,7 +38,7 @@ constexpr float kFrameLook = 0.005f;
 constexpr int kMostFrames = 4000;
 
 std::filesystem::path copy_game() {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_editor_agent";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_editor_agent";
   std::filesystem::remove_all(dir);
   std::filesystem::copy(REDGEM_PLATFORMER_DIR, dir, std::filesystem::copy_options::recursive);
   return dir;
@@ -45,7 +46,7 @@ std::filesystem::path copy_game() {
 
 // A list of agents with the fake one alone in it.
 std::filesystem::path fake_agents_file(std::vector<agent::EnvironmentVariable> environment = {}) {
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agents.json";
+  const std::filesystem::path file = redgem::test::temp_root() / "redgem_editor_agents.json";
   std::string error;
   REQUIRE(agent::write_agents(file, {{"Fake agent", REDGEM_FAKE_AGENT_FILE, {}, std::move(environment), ""}}, error));
   return file;
@@ -116,7 +117,7 @@ void click_into_prompt(EditorApp& app) {
 
 // A file of past conversations of the test's own, empty.
 std::filesystem::path fresh_sessions_file() {
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agent_sessions.json";
+  const std::filesystem::path file = redgem::test::temp_root() / "redgem_editor_agent_sessions.json";
   std::filesystem::remove(file);
   return file;
 }
@@ -282,7 +283,7 @@ TEST_CASE("the Agent panel talks to an agent, which writes a file in the game af
 
 TEST_CASE("the Agent panel says what to install when the agent's command is missing") {
   const std::filesystem::path game = copy_game();
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agents_missing.json";
+  const std::filesystem::path file = redgem::test::temp_root() / "redgem_editor_agents_missing.json";
   std::string error;
   REQUIRE(agent::write_agents(file, {{"Missing", "redgem-no-such-agent", {}, {}, ""}}, error));
   EditorOptions options = editor_options(GpuChoice::Auto);

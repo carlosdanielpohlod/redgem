@@ -10,12 +10,13 @@
 #include "editor/editor_session.hpp"
 #include "editor/scene_recovery.hpp"
 #include "scene/props.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
 namespace fs = std::filesystem;
 struct RecoveryGame {
-  fs::path folder = fs::temp_directory_path() / "redgem_scene_recovery_test";
+  fs::path folder = redgem::test::temp_root() / "redgem_scene_recovery_test";
   fs::path source = folder / "scene.glb";
   fs::path previous_data = platform::user_data_dir();
   std::string error;

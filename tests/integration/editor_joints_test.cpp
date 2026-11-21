@@ -16,6 +16,7 @@
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/props.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -28,7 +29,7 @@ constexpr double kLimit = 45.0;  // degrees the lid may fall
 constexpr Vec3 kLidSpot{0.0f, 4.0f, 0.0f};
 
 std::filesystem::path copy_sandbox(const std::string& name) {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem_joints_" + name);
+  const std::filesystem::path dir = redgem::test::temp_root() / ("redgem_joints_" + name);
   std::filesystem::remove_all(dir);
   std::filesystem::copy(fixture("games/sandbox"), dir, std::filesystem::copy_options::recursive);
   return dir;

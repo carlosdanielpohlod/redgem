@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <variant>
+#include "temp_dirs.hpp"
 
 #if !defined(_WIN32)
 #include <pthread.h>
@@ -120,7 +121,7 @@ const std::map<std::string, std::string> kScripts = {
 
 // A game of its own in a temporary folder, with the scripts above and a budget of kTestBudgetMs.
 std::filesystem::path budget_game(const std::string& name, const std::string& settings) {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / ("redgem-budget-" + name);
+  const std::filesystem::path game = redgem::test::temp_root() / ("redgem-budget-" + name);
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / config::kScriptsDirName);
   std::ofstream(game / "game.json") << settings;

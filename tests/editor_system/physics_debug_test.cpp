@@ -9,6 +9,7 @@
 #include "project/editor_setup.hpp"
 #include "scene/props.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -45,7 +46,7 @@ void frames(EditorApp& app) {
   for (int frame = 0; frame < kFrames; ++frame) app.frame();
 }
 std::filesystem::path game_files() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_physics_debug_editor";
+  const auto game = redgem::test::temp_root() / "redgem_physics_debug_editor";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);

@@ -10,6 +10,7 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -21,7 +22,7 @@ constexpr float kStickHalfway = 0.5f;
 
 // The files of the test's own, removed when the test ends.
 struct TempFiles {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-input-actions-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-input-actions-test";
   std::filesystem::path save = dir / "save.json";
   std::filesystem::path bindings = dir / "bindings.json";
   TempFiles() { std::filesystem::remove_all(dir); }

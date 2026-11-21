@@ -11,6 +11,7 @@
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/scene_ids.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace fs = std::filesystem;
@@ -19,7 +20,7 @@ namespace {
 
 struct TempScene {
   fs::path path;
-  explicit TempScene(const std::string& name) : path(fs::temp_directory_path() / ("redgem_ids_" + name + ".glb")) {}
+  explicit TempScene(const std::string& name) : path(redgem::test::temp_root() / ("redgem_ids_" + name + ".glb")) {}
   ~TempScene() { fs::remove(path); }
 };
 

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "editor/agent/agent_client.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem::agent;
 namespace fs = std::filesystem;
@@ -17,7 +18,7 @@ namespace {
 // A client whose messages are kept, in a game folder of its own.
 struct Conversation {
   explicit Conversation(const std::string& past_session = "")
-      : folder(fs::temp_directory_path() / "redgem_agent_client_test") {
+      : folder(redgem::test::temp_root() / "redgem_agent_client_test") {
     fs::remove_all(folder);
     fs::create_directories(folder / "scripts");
     std::ofstream(folder / "scripts" / "coin.rb", std::ios::binary) << "one\ntwo\nthree\n";

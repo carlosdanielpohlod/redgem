@@ -16,6 +16,7 @@
 #include "testing/system_test.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_notes.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -121,7 +122,7 @@ TEST_CASE("notes go from one test to another, by plain names only") {
 
 TEST_CASE("a run with a folder of its own keeps its notes there, whole, away from every other run's") {
   const std::filesystem::path shared = notes_folder();
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-tests-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-tests-work";
   std::filesystem::remove_all(work);
   ScriptedInputSource input;
   auto engine = sandbox(input);

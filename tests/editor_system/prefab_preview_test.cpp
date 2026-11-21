@@ -12,6 +12,7 @@
 #include "project/editor_setup.hpp"
 #include "scene/props.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -38,7 +39,7 @@ void source_file(const std::filesystem::path& game, PrimitiveShape shape, redgem
   REQUIRE_MESSAGE(source.save(error), error);
 }
 std::filesystem::path game_files() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_prefab_editor_window";
+  const auto game = redgem::test::temp_root() / "redgem_prefab_editor_window";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "prefabs");
   source_file(game, PrimitiveShape::Cube, kRed);

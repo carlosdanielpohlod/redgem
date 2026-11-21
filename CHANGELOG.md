@@ -124,6 +124,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **The engine's tests can run side by side.** Each C++ test run writes in a temporary folder of its
+  own, removed when it ends, so two runs on one machine no longer read each other's temporary files (one
+  failed with "scene.glb file not found" while another worktree's run was going on).
+  `REDGEM_KEEP_TEST_DIRS=1` keeps the folders.
 - **The API reference says `GameObject#props` and `Behaviour#props` have Symbol keys**, which is
   what they return (`props[:damage]`). It said String keys, and `props["damage"]` is nil.
 - **A character that picks up the body it stands on stays on the ground.** A courier standing on

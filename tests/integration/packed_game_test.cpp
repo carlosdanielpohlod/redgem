@@ -22,6 +22,7 @@
 #include "project/game_build.hpp"
 #include "script/game_locales.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -32,7 +33,7 @@ constexpr int kPlayFrames = 120;
 // A folder of the test's own with a stand-in for the player, removed (and the archive unmounted)
 // when the test ends.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-packed-game-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-packed-game-test";
   std::filesystem::path out = dir / "out";
   std::filesystem::path player = dir / "player";
   Scratch() {

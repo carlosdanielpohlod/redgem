@@ -15,6 +15,7 @@
 
 #include "server/key_locks.hpp"
 #include "server/save_database.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::server::KeyLocks;
@@ -28,7 +29,7 @@ constexpr double kVolume = 0.35;
 
 // A server's data folder that does not exist yet, removed when the test ends.
 struct TempData {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-save-database-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-save-database-test";
   std::filesystem::path database = dir / "data" / "save.sqlite3";
   TempData() { std::filesystem::remove_all(dir); }
   ~TempData() { std::filesystem::remove_all(dir); }

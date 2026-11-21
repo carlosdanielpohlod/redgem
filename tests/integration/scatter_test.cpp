@@ -14,6 +14,7 @@
 #include "scene/props.hpp"
 #include "scene/shapes/primitives.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -65,7 +66,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene) {
   options.game_dir = fixture("games/sandbox");
   options.fixed_step = true;
   options.scene = &scene;
-  options.save_file = std::filesystem::temp_directory_path() / "redgem-scatter-test" / "save.json";  // never written
+  options.save_file = redgem::test::temp_root() / "redgem-scatter-test" / "save.json";  // never written
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));

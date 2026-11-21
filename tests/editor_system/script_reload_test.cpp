@@ -8,6 +8,7 @@
 #include "project/editor_setup.hpp"
 #include "scene/props.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -29,7 +30,7 @@ void write_mover(const std::filesystem::path& game, bool blue) {
   REQUIRE_MESSAGE(write_text_file(game / "scripts/mover.rb", code, error), error);
 }
 std::filesystem::path game_files() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_editor_live_scripts";
+  const auto game = redgem::test::temp_root() / "redgem_editor_live_scripts";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   write_mover(game, false);

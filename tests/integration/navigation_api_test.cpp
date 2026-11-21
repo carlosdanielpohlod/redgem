@@ -11,6 +11,7 @@
 
 #include "physics_game.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::test::physics_game;
@@ -25,7 +26,7 @@ constexpr const char* kPlainGame = R"({"title": "Plain"})";
 
 // A game folder of the test's own holding only a game.json, removed when the test ends.
 struct NavGame {
-  fs::path dir = fs::temp_directory_path() / "redgem-navigation-api-test";
+  fs::path dir = redgem::test::temp_root() / "redgem-navigation-api-test";
   explicit NavGame(const std::string& game_json) {
     fs::remove_all(dir);
     fs::create_directories(dir);

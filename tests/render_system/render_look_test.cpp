@@ -11,6 +11,7 @@
 
 #include "render_system/render_stage.hpp"
 #include "scene/shapes/primitives.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -158,7 +159,7 @@ Picture shadow_of(RenderStage& stage, PropertyMap environment, const std::string
 }  // namespace
 
 TEST_CASE("a sky picture is drawn behind everything, turned as asked, and lights what it surrounds") {
-  const std::filesystem::path images = std::filesystem::temp_directory_path() / "redgem_render_sky";
+  const std::filesystem::path images = redgem::test::temp_root() / "redgem_render_sky";
   std::filesystem::create_directories(images);
   write_sky(images / "sky.hdr");
   RenderStage stage;

@@ -6,6 +6,7 @@
 
 #include "editor/project_files.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -30,7 +31,7 @@ TEST_CASE("a game folder is listed by kind, with the names scripts use") {
 }
 
 TEST_CASE("the pictures of images/ are listed by file name, whatever the case of their extension") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_project_files_images";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_project_files_images";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "images");
   for (const char* file : {"wood.png", "Bark.JPG", "moss.webp", "notes.txt"}) {
@@ -42,7 +43,7 @@ TEST_CASE("the pictures of images/ are listed by file name, whatever the case of
 }
 
 TEST_CASE("files reached through links are not listed: built games leave them out") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_project_files_links";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_project_files_links";
   std::filesystem::remove_all(game);
   std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
   std::filesystem::create_symlink(game / "scripts" / "lift.rb", game / "scripts" / "alias.rb");
@@ -58,7 +59,7 @@ TEST_CASE("files reached through links are not listed: built games leave them ou
 }
 
 TEST_CASE("prefab files are listed separately from imported models and affect project rescans") {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_project_files_prefabs";
+  const auto game = redgem::test::temp_root() / "redgem_project_files_prefabs";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "prefabs");
   const auto before = ProjectFiles::scan(game);

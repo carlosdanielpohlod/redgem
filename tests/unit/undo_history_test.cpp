@@ -11,6 +11,7 @@
 #include "editor/document/scene_document.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -59,14 +60,14 @@ std::filesystem::path painted_model() {
       {{"buffer", 0}, {"byteOffset", sizeof(kTriangle)}, {"byteLength", 3 * sizeof(std::uint16_t)}},
       {{"buffer", 0}, {"byteOffset", picture_at}, {"byteLength", kPictureBytes}}};
   glb.json["buffers"] = {{{"byteLength", glb.bin.size()}}};
-  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_undo_painted.glb";
+  const std::filesystem::path file = redgem::test::temp_root() / "redgem_undo_painted.glb";
   std::string error;
   REQUIRE_MESSAGE(write_glb(file, glb, error), error);
   return file;
 }
 
 SceneDocument empty_document(const std::string& name) {
-  return SceneDocument::create_empty(std::filesystem::temp_directory_path() / ("redgem_undo_" + name + ".glb"));
+  return SceneDocument::create_empty(redgem::test::temp_root() / ("redgem_undo_" + name + ".glb"));
 }
 
 // How many times the document can be undone (it is left undone all the way).

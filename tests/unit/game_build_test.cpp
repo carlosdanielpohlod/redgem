@@ -16,6 +16,7 @@
 #include "project/game_shipping.hpp"
 #include "project/game_templates.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -23,7 +24,7 @@ namespace {
 
 // A folder of the test's own, removed when the test ends, with a game and a folder that is none.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-game-build-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-game-build-test";
   std::filesystem::path game = dir / "game";
   std::filesystem::path empty = dir / "empty";
   Scratch() {

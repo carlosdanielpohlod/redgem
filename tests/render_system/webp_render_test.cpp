@@ -11,6 +11,7 @@
 #include "render/texture_loading.hpp"
 #include "render_system/render_stage.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -110,7 +111,7 @@ TEST_CASE("WebP sky pictures decode to linear light with the existing shrink lim
 
 namespace {
 struct DisguisedImages {
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-sniffed-images";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem-sniffed-images";
   DisguisedImages() { std::filesystem::create_directories(folder); }
   ~DisguisedImages() { std::filesystem::remove_all(folder); }
 };

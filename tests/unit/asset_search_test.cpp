@@ -14,6 +14,7 @@
 #include "project/mcp_tools.hpp"
 #include "project/search_command.hpp"
 #include "project/tool_commands.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -34,7 +35,7 @@ constexpr std::size_t kOne = 1;
 // A game of those files, gone with the test.
 class SmallGame {
  public:
-  explicit SmallGame(const std::string& name) : dir_(fs::temp_directory_path() / ("redgem_asset_search_" + name)) {
+  explicit SmallGame(const std::string& name) : dir_(redgem::test::temp_root() / ("redgem_asset_search_" + name)) {
     fs::remove_all(dir_);
     for (const std::string& file : kGameFiles) {
       fs::create_directories((dir_ / file).parent_path());

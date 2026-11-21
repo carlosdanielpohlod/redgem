@@ -8,6 +8,7 @@
 #include "app/game_settings.hpp"
 #include "app/app_config.hpp"
 #include "physics/physics_config.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -19,7 +20,7 @@ constexpr int kVersionCode = 3;
 
 // A game folder of the test's own, with the game.json given.
 std::filesystem::path game_saying(const std::string& json) {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_game_settings_test" / "Coin Rush";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_game_settings_test" / "Coin Rush";
   std::filesystem::remove_all(dir.parent_path());
   std::filesystem::create_directories(dir);
   if (!json.empty()) std::ofstream(dir / kGameSettingsFile) << json;

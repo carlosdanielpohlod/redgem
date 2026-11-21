@@ -13,6 +13,7 @@
 #include "editor/agent/child_process.hpp"
 #include "editor/agent/workspace_files.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 #ifndef _WIN32
 #include <sys/stat.h>
@@ -30,7 +31,7 @@ constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user'
 constexpr const char* kAgentText = "AGENT TEXT\n";        // what the agent asked to write
 
 fs::path fresh_folder(const std::string& name) {
-  const fs::path folder = fs::temp_directory_path() / name;
+  const fs::path folder = redgem::test::temp_root() / name;
   fs::remove_all(folder);
   fs::create_directories(folder);
   return folder;
@@ -65,7 +66,7 @@ TEST_CASE("a workspace refuses what leaves its folder") {
   CHECK(error.find("outside") != std::string::npos);
   CHECK_FALSE(workspace.resolve((workspace.folder() / ".." / "x").u8string(), error));
   CHECK_FALSE(workspace.resolve(workspace.folder().u8string(), error));
-  CHECK_FALSE(workspace.resolve((fs::temp_directory_path() / "other").u8string(), error));
+  CHECK_FALSE(workspace.resolve((redgem::test::temp_root() / "other").u8string(), error));
   fs::remove_all(folder);
 }
 

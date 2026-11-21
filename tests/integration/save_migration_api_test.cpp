@@ -10,6 +10,7 @@
 #include "core/config.hpp"
 #include "server/save_database.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -40,7 +41,7 @@ struct MigrationGame {
   }
 };
 struct MigrationData {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-save-migration-test";
+  std::filesystem::path folder = redgem::test::temp_root() / "redgem-save-migration-test";
   std::filesystem::path file = folder / "save.json";
   MigrationData() { std::filesystem::remove_all(folder); }
   ~MigrationData() { std::filesystem::remove_all(folder); }

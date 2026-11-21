@@ -6,10 +6,11 @@
 #include "storage/save_file.hpp"
 #include "storage/save_slots.hpp"
 #include "server/save_database.hpp"
+#include "temp_dirs.hpp"
 using namespace redgem;
 namespace {
 struct SlotFolder {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-save-slots-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-save-slots-test";
   std::filesystem::path file = root / "save.json";
   SlotFolder() { std::filesystem::remove_all(root); }
   ~SlotFolder() { std::filesystem::remove_all(root); }

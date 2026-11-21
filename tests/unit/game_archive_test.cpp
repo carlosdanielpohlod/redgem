@@ -14,6 +14,7 @@
 #include "core/game_files.hpp"
 #include "core/safe_path.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -64,7 +65,7 @@ Bytes read_all(const std::filesystem::path& file) {
 
 // A folder of the test's own, removed when the test ends; nothing stays mounted after it.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-game-archive-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-game-archive-test";
   Scratch() {
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);

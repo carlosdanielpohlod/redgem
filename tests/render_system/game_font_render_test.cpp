@@ -8,6 +8,7 @@
 #include "render/game_fonts.hpp"
 #include "render/ui_font.hpp"
 #include "render_system/render_stage.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::RenderStage;
@@ -27,7 +28,7 @@ constexpr int kFirstLineRows = 50;
 
 class FontFiles {
  public:
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-font-render";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem-font-render";
   FontFiles() {
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);
@@ -125,7 +126,7 @@ TEST_CASE("font glyph growth is bounded and changing games resets the glyph budg
   CHECK(bounded.glyphCount <= kLargestAtlas);
   const auto saturated = bounded.texture.id;
   CHECK(fonts.get("", "€").texture.id == saturated);
-  fonts.set_directory(std::filesystem::temp_directory_path() / "redgem-next-font-game");
+  fonts.set_directory(redgem::test::temp_root() / "redgem-next-font-game");
   CHECK(GetGlyphInfo(fonts.get("", "€"), kEuro).value == kEuro);
 }
 

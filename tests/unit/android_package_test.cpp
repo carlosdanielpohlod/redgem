@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include "temp_dirs.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -35,7 +36,7 @@ constexpr int kIconSide = 32;                     // the test's icon: small, so 
 
 // A folder of the test's own, removed when the test ends.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-android-package-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-android-package-test";
   Scratch() {
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);

@@ -9,6 +9,7 @@
 #include "core/config.hpp"
 #include "project/build_steps.hpp"
 #include "project/game_build.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -19,7 +20,7 @@ constexpr const char* kOtherStep = "counting the gems";
 
 // A folder of the test's own with a game and a player to ship, removed when the test ends.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-steps-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-steps-test";
   std::filesystem::path game = dir / "game";
   std::filesystem::path player = dir / "player";
   Scratch() {
