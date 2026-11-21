@@ -3,17 +3,19 @@
 # Spawn1, the next player's on Spawn2, and so on around. Add more points for more players.
 module Spawns
   TAG = :spawn
+  PREFIX = "Spawn".freeze   # a point is called this, followed by its number
   FIRST_ID = 1   # the host's id; offline, this machine counts as the host
   FEET = 1.2     # how far above a point a hero's middle stands (its capsule is 2 meters tall)
 
   # Which point (from 0) the machine of that id gets, of `count`.
   def self.index(id, count) = (id - FIRST_ID) % count
 
-  # The point of this machine's hero.
+  # The point of this machine's hero; nil in a level with none.
   def self.mine
-    points = Scene.find_all(TAG).sort_by(&:name)
-    id = Network.online? ? Network.id : FIRST_ID
-    points[index(id, points.size)]
+    points = Scene.find_all(TAG).sort_by { |point| point.name[PREFIX.size..].to_i }
+    return nil if points.empty?
+
+    points[index(Network.online? ? Network.id : FIRST_ID, points.size)]
   end
 
   # Puts a hero on this machine's point, standing up.

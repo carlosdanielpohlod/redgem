@@ -22,14 +22,20 @@ class MainScene < SceneScript
     first = !MainScene.started?
     MainScene.started!
     Camera.main.add_component(Party)
-    Progress.follow(first_level: first)
-    return find!(HERO).destroy if Network.server?
+    Progress.follow
+    return server_start(first) if Network.server?
 
     hero_parts(find!(HERO))
     LobbyScreen.install(Camera.main.add_component(GameMenu, start_open: first))
   end
 
   private
+
+  # A dedicated server has no hero, and goes on from its own save as it starts.
+  def server_start(first)
+    find!(HERO).destroy
+    Progress.resume if first
+  end
 
   # What lets the hero use doors, talk, read a conversation and follow the quest.
   def hero_parts(hero)

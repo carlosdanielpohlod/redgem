@@ -63,10 +63,12 @@ class Party < Behaviour
     @teammates[peer] = teammate
   end
 
-  # The game is over (the host left, or this machine did): playing alone again.
+  # The game is over (the host left, or this machine did): playing alone again, from this
+  # machine's own save.
   def leave
     @teammates.each_value(&:destroy)
     @teammates = {}
     place_my_hero
+    Session.play unless Network.server?
   end
 end

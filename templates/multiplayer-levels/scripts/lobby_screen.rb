@@ -1,6 +1,8 @@
 # The menu's screen to play together (title and pause menus > Play together): host a game, type
 # the host's address and join it, or join the game's dedicated server (Session::SERVER). The title
-# screen's Play goes on alone from the save (Session.play). Esc goes back.
+# screen's Play goes on alone from the save (Session.play). Esc goes back. What cannot start (a
+# port taken, no server set) is said on the screen, which stays open; a join that fails later
+# opens it again, saying why.
 class LobbyScreen < GameMenu::Screen
   OPTION_INDEX = 1                  # on the title and pause screens: after Play or Resume
   DEFAULT_ADDRESS = "127.0.0.1".freeze
@@ -38,13 +40,14 @@ class LobbyScreen < GameMenu::Screen
     super(heading: -> { I18n.t("lobby.heading") }, back: -> { menu.show(@from) })
     @menu = menu
     @address = DEFAULT_ADDRESS
-    Network.on_fail { |reason| @note = I18n.t("lobby.failed", reason: reason.to_s) }
+    @from = :pause
+    Network.on_fail { |reason| failed(reason) }
   end
 
   def options
-    [[I18n.t("lobby.host"), -> { start { Session.host } }],
-     [I18n.t("lobby.join"), -> { start { Session.join(@address) } }],
-     [I18n.t("lobby.server"), -> { start { Session.play_on_server || (@note = I18n.t("lobby.no_server")) } }],
+    [[I18n.t("lobby.host"), -> { start(I18n.t("lobby.host_failed")) { Session.host } }],
+     [I18n.t("lobby.join"), -> { start(I18n.t("lobby.join_failed")) { Session.join(@address) } }],
+     [I18n.t("lobby.server"), -> { start(I18n.t("lobby.no_server")) { Session.play_on_server } }],
      [I18n.t("lobby.leave"), -> { Session.leave }], [I18n.t("lobby.back"), back]]
   end
 
@@ -66,10 +69,16 @@ class LobbyScreen < GameMenu::Screen
 
   private
 
-  # The game goes on while the network starts (a note says why, should it fail).
-  def start
+  # The game goes on once the network starts; the screen says `refusal` (a text) when it cannot.
+  def start(refusal)
     @note = nil
+    return @note = refusal unless yield
+
     @menu.resume
-    yield
+  end
+
+  def failed(reason)
+    @note = I18n.t("lobby.failed", reason: reason.to_s)
+    @menu.show(:together)
   end
 end

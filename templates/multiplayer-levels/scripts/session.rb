@@ -17,15 +17,20 @@ module Session
   end
 
   # Joins a game hosted at that address: the host's level, quest and save are the party's.
-  def self.join(address, port: Network::DEFAULT_PORT) = Network.join(address, port: port)
+  def self.join(address, port: Network::DEFAULT_PORT)
+    Progress.release
+    Network.join(address, port: port)
+  end
 
   # Joins the dedicated server ("address" or "address:port"), in any room with a free place.
   def self.play_on_server(server = SERVER)
     return false if server.to_s.empty?
 
     address, port = server.split(":")
+    Progress.release
     Network.join(address, port: (port || Network::DEFAULT_PORT).to_i)
   end
 
+  # Leaves the game played together (see Party, which goes on alone from this machine's save).
   def self.leave = Network.leave
 end

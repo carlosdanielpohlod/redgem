@@ -1,21 +1,19 @@
 # The save: the level the party is on and its quests (see Quests.save), kept with Save so that
-# they last across levels and between runs. Only the machine that decides writes it: the one
-# playing alone, the host, or the dedicated server (in the server's own database). The other
-# players hear of the quests from it and keep nothing.
+# they last across levels and between runs. A machine writes it only while its own save is in
+# play (after Play, Host, or the dedicated server's start: Progress.resume) and it decides the
+# party's progress (alone, the host, or the dedicated server, in the server's own database). A
+# player who joins someone else's game plays the host's progress and keeps nothing of it.
 module Progress
   LEVEL = :level
   QUESTS = :quests
 
-  # Whether this machine decides the party's progress.
-  def self.decides? = !Network.online? || Network.host?
+  # Whether this machine keeps the party's progress now.
+  def self.decides? = @own == true && (!Network.online? || Network.host?)
 
-  # Called by every level's setup: saves on every change of a quest, and saves the level each
-  # time one loads (but the first, which only shows the title). A dedicated server goes on from
-  # its own save as it starts.
-  def self.follow(first_level:)
+  # Called by every level's setup: saves the level, and every change of a quest from now on.
+  def self.follow
     Quests.on(:change) { |_quest| save }
-    save unless first_level
-    Quests.restore(QUESTS) if first_level && Network.server?
+    save
   end
 
   def self.save
@@ -28,12 +26,16 @@ module Progress
   # The level saved, or nil.
   def self.level = Save.get(LEVEL)
 
-  # Puts the saved quests back and goes to the saved level.
+  # Puts this machine's own save in play: its quests come back and the party goes to its level.
   def self.resume
+    saved = level   # (read first: putting the quests back saves the level that runs now)
+    @own = true
     Quests.restore(QUESTS)
-    saved = level
     Game.load_scene(saved) if saved && saved != Game.scene_name
   end
+
+  # Another machine's game is being joined: what it plays is not this machine's to save.
+  def self.release = @own = false
 
   # Starts over: nothing saved.
   def self.clear = [LEVEL, QUESTS].each { |key| Save.delete(key) }

@@ -32,7 +32,7 @@ SystemTest.define do |t|
   x, y, width, height = menu.button_box(SERVER_BUTTON)
   t.click(x + width / 2, y + height / 2)
   t.wait
-  t.assert("with no server set, the game starts and the lobby says where to set one") do
-    !menu.open? && menu.screens[:together].note == I18n.t("lobby.no_server") && !Network.connecting?
+  t.assert("with no server set, the lobby stays open and says where to set one") do
+    menu.screen == :together && menu.screens[:together].note == I18n.t("lobby.no_server") && !Network.connecting?
   end
 end
