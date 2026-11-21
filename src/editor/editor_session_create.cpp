@@ -34,8 +34,7 @@ ObjectId EditorSession::create_kind(Kind kind, Vec3 position) {
 ObjectId EditorSession::create_empty(Vec3 position) { return create_kind(Kind::Empty, position); }
 
 ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
-  constexpr Kind kKinds[] = {Kind::Cube, Kind::Sphere, Kind::Plane, Kind::Cylinder, Kind::Capsule};
-  return create_kind(kKinds[static_cast<int>(shape)], position);
+  return create_kind(new_objects::kind_of_shape(shape), position);
 }
 
 ObjectId EditorSession::create_terrain(Vec3 position) {

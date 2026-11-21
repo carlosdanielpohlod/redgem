@@ -1,13 +1,18 @@
 {
   "project.agent.no_bridge": "the editor's local bridge could not be enabled (see the console)",
-  "project.android.bundletool_jar_missing": "{variable} names {jar}, which is not a file: point it at bundletool's .jar (bundletool-all-<version>.jar)",
-  "project.android.network_refused": "game.json says \"network\": false, yet the game's scripts use the network (Network or HTTP): its app will not reach it on a phone",
-  "project.android.network_unsaid": "the game's scripts use the network (Network or HTTP), so its app asks for it: say \"network\": true in game.json",
-  "project.android.no_bundletool": "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
+  "project.android.bundletool_jar_missing":
+      "{variable} names {jar}, which is not a file: point it at bundletool's .jar (bundletool-all-<version>.jar)",
+  "project.android.network_refused":
+      "game.json says \"network\": false, yet the game's scripts use the network (Network or HTTP): its app will not reach it on a phone",
+  "project.android.network_unsaid":
+      "the game's scripts use the network (Network or HTTP), so its app asks for it: say \"network\": true in game.json",
+  "project.android.no_bundletool":
+      "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
   "project.api.did_you_mean": "Did you mean {names}?",
   "project.api.experimental": "experimental",
   "project.api.guide": "guide: {page}",
-  "project.api.index_header": "RedGem scripting API, {count} classes. redgem api <Class> for its methods; redgem api --search <word> to find one.",
+  "project.api.index_header":
+      "RedGem scripting API, {count} classes. redgem api <Class> for its methods; redgem api --search <word> to find one.",
   "project.api.more_found": "+{count} more: search a longer word",
   "project.api.no_class": "no class {class}.",
   "project.api.nothing_found": "no method has to do with {word}; redgem api lists the classes",
@@ -34,8 +39,10 @@
   "project.build.for_macos": "For macOS",
   "project.build.for_windows": "For Windows (.exe)",
   "project.build.game_inside_its_build": "cannot build {game}: it is inside {folder}, which a build replaces",
-  "project.build.unnamed_data_folder": "the game's players will keep their saves and settings in a folder named {folder}, after game.json's \"studio\" and \"title\": give the game a studio and a title of its own before the first release, since they name that folder for good",
-  "project.build.not_a_build": "cannot build: {path} is there and no build made it; move it away or build into another folder",
+  "project.build.unnamed_data_folder":
+      "the game's players will keep their saves and settings in a folder named {folder}, after game.json's \"studio\" and \"title\": give the game a studio and a title of its own before the first release, since they name that folder for good",
+  "project.build.not_a_build":
+      "cannot build: {path} is there and no build made it; move it away or build into another folder",
   "project.check.did_you_mean": "did you mean {names}?",
   "project.check.dialogue_unreadable": "{file}: it cannot be read, or is larger than {bytes} bytes",
   "project.check.missing_text": "{file}: {where}: no text for {key} in locales/ (nor among the engine's)",
@@ -47,7 +54,8 @@
   "project.check.unknown_item": "{file}: {where}: there is no item {item} (items/{item}.json)",
   "project.check.quest_name": "{file}: a quest's name is at most {bytes} bytes (its state is kept in GameVariables)",
   "project.check.quest_unreadable": "{file}: it cannot be read, or is larger than {bytes} bytes",
-  "project.check.missing_voice": "{file}: {where}: its voice {voice} is not in sounds/ (.wav, .ogg, .mp3 or .flac): the line plays silently",
+  "project.check.missing_voice":
+      "{file}: {where}: its voice {voice} is not in sounds/ (.wav, .ogg, .mp3 or .flac): the line plays silently",
   "project.check.missing_script": "{where}: {script} is not there; {hint}",
   "project.check.missing_sky": "{where}: sky_image {image} is not in images/ (.hdr, .png or .jpg)",
   "project.check.more": "+{count} more (--all shows every one)",
@@ -56,7 +64,8 @@
   "project.check.scripts_there": "the scripts are: {names}",
   "project.check.stopped": "check: stopped by the error above",
   "project.check.summary": "check: {errors} errors, {warnings} warnings ({scripts} scripts, {scenes} scenes)",
-  "project.check.tester_failed": "redgem-test ended without saying how the tests went (status {status}): run redgem-test --all <game> to see why",
+  "project.check.tester_failed":
+      "redgem-test ended without saying how the tests went (status {status}): run redgem-test --all <game> to see why",
   "project.check.tests": "tests: {passed} passed, {failed} failed",
   "project.check.usage": [
     "usage: redgem check <game> [--run-tests] [--all]",
@@ -159,7 +168,8 @@
   "project.icon.cannot_read_player": "cannot read the game's executable {player} to give it the game's icon",
   "project.icon.missing": "the icon {picture} that game.json names is not a file in the game folder",
   "project.icon.missing_side": "the game's icon was not made at every size the player for Windows has",
-  "project.icon.no_exe_icon": "the player for Windows carries no icon for the game's to replace: build it again with tools/windows/build_runtime.sh",
+  "project.icon.no_exe_icon":
+      "the player for Windows carries no icon for the game's to replace: build it again with tools/windows/build_runtime.sh",
   "project.icon.no_room": "the player for Windows has no room in its headers for the game's icon",
   "project.icon.unusable": "the icon {picture} is not a square PNG that can be read",
   "project.run.assertion_failed": "--assert was false: {expression}",
@@ -178,13 +188,15 @@
   "project.run.bad_point": "x and y must be numbers from 0 (pixels up to {most}; fractions up to 1 when normalized)",
   "project.run.bad_seed": "--seed needs a whole number from 0 to 2147483647",
   "project.run.bad_wheel": "wheel must be a number of notches from -{most} to {most}",
-  "project.run.crowded_pulse": "the event at frame {frame} comes right after a click or tap: leave a frame between them so the press is let go of",
+  "project.run.crowded_pulse":
+      "the event at frame {frame} comes right after a click or tap: leave a frame between them so the press is let go of",
   "project.run.duplicate_frame": "input has two events at frame {frame}",
   "project.run.duplicate_pad": "gamepad {pad} is listed twice",
   "project.run.event_fields": "each event needs frame and at least one of keys, mouse, pads, touch or tap",
   "project.run.every_needs_print": "--every needs --print",
   "project.run.frame_label": "frame {frame}: ",
-  "project.run.hidden_press": "the click or tap at frame {frame} presses a button the event before still holds: let it go first",
+  "project.run.hidden_press":
+      "the click or tap at frame {frame} presses a button the event before still holds: let it go first",
   "project.run.input_event": "input event {event}: {problem}",
   "project.run.needs_length": "--seconds and --frames need a number above 0, up to an hour of the game",
   "project.run.no_camera": "no camera called {camera}; the cameras are: {cameras}",
@@ -211,19 +223,23 @@
     ""
   ],
   "project.scene.ambiguous": "{count} objects are called {object}; name one by its id or its path:",
-  "project.scene.bad_revision": "{revision} is not a Git revision scene diff takes: a branch, a tag or a commit, with ~N or ^N (HEAD~1, main, 3fa2c1b); an earlier save is a .glb file",
+  "project.scene.bad_revision":
+      "{revision} is not a Git revision scene diff takes: a branch, a tag or a commit, with ~N or ^N (HEAD~1, main, 3fa2c1b); an earlier save is a .glb file",
   "project.scene.bad_name": "{name} cannot be a name: it would read as an id (#3) or a path (Level/Wall)",
   "project.scene.cannot_parent": "cannot move an object under itself or under one of its children",
   "project.scene.compact_bad_option": "scene compact does not accept {option}",
-  "project.scene.compact_whole": "note: this scene's glTF points at its data in ways compact does not follow (compressed meshes, GPU instancing, data outside the .glb): it was saved whole, nothing merged or left out",
-  "project.scene.compacted": "scene {scene}: wrote {written} bytes of data, left out {left_out} bytes repeated or no object uses",
+  "project.scene.compact_whole":
+      "note: this scene's glTF points at its data in ways compact does not follow (compressed meshes, GPU instancing, data outside the .glb): it was saved whole, nothing merged or left out",
+  "project.scene.compacted":
+      "scene {scene}: wrote {written} bytes of data, left out {left_out} bytes repeated or no object uses",
   "project.scene.did_you_mean": " (did you mean {name}?)",
   "project.scene.diff_absent": "<absent>",
   "project.scene.diff_against_only": "--against and --revision are only accepted by scene diff",
   "project.scene.diff_bad_option": "scene diff does not accept {option}",
   "project.scene.diff_failed": "cannot compare scenes: {problem}",
   "project.scene.diff_more": "+{count} detail lines not shown (--limit N; --limit 0 shows all)",
-  "project.scene.diff_needs_against": "scene diff needs one of --against <before.glb> (an earlier save of the same scene) and --revision <revision> (a Git revision: HEAD, HEAD~1, main); --against takes a revision too",
+  "project.scene.diff_needs_against":
+      "scene diff needs one of --against <before.glb> (an earlier save of the same scene) and --revision <revision> (a Git revision: HEAD, HEAD~1, main); --against takes a revision too",
   "project.scene.diff_none": "no object changes",
   "project.scene.diff_summary": "scene {scene}: +{added} -{removed} ~{changed} objects",
   "project.scene.list_header": "scene {scene}: {count} objects (#id name, then what differs from the defaults)",
@@ -239,16 +255,19 @@
   "project.scene.not_an_assignment": "{word} is not key=value; the keys are: {keys}",
   "project.scene.nothing_to_set": "nothing to set: add key=value words (position=1,2,3 prop.speed=2 script+=Door)",
   "project.scene.never_saved": "the scene has not been saved yet: no Git revision holds it",
-  "project.scene.not_in_git": "{folder} is in no Git repository (or git is not on the PATH): a Git revision can be compared with only in a game kept in Git",
+  "project.scene.not_in_git":
+      "{folder} is in no Git repository (or git is not on the PATH): a Git revision can be compared with only in a game kept in Git",
   "project.scene.only_equals": "{key} takes = only (not += or -=)",
   "project.scene.out_of_reach": "{key} takes numbers from -{largest} to {largest}, not {value}",
   "project.scene.read_only": "{key} says what the object is ({value}): it is not changed from the command line",
   "project.scene.removed": "removed {object} ({count} objects with its children)",
-  "project.scene.scale_out_of_range": "scale takes numbers from {least} to {largest} on every side (zero flattens the object, a negative scale turns it inside out), not {value}",
+  "project.scene.scale_out_of_range":
+      "scale takes numbers from {least} to {largest} on every side (zero flattens the object, a negative scale turns it inside out), not {value}",
   "project.scene.script_missing": "note: scripts/{script} does not exist yet; it must define class {class}",
   "project.scene.script_not_attached": "{script} is not attached; the object has: {scripts}",
   "project.scene.spot_cone_needs_light": "spot_cone requires an existing spot light",
-  "project.scene.spot_cone_bad_angles": "spot_cone needs inner,outer in degrees, from 0 to {max} and at least {gap} degrees apart",
+  "project.scene.spot_cone_bad_angles":
+      "spot_cone needs inner,outer in degrees, from 0 to {max} and at least {gap} degrees apart",
   "project.scene.spot_cone_use_pair": "Use spot_cone=inner,outer to change both angles in degrees.",
   "project.scene.unknown_key": "unknown key {key} (prop.{key}= sets a property of that name); the keys are: {keys}",
   "project.scene.usage": [
@@ -301,7 +320,8 @@
   "project.shot.ended_early": "the game ended before that moment: no picture",
   "project.shot.needs_game_and_file": "needs <game> and the picture's file (out.png)",
   "project.shot.needs_png": "the picture's file must end in .png",
-  "project.shot.needs_size_and_time": "--size needs <width>x<height> (512x288), and --at seconds or --frames N from 0 up to an hour of the game",
+  "project.shot.needs_size_and_time":
+      "--size needs <width>x<height> (512x288), and --at seconds or --frames N from 0 up to an hour of the game",
   "project.shot.saved": "saved {file} ({width}x{height}, scene {scene} at {seconds} s)",
   "project.shot.usage": [
     "usage: redgem shot <game> <out.png> [--at seconds | --frames N] [--scene name] [--size WxH] [--camera name]",
@@ -313,13 +333,18 @@
     ""
   ],
   "project.symbolize.builds_there": "the builds there are:",
-  "project.symbolize.no_build": "the report names no build (it has no \"Build:\" line): it is no crash report, or one written before reports named their build",
+  "project.symbolize.no_build":
+      "the report names no build (it has no \"Build:\" line): it is no crash report, or one written before reports named their build",
   "project.symbolize.no_builds_there": "there is no program with a build id there",
-  "project.symbolize.no_symbols": "no symbols in {place} are of the build that crashed ({build_id}, {program}): use the symbols of the release the game was built with (redgem-symbols-<system>.zip), or the build folder of the player it was built with",
-  "project.symbolize.no_tool": "no addr2line found to look addresses up with: put llvm-addr2line (LLVM) or addr2line (binutils) on the PATH, or name one with {option}",
+  "project.symbolize.no_symbols":
+      "no symbols in {place} are of the build that crashed ({build_id}, {program}): use the symbols of the release the game was built with (redgem-symbols-<system>.zip), or the build folder of the player it was built with",
+  "project.symbolize.no_tool":
+      "no addr2line found to look addresses up with: put llvm-addr2line (LLVM) or addr2line (binutils) on the PATH, or name one with {option}",
   "project.symbolize.one_report": "name one crash report",
-  "project.symbolize.tool_failed": "the addr2line used could say nothing of {symbols}: it failed, or does not read that kind of program (llvm-addr2line reads them all)",
-  "project.symbolize.unknown_build": "the program that crashed ({program}) carries no build id, so no symbols can be matched to it (the Mac's reports have none yet)",
+  "project.symbolize.tool_failed":
+      "the addr2line used could say nothing of {symbols}: it failed, or does not read that kind of program (llvm-addr2line reads them all)",
+  "project.symbolize.unknown_build":
+      "the program that crashed ({program}) carries no build id, so no symbols can be matched to it (the Mac's reports have none yet)",
   "project.symbolize.usage": [
     "usage: redgem symbolize <report> [--symbols <file or folder>] [--tool <addr2line>]",
     "",
@@ -336,9 +361,11 @@
   "project.tools.not_a_game": "{game_dir} is not a game: it has no scene.glb",
   "project.tools.option_needs_value": "{option} needs a value",
   "project.tools.unknown_option": "unknown option {option}",
-  "project.scene.needs_light": "{key} changes a light, and this object has none (add one with kind sun, point_light or spot_light)",
+  "project.scene.needs_light":
+      "{key} changes a light, and this object has none (add one with kind sun, point_light or spot_light)",
   "project.scene.needs_camera": "{key} changes a camera, and this object has none (add one with kind camera)",
   "project.scene.light_kinds": "light is sun, point or spot, not {value}",
   "project.scene.needs_color": "{key} needs #rrggbb or r,g,b (each 0 to 1), not {value}",
-  "project.scene.needs_number_in": "{key} needs a number from {least} to {most}, not {value}"
+  "project.scene.needs_number_in": "{key} needs a number from {least} to {most}, not {value}",
+  "project.scene.near_past_far": "camera_near must be less than camera_far (or camera_far=0 for none)"
 }

@@ -60,6 +60,10 @@ class SceneDocument {
   // The callback returns an error to roll back, preserving prior undo/redo. It must not save,
   // import/create assets, duplicate asset-backed nodes, or edit materials/terrain. Exceptions also roll back.
   bool edit_nodes(const std::function<std::string()>& edit, std::string& error);
+  // Makes objects that bring assets with them (`make`: a shape, a light, a camera, a terrain, a
+  // copy; it records its own undo step), then runs `edit` as part of that same step. When `edit`
+  // fails (an error, or an exception) the step is undone as Undo would, leaving no redo step.
+  bool make_then_edit(const std::function<void()>& make, const std::function<std::string()>& edit, std::string& error);
   void set_name(int index, const std::string& name);
   void set_local(int index, const Transform& local, bool record = true);
   void set_prop(int index, const std::string& key, const PropertyValue& value, bool record = true);
@@ -205,6 +209,8 @@ class SceneDocument {
   void push_step(std::vector<Snapshot>& steps, Snapshot step);
   Snapshot pop_step(std::vector<Snapshot>& steps);
   void clear_redo();
+  // Undoes the last step and forgets it (no redo): a step a failed edit made.
+  void take_back_last_step();
   // Drops the oldest undo step; true when a mesh no other step shows, or a picture, may have left
   // the history with it.
   bool drop_oldest_step();

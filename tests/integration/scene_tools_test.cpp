@@ -445,7 +445,9 @@ TEST_CASE("set changes a light and a camera as the Inspector does, and refuses w
   const auto& camera = *node_named(load(game.scene()), "Camera").camera;
   CHECK(radians_to_degrees(camera.fov_y_radians) == doctest::Approx(70));
   CHECK(camera.far_plane == doctest::Approx(500));
-  for (const char* bad : {"light_intensity=-1", "light_color=2,0,0", "light_color=red", "light=lamp", "camera_fov=1"}) {
+  CHECK(has(scene_tool({"set", game.dir(), "Camera", "camera_near=600"}).err, "less than camera_far"));
+  for (const char* bad : {"light_intensity=-1", "light_color=2,0,0", "light_color=red", "light_color=1,0,0,",
+                          "light=lamp", "camera_fov=1"}) {
     CAPTURE(bad);
     CHECK(scene_tool({"set", game.dir(), "GoalLight", bad}).exit_code == kExitFailure);
   }
@@ -482,6 +484,7 @@ TEST_CASE("scene_edit on the files adds kinds, duplicates, groups and removes se
   CHECK(has(reply_text(removed), "Coin1.001"));
   CHECK(load(game.scene()).find_node("Coin2.001") == kNoIndex);
   CHECK(has(reply_text(edit_files(game, {{"action", "add"}, {"object", "Sky"}, {"kind", "sun"}})), "light=sun"));
+  CHECK(has(reply_text(edit_files(game, {{"action", "add"}, {"object", "Coin1"}})), "Coin1.001"));  // a name taken
 }
 
 TEST_CASE("a wrong scene_edit on the files throws what to change and leaves the file alone") {

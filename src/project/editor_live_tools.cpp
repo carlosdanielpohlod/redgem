@@ -85,13 +85,7 @@ void select_outcome(EditorSession& session, const EditOutcome& outcome) {
 Json edit(EditorSession& session, const Json& args, bool busy) {
   require_editable(session, busy);
   SceneEdit edit{session.document(), session.game_dir() / config::kScriptsDirName, {}};
-  EditOutcome outcome;
-  std::string error;
-  const auto apply = [&] {
-    outcome = edit_scene(edit, args);
-    return std::string();
-  };
-  if (!session.document().edit_nodes(apply, error)) throw std::invalid_argument(error);
+  const EditOutcome outcome = edit_scene(edit, args);  // one undo step, or none when it throws
   session.refresh_preview();
   select_outcome(session, outcome);
   return tool_result(outcome.text);

@@ -1,6 +1,7 @@
 #include "project/scene_edits.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 
@@ -25,6 +26,24 @@ constexpr const char* kRemove = "remove";
 constexpr const char* kEmptyKind = "empty";
 
 std::invalid_argument wrong(const std::string& what) { return std::invalid_argument(what); }
+
+using Step = std::function<void()>;
+
+std::string done(const Step& step) {
+  step();
+  return {};
+}
+
+// Runs `make` then `rest` as one undo step, rolled back when either throws. Objects that bring
+// assets (a mesh, a light, a camera, a terrain, a copy) are made apart, as the editor makes them.
+void one_step(SceneDocument& document, bool brings_assets, const Step& make, const Step& rest) {
+  std::string unused;  // (every failure throws)
+  if (brings_assets) {
+    document.make_then_edit(make, [&rest] { return done(rest); }, unused);
+    return;
+  }
+  document.edit_nodes([&] { return make(), done(rest); }, unused);
+}
 
 int resolve(const SceneDocument& document, const std::string& reference) {
   const FoundObject found = find_object(document.desc(), reference);
@@ -104,7 +123,7 @@ EditOutcome set_all(SceneEdit& edit, const Json& args) {
   const Words ids = targets(edit.document, args, false);
   const Words words = words_of(args);
   if (words.empty()) throw wrong("set needs assignments");
-  assign_each(edit, ids, words);
+  one_step(edit.document, false, [] {}, [&] { assign_each(edit, ids, words); });
   return outcome(edit, ids);
 }
 
@@ -120,7 +139,7 @@ EditOutcome remove_all(SceneEdit& edit, const Json& args) {
   const std::vector<int> roots = roots_of(edit.document, targets(edit.document, args, false));
   EditOutcome result;
   for (const int root : roots) result.text += removal_line(edit.document, root);
-  edit.document.remove(roots);
+  one_step(edit.document, false, [] {}, [&] { edit.document.remove(roots); });
   return result;
 }
 
@@ -129,24 +148,17 @@ std::optional<int> parent_of_call(const SceneDocument& document, const Json& arg
   return resolve(document, args["parent"].get<std::string>());
 }
 
-// A copy of a template object is an object of the scene, not a template.
-int copy_of(SceneDocument& document, int source, const std::string& name) {
-  const int copy = document.duplicate(source);
-  document.set_name(copy, document.unique_name(name));
-  document.remove_prop(copy, props::kPrefab);
-  return copy;
-}
-
-int added_copy(SceneDocument& document, const Json& args, const std::string& name) {
-  const int copy = copy_of(document, resolve(document, args["from"].get<std::string>()), name);
-  const auto parent = parent_of_call(document, args);
-  return parent ? document.reparent(copy, *parent) : copy;
-}
-
 new_objects::Kind kind_of(const Json& args) {
   const auto kind = new_objects::kind_named(args.value("kind", std::string(kEmptyKind)));
   if (!kind) throw wrong("kind must be one of: " + new_objects::kind_words());
   return *kind;
+}
+
+// Whether an add makes more than nodes: a copy, a shape, a light, a camera or a terrain.
+bool brings_assets(const Json& args) {
+  if (args.contains("from")) return true;
+  const new_objects::Kind kind = kind_of(args);
+  return kind != new_objects::Kind::Empty && kind != new_objects::Kind::Environment;
 }
 
 bool second_environment(new_objects::Kind kind, int existing) {
@@ -164,9 +176,16 @@ void require_no_environment(const SceneDocument& document, new_objects::Kind kin
 int added_kind(SceneDocument& document, const Json& args, const std::string& name) {
   const new_objects::Kind kind = kind_of(args);
   require_no_environment(document, kind);
-  const int parent = parent_of_call(document, args).value_or(kNoIndex);
-  if (kind == new_objects::Kind::Empty) return document.add_empty(name, parent);
-  return new_objects::add_object(document, kind, name, parent);
+  return new_objects::add_object(document, kind, name, parent_of_call(document, args).value_or(kNoIndex));
+}
+
+// A copy of `from`, named and placed after it is made. A copy of a template is an object of the
+// scene, not a template.
+void finish_copy(SceneDocument& document, const Json& args, const std::string& name, int& index) {
+  document.set_name(index, document.unique_name(name));
+  document.remove_prop(index, props::kPrefab);
+  const auto parent = parent_of_call(document, args);
+  if (parent) index = document.reparent(index, *parent);
 }
 
 std::string new_name(const Json& args) {
@@ -179,23 +198,55 @@ std::string new_name(const Json& args) {
 
 bool names_both_sources(const Json& args) { return args.contains("from") && args.contains("kind"); }
 
+// One add, as it goes: its object made (index), then named, placed and set.
+struct Adding {
+  SceneEdit& edit;
+  const Json& args;
+  std::string name;
+  int source = kNoIndex;  // what from copies
+  int index = kNoIndex;
+  EditOutcome result{};
+};
+
+void make_added(Adding& adding) {
+  SceneDocument& document = adding.edit.document;
+  const bool copies = adding.source != kNoIndex;
+  adding.index = copies ? document.duplicate(adding.source) : added_kind(document, adding.args, adding.name);
+}
+
+void finish_added(Adding& adding) {
+  SceneDocument& document = adding.edit.document;
+  if (adding.source != kNoIndex) finish_copy(document, adding.args, adding.name, adding.index);
+  const std::string id = id_of(document, adding.index);
+  assign(adding.edit, adding.index, words_of(adding.args));
+  adding.result = outcome(adding.edit, {id});
+}
+
+int source_of(const SceneDocument& document, const Json& args) {
+  return args.contains("from") ? resolve(document, args["from"].get<std::string>()) : kNoIndex;
+}
+
 EditOutcome add_one(SceneEdit& edit, const Json& args) {
-  const std::string name = new_name(args);
   if (names_both_sources(args)) throw wrong("add takes from or kind, not both");
-  int index = args.contains("from") ? added_copy(edit.document, args, name) : added_kind(edit.document, args, name);
-  const std::string id = id_of(edit.document, index);
-  assign(edit, index, words_of(args));
-  return outcome(edit, {id});
+  Adding adding{edit, args, new_name(args), source_of(edit.document, args)};
+  one_step(edit.document, brings_assets(args), [&] { make_added(adding); }, [&] { finish_added(adding); });
+  return adding.result;
 }
 
 // Copies of the objects, each with its children (the document names them apart: "Crate.001").
 EditOutcome duplicate_all(SceneEdit& edit, const Json& args) {
   SceneDocument& document = edit.document;
-  Words ids;
-  for (const int copy : document.duplicate(roots_of(document, targets(document, args, false))))
-    ids.push_back(id_of(document, copy));
-  assign_each(edit, ids, words_of(args));
-  return outcome(edit, ids);
+  const std::vector<int> roots = roots_of(document, targets(document, args, false));
+  std::vector<int> copies;
+  EditOutcome result;
+  const Step rest = [&] {
+    Words ids;
+    for (const int copy : copies) ids.push_back(id_of(document, copy));
+    assign_each(edit, ids, words_of(args));
+    result = outcome(edit, ids);
+  };
+  one_step(document, true, [&] { copies = document.duplicate(roots); }, rest);
+  return result;
 }
 
 // Whether `parent` is one of the members or under one: a group cannot hold itself.
@@ -204,11 +255,38 @@ bool under_members(const SceneDesc& scene, int parent, const std::vector<int>& m
   return std::find(members.begin(), members.end(), parent) != members.end() || inside_any(scene, parent, members);
 }
 
+// Whether the object is a prefab placement or under one: its world placement comes from the
+// prefab's file, which only the editor's preview knows, so moving it to a new parent here could
+// move it in the world.
+bool under_prefab(const SceneDocument& document, int index) {
+  for (int at = index; at != kNoIndex; at = document.node(at).parent) {
+    if (document.node(at).props.count(props::kPrefabFile) > 0) return true;
+  }
+  return false;
+}
+
+void require_no_prefab_parent(const SceneDocument& document, int parent, const std::vector<int>& members) {
+  const auto inherited = [&document](int member) { return under_prefab(document, document.node(member).parent); };
+  if (under_prefab(document, parent) || std::any_of(members.begin(), members.end(), inherited))
+    throw wrong("group cannot move objects under a prefab placement; reparent them in the editor");
+}
+
 // Where a group goes: under `parent`, else where its first member is.
 int group_parent(const SceneDocument& document, const Json& args, const std::vector<int>& members) {
   const int parent = parent_of_call(document, args).value_or(document.node(members.front()).parent);
   if (under_members(document.desc(), parent, members)) throw wrong("a group cannot go under its members");
+  require_no_prefab_parent(document, parent, members);
   return parent;
+}
+
+// Moves the members (ids) under the group (the first id), and says the group and them.
+EditOutcome gather(SceneEdit& edit, const Words& group_and_members) {
+  SceneDocument& document = edit.document;
+  for (auto member = group_and_members.begin() + 1; member != group_and_members.end(); ++member)
+    document.reparent(resolve(document, *member), resolve(document, group_and_members.front()));
+  EditOutcome result = outcome(edit, group_and_members);
+  result.objects.resize(1);  // the group is what is selected
+  return result;
 }
 
 // The group, then its members (those under another member go along with it).
@@ -216,13 +294,12 @@ EditOutcome group_all(SceneEdit& edit, const Json& args) {
   SceneDocument& document = edit.document;
   const std::string name = new_name(args);
   const std::vector<int> roots = roots_of(document, targets(document, args, true));
-  Words members;
-  for (const int root : roots) members.push_back(id_of(document, root));
-  const std::string group = id_of(document, document.add_empty(name, group_parent(document, args, roots)));
-  for (const auto& member : members) document.reparent(resolve(document, member), resolve(document, group));
-  members.insert(members.begin(), group);
-  EditOutcome result = outcome(edit, members);
-  result.objects.resize(1);  // the group is what is selected
+  const int parent = group_parent(document, args, roots);
+  Words ids{std::string()};  // the group's, once made
+  for (const int root : roots) ids.push_back(id_of(document, root));
+  EditOutcome result;
+  const Step make = [&] { ids.front() = id_of(document, document.add_empty(document.unique_name(name), parent)); };
+  one_step(document, false, make, [&] { result = gather(edit, ids); });
   return result;
 }
 

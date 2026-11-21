@@ -26,9 +26,10 @@ struct EditOutcome {
   std::string text;
 };
 
-// Runs one scene_edit call (its arguments as the tool's schema gives them) on `edit`'s document.
-// Throws std::invalid_argument with what to change when the call is wrong; the edits made before
-// then are the caller's to roll back (the editor's edit_nodes does, a file is not saved).
+// Runs one scene_edit call (its arguments as the tool's schema gives them) on `edit`'s document,
+// as one undo step. A wrong call throws std::invalid_argument with what to change, and changes
+// nothing: no object, no undo step, the redo steps there were kept (except after a copy or a new
+// shape, light, camera or terrain, which clears them as the editor's own do).
 EditOutcome edit_scene(SceneEdit& edit, const mcp::Json& args);
 
 }  // namespace redgem::tools

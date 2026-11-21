@@ -569,6 +569,12 @@ TEST_CASE("live duplicate, group and multi-object edits are one undo step each")
   CHECK(session.selected().ids().size() == 2);
   session.undo();
   CHECK(doc.node_count() == count);
+  CHECK(doc.can_redo());
+  CHECK_FALSE(ok(invoke_editor(session, "scene_edit",
+                               {{"action", "duplicate"}, {"objects", coins}, {"assignments", {"position=bad"}}})));
+  CHECK(doc.node_count() == count);
+  CHECK_FALSE(doc.can_undo());
+  CHECK_FALSE(doc.can_redo());
   const auto grouped =
       invoke_editor(session, "scene_edit", {{"action", "group"}, {"object", "Coins"}, {"objects", coins}});
   REQUIRE_MESSAGE(ok(grouped), text_of(grouped));

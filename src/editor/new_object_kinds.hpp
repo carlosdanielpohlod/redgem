@@ -8,6 +8,7 @@
 
 #include "core/math.hpp"
 #include "editor/document/scene_document.hpp"
+#include "scene/shapes/primitives.hpp"
 
 namespace redgem::new_objects {
 
@@ -30,6 +31,8 @@ enum class Kind {
 std::optional<Kind> kind_named(const std::string& word);
 // Every kind's word, comma separated, for the message that says what a kind can be.
 std::string kind_words();
+// The kind of a shape of the 3D Object menu.
+Kind kind_of_shape(PrimitiveShape shape);
 // What the menu calls a new object of that kind ("Cube", "Point Light").
 std::string default_name(Kind kind);
 

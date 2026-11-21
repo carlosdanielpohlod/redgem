@@ -114,6 +114,12 @@ std::string kind_words() {
   return words;
 }
 
+Kind kind_of_shape(PrimitiveShape shape) {
+  const auto* found = std::find_if(std::begin(kShapes), std::end(kShapes),
+                                   [shape](const ShapeKind& known) { return known.shape == shape; });
+  return found == std::end(kShapes) ? Kind::Cube : found->kind;
+}
+
 std::string default_name(Kind kind) {
   if (const ShapeKind* shape = shape_of(kind)) return primitive_name(shape->shape);
   const auto* found = std::find_if(std::begin(kKindWords), std::end(kKindWords),

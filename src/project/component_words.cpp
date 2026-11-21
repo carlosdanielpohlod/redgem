@@ -52,7 +52,15 @@ std::string out_of_bounds(const char* key, const std::string& value, Bounds boun
 
 std::string needs(const char* text_key, const char* key) { return tr(text_key, {{"key", key}}); }
 
+bool ends_with_separator(const std::string& value) { return !value.empty() && value.back() == kComma; }
+
+// A far plane (0: none) nearer than the near one shows nothing.
+bool clips_everything(const CameraDesc& camera) {
+  return camera.far_plane > kNone && camera.near_plane >= camera.far_plane;
+}
+
 std::optional<Color> rgb_from(const std::string& value) {
+  if (ends_with_separator(value)) return std::nullopt;  // (getline drops a last empty part)
   std::array<double, kChannels> channels{};
   std::stringstream stream(value);
   std::size_t count = 0;
@@ -110,6 +118,7 @@ std::string camera_number(SceneDocument& document, int index, const char* key, c
     const auto number = number_within(value, bounds);
     if (!number) return out_of_bounds(key, value, bounds);
     camera.*field = static_cast<float>(*number);
+    if (clips_everything(camera)) return tr("project.scene.near_past_far");
     return {};
   });
 }
