@@ -9,10 +9,19 @@
 
 namespace redgem {
 
-// One thing a script draws over the game this frame (UI.text, UI.rect, UI.image), or where what
-// follows is drawn (UI.clip): only inside a box (Clip, x/y/width/height), or anywhere again (Unclip).
+// A part of a picture, in its own pixels; one with no width is the whole picture.
+struct PicturePart {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+// One thing a script draws over the game this frame (UI.text, UI.rect, UI.gradient, UI.image), or
+// where what follows is drawn (UI.clip): only inside a box (Clip, x/y/width/height), or anywhere
+// again (Unclip).
 struct HudItem {
-  enum class Kind { Text, Rect, Image, Clip, Unclip };
+  enum class Kind { Text, Rect, Gradient, Image, Clip, Unclip };
   Kind kind = Kind::Text;
   std::string text;  // the text, or the image's name (a file in the game's images/ folder)
   std::string font;  // UI text face in fonts/, or a chain of them (font_chain.hpp); empty: the built-in face
@@ -25,7 +34,9 @@ struct HudItem {
   // Pixels an image drawn at its own size (width and height 0) takes for each of its own: the
   // interface's scale (UI.scale).
   float scale = 1.0f;
-  Color color;
+  PicturePart part;  // the part of an image drawn (the whole of it unless a script says)
+  Color color;       // a gradient's top; what an image is tinted with
+  Color bottom;      // a gradient's bottom
 };
 
 // One of the controls a touch screen shows, as a see-through circle.

@@ -50,8 +50,14 @@ module Audio
   # The new track fades in over `fade` seconds while the one playing fades out. False when the
   # file does not exist: the track playing goes on.
   def self.music(name, loop: true, volume: DEFAULT_MUSIC_VOLUME, fade: NO_FADE)
-    __music(name, loop ? true : false, volume.to_f, fade.to_f)
+    started = __music(name, loop ? true : false, volume.to_f, fade.to_f)
+    @track = [name.to_s, loop, volume] if started
+    started
   end
+
+  # The track Audio.music last started and nothing stopped since: [name, loop, volume], or nil.
+  # (A track that does not loop is still here once it ended.) GameMenu gives it back after its own.
+  def self.__track = @track
 
   # How the music (its tracks and the sounds of the :music group) goes down while someone speaks.
   # volume: NO_DUCKING turns it off. The game's ducking ends with it.
@@ -82,5 +88,6 @@ module Audio
 
   def self.stop_music(fade: NO_FADE)
     __stop_music(fade.to_f)
+    @track = nil
   end
 end

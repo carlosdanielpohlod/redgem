@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include <raylib.h>
+
 #include "app/engine.hpp"
 #include "testing/frame_pictures.hpp"
 #include "testing/system_test.hpp"
@@ -104,4 +106,38 @@ TEST_CASE("a test played without a window passes all the same, and leaves no pic
   CHECK(run_system_test(options) == 0);
   CHECK(log.contains("system test passed"));
   CHECK_FALSE(std::filesystem::exists(scratch.dir / "shots"));
+}
+
+namespace {
+
+constexpr int kPictureSide = 10;
+constexpr int kWideSide = kPictureSide * 2;  // a picture of another size
+constexpr unsigned char kNearRed = 200 + kBaselineTolerance / 2;  // within the tolerance of 200
+constexpr unsigned char kFarRed = 200 + kBaselineTolerance * 2;
+constexpr float kUnread = -1.0f;  // what a difference that could not be read is taken as
+
+// A picture of one color, but for its first `changed` pixels, which are `other`.
+std::filesystem::path write_picture(const std::filesystem::path& file, ::Color color, int changed, ::Color other) {
+  Image image = GenImageColor(kPictureSide, kPictureSide, color);
+  for (int i = 0; i < changed; ++i) ImageDrawPixel(&image, i % kPictureSide, i / kPictureSide, other);
+  ExportImage(image, file.string().c_str());
+  UnloadImage(image);
+  return file;
+}
+
+}  // namespace
+
+TEST_CASE("a picture is as far from its baseline as the share of its pixels that moved past the tolerance") {
+  const Scratch scratch;
+  const ::Color red = {200, 0, 0, 255};
+  const auto baseline = write_picture(scratch.dir / "baseline.png", red, 0, red);
+  const auto near = write_picture(scratch.dir / "near.png", red, kPictureSide * kPictureSide, {kNearRed, 0, 0, 255});
+  const auto far = write_picture(scratch.dir / "far.png", red, kPictureSide, {kFarRed, 0, 0, 255});
+  CHECK(picture_difference(near, baseline).value_or(kUnread) == doctest::Approx(0.0f));
+  CHECK(picture_difference(far, baseline).value_or(kUnread) == doctest::Approx(1.0f / kPictureSide));
+  Image wide = GenImageColor(kWideSide, kPictureSide, red);
+  ExportImage(wide, (scratch.dir / "wide.png").string().c_str());
+  UnloadImage(wide);
+  CHECK(picture_difference(scratch.dir / "wide.png", baseline).value_or(kUnread) == doctest::Approx(1.0f));
+  CHECK_FALSE(picture_difference(scratch.dir / "none.png", baseline).has_value());
 }
