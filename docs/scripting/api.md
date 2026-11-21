@@ -879,6 +879,7 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.validate_movement(max_speed: Numeric = 0.0, teleport_distance: Numeric = 0.0, tolerance: Numeric = 0.25, kick_after: Integer = 0, undo: bool = false) -> nil`: on the host: corrects the others' objects that move faster or further than this (no limits: off) *Experimental.*
 - `Network.movement_rules -> Hash[Symbol, Numeric | bool]`: the movement validation settings, as a hash *Experimental.*
 - `Network.movement_violations(Integer peer) -> Integer`: how many moves of a machine the host did not believe in this game *Experimental.*
+- `Network.teleport(GameObject | String object, Vector3 | Array[Numeric] position) -> bool`: on the host (or alone): puts an object kept in step (a GameObject with a NetworkSync, or its key) there on every machine, its owner's included, with no movement violation (a respawn, a spawn point, a level's entry); false on a machine that does not host *Experimental.*
 - `Network.port -> Integer`: the port of the game
 - `Network.room -> String | nil`: the room code, on a relay
 - `Network.relay -> String | nil`: the relay's address

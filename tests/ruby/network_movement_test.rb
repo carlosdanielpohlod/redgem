@@ -52,6 +52,65 @@ class NetworkMovementTest < RedGemTest::Case
     WRONG_CORRECTIONS.each { |data| refute Network::Said.correction?(data), data.inspect }
   end
 
+  # An object kept in step, as Network.teleport sees one: where it was put.
+  PlacedSync = Struct.new(:owner, :key, :placed) do
+    def __placed(position) = (self.placed = position)
+  end
+  Placed = Struct.new(:sync) do
+    def get_component(klass) = klass == NetworkSync ? sync : nil
+  end
+
+  def test_alone_the_game_places_an_object_at_once
+    sync = PlacedSync.new(Network::HOST, "placed-hero")
+    assert Network.teleport(Placed.new(sync), POSITION)
+    assert_equal Vector3[*POSITION], sync.placed
+    in_step(sync) { assert Network.teleport(sync.key, Vector3[0.0, 0.0, 0.0]) }
+    assert_equal Vector3[0.0, 0.0, 0.0], sync.placed
+  end
+
+  def test_only_an_object_in_step_can_be_placed
+    assert_raises(ArgumentError) { Network.teleport("nobody", POSITION) }
+    assert_raises(ArgumentError) { Network.teleport(Placed.new(nil), POSITION) }
+  end
+
+  def test_only_the_host_places
+    sync = PlacedSync.new(STRANGER, "heard-hero")
+    in_step(sync) do
+      Network.__send__(:receive_place, [sync.key, POSITION], STRANGER)
+      assert_nil sync.placed
+      Network.__send__(:receive_place, [sync.key, POSITION], Network::HOST)
+    end
+    assert_equal Vector3[*POSITION], sync.placed
+  end
+
+  def test_a_machine_in_a_game_it_does_not_host_places_nothing
+    sync = PlacedSync.new(Network::HOST, "hosts-hero")
+    as_a_guest { refute Network.teleport(Placed.new(sync), POSITION) }
+    assert_nil sync.placed
+  end
+
+  # The machine as if it were in a game that another machine hosts.
+  def as_a_guest
+    class << Network
+      alias_method :in_game_for_real?, :__in_game?
+      def __in_game? = true
+    end
+    yield
+  ensure
+    class << Network
+      alias_method :__in_game?, :in_game_for_real?
+    end
+  end
+
+  # The object as if its NetworkSync had started.
+  def in_step(sync)
+    synced = Network.instance_variable_get(:@synced)
+    synced[sync.key] = sync
+    yield
+  ensure
+    synced.delete(sync.key)
+  end
+
   def test_only_the_host_corrects
     assert Network.__send__(:host_correction?, ["hero", POSITION], Network::HOST)
     refute Network.__send__(:host_correction?, ["hero", POSITION], STRANGER)

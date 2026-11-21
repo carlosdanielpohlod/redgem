@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **The host can put a player's object anywhere, with no movement violation.**
+  `Network.teleport(object, position)` (experimental) is for a respawn, a spawn point, or a level's
+  entry. It moves the object on every machine, its owner's included, and the host checks its
+  moves from there. The owner's poses from before it heard are not used.
+
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.

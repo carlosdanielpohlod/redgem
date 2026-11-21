@@ -19,7 +19,7 @@ module Network
   module Level
     # What waits to be sent and arrives to be dropped while the machines are between two levels:
     # what is said about the objects of one level, which the other does not have.
-    HELD = [SYNC, SPAWN, SPAWNED, DESPAWN].freeze
+    HELD = [SYNC, SPAWN, SPAWNED, DESPAWN, PLACE].freeze
     # Why Game.load_scene changes nothing.
     NOT_HOST = "only the host changes the level of a network game".freeze
     BUSY = "the level is changing already".freeze
