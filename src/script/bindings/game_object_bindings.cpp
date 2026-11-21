@@ -58,6 +58,16 @@ mrb_value game_object_set_visible(mrb_state* mrb, mrb_value self) {
   return mrb_bool_value(visible);
 }
 
+mrb_value game_object_view_model(mrb_state* mrb, mrb_value self) {
+  return mrb_bool_value(alive_object(mrb, self).view_model);
+}
+
+mrb_value game_object_set_view_model(mrb_state* mrb, mrb_value self) {
+  const bool view_model = bool_arg(mrb);
+  alive_object(mrb, self).view_model = view_model;
+  return mrb_bool_value(view_model);
+}
+
 mrb_value game_object_tint(mrb_state* mrb, mrb_value self) { return vec3_value(mrb, alive_object(mrb, self).tint); }
 
 mrb_value game_object_set_tint(mrb_state* mrb, mrb_value self) {
@@ -185,6 +195,8 @@ void install_identity_bindings(RClass* game_object, mrb_state* mrb) {
 void install_look_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "visible", game_object_visible, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "visible=", game_object_set_visible, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "view_model?", game_object_view_model, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "view_model=", game_object_set_view_model, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "tint", game_object_tint, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "tint=", game_object_set_tint, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "animation_offset", game_object_animation_offset, MRB_ARGS_NONE());

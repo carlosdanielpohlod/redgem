@@ -172,5 +172,6 @@ void Renderer::set_images_dir(const std::filesystem::path& dir) {
 }
 
 void Renderer::set_show_prefabs(bool show) { impl_->show_prefabs = show; }
+void Renderer::draw_view_models_apart(bool apart) { impl_->view_models_apart = apart; }
 
 }  // namespace redgem

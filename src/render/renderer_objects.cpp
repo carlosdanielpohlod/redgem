@@ -21,11 +21,11 @@ using render_math::to_raylib;
 // A switch of the lit shader: on for a material that has that texture.
 float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 
-// Whether a view draws an object: one the frame has a record of, that casts a shadow when the
-// pass is the shadow map's, in the view, big enough in it, and at the distance its level of
-// detail is for.
+// Whether a view of the world draws an object: one the frame has a record of, not the view
+// model's (drawn apart), that casts a shadow when the pass is the shadow map's, in the view, big
+// enough in it, and at the distance its level of detail is for.
 bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pass) {
-  return sight.drawn && casts_into(sight.cast_shadow, depth_pass) &&
+  return sight.drawn && !sight.view_model && casts_into(sight.cast_shadow, depth_pass) &&
          render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 

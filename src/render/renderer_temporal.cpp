@@ -26,13 +26,6 @@ void send_matrix(const Shader& program, int location, const Matrix& matrix) {
   SetShaderValueMatrix(program, location, matrix);
 }
 
-// Covered: a particle's alpha added to what is covered already, on the alpha channel alone.
-void blend_cover() {
-  rlColorMask(false, false, false, true);
-  rlSetBlendFactorsSeparate(RL_ZERO, RL_ONE, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
-  rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
-}
-
 // Whether a frame is smoothed with the ones before: the environment asks, the view allows it (not
 // the editor's) and the graphics card can.
 // (The environment is held to what the card can do; the card may have turned out not to during
@@ -50,6 +43,12 @@ bool temporal_wanted(const Environment& env, bool allowed, bool supported) {
 }
 
 }  // namespace
+
+void render_detail::blend_cover() {
+  rlColorMask(false, false, false, true);
+  rlSetBlendFactorsSeparate(RL_ZERO, RL_ONE, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+  rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
+}
 
 void Renderer::Impl::begin_temporal(const Environment& env, const Camera3D& camera) {
   temporal.on = temporal_wanted(env, temporal_allowed, gpu.temporal);

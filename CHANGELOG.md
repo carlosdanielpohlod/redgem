@@ -83,6 +83,15 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
+- **A first-person weapon: the view model** (experimental). `view_model = true` on an object
+  (in the Inspector, or `weapon.view_model = true`) draws it, and everything under it, after the
+  world, in front of all of it: pressed against a wall, the weapon no longer goes into it. It has a
+  field of view of its own (`Camera.view_model_fov`, 50 degrees unless set), apart from
+  `Camera.fov`. It is lit by the sun without the world's shadows and by a fill light from the eye,
+  so it reads indoors; it casts no shadow on the world, and no frustum culls it. A muzzle socket
+  is an object under the weapon: a flash mesh there is drawn with it, and
+  `Camera.from_view_model(point)` says where the socket shows in the world, where particles and
+  tracers start. The editor's own view draws the weapon where it stands.
 - **Recorded videos have the game's sound.** `redgem <game> --record out.mp4` now puts the game's
   mix in the video as AAC. It is mixed by the engine's own mixer, not taken from the sound card,
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried

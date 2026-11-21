@@ -47,6 +47,7 @@ void Renderer::Impl::pick_frame_lights(std::vector<PointLight> points, const Env
 
 void Renderer::Impl::send_lights(Vector3 sun_direction, Vector3 sun_color, float ambient,
                                  const render_math::PointLightUniforms& points) {
+  frame_sun = {sun_direction, sun_color, ambient};  // (what the view model is lit with, after the world)
   send(shader, lit_uniforms.sun_direction, sun_direction);
   send(shader, lit_uniforms.sun_color, sun_color);
   send(shader, lit_uniforms.ambient, ambient);

@@ -53,6 +53,7 @@ void GameView::capture_cursor(bool wanted) { window_.set_cursor_locked(pointer_g
 void GameView::present(const FrameView& view) {
   if (view_.target.id == 0) return;   // the view was not laid out yet: there is nothing to draw into
   renderer_.set_show_prefabs(false);  // templates are edited in the editor, hidden in the game
+  renderer_.draw_view_models_apart(true);
   view_.camera = renderer_.scene_camera(view.scene);
   paint_with_debug(view);
 }

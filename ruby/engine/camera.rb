@@ -18,6 +18,26 @@ module Camera
   # way to look.
   NEAREST_SEAT = 0.3
   HALF = 0.5
+  RADIANS_PER_DEGREE = Math::PI / 180.0
+
+  # Where a point of the view model (a socket under the weapon: its muzzle) shows in the world:
+  # the point as far in front of the camera that the world's field of view puts on the same pixel.
+  # A muzzle flash or a tracer drawn in the world starts there.
+  #   Particles.burst(Camera.from_view_model(muzzle.transform.position), count: 6, glow: true)
+  def self.from_view_model(point)
+    point = __vector(point, "Camera.from_view_model point")
+    eye = __main("Camera.from_view_model").transform
+    offset = point - eye.position
+    eye.position + eye.forward * offset.dot(eye.forward) + __across(eye, offset) * __view_model_widening
+  end
+
+  # What of an offset from the camera goes across its view (right and up).
+  def self.__across(eye, offset) = eye.right * offset.dot(eye.right) + eye.up * offset.dot(eye.up)
+
+  # How much wider the world's field of view shows things across than the view model's does.
+  def self.__view_model_widening
+    Math.tan(fov * HALF * RADIANS_PER_DEGREE) / Math.tan(view_model_fov * HALF * RADIANS_PER_DEGREE)
+  end
 
   # Makes another camera of the scene the one the game is seen through, at once (a cut in progress
   # stops); nil goes back to the scene's first camera. The helpers below act on it from then on.
@@ -83,11 +103,12 @@ module Camera
 
   # The main camera's rig, put on it the first time a helper is asked for.
   def self.__rig(asker)
-    camera = main
-    raise ArgumentError, "#{asker}: the scene has no camera" if camera.nil?
-
+    camera = __main(asker)
     camera.get_component(Rig) || camera.add_component(Rig)
   end
+
+  # The main camera: an ArgumentError when the scene has none.
+  def self.__main(asker) = main || raise(ArgumentError, "#{asker}: the scene has no camera")
 
   # The rig of the main camera, when it has one (a new scene's camera has none yet).
   def self.__current_rig = main&.get_component(Rig)
