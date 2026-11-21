@@ -182,6 +182,7 @@ add_executable(redgem_tests
   unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
   unit/movement_validator_test.cpp
+  unit/placed_objects_test.cpp
   unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp

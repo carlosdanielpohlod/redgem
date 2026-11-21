@@ -5566,6 +5566,18 @@
           "about": "how many moves of a machine the host did not believe in this game"
         },
         {
+          "name": "teleport",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject | String"},
+            {"name": "position", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "on the host (or alone): puts an object kept in step (a GameObject with a NetworkSync, or its key) there on every machine, its owner's included, with no movement violation (a respawn, a spawn point, a level's entry); false on a machine that does not host",
+          "example": "Network.teleport(hero, spawn.transform.position) if Network.host?"
+        },
+        {
           "name": "port",
           "stability": "stable",
           "static": true,

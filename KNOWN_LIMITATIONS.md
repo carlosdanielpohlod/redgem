@@ -650,7 +650,8 @@ promise of how it will be closed.
   validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
   lets the host or a dedicated server refuse moves faster or further than the game's limits, but
   it checks positions only: not rotations, animations, collisions (walking through a wall within
-  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  the speed limit is believed), nor objects the host moves itself. For up to two seconds after the host places an
+  object (`Network.teleport`), its poses from away from the placed spot are not used. One top speed and one
   teleport distance hold for every object of the game, and a kicked machine is not told why. In a
   room on a relay, nothing is checked (the relay passes poses on). An object destroyed and made
   again under the same key is checked from where it was until the host makes its copy again, so a
