@@ -14,11 +14,12 @@
 #include "scene/animation/animation_player.hpp"
 #include "scene/scene_ids.hpp"
 #include "scene/props.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
 struct PrefabFiles {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem-prefabs-" + make_scene_id());
+  std::filesystem::path dir = redgem::test::temp_root() / ("redgem-prefabs-" + make_scene_id());
   PrefabFiles() { std::filesystem::create_directories(dir / "prefabs"); }
   ~PrefabFiles() {
     std::error_code error;

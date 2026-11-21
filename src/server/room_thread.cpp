@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <exception>
 
-#include "core/config.hpp"
 #include "core/log.hpp"
 #include "core/engine_thread.hpp"
 #include "server/tick_pacer.hpp"
@@ -39,7 +38,7 @@ void RoomThread::stop() {
 
 void RoomThread::run() {
   Clock& clock = *start_.clock;
-  TickPacer pacer(config::kDefaultFixedDeltaSeconds, clock.now());
+  TickPacer pacer(start_.tick_seconds, clock.now());
   while (wait_for_turn(pacer.until_next(clock.now()))) {
     take_new_rooms();
     play_turn(pacer.take_turn(clock.now()));

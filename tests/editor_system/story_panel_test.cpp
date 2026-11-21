@@ -13,6 +13,7 @@
 #include "editor/editor_app.hpp"
 #include "project/editor_setup.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -35,7 +36,7 @@ void write(const std::filesystem::path& file, const std::string& text) {
 }
 
 std::filesystem::path story_game() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_story_panel_editor";
+  const auto game = redgem::test::temp_root() / "redgem_story_panel_editor";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);

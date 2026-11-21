@@ -7,6 +7,7 @@
 
 #include "app/user_settings.hpp"
 #include "core/platform.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -54,7 +55,7 @@ TEST_CASE("a run's card is the one its command line names, whatever else is set"
 }
 
 TEST_CASE("settings are saved and read back; broken files give the defaults") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_settings_test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_settings_test";
   std::filesystem::remove_all(dir);
   const std::filesystem::path file = dir / "nested" / "settings.json";
   CHECK(read_user_settings(file).gpu == GpuChoice::Auto);  // no file yet
@@ -72,7 +73,7 @@ TEST_CASE("settings are saved and read back; broken files give the defaults") {
 }
 
 TEST_CASE("a game's display settings are kept in its own settings file, beside its player's card and language") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_display_settings_test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_display_settings_test";
   std::filesystem::remove_all(dir);
   const std::filesystem::path file = dir / "settings.json";
   DisplaySettings defaults;
@@ -100,7 +101,7 @@ TEST_CASE("a game's display settings are kept in its own settings file, beside i
 }
 
 TEST_CASE("a built game's card and language come from its own settings file") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_game_run_settings_test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_game_run_settings_test";
   std::filesystem::remove_all(dir);
   const std::filesystem::path file = dir / "settings.json";
   UserSettings chosen;
@@ -128,7 +129,7 @@ std::string text_of(const std::filesystem::path& file) {
 }  // namespace
 
 TEST_CASE("a damaged settings file is moved aside, not written over, and the settings are written anew") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_damaged_settings_test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_damaged_settings_test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   const std::filesystem::path file = dir / "settings.json";

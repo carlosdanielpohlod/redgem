@@ -13,6 +13,7 @@
 #include "core/exit_codes.hpp"
 #include "core/platform.hpp"
 #include "project/symbolize_command.hpp"
+#include "temp_dirs.hpp"
 
 namespace {
 
@@ -20,7 +21,7 @@ constexpr const char* kGameId = "com.tests.crashing";
 constexpr const char* kGameTitle = "Crashing Game";
 
 struct CrashFolders {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-crash-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-crash-test";
   std::filesystem::path data = root / "data";
   std::filesystem::path game = root / "game";
   // The game's players' folder holds its save, and its reports in crashes/.

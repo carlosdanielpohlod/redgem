@@ -21,6 +21,7 @@
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using nlohmann::json;
@@ -48,7 +49,7 @@ constexpr const char* kPictureBytes = "not really a picture, but the bytes of a 
 
 // A folder of the test's own, removed when the test ends.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-gltf-safety-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-gltf-safety-test";
   Scratch() {
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir / "game");

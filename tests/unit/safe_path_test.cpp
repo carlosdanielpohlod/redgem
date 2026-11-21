@@ -9,6 +9,7 @@
 #include "core/safe_path.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -21,7 +22,7 @@ constexpr std::uintmax_t kSmallLimit = 8;  // bytes
 
 // A folder of the test's own, with a game's assets folder in it and a file beside that folder.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-safe-path-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-safe-path-test";
   std::filesystem::path assets = dir / "assets";
   Scratch() {
     std::filesystem::remove_all(dir);

@@ -12,6 +12,7 @@
 #include "editor/document/scene_document.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -51,7 +52,7 @@ GlbFile two_meshes_one_shown() {
 }
 
 std::filesystem::path temp_scene(const std::string& name) {
-  return std::filesystem::temp_directory_path() / ("redgem_compact_" + name + ".glb");
+  return redgem::test::temp_root() / ("redgem_compact_" + name + ".glb");
 }
 
 // A scene with a floor, saved.
@@ -66,7 +67,7 @@ SceneDocument saved_floor(const std::filesystem::path& file) {
 }  // namespace
 
 TEST_CASE("saving a scene never writes through a link planted under its temporary name") {
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem_compact_planted";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem_compact_planted";
   std::filesystem::remove_all(folder);
   std::filesystem::create_directories(folder / "game");
   const std::filesystem::path victim = folder / "victim.txt";

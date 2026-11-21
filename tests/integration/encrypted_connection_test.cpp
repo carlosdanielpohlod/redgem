@@ -28,6 +28,7 @@
 #include "server/game_server.hpp"
 #include "socket_rounds.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::net;
@@ -177,7 +178,7 @@ bool offline(Engine& engine) { return offline(engine.network()); }
 // Players of the sandbox game (a copy of it, whose game.json a test may write) and, when started,
 // a dedicated server of it keeping its saves and identity in a folder of its own.
 struct EncryptedGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-encrypted-connection-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-encrypted-connection-test";
   std::filesystem::path game = root / "game";
   std::filesystem::path data = root / "data";
   std::unique_ptr<server::GameServer> server;
@@ -520,7 +521,7 @@ TEST_CASE("game.json's servers are used when they make sense, and the rest are s
 }
 
 TEST_CASE("a server's identity is made once in its folder, its private key for its owner alone") {
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-tls-identity-test";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem-tls-identity-test";
   std::filesystem::remove_all(folder);
   std::string error;
   const auto first = TlsIdentity::kept_in(folder, error);

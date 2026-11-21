@@ -14,6 +14,7 @@
 #include "testing/system_test.hpp"
 #include "testing/test_library.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -34,7 +35,7 @@ std::unique_ptr<Engine> sandbox(ScriptedInputSource& input) {
 
 // A folder of the test's own, removed when the test ends.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_frame_pictures_test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem_frame_pictures_test";
   Scratch() {
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);
@@ -111,7 +112,7 @@ TEST_CASE("a test played without a window passes all the same, and leaves no pic
 namespace {
 
 constexpr int kPictureSide = 10;
-constexpr int kWideSide = kPictureSide * 2;  // a picture of another size
+constexpr int kWideSide = kPictureSide * 2;                       // a picture of another size
 constexpr unsigned char kNearRed = 200 + kBaselineTolerance / 2;  // within the tolerance of 200
 constexpr unsigned char kFarRed = 200 + kBaselineTolerance * 2;
 constexpr float kUnread = -1.0f;  // what a difference that could not be read is taken as

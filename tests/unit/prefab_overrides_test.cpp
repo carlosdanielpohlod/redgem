@@ -13,6 +13,7 @@
 #include "scene/props.hpp"
 #include "scene/scene_ids.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using prefabs::Overrides;
@@ -20,7 +21,7 @@ using prefabs::PartOverride;
 
 namespace {
 struct GameFolder {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem-overrides-" + make_scene_id());
+  std::filesystem::path dir = redgem::test::temp_root() / ("redgem-overrides-" + make_scene_id());
   GameFolder() { std::filesystem::create_directories(dir / "prefabs"); }
   ~GameFolder() {
     std::error_code error;

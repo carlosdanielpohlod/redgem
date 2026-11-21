@@ -9,6 +9,7 @@
 #include "core/files.hpp"
 #include "physics/body_limit.hpp"
 #include "physics/physics_config.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -22,7 +23,7 @@ BodyLimitReading read(const std::string& physics) { return body_limit_from_json(
 // A game of nothing but its game.json, gone with the test.
 class GameFile {
  public:
-  explicit GameFile(const std::string& text) : dir_(std::filesystem::temp_directory_path() / "redgem_body_limit") {
+  explicit GameFile(const std::string& text) : dir_(redgem::test::temp_root() / "redgem_body_limit") {
     std::filesystem::remove_all(dir_);
     std::filesystem::create_directories(dir_);
     std::string error;
