@@ -84,9 +84,9 @@ class Behaviour
   # the object's own Animator
   %a{redgem:stable}
   def animation: () -> Animator
-  # the object's custom properties, as a Hash
+  # the object's custom properties, as a Hash with Symbol keys
   %a{redgem:stable}
-  def props: () -> Hash[String, untyped]
+  def props: () -> Hash[Symbol, untyped]
   # a setting: what add_component was given, else the object's property, else the default
   %a{redgem:stable}
   def prop: (Symbol | String key, ?untyped default) -> untyped
@@ -154,9 +154,9 @@ class GameObject
   # whether its tag is value
   %a{redgem:stable}
   def tag?: (String | Symbol value) -> bool
-  # its custom properties
+  # its custom properties, as a Hash with Symbol keys
   %a{redgem:stable}
-  def props: () -> Hash[String, untyped]
+  def props: () -> Hash[Symbol, untyped]
   # the Joint it came with in the scene (its Joint component, set up in the editor), or nil
   %a{redgem:experimental}
   def joint: () -> (Joint | nil)

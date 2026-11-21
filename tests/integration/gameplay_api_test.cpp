@@ -795,3 +795,12 @@ TEST_CASE("Ruby spawns a nested rigid prefab from an archive and shares its mesh
   CHECK_FALSE(engine->scripts().eval("Scene.spawn_prefab('missing.glb')", "test.rb").ok);
   CHECK(world.alive_ids().size() == count);
 }
+
+TEST_CASE("props gives an object's custom properties with Symbol keys, as the API reference says") {
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  scene.nodes[1].props = {{"damage", 120.0}, {"region", std::string("head")}};
+  auto engine = engine_for(scene, temp.file);
+  CHECK(ruby(*engine, "Scene.find('Host').props.keys.sort.inspect") == "[:damage, :region]");
+  CHECK(ruby(*engine, "Scene.find('Host').props[:region]") == "head");
+}
