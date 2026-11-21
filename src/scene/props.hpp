@@ -23,9 +23,17 @@ inline constexpr const char* kWheel = "wheel";
 inline constexpr const char* kTerrain = "terrain";
 inline constexpr const char* kTerrainSize = "terrain_size";    // meters across
 inline constexpr const char* kTerrainCells = "terrain_cells";  // quads per side
+// Any ground mesh: its ground layers, blended by weights, are those of the game's
+// terrains/<name>.json (see scene/ground/terrain_layers.hpp). Experimental.
+inline constexpr const char* kTerrainLayers = "terrain_layers";
 inline constexpr const char* kPrefab = "prefab";
 // An empty placement resolves this GLB from the game folder when its scene loads.
 inline constexpr const char* kPrefabFile = "prefab_file";
+// On such a placement: what it changes in the parts it inherits (scene/prefab_overrides.hpp).
+inline constexpr const char* kPrefabOverrides = "prefab_overrides";
+// On an object added under a placement: the path of the inherited part it hangs from (none: the
+// placement itself).
+inline constexpr const char* kPrefabParent = "prefab_parent";
 inline constexpr const char* kTint = "tint";
 // Levels of detail: an object is drawn only while its distance from the camera (meters) is at
 // least `visible_from` and less than `visible_to`. Several versions of a model, each with its own

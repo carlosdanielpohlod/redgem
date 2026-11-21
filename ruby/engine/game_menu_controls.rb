@@ -7,7 +7,9 @@
 # Y clears the focused cell. Under the rows: "Reset
 # to defaults" (the player's bindings, all back to the game's), Back (to the settings, with the
 # focus on their Controls button) and any option a game adds. The players' bindings are kept for
-# the game's next runs as they change.
+# the game's next runs as they change. It is drawn as the menu's theme says (UI::Theme): its
+# captions and note in sizes.caption and sizes.note, its cells in colors.cell (colors.focused for
+# the focused one), a cell with a conflict in colors.conflict.
 class GameMenu < Behaviour
   class ControlsScreen < Screen
     ROW_WIDTH = 720
@@ -16,11 +18,6 @@ class GameMenu < Behaviour
     LABEL_SHARE = 0.3         # how much of a row its name takes, on the left; the cells share the rest
     CELL_GAP = 8              # pixels between a row's name and its cells, and between the cells
     LINE_HEIGHT = 30          # pixels the column captions take above the rows, and the note under them
-    CAPTION_SIZE = 20
-    CAPTION_COLOR = :gold
-    CELL_COLOR = :black       # a cell, on its row
-    CELL_ALPHA = 140
-    CONFLICT_COLOR = :orange  # the text of a cell with a binding another row has too
     CONFLICT_MARK = " !".freeze
     WAITING_MARK = "...".freeze
     CUT_MARK = "...".freeze   # ends a cell's text cut short to fit it
@@ -86,7 +83,7 @@ class GameMenu < Behaviour
 
     def shown_rows = PLAYER_ROWS + [@page.rows.size, VISIBLE_ROWS].min
     def row_step = @menu.scaled(ROW_HEIGHT + ROW_GAP)
-    def row_x = (UI.width - @menu.scaled(ROW_WIDTH)) / 2
+    def row_x = @menu.column_x(@menu.scaled(ROW_WIDTH))
     def focused?(place) = focus&.at?(place) || false
     def focus_index = focus ? focus.index : 0
 
@@ -96,9 +93,9 @@ class GameMenu < Behaviour
 
     # The columns' names, over the cells.
     def captions(y)
-      size = @menu.scaled(CAPTION_SIZE)
+      size = @menu.scaled(UI.theme[:sizes, :caption])
       [I18n.t("game.controls.keyboard"), I18n.t("game.controls.gamepad")].each_with_index do |caption, column|
-        UI.text(caption, x: cell_x(column * ControlsPage::SLOTS), y: y, size: size, color: CAPTION_COLOR)
+        UI.text(caption, x: cell_x(column * ControlsPage::SLOTS), y: y, size: size, color: UI.theme[:colors, :caption])
       end
     end
 
@@ -154,8 +151,9 @@ class GameMenu < Behaviour
 
     def draw_cell(box, focused)
       UI.focus_ring(box) if focused
-      fill, alpha = focused ? [UI::BUTTON_HOVER_COLOR, UI::BUTTON_ALPHA] : [CELL_COLOR, CELL_ALPHA]
-      UI.rect(**box, color: fill, alpha: alpha, radius: UI::BUTTON_RADIUS)
+      colors = UI.theme[:colors]
+      fill, alpha = focused ? [colors[:focused], colors[:button_alpha]] : [colors[:cell], colors[:cell_alpha]]
+      UI.rect(**box, color: fill, alpha: alpha, radius: UI.theme[:button, :radius])
     end
 
     # Waits for a cell's binding, with the focus moved to it (it was clicked, maybe).
@@ -176,9 +174,9 @@ class GameMenu < Behaviour
     def cell_text(row, at, box, conflict)
       size = UI.label_size(box[:height])
       text = waiting?(row, at) ? WAITING_MARK : @page.text(row, *at)
-      text = fitted(text, box[:width] - 2 * UI::FIELD_PADDING, size, conflict ? CONFLICT_MARK : "")
-      UI.text(text, x: box[:x] + UI::FIELD_PADDING, y: UI.centered(box[:y], box[:height], size), size: size,
-                    color: conflict ? CONFLICT_COLOR : :white)
+      text = fitted(text, box[:width] - 2 * UI.padding, size, conflict ? CONFLICT_MARK : "")
+      UI.text(text, x: box[:x] + UI.padding, y: UI.centered(box[:y], box[:height], size), size: size,
+                    color: UI.theme[:colors, conflict ? :conflict : :text])
     end
 
     # A text with `mark` after it, cut short (and ending in CUT_MARK) where it would be wider than
@@ -208,7 +206,8 @@ class GameMenu < Behaviour
     # else how to clear a cell.
     def note(y, shared)
       text = note_text(shared)
-      UI.text(text, x: UI.width / 2, y: y, size: @menu.scaled(CAPTION_SIZE), align: :center) if text
+      x, align = @menu.column_text_x
+      UI.text(text, x: x, y: y, size: @menu.scaled(UI.theme[:sizes, :note]), align: align) if text
     end
 
     def note_text(shared)

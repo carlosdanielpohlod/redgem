@@ -12,6 +12,7 @@
 #include "app/engine.hpp"
 #include "editor/document/scene_document.hpp"
 #include "editor/inspector_logic.hpp"
+#include "editor/new_object_kinds.hpp"
 #include "editor/selection.hpp"
 #include "editor/prefab_preview.hpp"
 #include "editor/scene_recovery.hpp"
@@ -60,6 +61,9 @@ class EditorSession {
   const SceneDesc& preview_desc() const;
   ObjectId authored_object(ObjectId id) const;
   Transform placement_world(ObjectId id) const;
+  // The world transform an object's authored local is relative to: its parent's, and for a child
+  // hung from an inherited prefab part (props::kPrefabParent), that part's too.
+  Transform authored_parent_world(ObjectId id) const;
   void sync_preview_assets(const std::vector<int>& changed_meshes);
   std::uint64_t preview_generation() const { return prefab_preview_.generation(); }
   // After every document edit, one of these so the preview reflects it: refresh_preview makes it
@@ -194,6 +198,8 @@ class EditorSession {
   void keep_my_edits() { external_change_pending_ = false; }
 
  private:
+  // A child moved to another parent no longer hangs from a prefab part (unrecorded).
+  void unhang(int index);
   EditorSession(std::filesystem::path game_dir, SceneDocument document);
   // The document just read from its file is edited from now on: nothing selected, and the file
   // followed for changes others make to it.
@@ -215,8 +221,6 @@ class EditorSession {
   bool reload_wanted(std::filesystem::file_time_type write_time) const {
     return write_time != loaded_write_time_ && editing() && !recovery_.pending();
   }
-  // The first object carrying the environment's properties, or kNoObject.
-  ObjectId find_environment() const;
   // The selection after an edit that renumbers the objects: the ones called `names`.
   void refresh_and_reselect(const std::vector<std::string>& names);
   ObjectId place_linked(const std::string& file, const Transform& world, ObjectId parent, std::string& error);
@@ -224,7 +228,7 @@ class EditorSession {
   // What every creation does: `add` makes the object (one undo step) and it is placed and
   // selected, while the game is stopped (kNoObject while it runs).
   ObjectId place_created(const std::function<int()>& add, Vec3 position);
-  int add_light(LightType type);
+  ObjectId create_kind(new_objects::Kind kind, Vec3 position);
   // Names of the selected objects: how the selection is found again after an edit that renumbers
   // the objects.
   std::vector<std::string> selected_names() const;

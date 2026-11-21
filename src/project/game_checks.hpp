@@ -49,6 +49,11 @@ void check_dialogues(const std::filesystem::path& game_dir, CheckReport& report)
 // names is in items/, when the game has that folder.
 void check_quests(const std::filesystem::path& game_dir, CheckReport& report);
 
+// game.json's "menu" section (how the game's menus look) is one a theme reads (every key one it
+// has, every value one it takes: UI::Theme), and every font, picture and sound it names is in the
+// game's fonts/, images/ and sounds/.
+void check_menu(const std::filesystem::path& game_dir, CheckReport& report);
+
 // Every check above, in that order, into `report`: what `redgem check` finds (its game's tests
 // aside). A check that throws leaves in `report` what the ones before it found.
 void check_game(const std::filesystem::path& game_dir, CheckReport& report);

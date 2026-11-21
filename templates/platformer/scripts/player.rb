@@ -39,7 +39,10 @@ class Player < Behaviour
     draw_hud
   end
 
+  # (Not while a menu is open: the title and pause screens stay clean.)
   def draw_hud
+    return if GameMenu.open?
+
     UI.text(I18n.t("hud.coins", coins: @coins, total: @total), x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
   end
 

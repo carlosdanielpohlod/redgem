@@ -11,22 +11,30 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
+#include <nlohmann/json.hpp>
+
+#include "core/game_files.hpp"
+#include "core/image_header.hpp"
 #include "core/safe_path.hpp"
 #include "render/font_chain.hpp"
 
 #include "scene/scene_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/bindings/message_values.hpp"
 
 namespace redgem {
 namespace {
 
 using namespace binding;
 
-constexpr mrb_int kOpaque = config::kMaxColorByte;  // a color channel at its fullest
 
 constexpr int kSmallestTextPixels = 1;
 constexpr float kUnitSlack = 1e-3f;  // a width a hair over a whole unit, from dividing by the scale, is that unit
+// How a picture UI.image draws may be named, after its name (as the renderer looks for it).
+constexpr const char* kPictureExtensions[] = {"", ".png", ".jpg", ".jpeg", ".webp"};
+// The largest picture whose size UI.image_size reads (its whole file is read).
+constexpr std::uintmax_t kMostPictureBytes = 64u * 1024u * 1024u;
 
 // Where something is drawn, in units of the interface (see ui_scale_of), as mruby hands it over.
 struct Box {
@@ -65,19 +73,82 @@ mrb_value ui_rect(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
-mrb_value ui_image(mrb_state* mrb, mrb_value) {
-  const char* name = nullptr;
+// A color's red, green, blue and alpha, as mruby hands them over.
+struct Channels {
+  mrb_int r = 0, g = 0, b = 0, a = 0;
+  Color color() const { return color_from(r, g, b, a); }
+};
+
+// A filled rectangle that goes from one color at its top to another at its bottom.
+mrb_value ui_gradient(mrb_state* mrb, mrb_value) {
   Box box;
-  mrb_int a = 0;
-  mrb_get_args(mrb, "zffffi", &name, &box.x, &box.y, &box.width, &box.height, &a);
+  Channels top, bottom;
+  mrb_get_args(mrb, "ffffiiiiiiii", &box.x, &box.y, &box.width, &box.height, &top.r, &top.g, &top.b, &top.a,
+               &bottom.r, &bottom.g, &bottom.b, &bottom.a);
+  HudItem item;
+  item.kind = HudItem::Kind::Gradient;
+  place(item, box, ui_scale_of(context(mrb)));
+  item.color = top.color();
+  item.bottom = bottom.color();
+  context(mrb).hud.push_back(std::move(item));
+  return mrb_nil_value();
+}
+
+// The part of a picture to draw, in its own pixels, as mruby hands it over (none wide: all of it).
+struct Part {
+  mrb_float x = 0, y = 0, width = 0, height = 0;
+  PicturePart picture() const {
+    return {static_cast<float>(x), static_cast<float>(y), static_cast<float>(width), static_cast<float>(height)};
+  }
+};
+
+HudItem image_item(mrb_state* mrb, const char* name, const Box& box) {
   HudItem item;
   item.kind = HudItem::Kind::Image;
   item.text = name;
   item.scale = ui_scale_of(context(mrb));
   place(item, box, item.scale);
-  item.color = color_from(kOpaque, kOpaque, kOpaque, a);
+  return item;
+}
+
+// A picture (or a part of it), tinted with a color.
+mrb_value ui_image(mrb_state* mrb, mrb_value) {
+  const char* name = nullptr;
+  Box box;
+  Channels tint;
+  Part part;
+  mrb_get_args(mrb, "zffffiiiiffff", &name, &box.x, &box.y, &box.width, &box.height, &tint.r, &tint.g, &tint.b,
+               &tint.a, &part.x, &part.y, &part.width, &part.height);
+  HudItem item = image_item(mrb, name, box);
+  item.part = part.picture();
+  item.color = tint.color();
   context(mrb).hud.push_back(std::move(item));
   return mrb_nil_value();
+}
+
+// The size a picture of the game's images/ folder says it has, read from its file's first bytes.
+std::optional<ImageSize> picture_size(const std::filesystem::path& folder, const std::string& name) {
+  if (folder.empty()) return std::nullopt;
+  const auto file = find_asset_file(folder, name, kPictureExtensions);
+  const auto bytes = file ? game_files::read(*file, kMostPictureBytes) : std::nullopt;
+  if (!bytes) return std::nullopt;
+  return encoded_image_size(bytes->data(), bytes->size());
+}
+
+// [width, height] of a picture of images/, in its own pixels; nil when there is none.
+mrb_value ui_image_size(mrb_state* mrb, mrb_value) {
+  const auto size = picture_size(context(mrb).images_dir, to_name(mrb, single_arg(mrb)));
+  if (!size) return mrb_nil_value();
+  const mrb_value sides[] = {mrb_int_value(mrb, size->width), mrb_int_value(mrb, size->height)};
+  return mrb_ary_new_from_values(mrb, static_cast<mrb_int>(std::size(sides)), sides);
+}
+
+// game.json's "menu" section, its keys as texts (GameMenu reads them against the names it knows);
+// nil for a game without one.
+mrb_value ui_menu_settings(mrb_state* mrb, mrb_value) {
+  const std::string& text = context(mrb).menu_settings;
+  if (text.empty()) return mrb_nil_value();
+  return value_from(mrb, nlohmann::json::parse(text, nullptr, false), HashKeys::Strings);
 }
 
 mrb_value ui_text(mrb_state* mrb, mrb_value) {
@@ -212,6 +283,8 @@ void install_ui_size_bindings(mrb_state* mrb, RClass* ui_module) {
   mrb_define_module_function(mrb, ui_module, "pixel_height", ui_pixel_height, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "scale", ui_scale_value, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "reference", ui_reference, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "__image_size", ui_image_size, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, ui_module, "__menu_settings", ui_menu_settings, MRB_ARGS_NONE());
 }
 
 }  // namespace
@@ -222,7 +295,8 @@ void install_ui_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, ui_module, "font=", ui_set_font, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, ui_module, "__text", ui_text, MRB_ARGS_REQ(8));
   mrb_define_module_function(mrb, ui_module, "__rect", ui_rect, MRB_ARGS_REQ(9));
-  mrb_define_module_function(mrb, ui_module, "__image", ui_image, MRB_ARGS_REQ(6));
+  mrb_define_module_function(mrb, ui_module, "__image", ui_image, MRB_ARGS_REQ(13));
+  mrb_define_module_function(mrb, ui_module, "__gradient", ui_gradient, MRB_ARGS_REQ(12));
   mrb_define_module_function(mrb, ui_module, "__clip", ui_clip, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, ui_module, "__unclip", ui_unclip, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));

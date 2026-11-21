@@ -11,12 +11,14 @@
     "Camera::Shake",
     "Dialogue::Rules",
     "GameMenu::BindingNames",
+    "GameMenu::CameraPath",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
     "GameMenu::ControlsScreen",
     "GameMenu::Journal",
     "GameMenu::Journal::Line",
     "GameMenu::JournalScreen",
+    "GameMenu::Look",
     "GameMenu::SettingsScreen",
     "Network::Level",
     "Network::Said",
@@ -24,6 +26,9 @@
     "NetworkSync::Snapshots::Pose",
     "Save::Spawns",
     "UI::TextBlock",
+    "UI::Theme::Kinds",
+    "UI::Theme::MenuReading",
+    "UI::Theme::Reading",
     "UI::Wrapping"
   ],
   "classes": [
@@ -2267,6 +2272,58 @@
       "notes": "Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game."
     },
     {
+      "name": "Environment",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them.",
+      "methods": [
+        {
+          "name": "[]",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "Float | String | bool | nil"},
+          "about": "what the environment object says of a setting (a color as \"#rrggbb\"), or nil when it says nothing and the default applies",
+          "example": "Environment[:sky_intensity]"
+        },
+        {
+          "name": "[]=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "key", "type": "Symbol | String"},
+            {"name": "value", "type": "Numeric | String | Symbol | Array[Numeric] | bool | nil"}
+          ],
+          "returns": {"type": "Numeric | String | Symbol | Array[Numeric] | bool | nil"},
+          "about": "changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or \"#rrggbb\"; nil gives the setting back to its default",
+          "example": "Environment[:fog_color] = [40, 50, 70]"
+        },
+        {
+          "name": "set",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "nil"},
+          "about": "changes several settings at once, as []= does each: all of them, or none when one is refused",
+          "example": "Environment.set(sky_image: \"night_sky\", sky_intensity: 0.3, ambient: 0.6)"
+        },
+        {
+          "name": "present?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the scene has an environment object (environment = true) for scripts to change"
+        }
+      ],
+      "guide": "../levels.md#changing-the-look-while-the-game-runs",
+      "notes": "The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file."
+    },
+    {
       "name": "Material",
       "stability": "experimental",
       "kind": "module",
@@ -2851,6 +2908,24 @@
           "params": [],
           "returns": {"type": "void"},
           "about": "stops the shake at once"
+        },
+        {
+          "name": "backdrop_blur",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "how much the whole picture is blurred evenly, 0 to 1 (a menu over the scene)"
+        },
+        {
+          "name": "backdrop_blur=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "amount", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "sets it"
         }
       ],
       "guide": "gameplay.md#follow-orbit-and-shake-the-camera"
@@ -3639,14 +3714,14 @@
             {"name": "x", "type": "Numeric", "keyword": true},
             {"name": "y", "type": "Numeric", "keyword": true},
             {"name": "size", "type": "Numeric", "keyword": true, "optional": true, "default": "24"},
-            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
             {"name": "align", "type": "Symbol", "keyword": true, "optional": true, "default": ":left"},
             {"name": "width", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "void"},
-          "about": "draws a text; width: wraps it at word boundaries",
+          "about": "draws a text; width: wraps it at word boundaries; color: the theme's text color unless given",
           "top": 25,
           "example": "UI.text(\"Coins: #{@coins}\", x: 20, y: 20, size: 32, color: :yellow)"
         },
@@ -3678,10 +3753,12 @@
             {"name": "width", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
             {"name": "height", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
             {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
-            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "part", "type": "Array[Numeric]", "keyword": true, "optional": true, "default": "[0, 0, 0, 0]"},
+            {"name": "tint", "type": "Color", "keyword": true, "optional": true, "default": ":white"}
           ],
           "returns": {"type": "void"},
-          "about": "draws a picture of images/"
+          "about": "draws a picture of images/; part: [x, y, width, height] of it; tint: a color it is multiplied by"
         },
         {
           "name": "button",
@@ -3693,16 +3770,18 @@
             {"name": "y", "type": "Numeric", "keyword": true},
             {"name": "width", "type": "Numeric", "keyword": true},
             {"name": "height", "type": "Numeric", "keyword": true},
-            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":dark"},
-            {"name": "hover_color", "type": "Color", "keyword": true, "optional": true, "default": ":ruby"},
-            {"name": "text_color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "hover_color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "text_color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "size", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
             {"name": "confirm", "type": "Array[Array[Symbol]]", "keyword": true, "optional": true, "default": "[[:enter], [:a]]"},
-            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "disabled", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "icon", "type": "String | Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "bool"},
-          "about": "draws a button; true the frame it is clicked"
+          "about": "draws a button; true the frame it is clicked; disabled: grayed, does nothing; icon: a picture before its label"
         },
         {
           "name": "text_field",
@@ -3715,8 +3794,8 @@
             {"name": "width", "type": "Numeric", "keyword": true},
             {"name": "height", "type": "Numeric", "keyword": true},
             {"name": "max_length", "type": "Integer", "keyword": true, "optional": true, "default": "64"},
-            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":dark"},
-            {"name": "text_color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "text_color", "type": "Color | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "secret", "type": "bool", "keyword": true, "optional": true, "default": "false"},
             {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
@@ -3941,12 +4020,111 @@
           ],
           "returns": {"type": "String | Array[String] | nil"},
           "about": "draws the next texts with fonts/<name>.ttf or .otf; a list of up to 4 names draws each letter with the first face that has it, then the built-in one (nil: the built-in face)"
+        },
+        {
+          "name": "gradient",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "top", "type": "Color", "keyword": true},
+            {"name": "bottom", "type": "Color", "keyword": true},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws a rectangle that goes from the top color to the bottom one"
+        },
+        {
+          "name": "image_size",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "[Integer, Integer] | nil"},
+          "about": "a picture's [width, height] in its own pixels; nil when there is none"
+        },
+        {
+          "name": "theme",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "UI::Theme"},
+          "about": "the theme widgets are drawn with now"
+        },
+        {
+          "name": "theme=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "changes", "type": "Hash[Symbol, untyped] | nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
+          "about": "changes the engine's look for every widget (a font it names becomes UI.font); nil goes back to it; raises ArgumentError on a wrong key or value",
+          "example": "UI.theme = { colors: { button: :blue }, button: { radius: 0 } }"
+        },
+        {
+          "name": "with_theme",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "theme", "type": "UI::Theme"},
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws what the block draws with another theme"
+        },
+        {
+          "name": "shifted",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "x", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "y", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "alpha", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws what the block draws moved and at a share of its opacity; the pointer follows"
+        },
+        {
+          "name": "draw_button",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "label", "type": "String"},
+            {"name": "box", "type": "Hash[Symbol, Numeric]"},
+            {"name": "state", "type": "UI::ButtonState"},
+            {"name": "look", "type": "Hash[Symbol, untyped]", "optional": true, "default": "{}"}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws a button in a box as the theme says, without hearing the mouse or the keys"
+        },
+        {
+          "name": "button_state",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "box", "type": "Hash[Symbol, Numeric]"},
+            {"name": "focused", "type": "bool"},
+            {"name": "disabled", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "id", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "UI::ButtonState"},
+          "about": "what a button in a box is this frame: focused, under the pointer, held down"
         }
       ],
       "internal": [
         "align_share",
         "anchor_shares",
+        "base_theme",
         "button_fill",
+        "button_icon",
+        "button_skin",
         "centered",
         "chop",
         "clicked?",
@@ -3957,36 +4135,61 @@
         "direction",
         "draw_field",
         "draw_slider",
+        "face",
+        "faded",
         "flipped?",
         "focus_ring",
         "from_left_edge?",
         "held?",
+        "icon_side",
+        "inset",
         "inside?",
         "inside_letter?",
+        "label_color",
         "label_size",
         "letters",
         "letters_of",
         "lines_height",
         "mouse_over?",
+        "nine_slice",
         "overlap",
+        "own_fill?",
+        "padding",
         "paragraphs",
         "placed",
+        "plain_face",
         "pointer_in?",
         "pointer_in_clip?",
         "pressed_any?",
+        "pressed_fill",
         "rgb",
         "row",
         "shade",
+        "shift",
+        "shifted_box",
+        "shifted_point",
+        "shifts",
+        "shown_slices",
         "sideways",
+        "slice",
+        "slice_shows?",
+        "slices",
         "slider_at",
+        "slider_bar",
         "slider_track",
         "span",
         "span_overlap",
+        "state_color",
+        "state_color_name",
         "text_box_width",
         "text_corner",
         "text_lines",
+        "theme_layer",
+        "theme_of_menu",
+        "themes",
         "typed_into",
         "widest",
+        "with_font",
         "within?",
         "worked?",
         "wrapped",
@@ -4128,6 +4331,149 @@
       ],
       "guide": "gameplay.md",
       "notes": "Given a focus (`UI::Focus`), the list scrolls to the row the focus moves to, and Page Up and Page Down move the focus a page; row 0 is the focus' `first`, so rows may come after other widgets. Without one, up and down (arrows, D-pad) scroll a row. The wheel scrolls it while the pointer is over it, and scrolling away from the focused row stays until the focus moves. `input: false` leaves the keys and the wheel to something else that frame. A bar beside its right edge shows how far it is scrolled."
+    },
+    {
+      "name": "UI::Theme",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "How the interface and the menus look: fonts, sizes, colors, buttons, layout, background, logo, footer, transitions, sounds and music. Made of layers over the engine's defaults.",
+      "methods": [
+        {
+          "name": "default",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "UI::Theme"},
+          "about": "the engine's own look"
+        },
+        {
+          "name": "read!",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "layer", "type": "Hash[Symbol, untyped] | nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "a layer read from symbols or from game.json strings; raises ArgumentError on a wrong key or value"
+        },
+        {
+          "name": "merge",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "base", "type": "Hash[Symbol, untyped]"},
+            {"name": "over", "type": "Hash[Symbol, untyped]"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "two layers in one, the second over the first"
+        },
+        {
+          "name": "[]",
+          "stability": "experimental",
+          "params": [
+            {"name": "path", "type": "Symbol", "rest": true}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "a section or a setting: theme[:colors, :button]"
+        },
+        {
+          "name": "color",
+          "stability": "experimental",
+          "params": [
+            {"name": "name", "type": "Symbol"}
+          ],
+          "returns": {"type": "Color | nil"},
+          "about": "one of its colors"
+        },
+        {
+          "name": "merged",
+          "stability": "experimental",
+          "params": [
+            {"name": "layer", "type": "Hash[Symbol, untyped]"}
+          ],
+          "returns": {"type": "UI::Theme"},
+          "about": "this theme with a layer over it"
+        },
+        {
+          "name": "to_h",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "all its settings"
+        }
+      ],
+      "internal": [
+        "both_sections?",
+        "changed",
+        "files_of",
+        "read",
+        "read_menu",
+        "version"
+      ]
+    },
+    {
+      "name": "UI::ButtonState",
+      "stability": "experimental",
+      "kind": "class",
+      "about": "What a button is this frame: focused, under the pointer, held down, disabled; and the id of the option it is of.",
+      "methods": [
+        {
+          "name": "new",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "hover", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "pressed", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "disabled", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "id", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "UI::ButtonState"},
+          "about": "a state"
+        },
+        {
+          "name": "focused?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it has the focus"
+        },
+        {
+          "name": "hover?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the pointer is over it"
+        },
+        {
+          "name": "pressed?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether the pointer holds it down"
+        },
+        {
+          "name": "disabled?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it cannot be picked"
+        },
+        {
+          "name": "id",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
+          "about": "the id of its menu option"
+        },
+        {
+          "name": "name",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Symbol"},
+          "about": "the one that shows most: :disabled, :pressed, :hover, :focused or :normal"
+        }
+      ]
     },
     {
       "name": "Debug",
@@ -4741,12 +5087,98 @@
           ],
           "returns": {"type": "[Integer, Integer, Integer, Integer]"},
           "about": "where the menu's button of that index is: [x, y, width, height]"
+        },
+        {
+          "name": "theme",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "UI::Theme"},
+          "about": "the menus' theme, before any screen's own"
+        },
+        {
+          "name": "theme=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "changes", "type": "Hash[Symbol, untyped] | nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
+          "about": "changes how the menus look (over game.json's menu theme); nil takes it away",
+          "example": "GameMenu.theme = { layout: { align: :left }, background: { kind: :gradient } }"
+        },
+        {
+          "name": "theme_of",
+          "stability": "experimental",
+          "params": [
+            {"name": "name", "type": "Symbol"}
+          ],
+          "returns": {"type": "UI::Theme"},
+          "about": "the theme a screen is drawn with"
+        },
+        {
+          "name": "on_draw_button",
+          "stability": "experimental",
+          "params": [
+            {"name": "block", "type": "^(String, Hash[Symbol, Numeric], UI::ButtonState) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws the menu's buttons with a block instead of the theme's look"
+        },
+        {
+          "name": "on_draw_background",
+          "stability": "experimental",
+          "params": [
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws the menu's background with a block instead of the theme's"
+        },
+        {
+          "name": "column_x",
+          "stability": "experimental",
+          "params": [
+            {"name": "width", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "where a box that wide starts, as the theme aligns the menu"
+        },
+        {
+          "name": "column_text_x",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "[Numeric, Symbol]"},
+          "about": "where texts aligned with the menu start: [x, align]"
+        },
+        {
+          "name": "margin",
+          "stability": "experimental",
+          "params": [
+            {"name": "side", "type": "Symbol"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "one of the theme's margins (:top, :right, :bottom, :left), scaled"
+        },
+        {
+          "name": "open?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether any menu is open now; a HUD can hide while one is"
         }
       ],
       "internal": [
+        "closed",
+        "game_menu",
+        "on_destroy",
+        "open_menus",
+        "opened",
+        "read_game_menu",
         "scale",
         "scaled",
         "start",
+        "theme_layer",
         "update"
       ],
       "guide": "gameplay.md#pause-and-the-flow-between-screens"
@@ -4775,10 +5207,12 @@
           "params": [
             {"name": "label", "type": "String | Proc"},
             {"name": "index", "type": "Integer", "keyword": true, "optional": true, "default": "-1"},
+            {"name": "id", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "enabled", "type": "Proc | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "action", "type": "^() -> void", "block": true}
           ],
           "returns": {"type": "void"},
-          "about": "adds an option"
+          "about": "adds an option; id: its name for icons and drawn buttons; enabled: a lookup, grayed while false"
         },
         {
           "name": "heading",
@@ -4876,9 +5310,55 @@
           ],
           "returns": {"type": "UI::Focus | nil"},
           "about": "sets it"
+        },
+        {
+          "name": "option_extras",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
+          "about": "what each option says besides: {id:, enabled:}"
+        },
+        {
+          "name": "theme=",
+          "stability": "experimental",
+          "params": [
+            {"name": "changes", "type": "Hash[Symbol, untyped] | nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
+          "about": "this screen's own changes over the menu's theme"
+        },
+        {
+          "name": "theme_layer",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "what this screen changes of the menu's theme"
+        },
+        {
+          "name": "on_draw_button",
+          "stability": "experimental",
+          "params": [
+            {"name": "block", "type": "^(String, Hash[Symbol, Numeric], UI::ButtonState) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws this screen's buttons with a block"
+        },
+        {
+          "name": "on_draw_background",
+          "stability": "experimental",
+          "params": [
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
+          "about": "draws this screen's background with a block"
         }
       ],
-      "guide": "gameplay.md#pause-and-the-flow-between-screens"
+      "guide": "gameplay.md#pause-and-the-flow-between-screens",
+      "internal": [
+        "background_drawer",
+        "button_drawer",
+        "disabled?"
+      ]
     },
     {
       "name": "Particles",
