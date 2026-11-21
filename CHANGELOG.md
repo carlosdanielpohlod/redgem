@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents change the whole game, not only its scenes.** MCP's new `project` tool reads and
+  writes `game.json` (`set_settings` merges changes, input and the menu theme included), the locales' texts, and the
+  dialogues, quests and items, and lists and makes scenes and new games from a template. Each
+  write is checked as `redgem check` checks the game, and refused, the file kept, when it brings a
+  new problem. `--read-only` keeps its reading actions. The editor tool gains `open_scene` (with
+  `discard: true` to drop unsaved edits) and `save_as`.
 - **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
   property records, per inherited part, its position, rotation or scale, properties set or
   dropped, its light or camera, or that the part is removed. A child added under the placement
