@@ -399,6 +399,7 @@ The scene's look while the game runs: sky, fog, light and effects, as its enviro
 - `Environment.present? -> bool`: whether the scene has an environment object (environment = true) for scripts to change *Experimental.*
 
 The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file.
+
 ## Material
 
 The glow of the scene's materials, by name, changed while the game runs: lit windows at night. *Experimental.* See [../levels.md#glowing-materials-from-scripts](../levels.md#glowing-materials-from-scripts).

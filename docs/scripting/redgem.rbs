@@ -769,6 +769,8 @@ module Environment
   # whether the scene has an environment object (environment = true) for scripts to change
   %a{redgem:experimental}
   def self.present?: () -> bool
+end
+
 # The glow of the scene's materials, by name, changed while the game runs: lit windows at night.
 %a{redgem:experimental}
 module Material
