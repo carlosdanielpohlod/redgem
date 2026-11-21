@@ -29,6 +29,7 @@
 #include "audio/effect_rack.hpp"
 #include "audio/game_music.hpp"
 #include "audio/raylib_mixdown.h"
+#include "audio/sound_import.hpp"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -44,6 +45,7 @@ class SoundLibrary {
   void set_dir(const std::filesystem::path& dir) {
     forget();
     missing_.clear();
+    settings_.clear();
     dir_ = dir;
   }
   // The file of a name, said once for each missing name (a game asks for a sound every time).
@@ -51,6 +53,14 @@ class SoundLibrary {
     auto found = find_sound_file(dir_, name);
     if (!found) say_missing(name);
     return found;
+  }
+  // The import settings of a name's file (the defaults for a name with no file), read once.
+  const import_settings::SoundSettings& settings(const std::string& name) {
+    const auto known = settings_.find(name);
+    if (known != settings_.end()) return known->second;
+    const auto found = find_sound_file(dir_, name);
+    const auto read = found ? import_settings::sound_settings(*found) : import_settings::SoundSettings{};
+    return settings_.emplace(name, read).first->second;
   }
   // The decoded samples of a name; nullptr when it has no file that decodes.
   const Sound* sound(const std::string& name) {
@@ -75,6 +85,7 @@ class SoundLibrary {
   bool ready_ = false;
   std::filesystem::path dir_;
   std::map<std::string, Sound> sounds_;
+  std::map<std::string, import_settings::SoundSettings> settings_;
   std::set<std::string> missing_;
 };
 
@@ -102,15 +113,16 @@ std::optional<Voice> load_alias(SoundLibrary& library, const std::string& name) 
   UnloadSoundAlias(alias);
   return std::nullopt;
 }
-std::optional<Voice> load_loop(SoundLibrary& library, const std::string& name) {
+std::optional<Voice> load_stream(SoundLibrary& library, const std::string& name, bool loop) {
   const auto file = library.file(name);
   if (!file) return std::nullopt;
-  const auto music = load_music(*file);
+  auto music = load_music(*file);
   if (!music) return std::nullopt;
+  music->looping = loop;
   return Voice{*music};
 }
-std::optional<Voice> load_voice(SoundLibrary& library, const std::string& name, bool loop) {
-  return loop ? load_loop(library, name) : load_alias(library, name);
+std::optional<Voice> load_voice(SoundLibrary& library, const std::string& name, const VoicePlan& plan) {
+  return plan.stream ? load_stream(library, name, plan.loop) : load_alias(library, name);
 }
 
 void spatial_mono_callback(void* buffer, unsigned frames) { spatial_mono_frames(static_cast<float*>(buffer), frames); }
@@ -137,6 +149,7 @@ struct PlayingVoice {
   Voice voice;
   std::optional<EffectSlot> slot;
   float send_volume = 0.0F;  // the last volume the rack was told, so a mix that keeps it skips the rack's lock
+  float gain = kFullVolume;  // its import settings' volume, times every mix
 };
 void send_volume(PlayingVoice& playing, float volume) {
   if (!playing.slot || playing.send_volume == volume) return;
@@ -148,21 +161,35 @@ std::optional<EffectSlot> attach_slot(AudioStream stream) {
   if (slot) AttachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
   return slot;
 }
+// A slot of the rack for a voice that starts, given its effects and volume (none when every slot
+// is taken).
+std::optional<EffectSlot> rack_slot(AudioStream stream, const VoiceEffects& effects, float volume) {
+  const auto slot = attach_slot(stream);
+  if (!slot) return slot;
+  effect_rack().set_effects(*slot, effects);
+  effect_rack().set_volume(*slot, volume);
+  return slot;
+}
 // (Detached first: the audio thread no longer runs the slot once it is free again.)
 void detach_slot(AudioStream stream, std::optional<EffectSlot> slot) {
   if (!slot) return;
   DetachAudioStreamProcessor(stream, kSlotCallbacks.at(*slot));
   effect_rack().release(*slot);
 }
+// `mix` already holds the voice's own gain.
 void apply_mix(AudioStream stream, SpatialMix mix) {
   constexpr float kPanCenter = 0.5f;  // raylib uses 0 for right and 1 for left
   SetAudioStreamVolume(stream, mix.volume);
   SetAudioStreamPan(stream, kPanCenter * (1.0f - mix.pan));
 }
+SpatialMix with_gain(SpatialMix mix, float gain) {
+  mix.volume *= gain;
+  return mix;
+}
 // A positional sound is panned from mono, so the source's own channels do not pull it aside; a
-// flat one keeps its stereo.
-void prepare_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mix) {
-  if (sound.positional) AttachAudioStreamProcessor(stream, spatial_mono_callback);
+// flat one keeps its stereo (and so does a positional one whose settings say so).
+void prepare_stream(AudioStream stream, const SpatialSound& sound, const VoicePlan& plan, SpatialMix mix) {
+  if (plan.mono) AttachAudioStreamProcessor(stream, spatial_mono_callback);
   SetAudioStreamPitch(stream, sound.pitch);
   apply_mix(stream, mix);
 }
@@ -226,15 +253,14 @@ class RaylibSoundDriver final : public SoundDriver {
   bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix,
              const VoiceEffects& effects) override {
     if (!library_.ready()) return false;
-    auto voice = load_voice(library_, name, sound.loop);
+    const VoicePlan plan = voice_plan(sound, library_.settings(name));
+    auto voice = load_voice(library_, name, plan);
     if (!voice) return false;
-    const auto stream = voice_stream(*voice);
-    prepare_stream(stream, sound, mix);
-    const auto slot = attach_slot(stream);
-    if (slot) effect_rack().set_effects(*slot, effects);
-    if (slot) effect_rack().set_volume(*slot, mix.volume);
-    voices_.emplace(id, PlayingVoice{*voice, slot, mix.volume});
-    PlayAudioStream(stream);
+    const SpatialMix heard = with_gain(mix, plan.gain);
+    prepare_stream(voice_stream(*voice), sound, plan, heard);
+    voices_.emplace(
+        id, PlayingVoice{*voice, rack_slot(voice_stream(*voice), effects, heard.volume), heard.volume, plan.gain});
+    PlayAudioStream(voice_stream(*voice));
     return true;
   }
   void update(SoundSourceId id) override {
@@ -243,8 +269,10 @@ class RaylibSoundDriver final : public SoundDriver {
   }
   bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(stream_of(id)); }
   void mix(SoundSourceId id, SpatialMix mix) override {
-    apply_mix(stream_of(id), mix);
-    send_volume(voices_.at(id), mix.volume);
+    PlayingVoice& playing = voices_.at(id);
+    const SpatialMix heard = with_gain(mix, playing.gain);
+    apply_mix(stream_of(id), heard);
+    send_volume(playing, heard.volume);
   }
   void pitch(SoundSourceId id, float pitch) override { SetAudioStreamPitch(stream_of(id), pitch); }
   void effects(SoundSourceId id, const VoiceEffects& effects) override {
@@ -299,28 +327,37 @@ class RaylibMusicDriver final : public MusicDriver {
     auto music = load_music(*file);
     if (!music) return false;
     music->looping = loop;
-    SetMusicVolume(*music, volume);
+    const float gain = library_.settings(name).volume;
+    SetMusicVolume(*music, volume * gain);
     PlayMusicStream(*music);
-    tracks_.emplace(id, *music);
+    tracks_.emplace(id, Track{*music, gain});
     return true;
   }
-  void update(MusicTrackId id) override { UpdateMusicStream(tracks_.at(id)); }
+  void update(MusicTrackId id) override { UpdateMusicStream(tracks_.at(id).music); }
   void feed() {
-    for (auto& [id, music] : tracks_) UpdateMusicStream(music);
+    for (auto& [id, track] : tracks_) UpdateMusicStream(track.music);
   }
-  void volume(MusicTrackId id, float volume) override { SetMusicVolume(tracks_.at(id), volume); }
-  void pitch(MusicTrackId id, float pitch) override { SetMusicPitch(tracks_.at(id), pitch); }
+  void volume(MusicTrackId id, float volume) override {
+    const Track& track = tracks_.at(id);
+    SetMusicVolume(track.music, volume * track.gain);
+  }
+  void pitch(MusicTrackId id, float pitch) override { SetMusicPitch(tracks_.at(id).music, pitch); }
   void stop(MusicTrackId id) override {
     const auto found = tracks_.find(id);
     if (found == tracks_.end()) return;
-    StopMusicStream(found->second);
-    unload_game_music(found->second);
+    StopMusicStream(found->second.music);
+    unload_game_music(found->second.music);
     tracks_.erase(found);
   }
 
  private:
+  // A track and its import settings' volume, times every volume it is given.
+  struct Track {
+    Music music;
+    float gain = kFullVolume;
+  };
   SoundLibrary& library_;
-  std::map<MusicTrackId, Music> tracks_;
+  std::map<MusicTrackId, Track> tracks_;
 };
 
 // What raylib's streams hold when nothing else is asked for: its own size (a 30th of a second).

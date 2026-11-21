@@ -64,19 +64,40 @@ void draw_tile_name(ImVec2 start, const std::string& name) {
 
 bool double_clicked() { return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left); }
 
-// A file tile: big icon, name below. Returns true on double click.
-bool tile(const char* icon, const std::string& name, const char* payload_type) {
+enum class TileClick { None, Clicked, Opened };
+
+// A file tile: big icon, name below, highlighted when `chosen`. Says whether it was clicked once
+// or twice.
+TileClick tile(const char* icon, const std::string& name, const char* payload_type, bool chosen) {
   ImGui::PushID(name.c_str());
   const ImVec2 start = ImGui::GetCursorScreenPos();
-  ImGui::Selectable(kTileId, false, ImGuiSelectableFlags_AllowDoubleClick,
-                    ImVec2(ui::scaled(kTileWidth), ui::scaled(kTileHeight)));
-  const bool opened = double_clicked();
+  const bool clicked = ImGui::Selectable(kTileId, chosen, ImGuiSelectableFlags_AllowDoubleClick,
+                                         ImVec2(ui::scaled(kTileWidth), ui::scaled(kTileHeight)));
+  const TileClick click = double_clicked() ? TileClick::Opened : clicked ? TileClick::Clicked : TileClick::None;
   offer_tile_drag(icon, name, payload_type);
   tooltip(name.c_str());
   draw_tile_icon(start, icon);
   draw_tile_name(start, name);
   ImGui::PopID();
-  return opened;
+  return click;
+}
+
+// Whether the files of a folder have import settings for the Inspector to show.
+bool has_import_settings(Folder folder) {
+  return folder == Folder::Models || folder == Folder::Images || folder == Folder::Sounds;
+}
+
+bool asset_chosen(const AssetState& asset, const FolderInfo& info, const std::string& name) {
+  return asset.folder == info.dir && asset.name == name;
+}
+
+// A click on a model, picture or sound: the Inspector shows its import settings.
+void choose_asset(PanelContext& context, const FolderInfo& info, const std::string& name) {
+  if (!has_import_settings(info.folder)) return;
+  AssetState& asset = context.state.project.asset;
+  asset = AssetState{info.dir, name, std::nullopt, {}};
+  asset.draft = import_settings::read_checked(context.session.game_dir() / info.dir / name, asset.problem);
+  context.session.select(kNoObject);
 }
 
 // Makes scripts/<name>.rb and opens it in a tab.
@@ -147,6 +168,14 @@ void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
   platform::open_in_system(game_dir / info.dir);
 }
 
+// One file's tile: a click chooses it for the Inspector, a double click opens it.
+void draw_file_tile(PanelContext& context, const FolderInfo& info, const std::string& name) {
+  const bool chosen = asset_chosen(context.state.project.asset, info, name);
+  const TileClick click = tile(info.icon, name, payload_of(info.folder), chosen);
+  if (click == TileClick::Clicked) choose_asset(context, info, name);
+  if (click == TileClick::Opened) info.open(context, name);
+}
+
 // The current folder's files as a grid of tiles.
 void draw_tiles(PanelContext& context, const FolderInfo& info) {
   ImGui::BeginChild(kFilesId);
@@ -157,7 +186,7 @@ void draw_tiles(PanelContext& context, const FolderInfo& info) {
   int column = 0;
   for (const std::string& name : names) {
     if (column++ % columns != 0) ImGui::SameLine();
-    if (tile(info.icon, name, payload_of(info.folder))) info.open(context, name);
+    draw_file_tile(context, info, name);
   }
   ImGui::EndChild();
 }

@@ -30,6 +30,7 @@ A game is a folder:
 | `prefabs/*.glb` | [Reusable objects](prefabs.md) you can place in the editor or spawn from Ruby |
 | `sounds/` | `.wav`, `.ogg`, `.mp3` or `.flac` files |
 | `images/` | Pictures for menus and the HUD (`.png`, `.jpg`) |
+| `*.import.json` | How a model, picture or sound next to it is taken in: its [import settings](import-settings.md) |
 | `locales/` | The texts players read, one translation file per language: `en.json`, `pt.json`... (see [Texts in several languages](scripting/i18n.md)) |
 | `game.json` | The game's id, studio, title and window size |
 

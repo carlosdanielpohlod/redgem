@@ -293,7 +293,8 @@ case aside, a line each: its kind and its path inside the game. An asset's kind 
 `enemies`). The best matches come first: a name that is the word, then one that starts with it,
 one that holds it, a tag that is the word, and last the rest of the path; ties go by path.
 `--kind` and `--tag` keep one kind or one tag, and `--limit N` shows the best N (20 unless said,
-`0` for all). No words lists everything. `redgem templates [words...]` does the same for the
+`0` for all). No words lists everything. `redgem assets <game> --settings <asset> [field=value...]`
+lists or sets a model's, texture's or sound's [import settings](import-settings.md#from-the-command-line). `redgem templates [words...]` does the same for the
 templates `redgem new --template` takes, by their names and descriptions. Both are MCP tools too
 (`asset_search`, `template_search`, see [MCP tools](mcp.md)).
 
