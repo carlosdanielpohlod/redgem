@@ -998,3 +998,23 @@ TEST_CASE("a hinge added in the Inspector holds a lid that swings to its limit o
   CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(game);
 }
+
+TEST_CASE("MCP saves the open scene as another and opens the game's scenes in the real editor") {
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  test::FrameWaitClock clock;
+  auto server = enable_editor_bridge(app, clock.reading());
+  REQUIRE(server);
+  editor_call(app, *server, clock, {{"action", "save_as"}, {"scene", "cave"}});
+  CHECK(app.session().scene_name() == "cave");
+  CHECK(std::filesystem::exists(game / config::kScenesDirName / "cave.glb"));
+  editor_call(app, *server, clock, {{"action", "open_scene"}, {"scene", config::kMainSceneName}});
+  CHECK(app.session().scene_name() == config::kMainSceneName);
+  run(app, kFrameFrames);
+  CHECK(app.console().error_count() == 0);
+  app.set_frame_hook({});
+  std::filesystem::remove_all(game);
+}

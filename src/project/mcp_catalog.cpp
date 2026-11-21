@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "project/mcp_project_tools.hpp"
 #include "project/ruby_eval.hpp"
 
 namespace redgem::tools::mcp {
@@ -19,6 +20,7 @@ constexpr const char* kSchemas = R"JSON([
 {"name":"game_check","description":"Check scripts, scenes and referenced assets without playing or running the game's tests.","inputSchema":{"type":"object","additionalProperties":false,"properties":{}}},
 {"name":"game_shot","description":"A picture of the saved game at a moment, through its camera: a PNG image, 512x288 unless width says otherwise. For whether things work use game_run; this shows how it looks.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"scene":{"type":"string","maxLength":256},"at":{"type":"number","minimum":0,"maximum":10},"width":{"type":"integer","minimum":128,"maximum":1024},"camera":{"type":"string","maxLength":256}}}},
 {"name":"game_query","description":"Ask the playing game: inspect an object's live state (world pos, rot, body, velocity, grounded, props), raycast between two points (from, to) or overlap a sphere (at, radius). Points are x,y,z. Connected to an editor, it asks the game the editor is playing (start it with editor action=play); otherwise it plays the saved game for frames (default 60) first.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["inspect","raycast","overlap"]},"object":{"type":"string","minLength":1,"maxLength":256},"from":{"type":"string","maxLength":64},"to":{"type":"string","maxLength":64},"at":{"type":"string","maxLength":64},"radius":{"type":"number","minimum":0.01,"maximum":1000},"frames":{"type":"integer","minimum":0,"maximum":600},"scene":{"type":"string","maxLength":256}}}},
+{"name":"project","description":"The game beyond its scenes, as files. settings: game.json, or one section of it, and its problems. set_settings: merge changes into game.json (an object merges into its object, null removes a key), e.g. {\"changes\":{\"window\":{\"title\":\"Coast\"},\"input\":{\"actions\":{\"jump\":[\"key:space\",\"pad:a\"]}}}}; the menu section is how the game's menus look: {\"menu\":{\"theme\":{\"colors\":{\"button\":\"#203040\"}}}}. texts: the texts of locales/<language>.json (language default en), keys starting with prefix, limit default 50. set_texts: texts {\"key\":\"text\"} into that language, null removing one. story: list the files of kind (dialogue, quest, item), or read one by name (npcs/baker). set_story: write a whole file of kind and name as content (replacing one needs confirm=true). scenes: the scene names. new_scene: make scenes/<scene>.glb with a ground, a sun and a camera. new_game: make a game in a new folder path next to this one, from template (default empty; see template_search). Every write is checked as game_check checks the game (an item only through the quests that name it): refused, the file kept, when it brings a new error; new warnings are told.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["settings","set_settings","texts","set_texts","story","set_story","scenes","new_scene","new_game"]},"section":{"type":"string","minLength":1,"maxLength":64},"changes":{"type":"object"},"language":{"type":"string","minLength":2,"maxLength":16},"prefix":{"type":"string","maxLength":256},"limit":{"type":"integer","minimum":1,"maximum":200},"texts":{"type":"object"},"kind":{"type":"string","enum":["dialogue","quest","item"]},"name":{"type":"string","minLength":1,"maxLength":256},"content":{"type":"object"},"confirm":{"type":"boolean"},"scene":{"type":"string","minLength":1,"maxLength":256},"path":{"type":"string","minLength":1,"maxLength":256},"template":{"type":"string","minLength":1,"maxLength":256}}}},
 {"name":"api","description":"Read the scripting API: the class index, one class, or a search. Example: {\"class\":\"Transform\"}.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"class":{"type":"string","maxLength":256},"search":{"type":"string","maxLength":256}}}},
 {"name":"events","description":"Read log messages (script errors, Debug.log) since a cursor, one line each. Pass the returned cursor as since next time to get only new ones.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
@@ -31,15 +33,20 @@ constexpr const char* kColorWords =
     "become custom properties.";
 
 constexpr const char* kEditorSchema =
-    R"JSON({"name":"editor","description":"The open editor: status, select an object or several (objects), frame an object, capture the viewport (PNG, max_size default 512), play/pause/resume/stop/step its game, undo, redo or save. Document changes need edit mode and stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","frame","undo","redo","save","play","pause","resume","stop","step","capture"]},"object":{"type":"string","minLength":1,"maxLength":256},"objects":{"type":"array","maxItems":64,"items":{"type":"string","minLength":1,"maxLength":256}},"max_size":{"type":"integer","minimum":128,"maximum":1024}}}})JSON";
+    R"JSON({"name":"editor","description":"The open editor: status, select an object or several (objects), frame an object, capture the viewport (PNG, max_size default 512), play/pause/resume/stop/step its game, undo, redo or save, open_scene (another scene by name; one with unsaved edits needs save first, or discard=true) or save_as (the open scene as scenes/<scene>.glb, then the one edited). Document changes need edit mode and stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","frame","undo","redo","save","play","pause","resume","stop","step","capture","open_scene","save_as"]},"scene":{"type":"string","minLength":1,"maxLength":256},"discard":{"type":"boolean"},"object":{"type":"string","minLength":1,"maxLength":256},"objects":{"type":"array","maxItems":64,"items":{"type":"string","minLength":1,"maxLength":256}},"max_size":{"type":"integer","minimum":128,"maximum":1024}}}})JSON";
 
 bool read_only_tool(const std::string& name) {
   return name == "scene_list" || name == "scene_get" || name == "scene_diff" || name == "api" || name == "events" ||
          name == "editor" || name == "asset_search" || name == "template_search";
 }
 
+// The tools --read-only keeps with fewer actions: they only read then.
+bool narrowed_when_read_only(const std::string& name) { return name == "editor" || name == "project"; }
+
+bool kept_read_only(const std::string& name) { return read_only_tool(name) || narrowed_when_read_only(name); }
+
 bool enabled(const Options& options, const std::string& name) {
-  if (options.read_only && !read_only_tool(name)) return false;
+  if (options.read_only && !kept_read_only(name)) return false;
   return options.allow.empty() || options.allow.count(name) != 0;
 }
 
@@ -111,6 +118,7 @@ void check_object(const Json& schema, const Json& args) {
     const auto& key = field.get_ref<const std::string&>();
     if (!args.contains(key)) throw std::invalid_argument("missing argument: " + key);
   }
+  if (!schema.contains("properties")) return;  // a free-form object, such as project's changes
   const Json& properties = schema.at("properties");
   for (const auto& [key, value] : args.items()) {
     if (!properties.contains(key))
@@ -143,14 +151,35 @@ Json available_tools(const Options& options) {
   return tools;
 }
 
+// The actions of project that only read.
+Json project_reads() {
+  Json reads = Json::array();
+  for (const auto& action : Json::parse(kSchemas)) {
+    if (action["name"] != "project") continue;
+    for (const auto& word : action["inputSchema"]["properties"]["action"]["enum"])
+      if (reads_project(word)) reads.push_back(word);
+  }
+  return reads;
+}
+
+Json read_only_actions(const std::string& name) {
+  if (name == "editor") return {"status", "capture"};
+  return project_reads();
+}
+
+// Whether this run keeps only the tool's reading actions.
+bool narrowed(const Options& options, const std::string& name) {
+  return options.read_only && narrowed_when_read_only(name);
+}
+
 void live_schema(Json& tool, const Options& options) {
-  if (tool["name"] == "editor" && options.read_only)
-    tool["inputSchema"]["properties"]["action"]["enum"] = {"status", "capture"};
+  if (!narrowed(options, tool["name"])) return;
+  tool["inputSchema"]["properties"]["action"]["enum"] = read_only_actions(tool["name"]);
 }
 
 // Whether a call of the tool may change or destroy what the game holds.
 bool destructive(const Options& options, const std::string& name) {
-  if (name == "editor") return !options.read_only;
+  if (narrowed_when_read_only(name)) return !options.read_only;
   return name == "scene_edit" || is_ruby_eval_tool(name);
 }
 
@@ -167,7 +196,7 @@ Json catalog(const Options& options) {
     if (!enabled(options, name)) continue;
     live_schema(tool, options);
     describe_assignments(tool);
-    tool["annotations"] = {{"readOnlyHint", name == "editor" ? options.read_only : read_only_tool(name)},
+    tool["annotations"] = {{"readOnlyHint", narrowed_when_read_only(name) ? options.read_only : read_only_tool(name)},
                            {"openWorldHint", !read_only_tool(name)},
                            {"destructiveHint", destructive(options, name)}};
     tools.push_back(std::move(tool));

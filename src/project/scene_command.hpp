@@ -11,6 +11,11 @@
 //   redgem scene add    <game> <name> [--from <object>] [--parent <object>] [key=value...] [--scene name]
 //   redgem scene remove <game> <object> [--scene name]
 //   redgem scene compact <game> [--scene name]
+//   redgem scene overrides <game> <placement> [--scene name]
+//   redgem scene override  <game> <placement> <part> key=value... [--scene name]
+//   redgem scene revert    <game> <placement> [<part> [<field>]] [--scene name]
+//   redgem scene apply     <game> <placement> [--scene name]
+//   redgem scene unpack    <game> <placement> [--scene name]
 //
 // <object> is an id (#12), a path (Level/Wall) or a name that one object alone has.
 

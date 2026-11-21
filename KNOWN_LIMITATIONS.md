@@ -351,8 +351,9 @@ promise of how it will be closed.
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
-- [Prefab file](docs/prefabs.md) instance overrides are set in the scene file only: the editor
-  cannot yet show, apply, revert or unpack them. Overrides do not reach materials (shared by every
+- [Prefab file](docs/prefabs.md) instance overrides are listed, reverted, applied and unpacked
+  from the command line; the editor Inspector does not show them yet. Applying cannot be undone in
+  the prefab file (only in the scene). Overrides do not reach materials (shared by every
   instance; use `tint`). Scripted prefab imports are synchronous and support rigid hierarchies
   only, and a running scene does not see a changed prefab file until reloaded. Export needs
   complete skeletons and descendant-only animation; it does not replace the original selection
@@ -746,11 +747,16 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
   bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials, terrain brushes and scene switching still use files or the editor UI. Native
+  materials and terrain brushes still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `project` tool checks a write as `redgem check` does: `game.json`'s physics, input and
+  menu sections, and what the locales, dialogues and quests name of each other. Other sections of
+  `game.json` and items no quest names are written as given. It edits files only: an open editor
+  sees a new scene once it rescans its files, and a game must be restarted to read changed
+  settings.
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
