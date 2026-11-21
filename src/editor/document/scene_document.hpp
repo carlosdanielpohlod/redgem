@@ -140,6 +140,9 @@ class SceneDocument {
   // What an image is called in the file (the picture file it came from), "" when nothing.
   std::string image_name(int image) const;
 
+  // Makes the last two undo steps one: undoing it goes back to before the earlier (a paste
+  // followed by the node edits that finish what it began).
+  void join_last_steps();
   // Drops the last checkpoint if nothing changed since (a click on a gizmo or field without moving it).
   void drop_checkpoint_if_unchanged();
 

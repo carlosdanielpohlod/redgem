@@ -44,6 +44,7 @@ add_executable(redgem_tests
   unit/prefabs_test.cpp
   unit/prefab_export_test.cpp
   unit/prefab_overrides_test.cpp
+  unit/prefab_instances_test.cpp
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp

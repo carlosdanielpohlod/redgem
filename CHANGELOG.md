@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Prefab overrides can be reverted, applied to the prefab file, or unpacked.**
+  `redgem scene overrides`, `override`, `revert`, `apply` and `unpack` list and change a prefab
+  placement's overrides from the command line, each change one undo step in the editor's
+  document. Apply writes them into the file for every placement; unpack turns the placement into
+  plain objects. See [prefab overrides](docs/prefabs.md#revert-apply-and-unpack).
+
 - **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
   property records, per inherited part, its position, rotation or scale, properties set or
   dropped, its light or camera, or that the part is removed. A child added under the placement

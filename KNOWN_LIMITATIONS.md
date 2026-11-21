@@ -337,8 +337,9 @@ promise of how it will be closed.
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
-- [Prefab file](docs/prefabs.md) instance overrides are set in the scene file only: the editor
-  cannot yet show, apply, revert or unpack them. Overrides do not reach materials (shared by every
+- [Prefab file](docs/prefabs.md) instance overrides are listed, reverted, applied and unpacked
+  from the command line; the editor Inspector does not show them yet. Applying cannot be undone in
+  the prefab file (only in the scene). Overrides do not reach materials (shared by every
   instance; use `tint`). Scripted prefab imports are synchronous and support rigid hierarchies
   only, and a running scene does not see a changed prefab file until reloaded. Export needs
   complete skeletons and descendant-only animation; it does not replace the original selection

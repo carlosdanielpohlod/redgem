@@ -89,6 +89,21 @@ A child added under the placement stays under its root. Give it the string prope
 relative to the part. The placement's own transform, name and properties still override the
 source root, as before.
 
+### Revert, apply and unpack
+
+- **Revert** drops one overridden field (`position`, `props.tag`), every override of one part, or
+  every override and root property of the placement. Children added under it are kept.
+- **Apply** writes the placement's overrides, its root properties and its added children into
+  the prefab file and saves it; every placement of the file then has them, and this one no longer
+  overrides them. A part of a nested prefab becomes an override of that nested placement in the
+  file. Undo brings the overrides back to the placement; the file stays written.
+- **Unpack** replaces the placement with plain objects copied from its file, its overrides
+  applied, removed parts left out and added children kept where they hang. A nested placement in
+  the file stays a placement (one level is unpacked). The objects get new identities.
+
+Each is one undo step. From the command line: `redgem scene overrides`, `override`, `revert`,
+`apply` and `unpack` (see [the command line](command-line.md)).
+
 ## Spawning from Ruby
 
 `Scene.spawn_prefab("crate.glb", position: Vector3.new(2, 0, 4))` creates a rigid hierarchy

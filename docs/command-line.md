@@ -90,6 +90,11 @@ renames and reparenting. New objects get hexadecimal identities: take them from 
 | `redgem scene remove <game> <object>` | removes the object and its children, and saves |
 | `redgem scene compact <game>` | rewrites the scene with repeated data written once and without data no object uses, and says how many bytes it left out |
 | `redgem scene diff <game> --against <before.glb>` | compares the current scene with an earlier save, without changing either file |
+| `redgem scene overrides <game> <placement>` | lists what a [prefab placement](prefabs.md#overrides) overrides, a line per field (`lid position=0,3,0`; `.` is the placement itself) |
+| `redgem scene override <game> <placement> <part> key=value...` | overrides fields of an inherited part (the keys of `set` but `name` and `parent`; `prop.key=` drops a property the file gives; `removed=true`), and saves |
+| `redgem scene revert <game> <placement> [<part> [<field>]]` | drops one overridden field, a part's overrides, or all of them, and saves |
+| `redgem scene apply <game> <placement>` | writes the placement's overrides and added children into its prefab file, and takes them off the placement |
+| `redgem scene unpack <game> <placement>` | replaces the placement with plain objects from its prefab file, its overrides applied |
 | `redgem scene diff <game> --revision <revision>` | compares the current scene with the scene a Git revision saved (`HEAD`, `HEAD~1`, `main`, a commit hash); `--against <revision>` does the same |
 
 Every command takes `--scene <name>` for another scene than `scene.glb`: `--scene level2` is

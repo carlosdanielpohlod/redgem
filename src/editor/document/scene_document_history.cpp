@@ -70,6 +70,12 @@ bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) 
 
 }  // namespace
 
+void SceneDocument::join_last_steps() {
+  constexpr std::size_t kJoined = 2;
+  if (undo_.size() < kJoined) return;
+  pop_step(undo_);  // the later step began where the earlier one ended
+}
+
 void SceneDocument::checkpoint() {
   if (node_edit_active_) return;
   push_step(undo_, snapshot());
