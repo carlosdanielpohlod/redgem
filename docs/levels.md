@@ -429,6 +429,74 @@ Measure your own card with `redgem_field_benchmark terrain 8 stochastic triplana
 the tests). Keep `stochastic` for the one or two layers whose repeats show, and `triplanar` for
 the layers that cover cliffs.
 
+### Painting ground layers by rules (experimental)
+
+Rules paint the weights from the shape of the ground: sand by the sea, grass above it, rock on
+steep slopes, patches of dirt. List them in the layers file, under `"rules"`:
+
+```json
+{
+  "layers": [
+    { "name": "sand", "albedo": "textures/coastal-sand/Color.jpg", "tiling": 4 },
+    { "name": "grass", "albedo": "textures/Grass004/Color.jpg", "tiling": 3, "variation": 0.3 },
+    { "name": "rock", "albedo": "textures/Rock030/Color.jpg", "tiling": 6, "triplanar": true },
+    { "name": "dirt", "albedo": "textures/Ground037/Color.jpg", "tiling": 4 }
+  ],
+  "rules": [
+    { "layer": "sand" },
+    { "layer": "grass", "height": { "min": 2, "soft": 1.5 } },
+    { "layer": "rock", "slope": { "min": 35, "soft": 10 } },
+    { "layer": "dirt", "height": { "min": 3 }, "noise": { "min": 0.65, "soft": 0.1 },
+      "noise_size": 12, "seed": 3, "strength": 0.8 }
+  ]
+}
+```
+
+The rules run in order. Each one moves every spot toward its layer by how much the spot is in its
+ranges, times its `strength`. Start with a rule without ranges, so that one layer covers
+everything first.
+
+| Key | Meaning |
+|-----|---------|
+| `layer` | The name of a layer of the file. |
+| `height` | Meters, in the terrain mesh's own space: `{ "min": 2, "max": 40, "soft": 1.5 }`. |
+| `slope` | Degrees from flat: 0 is level ground, 90 a wall. |
+| `noise` | 0 to 1, a smooth noise of patches about `noise_size` meters across (10 by default). Another `seed` gives other patches. |
+| `soft` | How wide the fade is at each end of a range, centered on the end. 0 is a hard edge. |
+| `strength` | 0 to 1 (1 by default): how far toward the layer a spot fully in range goes. |
+
+`min` and `max` may each be left out: the range is then open on that side.
+
+Paint from the command line, which writes the splat pictures beside the file:
+
+```bash
+redgem scene paint games/ilha Island        # (--scene name for a scene of scenes/)
+```
+
+Or from a script while the game runs. What a script paints is kept until the scene is loaded
+again. It is never written to the files.
+
+```ruby
+# On the player: a footstep sound that follows the ground under it.
+class Footsteps < Behaviour
+  SOUNDS = { "sand" => "step_sand", "rock" => "step_rock" }.freeze
+
+  def start
+    @ground = Scene.find("Island")
+    Terrain.paint_by_rules(@ground, [{ layer: "rock", slope: { min: 25, soft: 5 } }])
+  end
+
+  def step
+    layer = Terrain.layer_at(@ground, game_object.transform.position)  # the largest share
+    Audio.play(SOUNDS.fetch(layer, "step_grass"))
+  end
+end
+```
+
+Call `step` from the walk animation or a timer. `Terrain.weights_at(ground, point)` gives every
+layer's share, such as
+`{"sand" => 0.7, "grass" => 0.3}`. `Terrain.layers(ground)` lists the layer names.
+
 ## Editing the level in Blender
 
 ```bash

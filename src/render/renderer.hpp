@@ -63,6 +63,9 @@ class Renderer {
   void end_scene_texture_use();
   // Uploads again the vertices of a mesh that was reshaped (a sculpted terrain).
   void refresh_mesh(const SceneDesc& desc, int mesh);
+  // Sends the weights of the terrains' ground layers that changed since they were sent (a script
+  // painted them): cheap enough to call every frame.
+  void follow_terrain_weights(const SceneDesc& desc);
   // Camera of the scene's main camera object (or a default one).
   Camera3D scene_camera(const Scene& scene) const;
   // Draws the scene with its environment (sky, fog) and post-processing (bloom, tone mapping,
