@@ -25,7 +25,6 @@ constexpr const char* kStep = "signing the APK";
 constexpr const char* kLogged = "the build has something to say";
 constexpr const char* kWhyNot = "no Android SDK";
 constexpr auto kPatience = std::chrono::seconds(10);  // far longer than any step here takes
-constexpr auto kShortWait = std::chrono::milliseconds(50);
 // Times of builds, in seconds, and how they read.
 constexpr double kNearlyEight = 7.9;
 constexpr double kTwelveAndAHalfMinutes = 750.0;
@@ -63,6 +62,12 @@ struct HeldBuild {
     request.out_dir = kOut;
     return request;
   }
+};
+
+// Keeps its promise as it goes.
+struct SaysWhenItGoes {
+  std::promise<void>& promise;
+  ~SaysWhenItGoes() { promise.set_value(); }
 };
 
 // A build that fails at once, in the way `fail` does.
@@ -156,13 +161,14 @@ TEST_CASE("a build that fails says why, and one that throws fails with what it t
 
 TEST_CASE("a job that goes while its build runs waits for the build: its thread never outlives it") {
   std::atomic<bool> finished{false};
+  std::promise<void> going;
+  const std::shared_future<void> job_goes = going.get_future().share();
   {
     BuildJob job;
-    BuildRequest request = failing([&finished](std::string&) {
-      std::this_thread::sleep_for(kShortWait);
-      finished = true;
-    });
+    BuildRequest request = failing(
+        [&finished, job_goes](std::string&) { finished = job_goes.wait_for(kPatience) == std::future_status::ready; });
     REQUIRE(job.start(std::move(request)));
+    const SaysWhenItGoes says{going};  // (goes before the job: the build still runs as the job goes)
   }
   CHECK(finished);
 }

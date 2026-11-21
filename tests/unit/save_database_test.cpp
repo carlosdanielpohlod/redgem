@@ -1,9 +1,10 @@
 #include <doctest/doctest.h>
 
-#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -199,27 +200,40 @@ TEST_CASE("a database whose saves table is not the server's does not open as if 
 
 namespace {
 
-// Far longer than two threads take to meet when nothing keeps them apart.
+// Far longer than two threads take to meet when nothing keeps them apart: a guard against a hang.
 constexpr std::chrono::seconds kMeetingPatience{5};
-constexpr std::chrono::milliseconds kPoll{1};
 constexpr int kInnerValue = 7;
 constexpr int kOuterValue = 1;
 constexpr int kHolderValue = 2;
 
-// Whether `flag` is set within kMeetingPatience.
-bool comes_up(const std::atomic<bool>& flag) {
-  const auto until = std::chrono::steady_clock::now() + kMeetingPatience;
-  while (!flag.load() && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(kPoll);
-  return flag.load();
-}
+// A flag one thread raises and another waits for, woken by the raise rather than looking again.
+class Signal {
+ public:
+  void raise() {
+    {
+      const std::lock_guard<std::mutex> hold(mutex_);
+      raised_ = true;
+    }
+    raised_cv_.notify_all();
+  }
+  // Whether it is raised, waiting for the raise up to kMeetingPatience.
+  bool comes_up() const {
+    std::unique_lock<std::mutex> hold(mutex_);
+    return raised_cv_.wait_for(hold, kMeetingPatience, [this] { return raised_; });
+  }
+
+ private:
+  mutable std::mutex mutex_;
+  mutable std::condition_variable raised_cv_;
+  bool raised_ = false;
+};
 
 // An update of `key` whose block says it began, then waits for `other` to begin too: whether it did.
-bool met_inside_update(SaveDatabase& database, const std::string& key, std::atomic<bool>& began,
-                       const std::atomic<bool>& other) {
+bool met_inside_update(SaveDatabase& database, const std::string& key, Signal& began, const Signal& other) {
   bool met = false;
   database.update(key, [&](const std::optional<nlohmann::json>&) {
-    began = true;
-    met = comes_up(other);
+    began.raise();
+    met = other.comes_up();
     return nlohmann::json(met);
   });
   return met;
@@ -230,8 +244,8 @@ bool met_inside_update(SaveDatabase& database, const std::string& key, std::atom
 TEST_CASE("updates of different keys run side by side: one's block does not wait for the other's") {
   const TempData temp;
   auto database = opened(temp.database);
-  std::atomic<bool> first_began{false};
-  std::atomic<bool> second_began{false};
+  Signal first_began;
+  Signal second_began;
   bool first_met = false;
   std::thread first([&] { first_met = met_inside_update(*database, "room-1", first_began, second_began); });
   const bool second_met = met_inside_update(*database, "room-2", second_began, first_began);
@@ -265,16 +279,16 @@ TEST_CASE("rooms updating their own keys and a shared one at once lose no change
 TEST_CASE("a block that writes a key another room is updating is refused after a bounded wait, never deadlocks") {
   const TempData temp;
   auto database = opened(temp.database);
-  std::atomic<bool> holding{false};
-  std::atomic<bool> released{false};
+  Signal holding;
+  Signal released;
   std::thread holder([&] {
     database->update("b", [&](const std::optional<nlohmann::json>&) {
-      holding = true;
-      comes_up(released);
+      holding.raise();
+      released.comes_up();
       return nlohmann::json(kHolderValue);
     });
   });
-  REQUIRE(comes_up(holding));
+  REQUIRE(holding.comes_up());
   bool refused = false;
   const auto started = std::chrono::steady_clock::now();
   CHECK(database->update("a", [&](const std::optional<nlohmann::json>&) {
@@ -283,7 +297,7 @@ TEST_CASE("a block that writes a key another room is updating is refused after a
     return nlohmann::json(kOuterValue);
   }));
   CHECK(std::chrono::steady_clock::now() - started >= redgem::server::kNestedKeyWait);
-  released = true;
+  released.raise();
   holder.join();
   CHECK(refused);
   CHECK(*database->get("a") == kOuterValue);
