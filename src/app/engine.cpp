@@ -271,6 +271,8 @@ void Engine::connect_effects() {
   context_.head_aims = &head_aims_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
+  context_.decals = &decals_;
+  context_.scene_desc = &scene_desc_;
   context_.renders_particles = options_.presenter != nullptr;
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }

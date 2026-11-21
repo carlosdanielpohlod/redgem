@@ -5,6 +5,7 @@
 #include "render/shaders/ambient_occlusion.hpp"
 #include "render/shaders/antialias.hpp"
 #include "render/shaders/bloom.hpp"
+#include "render/shaders/decal.hpp"
 #include "render/shaders/exposure.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shaders/lit_vertex.hpp"
@@ -65,6 +66,7 @@ void Renderer::Impl::compile_shaders() {
   sharpen_shader = compile_shader(nullptr, shaders::kSharpenFragment, "sharpening");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::particle_fragment().c_str(), "particles");
+  decal_shader = compile_shader(shaders::kDecalVertex, shaders::kDecalFragment, "decals");
   antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
   panorama_shader = compile_shader(nullptr, shaders::kPanoramaFragment, "reflection panorama");
   occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
@@ -122,6 +124,7 @@ void Renderer::Impl::release() {
   free_maps(fallback_material);
   release_sky();
   release_ui_images();
+  release_decals();
   ui_fonts.clear();
   release_fixed_targets();
   release_shaders();
@@ -138,7 +141,7 @@ void Renderer::Impl::release_shaders() {
   for (Shader* program :
        {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader, &glow_limit_shader,
         &bright_shader, &blur_shader, &composite_shader, &antialias_shader, &motion_shader, &temporal_shader,
-        &sharpen_shader, &particle_shadow_shader, &luminance_shader, &adapt_shader}) {
+        &sharpen_shader, &particle_shadow_shader, &luminance_shader, &adapt_shader, &decal_shader}) {
     if (loaded(*program)) UnloadShader(*program);
     *program = Shader{};
   }

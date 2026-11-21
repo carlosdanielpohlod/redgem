@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Decals: bullet holes and other marks** (experimental). `Decals.place(hit)`, or
+  `Decals.place(point, normal, size:, image:, color:, alpha:, spin:)`, projects a mark onto the
+  meshes and terrain under it, straight from a raycast hit. A mark darkens what it lies on, so it
+  takes the surface's light and shade; without an image it is a soft round spot. It stays on the
+  object it fell on as that moves. Marks are kept up to `Decals.limit` (256 unless set): past it the
+  oldest goes. They are local looks: never sent over the network, and none on a dedicated server.
 - **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
   property records, per inherited part, its position, rotation or scale, properties set or
   dropped, its light or camera, or that the part is removed. A child added under the placement

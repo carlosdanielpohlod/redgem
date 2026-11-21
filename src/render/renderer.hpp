@@ -17,6 +17,7 @@
 #include "render/hud.hpp"
 #include "render/quality.hpp"
 #include "render/underwater.hpp"
+#include "scene/decals.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -115,6 +116,9 @@ class Renderer {
   // View model objects (a first-person weapon) are drawn apart, over the world, with their own
   // field of view in a game; the editor's view, from a camera of its own, draws them where they are.
   void draw_view_models_apart(bool apart);
+  // The marks laid on the scene's surfaces (Decals), drawn by draw_world while it is given; null
+  // for none. What it points to must outlast the draws it is given for.
+  void set_decals(const DecalSystem* decals);
   // Draws a touch screen's controls over everything: see-through, brighter where a finger is.
   void draw_controls(const std::vector<ControlCircle>& controls);
 

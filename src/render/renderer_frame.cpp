@@ -78,6 +78,7 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
   // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);
+  gather_decals(scene);
   slots.used = 0;  // the frame's passes start over in the buffer of what they see
   write_frame_texels(scene);
   send_frame_texels();
@@ -134,6 +135,7 @@ void Renderer::Impl::draw_surfaces(Vec3 viewer, bool sampled) {
   covering = sampled;
   const std::size_t first = draw_objects(false, viewer);
   covering = false;
+  draw_decals();
   if (temporal.on) draw_motion(first, viewer);
   if (lit_features.water) capture_water_background();
   draw_see_through(first, viewer);
