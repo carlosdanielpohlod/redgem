@@ -20,6 +20,9 @@ inline constexpr int kMostRecordFps = 240;
 // The encoder, found on the PATH, and what it is asked for: H.264 at high quality, in the pixel
 // format every player plays.
 inline constexpr const char* kEncoderProgram = "ffmpeg";
+// The game's sound in a video: mixed at this rate, in stereo, then encoded as AAC.
+inline constexpr int kRecordSampleRate = 48000;
+inline constexpr int kRecordChannels = 2;
 
 // Width and height of a recorded picture, in pixels.
 struct FrameSize {
@@ -37,6 +40,8 @@ struct RecordOptions {
   // The size of the video, when it is not `size`: the frames are scaled to it (lanczos).
   std::optional<FrameSize> scale;
   std::optional<double> seconds;  // the recording stops after this long (else when the game quits)
+  // Whether the video has the game's sound (--record-audio on, unless off).
+  bool sound = true;
 };
 
 // `size` with each side rounded down to an even number of pixels (at least two): the video's
@@ -68,9 +73,39 @@ std::optional<std::int64_t> frames_to_record(const RecordOptions& options);
 // Whether a recording that has `frames` frames is over.
 bool recording_complete(const RecordOptions& options, std::int64_t frames);
 
+// "on" or "off", for --record-audio; nothing for anything else.
+std::optional<bool> record_sound_from(const std::string& text);
+
+// The frames of sound (a sample on each channel) that go with each recorded picture: on average
+// exactly sample_rate / fps, the fraction carried from one picture to the next, so that the sound
+// never drifts from the pictures however long the recording.
+class SoundClock {
+ public:
+  SoundClock(int sample_rate, int fps) : sample_rate_(sample_rate), fps_(fps) {}
+  // The sound frames of the next picture.
+  std::int64_t next();
+  // Every sound frame so far: those of `pictures` pictures, to one frame.
+  std::int64_t total() const { return total_; }
+  std::int64_t pictures() const { return pictures_; }
+
+ private:
+  std::int64_t sample_rate_;
+  std::int64_t fps_;
+  std::int64_t pictures_ = 0;
+  std::int64_t total_ = 0;
+};
+
+// Where a video with sound is made, next to it: the pictures first, then the sound, which are put
+// together into the video once both are done (and then deleted).
+std::filesystem::path pictures_file(const RecordOptions& options);
+std::filesystem::path sound_file(const RecordOptions& options);
+
 // The encoder's arguments: raw RGB frames of `source` size on its standard input, upside down (as
-// a framebuffer is read), into the video.
+// a framebuffer is read), into the video (into pictures_file, when it has sound).
 std::vector<std::string> encoder_arguments(const RecordOptions& options, FrameSize source);
+// The encoder's arguments that put the pictures and the sound (raw float samples at
+// kRecordSampleRate) together into the video: the pictures as they are, the sound as AAC.
+std::vector<std::string> muxer_arguments(const RecordOptions& options);
 // Those arguments as one command line for Windows' shell, each quoted. (Elsewhere the encoder is
 // started with them as they are, through no shell.)
 std::string shell_command(const std::vector<std::string>& arguments);

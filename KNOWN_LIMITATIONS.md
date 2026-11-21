@@ -140,6 +140,9 @@ the same pull request.
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
   be drawn into): a phone that cannot draw several samples a pixel draws one, and says so.
+- `Material.set_emission` changes every material of that name at once: one object cannot glow
+  apart from the others that share its material. Each machine keeps its own glow, so a networked
+  game sets it on every machine.
 
 ## Multiplayer
 
@@ -242,7 +245,8 @@ the same pull request.
 
 - Recording a video (`redgem <game> --record out.mp4`) needs `ffmpeg` on the PATH, is only on the
   development program `redgem` (not on a built game's `redgem-player`), and cannot start on
-  Android.
+  Android. While it records the sound, nothing is heard, and after `Game.stop_recording` the game
+  stays silent for the rest of the run.
 
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change
   between runs), so regenerating a demo scene shows up as a change.
@@ -263,7 +267,22 @@ the same pull request.
 
 ## Before 1.0
 
-No 1.0 blocker is left (see the 1.0 cut plan).
+The 1.0 blockers still open are what a competitive multiplayer first-person shooter needs, and a
+menu whose look each game sets:
+
+- A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
+- Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
+- A character that changes shape (crouching) and will not stand up under a ceiling.
+- A first-person weapon drawn with its own field of view that never goes into walls.
+- Shots checked by the host against where the shooter saw the others (lag compensation).
+- Hit boxes on the bones of animated characters, posed on a dedicated server.
+- Rooms of more than 16 machines.
+- Inputs sent as numbered commands, character movement decided by the host, and prediction with
+  correction on the player's own machine.
+- An unreliable, sequenced channel for inputs and positions beside the reliable one.
+- Marks left on walls (bullet holes).
+- A theme for `GameMenu`: fonts, colors, buttons, layout, the title screen's background and logo,
+  transitions, sounds and music, from `game.json` or Ruby.
 
 ### Gameplay API
 

@@ -22,8 +22,8 @@ struct CliOptions {
   bool android_bundle = false;     // --bundle: an Android build makes an App Bundle (.aab), not an APK
   bool loose = false;              // --loose: a build keeps the game's files loose, not packed into game.rgpak
   std::optional<std::string> gpu;  // --gpu auto|dedicated|integrated (overrides the saved setting)
-  // --record <file> plays the game into a video (with --record-fps, --record-size, --record-scale
-  // and --record-seconds); no file: nothing is recorded.
+  // --record <file> plays the game into a video (with --record-fps, --record-size, --record-scale,
+  // --record-seconds and --record-audio); no file: nothing is recorded.
   RecordOptions record;
   bool editor_bridge = false;  // --editor-bridge: opt-in authenticated local tooling
   // --ruby-eval (development builds only): the bridge, answering game_eval too (project/ruby_eval.hpp)
