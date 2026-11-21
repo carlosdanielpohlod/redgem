@@ -74,6 +74,9 @@ constexpr double kOversleep = kTick;
 constexpr double kFloatRounding = 1e-3;
 constexpr double kStepTolerance = kTick + kFloatRounding;
 constexpr double kClockTolerance = 1e-9;
+constexpr int kFastTick = 128;
+constexpr double kFastTickSeconds = 1.0 / kFastTick;
+constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
 constexpr const char* kHeadEnd = "\r\n\r\n";
@@ -113,6 +116,20 @@ struct SlowGame {
     std::ofstream(game / "game.json") << "{\"script_budget_ms\": " << kSlowLevelBudgetMs << "}";
   }
   ~SlowGame() { std::filesystem::remove_all(root); }
+};
+
+// The sandbox game in a folder of its own, ticking at kFastTick.
+struct FastGame {
+  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-fast-tick-test";
+  std::filesystem::path game = root / "game";
+
+  FastGame() {
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+    std::ofstream(game / "game.json") << "{\"tick_hz\": " << kFastTick << "}";
+  }
+  ~FastGame() { std::filesystem::remove_all(root); }
 };
 
 // The game time of a room and its clock's reading, both read at the same turn of the room's.
@@ -426,6 +443,41 @@ TEST_CASE("the server's turns keep to its clock until it is asked to stop") {
   CHECK(on_time);
   CHECK(clock.sleeps() == kServedTurns);
   CHECK(clock.slept() == doctest::Approx(kServedTurns * kTick));
+}
+
+TEST_CASE("a server of a game at 128 Hz takes its lobby's turns at 128 Hz, and its budget is a step of it") {
+  const FastGame fast;
+  test::FakeClock clock;
+  Online online_game(kRoomy, fast.game, kOneThread, &clock);
+  CHECK(online_game.server.tick_hz() == kFastTick);
+  const double started = clock.now();
+  int turns = 0;
+  bool on_time = true;
+  server::serve_until(online_game.server, [&] {
+    on_time = on_time && std::abs(clock.now() - (started + turns * kFastTickSeconds)) <= kClockTolerance;
+    return turns++ == kServedTurns;
+  });
+  CHECK(on_time);
+  CHECK(clock.slept() == doctest::Approx(kServedTurns * kFastTickSeconds));
+  const nlohmann::json status = server::status_json(online_game.server.status());
+  CHECK(status["frame_ms"]["budget"].get<double>() == doctest::Approx(kFastTickSeconds * kMillisecondsPerSecond));
+}
+
+TEST_CASE("a room of a game at 128 Hz plays a frame and a fixed step each 1/128 s of its clock") {
+  const FastGame fast;
+  test::FakeClock clock(0.0, test::RealSleep::Yes);
+  Online online_game(kRoomy, fast.game, kOneThread, &clock);
+  Engine& player = online_game.join();
+  CHECK(std::stod(online_game.served(player, "Time.fixed_delta")) == doctest::Approx(kFastTickSeconds));
+  const int first_frame = std::stoi(online_game.served(player, "Time.frame"));
+  const GameAndClock first = game_and_clock(online_game, player, clock);
+  for (int turn = 0; turn < kServedTurns; ++turn) game_and_clock(online_game, player, clock);
+  const GameAndClock last = game_and_clock(online_game, player, clock);
+  const int frames = std::stoi(online_game.served(player, "Time.frame")) - first_frame;
+  const double clock_passed = last.clock - first.clock;
+  CHECK(std::abs(last.game - first.game - clock_passed) <= kFastTickSeconds + kFloatRounding);
+  // (The frame count is read a turn or so after the clock: it may be a few turns ahead.)
+  CHECK(frames >= static_cast<int>(std::lround(clock_passed / kFastTickSeconds)));
 }
 
 TEST_CASE("a player whose connection to a full room drops gets its place back, with its id") {

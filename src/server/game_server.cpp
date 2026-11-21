@@ -6,6 +6,7 @@
 #include <thread>
 #include <variant>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
@@ -24,6 +25,7 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
+  tick_hz_ = read_game_settings(settings_.game_dir).tick_hz;
   started_at_ = clock().now();
   return open_saves(error) && take_identity(error) &&
          lobby_.open(settings_.port, error, settings_.connections_per_address, identity_) && open_status(error);

@@ -1,7 +1,6 @@
 // GameServer: how busy it is, on its status port and in its log.
 
 #include "app/crash_report.hpp"
-#include "core/config.hpp"
 #include "core/log.hpp"
 #include "net/traffic.hpp"
 #include "server/game_server.hpp"
@@ -25,7 +24,7 @@ ServerStatus GameServer::status() const {
   status.uptime_seconds = clock().now() - started_at_;
   status.max_rooms = settings_.limits.max_rooms;
   status.max_players = settings_.limits.max_players;
-  status.tick_seconds = config::kDefaultFixedDeltaSeconds;
+  status.tick_seconds = tick_seconds();
   status.threads = threads_.size();
   status.max_threads = settings_.threads;
   status.traffic = traffic_.per_second();
