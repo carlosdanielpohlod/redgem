@@ -5,6 +5,7 @@
 #include <string>
 #include <variant>
 
+#include "app/terrain_files.hpp"
 #include "scene/scene_desc.hpp"
 
 namespace redgem {
@@ -12,9 +13,10 @@ namespace redgem {
 // Whether a folder is a game: it holds the scene a game starts with (scene.glb).
 bool is_game_folder(const std::filesystem::path& folder);
 
-// A game's scene.glb, read (what the loader has to say about it is logged); the error when it
-// cannot be read.
-std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir);
+// A game's scene.glb, read (what the loader has to say about it is logged), with its terrains'
+// ground layers as `reading` says; the error when it cannot be read.
+std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir,
+                                                     TerrainReading reading = TerrainReading::WeightsAndPictures);
 
 // Where a game keeps the scene a script calls `name` ("main" is scene.glb).
 std::filesystem::path scene_file(const std::filesystem::path& game_dir, const std::string& name);

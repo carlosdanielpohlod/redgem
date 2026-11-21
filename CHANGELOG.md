@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Terrains have ground layers (experimental).** An object with `terrain_layers = "island"` takes
+  up to eight ground materials from the game's `terrains/island.json`, each with its color, normal,
+  roughness, occlusion and height pictures, and their weights from a splat map saved beside it as
+  `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
+  1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
+  alone.
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.

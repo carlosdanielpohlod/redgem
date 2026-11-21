@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "core/math.hpp"
+#include "scene/ground/terrain_layers.hpp"
 #include "scene/property.hpp"
 #include "scene/transform.hpp"
 
@@ -259,6 +260,9 @@ struct SceneDesc {
   std::vector<DecodedPicture> decoded_images;
   std::vector<SkinDesc> skins;
   std::vector<AnimationDesc> animations;
+  // The ground layers of the objects that name a layers file (props::kTerrainLayers), read from the
+  // game's folder when the scene is loaded for a game, the editor or the tools: not in the scene file.
+  std::vector<TerrainLayers> terrains;
 
   int find_node(const std::string& name) const;
 };

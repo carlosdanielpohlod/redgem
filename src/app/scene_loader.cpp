@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "app/scene_files.hpp"
+#include "app/terrain_files.hpp"
 #include "core/wait_length.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
@@ -147,7 +148,9 @@ LoadResult read_scene_data(const std::filesystem::path& game, const std::string&
     result.error = "scene must be a regular file inside the game without symbolic links";
     return result;
   }
-  return load_gltf_scene(file.string());
+  result = load_gltf_scene(file.string());
+  if (result.ok) attach_terrain_layers(result.scene, game);
+  return result;
 }
 
 void decode_scene_pictures(SceneDesc& scene) {
