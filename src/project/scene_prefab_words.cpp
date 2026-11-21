@@ -81,14 +81,24 @@ std::string apply_words(SceneEdit& edit, int& node, const std::vector<std::strin
   return {};
 }
 std::string path_text(const std::string& path) { return path.empty() ? kPlacementRootWord : path; }
+
+// The scene with the placement's override of `path` taken out.
+SceneDesc without_override(const SceneDocument& document, int placement, const std::string& path) {
+  SceneDesc scene = document.desc();
+  auto overrides = prefabs::read_overrides(scene.nodes.at(static_cast<std::size_t>(placement)).props);
+  overrides.erase(path);
+  prefabs::write_overrides(scene.nodes.at(static_cast<std::size_t>(placement)).props, overrides);
+  return scene;
+}
 }  // namespace
 
 std::optional<NodeDesc> inherited_part(const SceneDocument& document, int placement,
-                                       const std::filesystem::path& game_dir, const std::string& path,
+                                       const std::filesystem::path& game_dir, const std::string& path, bool own,
                                        std::string& error) {
   try {
     prefabs::Origins origins;
-    const auto resolved = prefabs::resolve(document.desc(), game_dir, {}, &origins);
+    const auto scene = own ? document.desc() : without_override(document, placement, path);
+    const auto resolved = prefabs::resolve(scene, game_dir, {}, &origins);
     const auto origin = origins.find(placement);
     const auto part = origin == origins.end() ? nullptr : &origin->second.parts;
     if (part && part->count(path) != 0) return resolved.nodes.at(static_cast<std::size_t>(part->at(path)));
@@ -99,12 +109,13 @@ std::optional<NodeDesc> inherited_part(const SceneDocument& document, int placem
   return std::nullopt;
 }
 
-std::optional<prefabs::PartOverride> part_change(const NodeDesc& part, const std::vector<std::string>& words,
+std::optional<prefabs::PartOverride> part_change(const NodeDesc& current, const NodeDesc& base,
+                                                 const std::vector<std::string>& words,
                                                  const std::filesystem::path& scripts_dir, std::string& error,
                                                  std::vector<std::string>& notes) {
   auto scratch = SceneDocument::create_empty(scripts_dir / kScratchName);
-  int node = scratch_node(scratch, part);
-  const NodeDesc before = scratch.node(node);
+  const NodeDesc before = scratch.node(scratch_node(scratch, base));
+  int node = scratch_node(scratch, current);
   SceneEdit edit{scratch, scripts_dir, {}};
   prefabs::PartOverride change;
   error = apply_words(edit, node, words, change.removed);

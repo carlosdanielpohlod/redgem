@@ -1,12 +1,17 @@
 #include "editor/prefab_instances.hpp"
 
+#include <algorithm>
 #include <exception>
+#include <optional>
 #include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
+#include "core/log.hpp"
 #include "core/safe_path.hpp"
+#include "core/translations.hpp"
+#include "storage/durable_file.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/prefab_import.hpp"
 #include "scene/props.hpp"
@@ -38,7 +43,7 @@ bool guarded(const std::function<bool()>& work, std::string& error) {
   }
 }
 template <typename T>
-const T& held(const std::optional<T>& value, const char* what) {
+const T& held(const std::optional<T>& value, const std::string& what) {
   if (!value) throw std::runtime_error(what);
   return *value;
 }
@@ -56,7 +61,7 @@ PropertyMap root_props(const NodeDesc& placement) {
   return result;
 }
 void require_placement(const SceneDocument& document, int placement) {
-  require(is_placement(document, placement), "the object is not a prefab placement");
+  require(is_placement(document, placement), tr("editor.prefab.not_placement"));
 }
 int by_identity(const SceneDesc& scene, const std::string& identity) {
   for (std::size_t i = 0; i < scene.nodes.size(); ++i) {
@@ -67,7 +72,7 @@ int by_identity(const SceneDesc& scene, const std::string& identity) {
 std::string identity_of(const SceneDocument& document, int node) { return document.node(node).stable_id; }
 int found_identity(const SceneDocument& document, const std::string& identity) {
   const int node = by_identity(document.desc(), identity);
-  require(node != kNoIndex, "an object went missing while changing the placement");
+  require(node != kNoIndex, tr("editor.prefab.object_missing"));
   return node;
 }
 
@@ -92,9 +97,9 @@ std::string prop_value(const PartOverride& part, const std::string& key) {
 std::string field_value(const PartOverride& part, const std::string& name) {
   const std::string prefix = prefabs::field::kPropPrefix;
   if (name.rfind(prefix, 0) == 0) return prop_value(part, name.substr(prefix.size()));
-  if (name == prefabs::field::kPosition) return vector_text(held(part.position, name.c_str()));
-  if (name == prefabs::field::kScale) return vector_text(held(part.scale, name.c_str()));
-  if (name == prefabs::field::kRotation) return vector_text(quat_to_euler_degrees(held(part.rotation, name.c_str())));
+  if (name == prefabs::field::kPosition) return vector_text(held(part.position, name));
+  if (name == prefabs::field::kScale) return vector_text(held(part.scale, name));
+  if (name == prefabs::field::kRotation) return vector_text(quat_to_euler_degrees(held(part.rotation, name)));
   return name == prefabs::field::kRemoved ? kTrueText : kSetText;
 }
 
@@ -104,57 +109,74 @@ void write(SceneDocument& document, int placement, const Overrides& overrides, b
 }
 
 fs::path prefab_path(const fs::path& game, const std::string& uri) {
-  require(safe_asset_name(uri), "unsafe prefab file path");
-  require(!through_link(game, fs::u8path(uri)), "prefab file uses a symbolic link");
+  require(safe_asset_name(uri), tr("editor.prefab.unsafe_file"));
+  require(!through_link(game, fs::u8path(uri)), tr("editor.prefab.linked_file"));
   const auto found = file_inside(game, fs::u8path(uri));
-  return held(found, ("prefab file is missing or outside the game: " + uri).c_str());
+  return held(found, tr("editor.prefab.missing_file", {{"file", uri}}));
 }
 fs::path placement_file(const SceneDocument& document, int placement, const fs::path& game) {
   return prefab_path(fs::weakly_canonical(game), get_string(document.node(placement).props, props::kPrefabFile).value_or(""));
 }
 
 // Where a part path lands in a prefab file: a node of it, and what is left of the path when that
-// node is itself a placement (the part is then in its file).
+// node is itself a placement (the part is then in its file). Nothing when the file has no such part.
 struct Spot {
   int node = kNoIndex;
   std::string rest;
 };
-Spot locate(const SceneDesc& file, const std::string& path) {
+std::optional<Spot> locate(const SceneDesc& file, const std::string& path) {
   std::string rest = path;
   while (!rest.empty()) {
     auto [step, after] = prefabs::first_step(rest);
     const int node = by_identity(file, step);
-    require(node != kNoIndex, "the prefab file has no part " + path);
-    if (after.empty() || file.nodes[node].props.count(props::kPrefabFile) != 0) return {node, after};
+    if (node == kNoIndex) return std::nullopt;
+    if (after.empty() || file.nodes[node].props.count(props::kPrefabFile) != 0) return Spot{node, after};
     rest = after;
   }
-  return {0, {}};
+  return Spot{0, {}};
 }
+void report_missing(const std::string& path) { log::warning(tr("editor.prefab.part_missing", {{"part", path}})); }
 
 // Writes overrides into nodes copied from a prefab file: the file itself (offset 0), or a copy of
-// its nodes placed in a scene from `offset` on.
+// its nodes placed in a scene from `offset` on. It finds them by identity, so moving nodes around
+// (which renumbers them) is fine. Overrides of parts the file no longer has are reported and
+// skipped, as loading does.
 class PartWriter {
  public:
-  PartWriter(SceneDocument& document, const SceneDesc& file, int offset)
-      : document_(document), file_(file), offset_(offset) {}
+  PartWriter(SceneDocument& document, const SceneDesc& file, int offset) : document_(document), file_(file) {
+    for (std::size_t i = 0; i < file.nodes.size(); ++i)
+      identities_.push_back(identity_of(document, offset + static_cast<int>(i)));
+  }
   void write_all(const Overrides& overrides) {
     for (const auto& [path, change] : overrides) write_part(path, change);
   }
-  Spot spot(const std::string& path) const {
-    auto found = locate(file_, path);
-    found.node += offset_;
-    return found;
+  // Where an added child hangs: its part, or the root for none, a missing one or a removed one.
+  Spot hang_spot(const NodeDesc& child) const {
+    const auto part = get_string(child.props, props::kPrefabParent).value_or(kRootPath);
+    const auto found = locate(file_, part);
+    if (!found) report_missing(part);
+    const bool usable = found && !inside_removed(node_of(found->node));
+    return usable ? Spot{node_of(found->node), found->rest} : Spot{node_of(0), {}};
   }
   void remove_marked() {
     for (const auto& identity : removed_) document_.remove(found_identity(document_, identity));
   }
 
  private:
+  int node_of(int file_node) const { return found_identity(document_, identities_.at(file_node)); }
+  bool inside_removed(int node) const {
+    for (; node != kNoIndex; node = document_.node(node).parent) {
+      if (std::find(removed_.begin(), removed_.end(), identity_of(document_, node)) != removed_.end()) return true;
+    }
+    return false;
+  }
   void write_part(const std::string& path, const PartOverride& change) {
-    const auto where = spot(path);
-    if (!where.rest.empty()) return override_nested(where.node, where.rest, change);
-    change_node(where.node, change);
-    if (change.removed) removed_.push_back(identity_of(document_, where.node));
+    const auto where = locate(file_, path);
+    if (!where) return report_missing(path);
+    const int node = node_of(where->node);
+    if (!where->rest.empty()) return override_nested(node, where->rest, change);
+    change_node(node, change);
+    if (change.removed) removed_.push_back(identity_of(document_, node));
   }
   void change_node(int index, const PartOverride& change) {
     NodeDesc changed = document_.node(index);
@@ -172,15 +194,10 @@ class PartWriter {
   }
   SceneDocument& document_;
   const SceneDesc& file_;
-  int offset_;
+  std::vector<std::string> identities_;  // of the document's copy of each file node
   std::vector<std::string> removed_;
 };
 
-// The part an added child hangs from, as a spot in the file.
-Spot hang_spot(const PartWriter& writer, const NodeDesc& child) {
-  const auto part = get_string(child.props, props::kPrefabParent);
-  return part ? writer.spot(*part) : writer.spot(kRootPath);
-}
 void hang_as(SceneDocument& document, int node, const std::string& rest) {
   if (rest.empty()) return document.remove_prop(node, props::kPrefabParent, false);
   document.set_prop(node, props::kPrefabParent, rest, false);
@@ -193,8 +210,8 @@ void set_props(SceneDocument& document, int node, const PropertyMap& values) {
 void copy_child(SceneDocument& scene, int child, SceneDocument& file, const PartWriter& writer) {
   std::string error;
   const auto bytes = scene.copy_nodes({child}, error);
-  const auto where = hang_spot(writer, scene.node(child));
-  const auto pasted = file.paste_nodes(held(bytes, error.c_str()), where.node, error);
+  const auto where = writer.hang_spot(scene.node(child));
+  const auto pasted = file.paste_nodes(held(bytes, error), where.node, error);
   require(!pasted.empty(), error);
   file.set_local(pasted.front(), scene.node(child).local, false);
   hang_as(file, pasted.front(), where.rest);
@@ -220,17 +237,23 @@ std::string clear_applied(SceneDocument& scene, int placement) {
   if (!children.empty()) scene.remove(children);
   return {};
 }
+// The prefab file is written first; when the scene then cannot change, it gets its bytes back.
 bool apply_to_file(SceneDocument& scene, int placement, const fs::path& game, std::string& error) {
-  auto opened = SceneDocument::open(placement_file(scene, placement, game));
+  const auto path = placement_file(scene, placement, game);
+  const auto before = held(read_file_up_to(path, prefabs::Limits::kDefaultInputBytes), tr("editor.prefab.unreadable"));
+  auto opened = SceneDocument::open(path);
   if (const auto* problem = std::get_if<std::string>(&opened)) throw std::runtime_error(*problem);
   write_file(scene, placement, std::get<SceneDocument>(opened));
-  return scene.edit_nodes([&] { return clear_applied(scene, placement); }, error);
+  if (scene.edit_nodes([&] { return clear_applied(scene, placement); }, error)) return true;
+  durable::write_flushed(path, std::string(before.begin(), before.end()));
+  return false;
 }
 
 // --- unpack ---
 struct Unpacking {
   NodeDesc placement;
   SceneDesc file;
+  std::vector<std::uint8_t> bytes;
   int first = kNoIndex;  // the copied file's first node in the scene
 };
 void move_children(SceneDocument& scene, const Unpacking& unpacking, const PartWriter& writer) {
@@ -239,13 +262,12 @@ void move_children(SceneDocument& scene, const Unpacking& unpacking, const PartW
   for (const int child : unpacking.placement.children) children.push_back(identity_of(scene, child));
   for (const auto& identity : children) {
     const int child = found_identity(scene, identity);
-    const auto where = hang_spot(writer, scene.node(child));
+    const auto where = writer.hang_spot(scene.node(child));
     const Transform local = scene.node(child).local;
     hang_as(scene, scene.reparent(child, where.node, false, &local), where.rest);
   }
 }
-void place_root(SceneDocument& scene, const Unpacking& unpacking) {
-  const int root = unpacking.first;
+void place_root(SceneDocument& scene, int root, const Unpacking& unpacking) {
   scene.set_local(root, prefabs::checked_placement(combine(unpacking.placement.local, unpacking.file.nodes[0].local)),
                   false);
   scene.remove_prop(root, props::kPrefab, false);
@@ -255,58 +277,58 @@ void place_root(SceneDocument& scene, const Unpacking& unpacking) {
     if (value != unpacking.placement.props.end()) scene.set_prop(root, key, value->second, false);
   }
 }
-std::string unpack_nodes(SceneDocument& scene, const Unpacking& unpacking) {
+std::string unpack_nodes(SceneDocument& scene, const Unpacking& unpacking, std::string& root) {
   PartWriter writer(scene, unpacking.file, unpacking.first);
-  const std::string root = identity_of(scene, unpacking.first);
+  root = identity_of(scene, unpacking.first);
   writer.write_all(prefabs::read_overrides(unpacking.placement.props));
-  place_root(scene, unpacking);
+  place_root(scene, found_identity(scene, root), unpacking);
   move_children(scene, unpacking, writer);
   writer.remove_marked();
   scene.remove(found_identity(scene, unpacking.placement.stable_id));
   scene.set_name(found_identity(scene, root), unpacking.placement.name);
   return {};
 }
-std::string unpack_or_reason(SceneDocument& scene, const Unpacking& unpacking) {
+std::string unpack_or_reason(SceneDocument& scene, const Unpacking& unpacking, std::string& root) {
   try {
-    return unpack_nodes(scene, unpacking);
+    return unpack_nodes(scene, unpacking, root);
   } catch (const std::exception& problem) {
     return problem.what();
   }
 }
-Unpacking paste_file(SceneDocument& scene, int placement, const fs::path& game) {
+Unpacking read_source(const SceneDocument& scene, int placement, const fs::path& game) {
   const auto path = placement_file(scene, placement, game);
   auto loaded = load_gltf_scene(path.u8string());
   require(loaded.ok, loaded.error);
-  const auto bytes = read_file_up_to(path, prefabs::Limits::kDefaultInputBytes);
-  Unpacking unpacking{scene.node(placement), std::move(loaded.scene), scene.node_count()};
-  std::string error;
-  const auto pasted = scene.paste_nodes(held(bytes, "cannot read the prefab file"), scene.node(placement).parent, error);
-  require(pasted.size() == 1 && pasted.front() == unpacking.first, error.empty() ? "cannot copy the prefab" : error);
-  return unpacking;
+  auto bytes = held(read_file_up_to(path, prefabs::Limits::kDefaultInputBytes), tr("editor.prefab.unreadable"));
+  return {scene.node(placement), std::move(loaded.scene), std::move(bytes), scene.node_count()};
 }
+void paste_source(SceneDocument& scene, const Unpacking& unpacking) {
+  std::string error;
+  const auto pasted = scene.paste_nodes(unpacking.bytes, unpacking.placement.parent, error);
+  const bool one_root = pasted.size() == 1 && pasted.front() == unpacking.first;
+  require(one_root, error.empty() ? tr("editor.prefab.cannot_copy") : error);
+}
+// The copy and the edits that finish it are one undo step; a failure leaves no step behind.
 int unpack_placement(SceneDocument& scene, int placement, const fs::path& game, std::string& error) {
   prefabs::read_overrides(scene.node(placement).props);  // refuses malformed overrides before any change
-  const auto unpacking = paste_file(scene, placement, game);
-  const std::string root = identity_of(scene, unpacking.first);
-  if (!scene.edit_nodes([&] { return unpack_or_reason(scene, unpacking); }, error)) {
-    scene.undo();  // takes the copy back out
-    return kNoIndex;
-  }
-  scene.join_last_steps();
+  const auto unpacking = read_source(scene, placement, game);
+  std::string root;
+  const auto make = [&] { paste_source(scene, unpacking); };
+  if (!scene.make_then_edit(make, [&] { return unpack_or_reason(scene, unpacking, root); }, error)) return kNoIndex;
   return found_identity(scene, root);
 }
 // --- revert ---
 bool revert_root_prop(SceneDocument& document, int placement, const std::string& name) {
   const std::string prefix = prefabs::field::kPropPrefix;
-  require(name.rfind(prefix, 0) == 0, "the placement's own fields are its properties: props.<name>");
+  require(name.rfind(prefix, 0) == 0, tr("editor.prefab.root_fields"));
   const auto key = name.substr(prefix.size());
-  require(root_props(document.node(placement)).count(key) != 0, "the placement does not override " + key);
+  require(root_props(document.node(placement)).count(key) != 0, tr("editor.prefab.not_overridden", {{"field", key}}));
   document.remove_prop(placement, key);
   return true;
 }
 bool revert_part(SceneDocument& document, int placement, const std::string& path, const std::string& name) {
   auto overrides = overrides_of(document, placement);
-  require(prefabs::revert_field(overrides, path, name), "nothing to revert at " + path + " " + name);
+  require(prefabs::revert_field(overrides, path, name), tr("editor.prefab.nothing_to_revert", {{"part", path}, {"field", name}}));
   write(document, placement, overrides, true);
   return true;
 }
@@ -343,10 +365,25 @@ bool set_override(SceneDocument& document, int placement, const std::string& pat
   return guarded(
       [&] {
         require_placement(document, placement);
-        require(!path.empty(), "name an inherited part; the placement's own fields are edited on it");
+        require(!path.empty(), tr("editor.prefab.part_needed"));
         auto overrides = overrides_of(document, placement);
         prefabs::merge_override(overrides[path], change);
         if (overrides[path].empty()) overrides.erase(path);
+        write(document, placement, overrides, true);
+        return true;
+      },
+      error);
+}
+
+bool replace_override(SceneDocument& document, int placement, const std::string& path, const PartOverride& change,
+                      std::string& error) {
+  return guarded(
+      [&] {
+        require_placement(document, placement);
+        require(!path.empty(), tr("editor.prefab.part_needed"));
+        auto overrides = overrides_of(document, placement);
+        overrides[path] = change;
+        if (change.empty()) overrides.erase(path);
         write(document, placement, overrides, true);
         return true;
       },

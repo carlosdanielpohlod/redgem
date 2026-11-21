@@ -207,10 +207,16 @@ ToolResult overrides(OpenScene& scene) {
 
 std::optional<prefabs::PartOverride> line_change(OpenScene& scene, int placement, std::string& error,
                                                  std::vector<std::string>& notes) {
-  const auto part = inherited_part(scene.document, placement, scene.game_dir, part_word(scene, kPartWord), error);
-  if (!part) return std::nullopt;
+  const auto path = part_word(scene, kPartWord);
+  const auto current = inherited_part(scene.document, placement, scene.game_dir, path, true, error);
+  const auto base = current ? inherited_part(scene.document, placement, scene.game_dir, path, false, error) : current;
+  if (!base) return std::nullopt;
   const std::vector<std::string> words(scene.line.words.begin() + kFirstOverrideWord, scene.line.words.end());
-  return part_change(*part, words, scene.game_dir / config::kScriptsDirName, error, notes);
+  auto change = part_change(*current, *base, words, scene.game_dir / config::kScriptsDirName, error, notes);
+  const auto overrides = prefab_instances::overrides_of(scene.document, placement);
+  const auto old = overrides.find(path);
+  if (change && old != overrides.end()) change->removed = change->removed || old->second.removed;
+  return change;
 }
 
 ToolResult override_part(OpenScene& scene) {
@@ -221,7 +227,7 @@ ToolResult override_part(OpenScene& scene) {
   std::vector<std::string> notes;
   const auto change = line_change(scene, index, error, notes);
   if (!change) return failed(error);
-  if (!prefab_instances::set_override(scene.document, index, part_word(scene, kPartWord), *change, error))
+  if (!prefab_instances::replace_override(scene.document, index, part_word(scene, kPartWord), *change, error))
     return failed(error);
   return saved_object(scene, index, notes);
 }

@@ -224,3 +224,41 @@ TEST_CASE("redgem scene overrides, override, revert, apply and unpack work on a 
   CHECK(game.played().find_node("Second") != kNoIndex);
   CHECK(run({"apply", "Second"}).exit_code != 0);
 }
+
+TEST_CASE("unpacking keeps every added child, skips stale overrides, and keeps children of removed parts") {
+  Game game;
+  auto scene = game.scene();
+  const int first = find(scene, "First");
+  std::string error;
+  PartOverride gone;
+  gone.removed = true;
+  REQUIRE(prefab_instances::set_override(scene, first, "lid", gone, error));
+  REQUIRE(prefab_instances::set_override(scene, first, "missing", moved_to(9), error));
+  scene.add_empty("Plain", first);
+  const int hung = scene.add_empty("Hung", find(scene, "First"));
+  scene.set_prop(hung, props::kPrefabParent, std::string("lid"));
+  scene.add_empty("Other", find(scene, "First"));
+  test::LogCapture log;
+  const int root = prefab_instances::unpack(scene, find(scene, "First"), game.dir, error);
+  REQUIRE_MESSAGE(root != kNoIndex, error);
+  CHECK(log.contains("missing"));
+  for (const char* name : {"Plain", "Hung", "Other"}) {
+    CHECK(scene.node(find(scene, name)).parent == find(scene, "First"));
+  }
+  CHECK(scene.desc().find_node("lid") == kNoIndex);
+}
+
+TEST_CASE("an override set back to the file's value is no longer an override") {
+  Game game;
+  game.scene();
+  const auto run = [&game](std::vector<std::string> words) {
+    words.insert(words.begin() + 1, game.dir.string());
+    return tools::run_scene_command(words);
+  };
+  REQUIRE(run({"override", "First", "lid", "prop.color=red"}).exit_code == 0);
+  CHECK(run({"overrides", "First"}).out == "lid props.color=red\n");
+  REQUIRE(run({"override", "First", "lid", "prop.color="}).exit_code == 0);
+  CHECK(run({"overrides", "First"}).out.find("no overrides") != std::string::npos);
+  REQUIRE(run({"override", "First", "lid", "position=0,1,0"}).exit_code == 0);
+  CHECK(run({"overrides", "First"}).out.find("no overrides") != std::string::npos);
+}

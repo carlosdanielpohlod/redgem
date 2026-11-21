@@ -32,6 +32,10 @@ prefabs::Overrides overrides_of(const SceneDocument& document, int placement);
 bool set_override(SceneDocument& document, int placement, const std::string& path,
                   const prefabs::PartOverride& change, std::string& error);
 
+// Makes `change` the whole override of the part at `path` (an empty one removes it). One undo step.
+bool replace_override(SceneDocument& document, int placement, const std::string& path,
+                      const prefabs::PartOverride& change, std::string& error);
+
 // Drops one field of a part (`path` "" with "props.<key>": a root property the placement
 // overrides); a whole part when `name` is empty; every override and root property when both are.
 // Children added under the placement are kept. One undo step.

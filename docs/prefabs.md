@@ -101,6 +101,10 @@ source root, as before.
   applied, removed parts left out and added children kept where they hang. A nested placement in
   the file stays a placement (one level is unpacked). The objects get new identities.
 
+Apply and unpack skip, with a warning, overrides of parts the file no longer has; a child hung
+from such a part, or from a removed one, goes under the root. `redgem scene override` records a
+field only while it differs from the file: setting it back to the file's value drops it.
+
 Each is one undo step. From the command line: `redgem scene overrides`, `override`, `revert`,
 `apply` and `unpack` (see [the command line](command-line.md)).
 
