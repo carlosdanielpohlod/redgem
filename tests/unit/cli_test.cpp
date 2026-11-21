@@ -13,6 +13,7 @@
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
 #include "core/translations.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -60,7 +61,7 @@ TEST_CASE("errors") {
 }
 
 TEST_CASE("a word that names no folder to open or play is refused, most likely a mistyped command") {
-  const std::filesystem::path missing = std::filesystem::temp_directory_path() / "redgem_cli_no_such_game";
+  const std::filesystem::path missing = redgem::test::temp_root() / "redgem_cli_no_such_game";
   std::filesystem::remove_all(missing);
   for (const std::vector<std::string>& line :
        {std::vector<std::string>{missing.string()}, std::vector<std::string>{missing.string(), "--play"}}) {
@@ -69,7 +70,7 @@ TEST_CASE("a word that names no folder to open or play is refused, most likely a
     CHECK(missing_game_folder(result.options).find("no game folder at") != std::string::npos);
   }
   CHECK(missing_game_folder(parse_cli({}).options).empty());  // the project hub
-  CHECK(missing_game_folder(parse_cli({std::filesystem::temp_directory_path().string()}).options).empty());
+  CHECK(missing_game_folder(parse_cli({redgem::test::temp_root().string()}).options).empty());
   // (A new game makes its folder; a build says itself what is wrong with the game.)
   CHECK(missing_game_folder(parse_cli({"new", missing.string()}).options).empty());
   CHECK(missing_game_folder(parse_cli({"build", missing.string(), "out"}).options).empty());

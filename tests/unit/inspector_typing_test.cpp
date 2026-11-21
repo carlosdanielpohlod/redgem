@@ -13,6 +13,7 @@
 #include "editor/edit_stream.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/inspector_cards.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -37,7 +38,7 @@ ImVec2 middle(const ImVec2& min, const ImVec2& max) { return {(min.x + max.x) / 
 
 // An interface nobody sees, and two objects to edit in it.
 struct Editor {
-  SceneDocument doc = SceneDocument::create_empty(std::filesystem::temp_directory_path() / "redgem_typing.glb");
+  SceneDocument doc = SceneDocument::create_empty(redgem::test::temp_root() / "redgem_typing.glb");
   int first = doc.add_empty("First");
   int second = doc.add_empty("Second");
   int selection = first;

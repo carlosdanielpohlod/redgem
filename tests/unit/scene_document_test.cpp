@@ -19,6 +19,7 @@
 #include "scene/scene_config.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -47,7 +48,7 @@ SceneDocument open_fixture() {
 }
 
 std::filesystem::path temp_copy_path(const std::string& name) {
-  return std::filesystem::temp_directory_path() / ("redgem_test_" + name + ".glb");
+  return redgem::test::temp_root() / ("redgem_test_" + name + ".glb");
 }
 
 }  // namespace

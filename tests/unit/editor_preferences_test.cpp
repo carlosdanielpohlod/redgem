@@ -8,13 +8,14 @@
 #include "editor/editor_preferences.hpp"
 #include "editor/gizmo.hpp"
 #include "scene/scene_ids.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
 namespace {
 
 struct Scratch {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / ("redgem-editor-prefs-" + make_scene_id());
+  std::filesystem::path folder = redgem::test::temp_root() / ("redgem-editor-prefs-" + make_scene_id());
   std::filesystem::path file = folder / "editor-preferences.json";
 
   ~Scratch() {

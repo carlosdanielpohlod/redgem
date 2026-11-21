@@ -10,6 +10,7 @@
 #include "render_system/render_stage.hpp"
 #include "scene/particles.hpp"
 #include "scene/particle_emitters.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -101,7 +102,7 @@ void limit_glow(SceneDesc& desc) {
 
 // A sprite sheet of two cells in a row, red then green, in a folder of the test's own.
 std::filesystem::path write_sheet() {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-render-sheet";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-render-sheet";
   std::filesystem::create_directories(dir);
   Image sheet = GenImageColor(kCellPixels * 2, kCellPixels, kRed);
   ImageDrawRectangle(&sheet, kCellPixels, 0, kCellPixels, kCellPixels, kGreen);
@@ -266,7 +267,7 @@ std::size_t receiver_shadow_pixels(const Picture& plain, const Picture& shadowed
 }
 
 std::filesystem::path write_shadow_sheet() {
-  const auto dir = std::filesystem::temp_directory_path() / "redgem-render-shadow-sheet";
+  const auto dir = redgem::test::temp_root() / "redgem-render-shadow-sheet";
   std::filesystem::create_directories(dir);
   Image sheet = GenImageColor(kCellPixels * 2, kCellPixels, kShadowTransparent);
   ImageDrawCircle(&sheet, kCellPixels + kCellPixels / 2, kCellPixels / 2, kCellPixels / 3, kShadowOpaque);

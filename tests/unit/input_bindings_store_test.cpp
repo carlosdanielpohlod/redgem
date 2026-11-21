@@ -9,6 +9,7 @@
 
 #include "app/game_data_location.hpp"
 #include "app/input_bindings_store.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -18,7 +19,7 @@ constexpr std::size_t kThirdPad = 2;
 
 // A folder of the test's own, removed when the test ends.
 struct TempFolder {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-input-bindings-store-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-input-bindings-store-test";
   TempFolder() {
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);

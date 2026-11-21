@@ -12,6 +12,7 @@
 #include "editor/editor_app.hpp"
 #include "project/editor_setup.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -31,7 +32,7 @@ void frames(EditorApp& app) {
 }
 
 std::filesystem::path game_files() {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_npc_gizmos_editor";
+  const auto game = redgem::test::temp_root() / "redgem_npc_gizmos_editor";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);

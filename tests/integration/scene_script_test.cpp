@@ -11,6 +11,7 @@
 #include "core/config.hpp"
 #include "script/script_naming.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -162,7 +163,7 @@ TEST_CASE("a scene script of the wrong kind is reported") {
 }
 
 TEST_CASE("an object's script is a file of the game's scripts folder, or it is not loaded") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-script-outside-test";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem-script-outside-test";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   std::ofstream(game / "outside.rb") << "$outside_ran = true\nclass Outside < Behaviour\nend\n";
@@ -191,7 +192,7 @@ TEST_CASE("an object's script is a file of the game's scripts folder, or it is n
 // A constant of the class's name that is not a class is the script's mistake, reported like a
 // missing class: asking mruby for it as a class would raise where nothing catches it.
 TEST_CASE("a script's class name given to something that is not a class is reported, not fatal") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-not-a-class-test";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem-not-a-class-test";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   std::ofstream(game / "scripts" / "player.rb") << "Player = 5\n";

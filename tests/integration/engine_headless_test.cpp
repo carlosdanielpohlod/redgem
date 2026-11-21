@@ -21,6 +21,7 @@
 #include "script/script_config.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -414,7 +415,8 @@ TEST_CASE("an engine told to step fixedly plays the same game whatever time pass
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   for (int i = 0; i < kOneSecondOfFrames; ++i) engine.frame(kStall);
-  CHECK(engine.script_context().time.elapsed == doctest::Approx(kOneSecondOfFrames * config::kDefaultFixedDeltaSeconds));
+  CHECK(engine.script_context().time.elapsed ==
+        doctest::Approx(kOneSecondOfFrames * config::kDefaultFixedDeltaSeconds));
 }
 
 TEST_CASE("only fixed_step selects fixed stepping: without it the game follows the time it is given") {
@@ -614,7 +616,7 @@ TEST_CASE("spawning and destroying for a long time does not grow the scene or th
 }
 
 TEST_CASE("a game whose scene cannot be read says so before any window is opened") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_broken_scene";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_engine_broken_scene";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game);
   std::ofstream(game / config::kSceneFileName) << "this is no scene";
@@ -636,7 +638,7 @@ TEST_CASE("a game whose scene cannot be read says so before any window is opened
 }
 
 TEST_CASE("a game whose id cannot be used still plays, and is told") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_bad_id";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_engine_bad_id";
   std::filesystem::remove_all(game);
   std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
   std::ofstream(game / kGameSettingsFile) << R"({"id": "Not An Id"})";
@@ -670,7 +672,7 @@ std::unique_ptr<Engine> sandbox_saying(const std::filesystem::path& game, const 
 
 TEST_CASE("Game.version is the version game.json gives the game, nil when it gives none") {
   CHECK(ruby(*sandbox(), "Game.version.inspect") == "nil");
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_version";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_engine_version";
   CHECK(ruby(*sandbox_saying(game, R"({"version": "1.4.0-beta.2"})"), "Game.version") == "1.4.0-beta.2");
   test::LogCapture log;
   // One that is not a version is none, and the log says why.
@@ -680,7 +682,7 @@ TEST_CASE("Game.version is the version game.json gives the game, nil when it giv
 }
 
 TEST_CASE("a game played by nobody's window shows no splash picture, and plays all the same") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_loading_picture";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_engine_loading_picture";
   test::LogCapture log;
   auto engine = sandbox_saying(game, R"({"splash": "images/missing.png"})");
   frames(*engine, 1);
@@ -755,7 +757,7 @@ TEST_CASE("the frames-per-second counter is for whoever asks for it") { CHECK_FA
 TEST_CASE("the scene's animations play: bones move over time and loop") {
   constexpr int kHalfSecondFrames = 30;
   constexpr float kMinTurn = 0.2f;  // of the quaternion's x: the upper bone bends around X
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_animated_game";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem_animated_game";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game);
   std::filesystem::copy_file(fixture("skinned.glb"), game / "scene.glb");
@@ -815,7 +817,7 @@ std::unique_ptr<Engine> sandbox_keeping_settings(const std::filesystem::path& se
 }  // namespace
 
 TEST_CASE("what the player sets is kept for the game's next run, and the player's volume multiplies the game's") {
-  const std::filesystem::path settings = std::filesystem::temp_directory_path() / "redgem_engine_settings_test.json";
+  const std::filesystem::path settings = redgem::test::temp_root() / "redgem_engine_settings_test.json";
   std::filesystem::remove(settings);
   testing::RecordingAudio recording;
   {
@@ -845,7 +847,7 @@ namespace {
 
 // A copy of the sandbox game, of a studio of the tests', removed with what it kept when the test ends.
 struct NamedSandbox {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_engine_data_folder_game";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem_engine_data_folder_game";
   NamedSandbox() {
     std::filesystem::remove_all(dir);
     std::filesystem::copy(fixture("games/sandbox"), dir, std::filesystem::copy_options::recursive);
@@ -880,7 +882,7 @@ std::unique_ptr<Engine> keeping_data_in(const std::filesystem::path& game, const
 TEST_CASE(
     "a player's run keeps its save in the folder it is given; any other run in the developer's, never the players'") {
   const NamedSandbox game;
-  const std::filesystem::path players = std::filesystem::temp_directory_path() / "redgem_engine_players_folder";
+  const std::filesystem::path players = redgem::test::temp_root() / "redgem_engine_players_folder";
   std::filesystem::remove_all(players);
   ruby(*keeping_data_in(game.dir, players), "Save[:best] = 3");
   CHECK(std::filesystem::exists(game_data_files(players).save));

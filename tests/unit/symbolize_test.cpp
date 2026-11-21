@@ -14,6 +14,7 @@
 #include "core/platform.hpp"
 #include "project/crash_symbols.hpp"
 #include "project/symbolize_command.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -81,7 +82,7 @@ std::vector<unsigned char> symbols_picture() {
 // A folder of symbols with the report's build in it (as redgem-player.exe, in a folder of its own)
 // and a file that is no program.
 struct SymbolsFolder {
-  std::filesystem::path path = std::filesystem::temp_directory_path() / "redgem-symbolize-test";
+  std::filesystem::path path = redgem::test::temp_root() / "redgem-symbolize-test";
   std::filesystem::path player = path / "windows" / "redgem-player.exe";
 
   SymbolsFolder() {
@@ -241,7 +242,7 @@ TEST_CASE("redgem symbolize's command line: usage errors end with 2, what cannot
 }
 
 TEST_CASE("the addr2line used is LLVM's when the PATH has it, else binutils'") {
-  const std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-addr2line-test";
+  const std::filesystem::path root = redgem::test::temp_root() / "redgem-addr2line-test";
   const std::filesystem::path gnu = root / "gnu";
   const std::filesystem::path llvm = root / "llvm";
   std::filesystem::create_directories(gnu);

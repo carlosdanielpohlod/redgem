@@ -10,6 +10,7 @@
 #include "storage/save_file.hpp"
 #include "storage/save_slots.hpp"
 #include "testing/test_saves.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -20,7 +21,7 @@ namespace {
 struct NamedGame {
   std::filesystem::path dir;
   NamedGame(const std::string& folder, const std::string& title)
-      : dir(std::filesystem::temp_directory_path() / "redgem-testing-tests-named" / folder) {
+      : dir(redgem::test::temp_root() / "redgem-testing-tests-named" / folder) {
     std::filesystem::create_directories(dir);
     std::ofstream(dir / "game.json") << R"({"studio": "Pine Hill", "title": ")" << title << R"("})";
   }
@@ -52,7 +53,7 @@ TEST_CASE("test saves are kept in the user's own folder, not where every user of
 }
 
 TEST_CASE("tests run in a folder of their own save there, each in a file of its own, starting from nothing") {
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-tests-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-tests-work";
   const std::filesystem::path host = fresh_save_file_in(work, "tests/pairs/co_op_host_test.rb");
   const std::filesystem::path guest = fresh_save_file_in(work, "tests/pairs/co_op_guest_test.rb");
   CHECK(host != guest);
@@ -89,7 +90,7 @@ TEST_CASE("each test of each game keeps its settings in a file of its own, empti
   std::ofstream(first) << "{}";
   CHECK(fresh_settings_file_for(one, "", test) == first);
   CHECK_FALSE(std::filesystem::exists(first));
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-settings-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-settings-work";
   CHECK(fresh_settings_file_for(one, work, test).parent_path() == work / "saves");
 }
 
@@ -107,7 +108,7 @@ TEST_CASE("each test of each game keeps its players' bindings apart from its set
 
 TEST_CASE("a run that goes on from an earlier one plays with the files that run left, as it left them") {
   const std::filesystem::path game = "/nowhere/redgem-testing-tests/one/game";
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-kept-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-kept-work";
   const std::filesystem::path earlier = "/tests/system/x/settings_test.rb";
   const RunFiles first = fresh_run_files(game, work, earlier);
   CHECK(first.save == fresh_save_file_in(work, earlier));
@@ -126,7 +127,7 @@ TEST_CASE("a run that goes on from an earlier one plays with the files that run 
 
 TEST_CASE("a run that goes on from an earlier one plays on copies of its files, the same each time") {
   const std::filesystem::path game = "/nowhere/redgem-testing-tests/one/game";
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-copied-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-copied-work";
   const std::filesystem::path earlier = "/tests/system/x/settings_test.rb";
   const std::filesystem::path later = "/tests/system_restarts/x/settings_restarted_test.rb";
   const RunFiles first = fresh_run_files(game, work, earlier);
@@ -151,7 +152,7 @@ TEST_CASE("a run that goes on from an earlier one plays on copies of its files, 
 }
 
 TEST_CASE("a run in a work folder leaves word that it was made there, even having kept nothing") {
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-marked-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-marked-work";
   std::filesystem::remove_all(work);
   CHECK_FALSE(ran_in(work, "/tests/system/x/settings_test.rb"));
   mark_run(work, "/tests/system/x/settings_test.rb");
@@ -161,7 +162,7 @@ TEST_CASE("a run in a work folder leaves word that it was made there, even havin
 }
 
 TEST_CASE("copied game-test runs carry named slots and backups without sharing progress") {
-  const auto work = std::filesystem::temp_directory_path() / "redgem-testing-slots-work";
+  const auto work = redgem::test::temp_root() / "redgem-testing-slots-work";
   std::filesystem::remove_all(work);
   const auto first = fresh_run_files("/games/slot-test", work, "first_test.rb");
   SaveFile original(first.save);

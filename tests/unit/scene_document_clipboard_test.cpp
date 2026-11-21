@@ -16,6 +16,7 @@
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/props.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -37,7 +38,7 @@ SceneDocument open_scene(const std::string& file) {
 }
 
 std::filesystem::path temp_path(const std::string& name) {
-  return std::filesystem::temp_directory_path() / ("redgem_clipboard_" + name + ".glb");
+  return redgem::test::temp_root() / ("redgem_clipboard_" + name + ".glb");
 }
 
 std::vector<std::uint8_t> copied(SceneDocument& doc, const std::vector<std::string>& names) {
@@ -192,7 +193,7 @@ TEST_CASE("bytes that are not a scene paste nothing") {
 }
 
 TEST_CASE("pictures that are files next to the scene are carried inside a copy") {
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem_clipboard_pictures";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem_clipboard_pictures";
   std::filesystem::remove_all(folder);
   std::filesystem::create_directories(folder);
   std::filesystem::copy_file(fixture("images/sniff.png"), folder / "wood.png");

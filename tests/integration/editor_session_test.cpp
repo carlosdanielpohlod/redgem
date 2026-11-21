@@ -13,6 +13,7 @@
 #include "editor/scripts/script_files.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -34,7 +35,7 @@ void touch_later(const std::filesystem::path& path) {
 
 // Each test edits its own copy of the sandbox game.
 std::filesystem::path copy_sandbox(const std::string& name) {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem_editor_" + name);
+  const std::filesystem::path dir = redgem::test::temp_root() / ("redgem_editor_" + name);
   std::filesystem::remove_all(dir);
   std::filesystem::copy(fixture("games/sandbox"), dir, std::filesystem::copy_options::recursive);
   return dir;

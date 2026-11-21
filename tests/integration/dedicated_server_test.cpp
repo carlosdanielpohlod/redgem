@@ -25,6 +25,7 @@
 #include "server/stop_signals.hpp"
 #include "socket_rounds.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -102,7 +103,7 @@ std::string in_room(server::GameServer& server, const std::string& room, const s
 // The sandbox game in a folder of its own, with a level that may load slowly (kSlowScene), and
 // scripts given the time for it (past the engine's default budget).
 struct SlowGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-slow-level-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-slow-level-test";
   std::filesystem::path game = root / "game";
 
   SlowGame() {
@@ -126,7 +127,7 @@ bool offline(Engine& engine) { return engine.network().state() == net::NetworkSe
 
 // A dedicated server on this machine and the players who join it, each with an engine of its own.
 struct Online {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-dedicated-server-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-dedicated-server-test";
   server::GameServer server;
   std::vector<std::unique_ptr<Engine>> players;
 
@@ -440,7 +441,8 @@ TEST_CASE("a player whose connection to a full room drops gets its place back, w
   const auto until = [&](const std::function<bool()>& done) {
     return online_game.until([&] {
       network.pump();
-      for (net::NetworkEvent& event : dropping.poll(config::kDefaultFixedDeltaSeconds)) events.push_back(std::move(event));
+      for (net::NetworkEvent& event : dropping.poll(config::kDefaultFixedDeltaSeconds))
+        events.push_back(std::move(event));
       return done();
     });
   };

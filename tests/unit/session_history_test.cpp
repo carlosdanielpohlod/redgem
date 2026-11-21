@@ -10,6 +10,7 @@
 
 #include "editor/agent/session_history.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem::agent;
 namespace fs = std::filesystem;
@@ -19,7 +20,7 @@ namespace {
 constexpr std::int64_t kSomeTime = 1'800'000'000;  // seconds since 1970
 
 fs::path fresh_file(const std::string& name) {
-  const fs::path folder = fs::temp_directory_path() / name;
+  const fs::path folder = redgem::test::temp_root() / name;
   fs::remove_all(folder);
   fs::create_directories(folder);
   return folder / "agent-sessions.json";
