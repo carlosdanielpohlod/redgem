@@ -304,6 +304,8 @@ class EditorApp {
   void draw_script_tabs();
   void draw_viewport_window();
   void draw_viewport_image();
+  // What the Scene view shows only while editing: the selected NPCs' labels, and a drop target.
+  void draw_editing_overlays();
   void draw_npc_labels(const std::vector<NpcGizmo>& gizmos);
   void draw_viewport_drop_target();
   // What was dropped on a point of the Scene view (viewport pixels).

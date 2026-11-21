@@ -218,6 +218,10 @@ class Engine {
   // dedicated server's room, before any script asks for either.
   void open_network(const GameSettings& settings);
   void connect_effects();
+  // The network, the search for games on it, and web requests, for the scripts.
+  void connect_network();
+  // The sound, its occlusion asked of the bodies between a voice and the listener.
+  void connect_audio();
   // The scene, its bodies and its navigation, for the scripts.
   void connect_world();
   void connect_saves();

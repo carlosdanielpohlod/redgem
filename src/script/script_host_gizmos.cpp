@@ -21,6 +21,9 @@ mrb_value entry(mrb_state* mrb, mrb_value hash, const char* key) {
 }
 
 bool is_number(mrb_value value) { return mrb_float_p(value) || mrb_integer_p(value); }
+bool is_text(mrb_value value) { return mrb_string_p(value); }
+bool is_list(mrb_value value) { return mrb_array_p(value); }
+bool is_hash(mrb_value value) { return mrb_hash_p(value); }
 
 std::optional<float> number_at(mrb_state* mrb, mrb_value hash, const char* key) {
   const mrb_value value = entry(mrb, hash, key);
@@ -35,13 +38,13 @@ float number_or(mrb_state* mrb, mrb_value hash, const char* key, float fallback)
 
 std::optional<std::string> text_at(mrb_state* mrb, mrb_value hash, const char* key) {
   const mrb_value value = entry(mrb, hash, key);
-  if (!mrb_string_p(value)) return std::nullopt;
+  if (!is_text(value)) return std::nullopt;
   return std::string(RSTRING_PTR(value), static_cast<std::size_t>(RSTRING_LEN(value)));
 }
 
 std::vector<mrb_value> items_at(mrb_state* mrb, mrb_value hash, const char* key) {
   const mrb_value value = entry(mrb, hash, key);
-  if (!mrb_array_p(value)) return {};
+  if (!is_list(value)) return {};
   std::vector<mrb_value> items;
   for (mrb_int i = 0; i < RARRAY_LEN(value); ++i) items.push_back(mrb_ary_ref(mrb, value, i));
   return items;
@@ -84,7 +87,7 @@ void read_route(mrb_state* mrb, mrb_value hash, NpcSettings& settings) {
 
 NpcSettings settings_from(mrb_state* mrb, mrb_value hash) {
   NpcSettings settings;
-  if (!mrb_hash_p(hash)) return settings;
+  if (!is_hash(hash)) return settings;
   read_interactable(mrb, hash, settings);
   read_perception(mrb, hash, settings);
   read_schedule(mrb, hash, settings);
