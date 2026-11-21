@@ -13,6 +13,7 @@
 #include "app/game_data_location.hpp"
 #include "core/build_id.hpp"
 #include "core/platform.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::crash;
@@ -42,7 +43,7 @@ CrashFacts sample_facts() {
 
 // A crashes folder of its own, empty, removed at the end.
 struct ReportsFolder {
-  std::filesystem::path path = std::filesystem::temp_directory_path() / "redgem-untold-crash-test";
+  std::filesystem::path path = redgem::test::temp_root() / "redgem-untold-crash-test";
   ReportsFolder() {
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
@@ -131,7 +132,7 @@ TEST_CASE("a report with no backtrace says why") {
 }
 
 TEST_CASE("crash reports go in the crashes folder beside the game's save, named after the moment") {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-crash-folder-test";
+  const std::filesystem::path game = redgem::test::temp_root() / "redgem-crash-folder-test";
   std::filesystem::create_directories(game);
   std::ofstream(game / "game.json") << R"({"studio": "Pine Hill", "title": "Arena"})";
   const GameDataFiles files = game_data_files(players_data_folder(game));

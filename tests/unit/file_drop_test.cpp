@@ -6,13 +6,14 @@
 #include "core/config.hpp"
 #include "editor/file_drop.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
 namespace {
 
 struct Desk {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-file-drop-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-file-drop-test";
   std::filesystem::path game = root / "game";
 
   Desk() {

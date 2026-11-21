@@ -12,6 +12,7 @@
 #include "script/ruby_vm.hpp"
 #include "script/ruby_classes.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -54,7 +55,7 @@ class Mover < Behaviour
 end
 )";
 struct ReloadGame {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem-reload-" + make_scene_id());
+  std::filesystem::path dir = redgem::test::temp_root() / ("redgem-reload-" + make_scene_id());
   ReloadGame() {
     std::filesystem::create_directories(dir / "scripts");
     write(kOriginal);

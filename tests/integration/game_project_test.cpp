@@ -33,6 +33,7 @@
 #include "project/icons/icon_set.hpp"
 #include "core/safe_path.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -43,7 +44,7 @@ constexpr float kMinWalk = 2.0f;
 constexpr std::uintmax_t kMinToneBytes = 1000;
 
 std::filesystem::path fresh(const std::string& name) {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem_project_" + name);
+  const std::filesystem::path dir = redgem::test::temp_root() / ("redgem_project_" + name);
   std::filesystem::remove_all(dir);
   return dir;
 }
@@ -467,7 +468,7 @@ TEST_CASE("the platformer template comes with the sounds its scripts play") {
 }
 
 TEST_CASE("saving a game's settings keeps what else its game.json says") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-settings-keep-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-settings-keep-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   std::ofstream(dir / "game.json")
@@ -484,7 +485,7 @@ TEST_CASE("saving a game's settings keeps what else its game.json says") {
 }
 
 TEST_CASE("a built game never carries a signing key left in its folder") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-keys-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-keys-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   std::filesystem::copy(redgem::test::fixture("games/sandbox"), dir / "game_src",
@@ -504,7 +505,7 @@ TEST_CASE("a built game never carries a signing key left in its folder") {
 
 // Whatever its case or kind, and whatever the game.json's keystore is called.
 TEST_CASE("a built game carries no key in any case, nor the keystore its game.json names") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-named-keys-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-named-keys-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   const std::filesystem::path game = dir / "game_src";
@@ -529,7 +530,7 @@ TEST_CASE("a built game carries no key in any case, nor the keystore its game.js
 // The keystore is told by being the same file: an absolute path, or one in another case where the
 // system ignores case (Windows, macOS), names it as well.
 TEST_CASE("a built game never carries the keystore its game.json names by an absolute path or in another case") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-keystore-path-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-keystore-path-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   const std::filesystem::path game = dir / "game_src";
@@ -614,7 +615,7 @@ TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, 
 }
 
 TEST_CASE("a new game's guide for whoever makes it stays out of its builds") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-guide-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-guide-test";
   std::filesystem::remove_all(dir);
   std::string error;
   REQUIRE_MESSAGE(create_game(dir / "game", "empty", error), error);
@@ -631,7 +632,7 @@ TEST_CASE("a new game's guide for whoever makes it stays out of its builds") {
 }
 
 TEST_CASE("a built game carries the licenses of what it contains") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-notices-test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem-build-notices-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   std::ofstream(dir / "engine") << "engine";

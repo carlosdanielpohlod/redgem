@@ -20,6 +20,7 @@
 #include "script/script_config.hpp"
 #include "storage/save_file.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -43,7 +44,7 @@ double budget_seconds = 0.0;  // the game's
 // A game whose save is kept in a file on a slow disk, its scripts timed on a fake clock (which
 // `tick` moves by a quarter of a budget).
 struct SlowDiskGame {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-save-budget-test";
+  std::filesystem::path folder = redgem::test::temp_root() / "redgem-save-budget-test";
   test::FakeClock clock;
   std::unique_ptr<SaveFile> save;
   std::unique_ptr<Engine> engine;

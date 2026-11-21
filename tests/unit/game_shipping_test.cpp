@@ -18,6 +18,7 @@
 #include "project/icons/icon_set.hpp"
 #include "project/notices.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using bytes::Bytes;
@@ -36,7 +37,7 @@ constexpr int kLargestIcoSide = 256;  // written as 0 in an .ico
 
 // A folder of the test's own, removed when the test ends, with a game in it.
 struct Scratch {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-game-shipping-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-game-shipping-test";
   std::filesystem::path game = dir / "My Game";
   std::filesystem::path out = dir / "out";
   Scratch() {

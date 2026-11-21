@@ -16,6 +16,7 @@
 #include "scene/props.hpp"
 #include "scene/scene_ids.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -29,7 +30,7 @@ constexpr float kByteTolerance = 1.0f / kFullSplatWeight;
 constexpr unsigned char kRed = 200;
 
 struct GameFolder {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / ("redgem-terrain-" + make_scene_id());
+  std::filesystem::path dir = redgem::test::temp_root() / ("redgem-terrain-" + make_scene_id());
   GameFolder() { std::filesystem::create_directories(dir / "terrains"); }
   ~GameFolder() {
     std::error_code error;
