@@ -11,6 +11,7 @@
 
 #include "app/engine.hpp"
 #include "core/clock.hpp"
+#include "core/config.hpp"
 #include "net/rooms/lobby.hpp"
 #include "net/wire.hpp"
 #include "scene/scene_desc.hpp"
@@ -103,6 +104,10 @@ class GameServer {
   // The lobby's turn: newcomers are heard and handed to their rooms, and the rooms whose match
   // ended are let go. (The rooms play on their own threads meanwhile, on the server's clock.)
   void tick(float seconds);
+  // How many turns a second the lobby and every room take: the game's game.json "tick_hz" (read
+  // by start), each turn a fixed step of the room's game.
+  int tick_hz() const { return tick_hz_; }
+  double tick_seconds() const { return config::tick_seconds(tick_hz_); }
   // The clock the server keeps to (see ServerSettings::clock).
   Clock& clock() const { return settings_.clock != nullptr ? *settings_.clock : steady_clock(); }
   // Ends every match (their players are told the game is gone), waits for the rooms' threads to
@@ -131,6 +136,7 @@ class GameServer {
     bool runs_on(const RoomThread& other) const { return thread == &other && !slot->closed(); }
   };
 
+  void read_tick();
   bool open_saves(std::string& error);
   bool take_identity(std::string& error);
   bool open_status(std::string& error);
@@ -167,6 +173,7 @@ class GameServer {
   std::vector<Room> rooms_;  // in the order they opened
   std::vector<std::unique_ptr<RoomThread>> threads_;
   double started_at_ = 0.0;  // on the server's clock, when it started
+  int tick_hz_ = config::kDefaultTickHz;
   StatusPort status_port_;
   TrafficRate traffic_;
   float since_status_logged_ = 0.0f;

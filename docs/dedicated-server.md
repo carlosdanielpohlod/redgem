@@ -85,10 +85,11 @@ Both answer one JSON document:
 ```
 
 - `rooms.open` near `rooms.limit` most of the time: players are being turned away, raise `--rooms`.
-- `frame_ms.worst` near `frame_ms.budget` (one frame of the engine's fixed step): rooms are
+- `frame_ms.worst` near `frame_ms.budget` (one frame: a fixed step of the game, 16.667 ms at the
+  default 60 Hz, 7.8125 ms for a game whose `game.json` sets `"tick_hz": 128`): rooms are
   falling behind: raise `--threads` (up to the machine's cores) or get a bigger machine. A room's
   frame time is the turn of the thread it runs on, every room of that thread one after the
-  other, over its last 300 frames (about five seconds). Loading a new room's game is left out.
+  other, over its last 300 frames (five seconds at 60 Hz, about 2.3 at 128 Hz). Loading a new room's game is left out.
 - `bytes_per_second` is everything the server's game connections received and sent over the last
   ten seconds.
 
@@ -108,6 +109,15 @@ and macOS `kill -USR1 <pid>` (or `systemctl kill -s USR1 <unit>`, `docker kill -
 ```text
 status: 2/8 rooms, 4 players, frame 0.8 ms average, 2.1 ms worst (of 16.7), 5210.0 B/s in, 18034.0 B/s out, up 3600.5 s
 ```
+
+## Tick rate
+
+The server takes its turns at the game's tick: 60 a second, or what its `game.json` sets with
+`tick_hz` (30 to 128, see [Tick rate](scripting/gameplay.md#tick-rate)). Each turn, the lobby
+hears newcomers and every room plays one frame of its game, which is one fixed step. The log
+says the rate as the server starts (`its rooms at 128 Hz`). At 128 Hz each room has half the time
+for its frame that it has at 60, so a machine holds about half as many busy rooms: watch
+`frame_ms.worst` against `frame_ms.budget`.
 
 ## Run it with Docker
 
