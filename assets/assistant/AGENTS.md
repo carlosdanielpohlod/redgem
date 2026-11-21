@@ -25,6 +25,8 @@ redgem scene get . Player                  # everything about one object (or #5,
 redgem scene set . Coin1 position=1,2,3 prop.speed=2.5 script+=Spinner
 redgem scene add . Coin6 --from Coin1 position=4,1,0
 redgem scene remove . Coin6
+redgem scene set . Lamp light_color=#ffcc88 light_intensity=300 light_range=8
+redgem scene set . Camera camera_fov=60
 redgem scene diff . --against HEAD         # what changed in the scene since the last commit (any Git revision)
 redgem assets . orc --kind model           # find the game's files: model, texture, sound, script, prefab
 redgem check .                             # scripts compile, scenes read, attached scripts exist
@@ -42,6 +44,18 @@ when objects are added or removed: list again before using one. A scene changed 
 `redgem scene` is saved exactly as the editor saves it; do not edit `.glb` files any other way.
 
 Run `redgem check .` after every change, and `redgem run .` after changing a behaviour.
+
+## Through MCP
+
+With the `redgem` MCP server (`redgem mcp . --editor auto`), `scene_edit` does more than one
+object at a time, as one undo step in an open editor:
+
+- `{"action": "add", "object": "Crate", "kind": "cube", "assignments": ["position=0,0.5,-3", "prop.body=dynamic"]}`:
+  kinds are `empty`, `cube`, `sphere`, `plane`, `cylinder`, `capsule`, `sun`, `point_light`,
+  `spot_light`, `camera`, `terrain`, `environment`; `from` copies an object instead.
+- `duplicate`, `remove` (with `confirm: true`) and `set` take `objects`, a list; `group` makes a
+  parent named `object` for the `objects`, leaving them where they are.
+- `editor` `select` takes `objects`; `editor` `save` keeps the editor's changes.
 
 ## Tests
 

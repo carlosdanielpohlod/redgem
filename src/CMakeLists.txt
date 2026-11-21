@@ -18,12 +18,19 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_theme.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_theme_kinds.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_button.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/debug.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_layout.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_scroll.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_theme.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_look.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_camera_path.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/input.rb
@@ -81,6 +88,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_preview.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_gizmos.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/environment.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/material.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
@@ -328,6 +336,8 @@ redgem_add_library(redgem_runtime
   scene/prefab_nodes.cpp
   scene/prefab_origins.cpp
   scene/prefab_loader.cpp
+  scene/prefab_overrides.cpp
+  scene/prefab_customize.cpp
   scene/gltf/gltf_checks.cpp
   scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp
@@ -367,6 +377,8 @@ redgem_add_library(redgem_runtime
   scene/water_interactions.cpp
   scene/water_volume.cpp
   scene/shapes/terrain.cpp
+  scene/ground/splat_map.cpp
+  scene/ground/terrain_layers_file.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
@@ -478,6 +490,7 @@ redgem_add_library(redgem_runtime
   script/bindings/navigation_bindings.cpp
   script/bindings/navigation_crowd_bindings.cpp
   script/bindings/water_bindings.cpp
+  script/bindings/environment_bindings.cpp
   script/bindings/material_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
@@ -618,6 +631,8 @@ redgem_add_library(redgem_runtime
   app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
+  app/terrain_files.cpp
+  app/terrain_pictures.cpp
   app/touch_circles.cpp
   app/game_texts.cpp
   app/crash_text.cpp
@@ -707,6 +722,7 @@ if(NOT ANDROID)
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
     editor/editor_session_create.cpp
+    editor/new_object_kinds.cpp
     editor/editor_session_play.cpp
     editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
@@ -858,6 +874,8 @@ if(NOT ANDROID)
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp
     project/scene_assignments.cpp
+    project/component_words.cpp
+    project/scene_edits.cpp
     project/scene_command.cpp
     project/script_messages.cpp
     project/tool_play.cpp
@@ -872,6 +890,7 @@ if(NOT ANDROID)
   project/dialogue_checks.cpp
   project/text_checks.cpp
   project/quest_checks.cpp
+  project/menu_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
     project/api_types.cpp

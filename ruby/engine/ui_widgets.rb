@@ -12,7 +12,8 @@
 #
 # A focused widget is ringed. The confirm key (Enter) or a gamepad's A works it as a click does;
 # left and right (arrows, D-pad) change a toggle, a choice or a slider. Each takes an anchor too
-# (see ui_layout.rb).
+# (see ui_layout.rb). They are drawn as the theme says (UI.theme): a row sits on what a button
+# does, and a slider's track is in its track and accent colors.
 module UI
   # [keys, gamepad buttons] that do each thing.
   UP = [%i[up], %i[dpad_up]].freeze
@@ -21,12 +22,8 @@ module UI
   RIGHT = [%i[right], %i[dpad_right]].freeze
   CONFIRM = [%i[enter], %i[a]].freeze
   GAMEPAD_CONFIRM = [[], %i[a]].freeze  # where Enter belongs to a text being typed
-  FOCUS_COLOR = :gold
-  FOCUS_RING = 3            # units the ring around a focused widget shows past it
   SLIDER_STEP = 0.05        # a slider's step unless said
   SLIDER_SHARE = 0.45       # how much of its row a slider's track takes, on the right
-  SLIDER_TRACK_COLOR = :gray
-  SLIDER_FILL_COLOR = :ruby
   SLIDER_THICKNESS = 0.18   # the track's height, as a share of the row's
 
   # Which of a screen's widgets the keyboard and a gamepad work: up and down move it, wrapping.
@@ -80,21 +77,18 @@ module UI
   # Whether a toggle flips this frame: worked, or pushed left or right while focused.
   def self.flipped?(box, focused) = worked?(box, focused) || (focused && sideways != 0)
 
-  # A ring around a focused widget's box.
-  def self.focus_ring(box)
-    rect(x: box[:x] - FOCUS_RING, y: box[:y] - FOCUS_RING, width: box[:width] + 2 * FOCUS_RING,
-         height: box[:height] + 2 * FOCUS_RING, color: FOCUS_COLOR, radius: BUTTON_RADIUS + FOCUS_RING)
-  end
-
   # A widget's row: its label on the left, its value (when it has one) on the right.
   def self.row(label, value, box, focused)
     focus_ring(box) if focused
-    rect(**box, color: BUTTON_COLOR, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
+    plain_face(box)
     size = label_size(box[:height])
     y = centered(box[:y], box[:height], size)
-    text(label, x: box[:x] + FIELD_PADDING, y: y, size: size)
-    text(value, x: box[:x] + box[:width] - FIELD_PADDING, y: y, size: size, align: :right) if value
+    text(label, x: box[:x] + padding, y: y, size: size)
+    text(value, x: box[:x] + box[:width] - padding, y: y, size: size, align: :right) if value
   end
+
+  # What a row sits on: a button's face, as it is when nothing is on it.
+  def self.plain_face(box) = face(box, rgb(theme[:colors, :button]), theme[:button, :skin])
 
   # A switch: returns whether it is on after this frame. A click flips it, and so do the confirm
   # key or button and left or right while it is focused.
@@ -133,7 +127,7 @@ module UI
   # Where a row's slider track is: on its right, as tall as its middle.
   def self.slider_track(box)
     width = (box[:width] * SLIDER_SHARE).to_i
-    { x: box[:x] + box[:width] - FIELD_PADDING - width, y: box[:y], width: width, height: box[:height] }
+    { x: box[:x] + box[:width] - padding - width, y: box[:y], width: width, height: box[:height] }
   end
 
   # The value the pointer points at along a track.
@@ -144,9 +138,14 @@ module UI
 
   # A track filled up to `share` (0 to 1).
   def self.draw_slider(track, share)
+    bar = slider_bar(track)
+    rect(**bar, width: track[:width], color: theme[:colors, :track], alpha: theme[:colors, :track_alpha])
+    rect(**bar, width: (track[:width] * share).to_i, color: theme[:colors, :accent])
+  end
+
+  # Where a slider's bar is across its track: as thick as SLIDER_THICKNESS says, with round ends.
+  def self.slider_bar(track)
     thickness = (track[:height] * SLIDER_THICKNESS).to_i
-    bar = { x: track[:x], y: centered(track[:y], track[:height], thickness), height: thickness }
-    rect(**bar, width: track[:width], color: SLIDER_TRACK_COLOR, radius: thickness / 2)
-    rect(**bar, width: (track[:width] * share).to_i, color: SLIDER_FILL_COLOR, radius: thickness / 2)
+    { x: track[:x], y: centered(track[:y], track[:height], thickness), height: thickness, radius: thickness / 2 }
   end
 end

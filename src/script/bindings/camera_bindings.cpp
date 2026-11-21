@@ -168,6 +168,14 @@ mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, amount);
 }
 
+mrb_value camera_backdrop_blur(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).backdrop_blur); }
+
+mrb_value camera_set_backdrop_blur(mrb_state* mrb, mrb_value) {
+  const mrb_float amount = from_to(mrb, float_arg(mrb), kNoBlur, kFullBlur, "Camera.backdrop_blur");
+  context(mrb).backdrop_blur = static_cast<float>(amount);
+  return mrb_float_value(mrb, amount);
+}
+
 // Shakes a camera: what it shows moves by `move` meters (right, up, back) and turns by `turn`
 // degrees (pitch, yaw, roll) in its own axes, until the next shake; the object itself stays put
 // (see GameObject::camera_shake). Camera::Rig gives the offsets.
@@ -197,6 +205,8 @@ void install_camera_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, camera_module, "view_model_fov=", camera_set_view_model_fov, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "motion_blur", camera_motion_blur, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "motion_blur=", camera_set_motion_blur, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, camera_module, "backdrop_blur", camera_backdrop_blur, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "backdrop_blur=", camera_set_backdrop_blur, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "__shake_by", camera_shake_by, MRB_ARGS_REQ(3));
 }
 

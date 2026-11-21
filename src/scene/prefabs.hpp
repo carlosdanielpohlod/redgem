@@ -30,12 +30,21 @@ struct Origin {
   std::string name;
   PropertyMap defaults;
   std::vector<Transform> roots;
+  // The inherited parts by path (scene/prefab_overrides.hpp), as resolved node indices.
+  std::map<std::string, int> parts;
+  // Authored children hung from an inherited part (props::kPrefabParent): the placement-relative
+  // transform of that part, which the preview combines with the child's own.
+  std::map<int, Transform> attached;
 };
 using Origins = std::map<int, Origin>;
 Transform inherited_local(const Origin& origin, Transform placement);
 PropertyMap inherited_props(const Origin& origin, const PropertyMap& authored);
 // Resolves game-root-relative GLB references; throws on unusable dependencies. The caller's
 // original description is untouched. Shared files contribute meshes/materials/images once.
+// Each placement's overrides (props::kPrefabOverrides) are applied, removed parts left out and
+// children hung from inherited parts (props::kPrefabParent) moved under them. With `origins` (the
+// editor's preview), authored nodes keep their indices: such a child stays under its placement,
+// its transform combined with the part's, and only inherited nodes are left out.
 SceneDesc resolve(SceneDesc scene, const std::filesystem::path& game_dir, const Limits& limits = {},
                   Origins* origins = nullptr);
 bool has_references(const SceneDesc& scene);

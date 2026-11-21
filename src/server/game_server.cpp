@@ -6,6 +6,7 @@
 #include <thread>
 #include <variant>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
@@ -18,15 +19,22 @@ std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir) {
 }
 
 bool GameServer::start(std::string& error) {
-  auto scene = read_game_scene(settings_.game_dir);
+  auto scene = read_game_scene(settings_.game_dir, TerrainReading::Weights);  // (nothing is drawn here)
   if (const auto* failed = std::get_if<std::string>(&scene)) {
     error = *failed;
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
+  read_tick();
   started_at_ = clock().now();
   return open_saves(error) && take_identity(error) &&
          lobby_.open(settings_.port, error, settings_.connections_per_address, identity_) && open_status(error);
+}
+
+void GameServer::read_tick() {
+  const GameManifest game = read_game_manifest(settings_.game_dir);
+  if (!game.tick_hz_error.empty()) log::warning(game.tick_hz_error);
+  tick_hz_ = game.settings.tick_hz;
 }
 
 bool GameServer::take_identity(std::string& error) {

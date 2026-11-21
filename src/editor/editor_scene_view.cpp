@@ -72,6 +72,7 @@ void EditorApp::set_editor_look() {
   renderer_->set_show_prefabs(true);         // templates are edited in the editor, hidden in the game
   renderer_->draw_view_models_apart(false);  // seen from the editor's camera, a weapon is where it is
   renderer_->set_motion_blur(kNoMotionBlur);
+  renderer_->set_backdrop_blur(kNoMotionBlur);
   renderer_->set_auto_exposure(AutoExposureOverrides{});  // the scene's own, whatever a game set
   renderer_->set_underwater({});                          // the editor's camera flies through water without the look
   renderer_->set_material_emission({});                   // the file's glow, whatever a game script set

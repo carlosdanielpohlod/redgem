@@ -1011,7 +1011,8 @@ menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 `-> { I18n.t("menu.credits") }`, made each time it is shown (see [Texts in several languages](i18n.md)). A screen that draws more than buttons is a
 subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`, and `rows`
 for widgets of its own that take the focus before its buttons, with `focus`): the
-platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
+platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one. How the
+menu looks is its theme's: see [Giving the menu your game's look](#giving-the-menu-your-games-look).
 
 ### A loading screen
 
@@ -1059,6 +1060,147 @@ what the level's environment asks for (samples a pixel, temporal anti-aliasing, 
 and distance, scattered copies and how far they show, the sky picture's size, ambient occlusion,
 bloom): `:ultra` draws the level as it was made, and nothing ever gets more than it asked for.
 What the graphics card cannot do is left out whatever the quality.
+
+## Giving the menu your game's look
+
+The menus are the first thing a player sees, so their look is the game's to choose. Everything
+`GameMenu` and the `UI` widgets draw comes from a **theme**: fonts, sizes, colors, the buttons'
+shape, the layout, the title screen's background, logo and footer, the transitions between
+screens, and the menu's sounds and music. A game that sets nothing keeps the engine's own look.
+*(Experimental: the keys may still change.)*
+
+A theme is made of layers, each over the last, and each says only what it changes:
+
+1. the engine's defaults (`UI::Theme::DEFAULTS`);
+2. `UI.theme = {...}`: every widget, the HUD's buttons and sliders too;
+3. game.json's `"menu": {"theme": {...}}`;
+4. `GameMenu.theme = {...}` from a script;
+5. one screen's own: game.json's `"menu": {"screens": {"title": {...}}}`, then
+   `menu.screens[:title].theme = {...}`.
+
+### In game.json
+
+Non-programmers, and the editor, set it in game.json. This gives a game a display font for its
+headings, buttons on a picture, an icon on Play, the column on the right, screens that fade in,
+and a title screen with a logo over the level, blurred, seen from a camera that flies around it:
+
+```json
+"menu": {
+  "theme": {
+    "heading_font": "Bangers",
+    "colors": {"heading": "#ffcc33", "label": "#fff4d6", "button": "#2a1a4a",
+               "hover": "#5a2a8a", "focused": "#5a2a8a", "focus_ring": "#ffcc33",
+               "shade": "#120820", "shade_alpha": 150},
+    "button": {"skin": "panel", "skin_focused": "panel_lit", "skin_edge": 14,
+               "icons": {"play": "icon_play"}},
+    "layout": {"align": "right", "margins": [0, 48, 0, 0]},
+    "transition": {"kind": "fade", "seconds": 0.25},
+    "sounds": {"move": "ui_move", "pick": "ui_pick", "back": "ui_back"},
+    "music": {"name": "menu_theme", "volume": 0.6, "fade": 1.5}
+  },
+  "screens": {
+    "title": {
+      "layout": {"heading": "none", "top": 0.42},
+      "logo": {"image": "logo", "anchor": "top_left", "x": 48, "y": 60, "scale": 1.0},
+      "footer": {"text": "v{version}"},
+      "background": {"kind": "scene", "blur": 0.5,
+                     "camera_path": {"points": [[0, 4, 12], [10, 5, 0], [0, 6, -12]],
+                                     "look_at": [0, 1, 0], "seconds": 30}}
+    }
+  }
+}
+```
+
+Fonts are faces of `fonts/` (`.ttf` or `.otf`, a name or a list: see `UI.font`), pictures are
+in `images/`, sounds in `sounds/`. Colors are a name (`"gold"`), `"#rrggbb"` or `[r, g, b]`.
+Sizes are in the units the menu is laid out in: a screen 720 high, scaled to the real one with
+the rest of the menu. `redgem check` says what is wrong with any key or value, and names any
+font, picture or sound that is not there.
+
+### What a theme has
+
+| Section | Keys |
+| --- | --- |
+| (top) | `font` (the labels and rows), `heading_font` |
+| `sizes` | `heading`, `caption`, `text`, `note`, `footer`, `label_share` (a label's height as a share of its button's) |
+| `colors` | `text`, `heading`, `caption`, `muted`, `label`, `button`, `button_alpha`, `hover`, `focused`, `pressed` (none: the hover color darkened by `pressed_shade`), `disabled`, `disabled_text`, `border`, `focus_ring`, `accent` (a slider's fill), `track`, `track_alpha`, `scrollbar_alpha`, `handle_alpha`, `cell`, `cell_alpha`, `conflict`, `done`, `to_do`, `shade` (none: no shade), `shade_alpha` |
+| `button` | `width` (the least), `max_width` (grow to the widest label, up to it), `height`, `gap`, `radius`, `border`, `padding`, `focus_ring`, `skin`, `skin_focused`, `skin_pressed`, `skin_disabled`, `skin_edge`, `icons` (option id: picture), `icon_share` |
+| `layout` | `align` (`left`, `center`, `right`), `top` (the first button, as a share of the height), `margins` (`[top, right, bottom, left]`, the safe area), `heading` (`above` the buttons, at the `top`, or `none`), `heading_gap`, `heading_top` |
+| `background` | `kind` (`scene`, `color`, `gradient`, `image`), `color`, `colors` (a gradient's top and bottom), `image`, `fit` (`cover`, `contain`, `stretch`), `blur` (0 to 1, the scene), `camera_path` (`points`, `look_at`, `seconds`) |
+| `logo` | `image`, `anchor`, `x`, `y`, `scale`, `width` |
+| `footer` | `text` (`{version}` and `{title}` are filled in; a key of the game's texts is translated), `anchor`, `x`, `y`, `color` |
+| `transition` | `kind` (`none`, `fade`, `slide`), `seconds` |
+| `sounds` | `move`, `pick`, `back`, `volume`, `group` (the audio group: `effects` unless said) |
+| `music` | `name`, `volume`, `fade` |
+
+A skin is a picture cut in nine: its corners keep `skin_edge` pixels, its edges stretch along and
+its middle across, so one small picture makes buttons of any size. The built-in options have ids
+for `icons` and for drawing: `play`, `resume`, `restart`, `settings`, `journal`, `play_again`,
+`quit`. The settings rows, the controls page's cells and the journal take the theme too: their
+captions, colors, padding and the buttons' face, lined up as `layout.align` says.
+
+The sounds play through the audio groups, and the music in the music group, so the player's
+volumes on the settings screen apply. A screen whose theme names music starts it (fading over
+`fade` seconds); it plays on through screens that name none, and fades out when the menu closes.
+
+### From a script
+
+The same keys, as a Hash; a mistake raises an `ArgumentError` that says what is wrong:
+
+```ruby
+class MainScene < SceneScript
+  def setup
+    menu = Camera.main.add_component(GameMenu)
+    GameMenu.theme = { heading_font: "Bangers", colors: { button: [20, 40, 70], hover: :gold },
+                       button: { radius: 0, border: 2 }, layout: { align: :left, margins: 64 } }
+    menu.screens[:title].theme = { background: { kind: :gradient, colors: [[60, 20, 80], :black] } }
+    menu.screens[:credits] = CreditsScreen.new(menu)
+    menu.screens[:credits].theme = { transition: { kind: :slide } }
+  end
+end
+```
+
+`UI.theme` is the theme widgets draw with now, read as `UI.theme[:colors, :button]`; inside a
+menu it is the open screen's, so a screen of the game's own draws in the same colors.
+
+The game's own HUD draws over the menu unless it steps aside. `GameMenu.open?` says whether a
+menu is open, so a title or pause screen stays clean:
+
+```ruby
+def draw_hud
+  return if GameMenu.open?
+
+  UI.text("Coins: #{@coins}", x: 20, y: 20, size: 28, color: :gold)
+end
+```
+
+### Drawing the buttons yourself
+
+When a theme is not enough, draw the buttons, or the background, in Ruby. The menu still lays
+them out, and still hears the keyboard, a gamepad, the mouse and taps on them:
+
+```ruby
+menu.on_draw_button do |label, box, state|
+  glow = state.focused? || state.hover?
+  UI.image(glow ? :scroll_lit : :scroll, **box)
+  UI.text(label, x: box[:x] + box[:width] / 2, y: box[:y] + 14, size: 30,
+                 color: state.pressed? ? :orange : :white, align: :center)
+end
+menu.on_draw_background { UI.image(:parchment, x: 0, y: 0, width: UI.width, height: UI.height) }
+```
+
+`box` is `{x:, y:, width:, height:}`; `state` (a `UI::ButtonState`) says `focused?`, `hover?`,
+`pressed?`, `disabled?`, its `name` (the one that shows most) and the option's `id`. A screen's
+own block wins over the menu's, and a subclass of `GameMenu::Screen` may define `draw_button`
+and `draw_background` instead. `UI.draw_button(label, box, state)` draws one the theme's way, for
+a block that only adds to it.
+
+An option a game adds can say its id and when it can be picked; while it cannot, it is grayed:
+
+```ruby
+menu.screens[:pause].add_option("Play online", index: 1, id: :online,
+                                enabled: -> { !Network.online? }) { menu.show(:online) }
+```
 
 ## Play sounds and music
 
