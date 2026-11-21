@@ -152,26 +152,26 @@ TEST_CASE("frame views draw depth-tested and x-ray shapes in native and scaled w
     return pixel.g > kMinimumGreen && pixel.g > pixel.r * kChannelContrast && pixel.g > pixel.b * kChannelContrast;
   };
   capture = "hidden.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(latest.find(visible).count == 0);
   ruby("$xray_wire = true");
   capture = "xray.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(latest.find(visible).count > 0);
   ruby("$xray_wire = false; $front_wire = true");
   capture = "front.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(latest.find(visible).count > 0);
   ruby("$hide_wire = true");
   capture = "cleared.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(latest.find(visible).count == 0);
   display.resolution = {320, 240};
   window.apply_display(display);
   ruby("$hide_wire = false");
   capture = "resized.png";
   constexpr int kResizeFrames = 3;
-  for (int frame = 0; frame < kResizeFrames; ++frame) engine.frame(config::kFixedDeltaSeconds);
+  for (int frame = 0; frame < kResizeFrames; ++frame) engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(latest.find(visible).count > 0);
 }
 

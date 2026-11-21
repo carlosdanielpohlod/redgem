@@ -93,7 +93,7 @@ class DialogueBox < Behaviour
 
   def draw(conversation)
     box = line_box(conversation)
-    UI.rect(**box, color: BOX_COLOR, alpha: BOX_ALPHA, radius: UI::BUTTON_RADIUS)
+    UI.rect(**box, color: BOX_COLOR, alpha: BOX_ALPHA, radius: UI.theme[:button, :radius])
     draw_speaker(conversation, box)
     UI.text(shown_text, x: box[:x] + PADDING, y: line_top(conversation, box), size: LINE_SIZE,
                         width: line_width(box))

@@ -4,15 +4,14 @@
 # screen (its Back button or Esc) keeps them for the game's next runs and goes back to the screen
 # it was opened from. Its Controls button keeps them too, and opens the controls page (see
 # GameMenu::ControlsScreen), which comes back to it. A game's own options (add_option) come with
-# its buttons.
+# its buttons. Its captions and rows are drawn as the menu's theme says (UI::Theme: sizes.caption,
+# colors.caption, and the buttons' look for the rows), lined up as its layout aligns the menu.
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560
     ROW_HEIGHT = 30            # (eleven rows and the heading fit above the buttons on a 720 unit screen)
     ROW_GAP = 4
-    CAPTION_SIZE = 20
     CAPTION_HEIGHT = 28        # pixels a section's caption takes above its rows
-    CAPTION_COLOR = :gold
     BUTTONS_SHARE = 0.8        # where its Back button sits, as a share of the screen's height
     PERCENT = 100
     VOLUME_STEP = 0.05
@@ -79,7 +78,9 @@ class GameMenu < Behaviour
     # A caption, then its rows (`first` is the first one's place in the focus). Returns where the
     # next section starts.
     def section(caption, names, first, y)
-      UI.text(caption.call, x: row_x, y: y, size: @menu.scaled(CAPTION_SIZE), color: CAPTION_COLOR)
+      theme = UI.theme
+      UI.text(caption.call, x: row_x, y: y, size: @menu.scaled(theme[:sizes, :caption]),
+                            color: theme[:colors, :caption])
       y += @menu.scaled(CAPTION_HEIGHT)
       names.each_with_index do |name, at|
         __send__(name, row_box(y, first + at))
@@ -95,7 +96,7 @@ class GameMenu < Behaviour
     end
 
     def row_step = @menu.scaled(ROW_HEIGHT + ROW_GAP)
-    def row_x = (UI.width - @menu.scaled(ROW_WIDTH)) / 2
+    def row_x = @menu.column_x(@menu.scaled(ROW_WIDTH))
 
     # A choice among `values`, each shown as `shown` makes it: the one picked, or nil while the
     # current one stays. A current value the list does not have (set by a script) is added to it.

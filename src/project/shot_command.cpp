@@ -52,13 +52,15 @@ WindowSettings hidden_window(FrameSize size) {
 // Shows a game to nobody, frame by frame off screen, and keeps the picture of one frame.
 class ShotPresenter final : public Presenter {
  public:
-  ShotPresenter(FrameSize size, long long frame, std::filesystem::path file)
+  // `step_seconds`: the game's fixed step, what each frame counts as.
+  ShotPresenter(FrameSize size, long long frame, std::filesystem::path file, float step_seconds)
       : window_(hidden_window(size)),
         renderer_(window_),
         painter_(renderer_),
         picture_(LoadRenderTexture(size.width, size.height)),
         frame_(frame),
-        file_(std::move(file)) {}
+        file_(std::move(file)),
+        step_seconds_(step_seconds) {}
   ~ShotPresenter() override { UnloadRenderTexture(picture_); }
   ShotPresenter(const ShotPresenter&) = delete;
   ShotPresenter& operator=(const ShotPresenter&) = delete;
@@ -67,11 +69,11 @@ class ShotPresenter final : public Presenter {
   int text_width(const std::string& text, int size) const override { return renderer_.text_width(text, size); }
   void capture_cursor(bool) override {}
   bool open() const override { return !taken_; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return step_seconds_; }
 
   // Every frame is drawn, so that what builds up over frames (smoothed edges, trails) is there.
   void present(const FrameView& view) override {
-    renderer_.set_clock(static_cast<double>(steps_) * config::kFixedDeltaSeconds);
+    renderer_.set_clock(static_cast<double>(steps_) * step_seconds_);
     painter_.paint(view, &picture_);
     if (steps_ == frame_) take();
   }
@@ -96,6 +98,7 @@ class ShotPresenter final : public Presenter {
   RenderTexture2D picture_{};
   long long frame_;
   std::filesystem::path file_;
+  float step_seconds_;
   long long steps_ = 0;
   bool taken_ = false;
   bool saved_ = false;
@@ -113,7 +116,7 @@ ToolResult usage_failure(const std::string& problem) {
 }
 
 std::string said(const ShotRequest& request, const MessageCollector& messages) {
-  const double seconds = static_cast<double>(request.frame) * config::kFixedDeltaSeconds;
+  const double seconds = static_cast<double>(request.frame) / steps_per_second(request.play.game_dir);
   return messages.lines() +
          tr("project.shot.saved", {{"file", request.file.string()},
                                    {"width", std::to_string(request.size.width)},
@@ -131,14 +134,15 @@ void play_to_picture(Engine& engine, ShotPresenter& shot) {
   engine.present();
   while (!shot.taken() && !engine.finished()) {
     shot.at_step(++steps);
-    engine.frame(config::kFixedDeltaSeconds);
+    engine.frame(engine.fixed_delta());
   }
 }
 
 ToolResult shoot(const ShotRequest& request) {
   ScratchFolder scratch;
   MessageCollector messages(request.play.game_dir);
-  ShotPresenter shot(request.size, request.frame, request.file);
+  const auto step_seconds = static_cast<float>(1.0 / steps_per_second(request.play.game_dir));
+  ShotPresenter shot(request.size, request.frame, request.file, step_seconds);
   auto created = engine_for(request.play, &shot, scratch);
   if (auto* problem = std::get_if<std::string>(&created)) return failed(messages.lines() + *problem);
   play_to_picture(*std::get<std::unique_ptr<Engine>>(created), shot);
@@ -152,7 +156,7 @@ ToolResult shoot(const ShotRequest& request) {
 bool read_timing(const ToolLine& line, ShotRequest& request) {
   const auto size_given = line.value(kSizeOption);
   const auto size = size_given ? frame_size_from(*size_given) : kDefaultSize;
-  const auto frame = moment_asked(line, kAtOption, kDefaultAt);
+  const auto frame = moment_asked(line, kAtOption, kDefaultAt, steps_per_second(request.play.game_dir));
   if (!size || !frame) return false;
   request.size = *size;
   request.frame = *frame;

@@ -23,7 +23,7 @@ void Engine::advance_or_loading(float frame_seconds) {
   if (!frozen()) return advance_game(frame_seconds);
   context_.time.delta = 0.0f;
   const float delta =
-      options_.fixed_step ? config::kFixedDeltaSeconds : std::clamp(frame_seconds, 0.0f, config::kMaxFrameSeconds);
+      options_.fixed_step ? fixed_delta() : std::clamp(frame_seconds, 0.0f, config::kMaxFrameSeconds);
   if (context_.level_held) scripts_->wait_for_level(delta);
   scripts_->draw_loading(delta);
 }

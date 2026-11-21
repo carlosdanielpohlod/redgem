@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "core/config.hpp"
 #include "core/frame_budget.hpp"
 #include "render/auto_exposure.hpp"
 #include "render/material_emission.hpp"
@@ -53,6 +54,7 @@ struct FrameView {
   const std::vector<WaterSurface>* water_surfaces = nullptr;
   // What scripts change of the materials' glow (Material.set_emission); none: the files' own.
   const EmissionOverrides* material_emission = nullptr;
+  float backdrop_blur = 0.0f;  // Camera.backdrop_blur: 0 (none) to 1
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine
@@ -108,16 +110,19 @@ class Presenter {
 // are as wide as a usual letter makes them, and every frame counts as one fixed step.
 class NullPresenter final : public Presenter {
  public:
-  explicit NullPresenter(SurfaceSize size) : size_(size) {}
+  // `frame_seconds`: what every frame counts as, the game's fixed step.
+  explicit NullPresenter(SurfaceSize size, float frame_seconds = config::kDefaultFixedDeltaSeconds)
+      : size_(size), frame_seconds_(frame_seconds) {}
   SurfaceSize surface_size() const override { return size_; }
   int text_width(const std::string& text, int size) const override;
   void capture_cursor(bool) override {}
   void present(const FrameView&) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override;
+  float frame_seconds() const override { return frame_seconds_; }
 
  private:
   SurfaceSize size_;
+  float frame_seconds_;
 };
 
 }  // namespace redgem

@@ -40,7 +40,7 @@ struct ProfileGame {
     REQUIRE_MESSAGE(value.ok, value.error);
     return RSTRING_PTR(mrb_obj_as_string(engine->scripts().vm().state(), value.value));
   }
-  void frame() { engine->frame(config::kFixedDeltaSeconds); }
+  void frame() { engine->frame(config::kDefaultFixedDeltaSeconds); }
 };
 }  // namespace
 

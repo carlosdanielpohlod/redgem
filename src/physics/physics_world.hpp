@@ -163,6 +163,12 @@ class PhysicsWorld {
   // Jumps on the next step if the character is grounded then.
   virtual void character_jump(ObjectId object, float speed) = 0;
   virtual bool character_grounded(ObjectId object) const = 0;
+  // Gives a character an upright capsule this tall (end to end) and this wide, with its feet where
+  // they were (to crouch, and to stand up again). A capsule that would grow into something (a
+  // ceiling over a crouching character) is refused. True when the shape changed: false for one
+  // refused, one it already has, a measure that is not a positive number, a height under twice
+  // the radius, or an object that is not a character.
+  virtual bool resize_character(ObjectId object, float height, float radius) = 0;
 
   // Vehicles. Wheels are driven by the simulation and reported for rendering.
   virtual void set_vehicle_input(ObjectId object, const VehicleInput& input) = 0;

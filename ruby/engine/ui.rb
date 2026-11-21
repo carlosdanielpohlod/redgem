@@ -16,6 +16,9 @@
 #   UI.text("Score: #{@score}", x: 20, y: 20, size: 28, color: :gold)
 #   UI.text("Lives: #{@lives}", anchor: :top_right, x: -20, y: 20)
 #   Game.quit if UI.button("Quit", x: 40, y: 200, width: 220, height: 56)
+#
+# How the widgets look (their colors, the font, the buttons' shape) is the theme's (UI.theme, see
+# UI::Theme): what a call does not say, the theme does.
 module UI
   DEFAULT_SIZE = 24
   OPAQUE = 255
@@ -34,29 +37,27 @@ module UI
     ruby: [225, 29, 72]
   }.freeze
 
-  # Looks of a button: resting, under the mouse, pressed.
-  BUTTON_COLOR = :dark
-  BUTTON_HOVER_COLOR = :ruby
-  BUTTON_ALPHA = 225
-  BUTTON_RADIUS = 10
-  BUTTON_TEXT_SHARE = 0.42   # text height as a share of the button's height
   FIELD_MAX_LENGTH = 64
-  FIELD_PADDING = 14         # units between a text field's edge and its text
   FIELD_CARET = "_".freeze
   SECRET_LETTER = "*".freeze  # what a secret text field shows for each letter
   CONTINUATION_MASK = 0xC0
   CONTINUATION_BITS = 0x80
-  PRESSED_SHADE = 0.8        # a held button is this much darker
+  WHOLE_PICTURE = [0, 0, 0, 0].freeze   # an image's part that is all of it
+  UNTINTED = :white
 
-  # Where the pointer (the mouse, a finger) is, in units of the interface.
-  def self.mouse_x = Input.mouse_x / scale
-  def self.mouse_y = Input.mouse_y / scale
+  # Where the pointer (the mouse, a finger) is, in units of the interface (and of what UI.shifted
+  # moved: it is over what is drawn where it shows).
+  def self.mouse_x = Input.mouse_x / scale - shift[0]
+  def self.mouse_y = Input.mouse_y / scale - shift[1]
 
   # A color [r, g, b] darkened to a share of its brightness.
   def self.shade(color, share) = rgb(color).map { |channel| (channel * share).to_i }
 
   # How tall the text of a button or a text field of that height is.
-  def self.label_size(height) = (height * BUTTON_TEXT_SHARE).to_i
+  def self.label_size(height) = (height * theme[:sizes, :label_share]).to_i
+
+  # Units between a button's, a row's or a text field's edge and its text.
+  def self.padding = theme[:button, :padding]
 
   # Where something `size` tall starts to sit in the middle of a span from `start`, `length` long.
   def self.centered(start, length, size) = start + (length - size) / 2
@@ -70,14 +71,15 @@ module UI
   # the text's own line breaks, starts LINE_SPACING times the size below the last. With an anchor,
   # the text's box (as wide as width:, or its widest line) sits at it by its matching corner, and
   # align lays the lines out inside that box.
-  def self.text(text, x:, y:, size: DEFAULT_SIZE, color: :white, alpha: OPAQUE, align: :left, width: nil,
+  # color: the theme's text color unless given.
+  def self.text(text, x:, y:, size: DEFAULT_SIZE, color: nil, alpha: OPAQUE, align: :left, width: nil,
                 anchor: nil)
     lines = text_lines(text, width, size)
     box = { width: text_box_width(lines, size, width, anchor, align), height: lines_height(lines.size, size) }
     left, top = text_corner(box, x, y, anchor, align)
     block = TextBlock.new(left, top, box[:width], size, align)
-    look = [size.to_i, *rgb(color), alpha.to_i]
-    lines.each_with_index { |line, row| __text(line, *block.line_at(line, row), *look) }
+    look = [size.to_i, *rgb(color || theme[:colors, :text]), faded(alpha)]
+    lines.each_with_index { |line, row| __text(line, *shifted_point(*block.line_at(line, row)), *look) }
   end
 
   def self.text_width(text, size: DEFAULT_SIZE) = __text_width(text.to_s, size.to_i)
@@ -85,23 +87,38 @@ module UI
   # A filled rectangle; radius rounds its corners (units).
   def self.rect(x:, y:, width:, height:, color: :black, alpha: OPAQUE, radius: 0, anchor: nil)
     box = placed(anchor, x, y, width, height)
-    __rect(*box.values_at(:x, :y, :width, :height).map(&:to_i), *rgb(color), alpha.to_i, radius.to_f)
+    __rect(*shifted_box(box), *rgb(color), faded(alpha), radius.to_f)
+  end
+
+  # A filled rectangle that goes from the `top` color at its top to the `bottom` one at its bottom.
+  def self.gradient(x:, y:, width:, height:, top:, bottom:, alpha: OPAQUE, anchor: nil)
+    box = placed(anchor, x, y, width, height)
+    __gradient(*shifted_box(box), *rgb(top), faded(alpha), *rgb(bottom), faded(alpha))
   end
 
   # A picture from the game's images/ folder (UI.image(:logo) draws images/logo.png). Without a
   # width and height it is drawn at its own size; with only one, the other follows its shape. An
-  # anchor places it by the width and height given (0 for one not given).
-  def self.image(name, x:, y:, width: 0, height: 0, alpha: OPAQUE, anchor: nil)
+  # anchor places it by the width and height given (0 for one not given). part: [x, y, width,
+  # height] of the picture, in its own pixels, draws only that part of it; tint: a color it is
+  # multiplied by (white leaves it as it is).
+  def self.image(name, x:, y:, width: 0, height: 0, alpha: OPAQUE, anchor: nil, part: WHOLE_PICTURE, tint: UNTINTED)
     box = placed(anchor, x, y, width, height)
-    __image(name.to_s, *box.values_at(:x, :y, :width, :height).map(&:to_i), alpha.to_i)
+    __image(name.to_s, *shifted_box(box), *rgb(tint), faded(alpha), *part.map(&:to_f))
+  end
+
+  # [width, height] of a picture of images/, in its own pixels (read from its file once); nil when
+  # the game has none of that name.
+  def self.image_size(name)
+    sizes = @image_sizes ||= {}
+    sizes.key?(name.to_s) ? sizes[name.to_s] : sizes[name.to_s] = __image_size(name.to_s)
   end
 
   # A box to type in. Returns the text after this frame's typing: keep it and pass it back. A
   # secret one (a password) shows a star for each letter. On a phone, the system's keyboard is up
   # while a text field is drawn (see UI.keyboard_visible?).
   #   @name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48)
-  def self.text_field(value, x:, y:, width:, height:, max_length: FIELD_MAX_LENGTH, color: BUTTON_COLOR,
-                      text_color: :white, secret: false, anchor: nil)
+  def self.text_field(value, x:, y:, width:, height:, max_length: FIELD_MAX_LENGTH, color: nil,
+                      text_color: nil, secret: false, anchor: nil)
     box = placed(anchor, x, y, width, height)
     __text_field_drawn(clicked?(mouse_over?(**box)))
     value = typed_into(value, max_length)
@@ -121,10 +138,10 @@ module UI
 
   # A text field's box and what it shows, with the caret after it.
   def self.draw_field(shown, box, color, text_color)
-    rect(**box, color: color, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
+    color ? face(box, rgb(color)) : plain_face(box)   # (a color of its own: not the theme's skin)
     size = label_size(box[:height])
-    text(shown + FIELD_CARET, x: box[:x] + FIELD_PADDING, y: centered(box[:y], box[:height], size), size: size,
-                              color: text_color)
+    text(shown + FIELD_CARET, x: box[:x] + padding, y: centered(box[:y], box[:height], size), size: size,
+                              color: text_color || theme[:colors, :text])
   end
 
   # A text without its last letter: all of that letter's bytes (accented letters take several).
@@ -150,24 +167,25 @@ module UI
 
   # Draws a button and returns true on the frame it is clicked (the left button is released over
   # it). A focused one (see UI::Focus) is ringed, and the confirm key or a gamepad's A clicks it
-  # (`confirm: UI::GAMEPAD_CONFIRM` leaves Enter to a text field).
-  def self.button(label, x:, y:, width:, height:, color: BUTTON_COLOR, hover_color: BUTTON_HOVER_COLOR,
-                  text_color: :white, size: nil, focused: false, confirm: CONFIRM, anchor: nil)
+  # (`confirm: UI::GAMEPAD_CONFIRM` leaves Enter to a text field). A disabled one is grayed and
+  # does nothing. Its colors and shape are the theme's unless given; icon: a picture of images/
+  # drawn before its label. (UI.draw_button draws one without hearing the mouse or the keys.)
+  def self.button(label, x:, y:, width:, height:, color: nil, hover_color: nil, text_color: nil, size: nil,
+                  focused: false, confirm: CONFIRM, anchor: nil, disabled: false, icon: nil)
     box = placed(anchor, x, y, width, height)
+    state = button_state(box, focused, disabled: disabled)
+    draw_button(label, box, state, color: color, hover_color: hover_color, text_color: text_color, size: size,
+                                   icon: icon)
+    !disabled && worked?(box, focused, confirm)
+  end
+
+  # What a button in a box is this frame (UI::ButtonState): focused, under the pointer, held down.
+  def self.button_state(box, focused, disabled: false, id: nil)
     over = mouse_over?(**box)
-    focus_ring(box) if focused
-    fill = button_fill(over || focused ? hover_color : color, pressed: held?(over))
-    rect(**box, color: fill, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
-    size ||= label_size(height)
-    text(label, x: centered(box[:x], width, 0), y: centered(box[:y], height, size), size: size, color: text_color,
-                align: :center)
-    worked?(box, focused, confirm)
+    ButtonState.new(focused: focused, hover: over, pressed: held?(over), disabled: disabled, id: id)
   end
 
   # What the left button of the mouse does to a button the pointer may be `over`.
   def self.held?(over) = over && Input.mouse_down?(:left)
   def self.clicked?(over) = over && Input.mouse_released?(:left)
-
-  # A held button is darker.
-  def self.button_fill(color, pressed:) = pressed ? shade(color, PRESSED_SHADE) : rgb(color)
 end

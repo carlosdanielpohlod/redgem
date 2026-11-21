@@ -17,7 +17,7 @@ class DrawPresenter final : public Presenter {
   int text_width(const std::string&, int) const override { return 0; }
   void capture_cursor(bool) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return config::kDefaultFixedDeltaSeconds; }
   void present(const FrameView& frame) override {
     REQUIRE(frame.debug_draw != nullptr);
     seen = frame.debug_draw->items();
@@ -41,7 +41,7 @@ struct DrawGame {
     REQUIRE_MESSAGE(result.ok, result.error);
     return RSTRING_PTR(mrb_obj_as_string(engine->scripts().vm().state(), result.value));
   }
-  void frame() { engine->frame(config::kFixedDeltaSeconds); }
+  void frame() { engine->frame(config::kDefaultFixedDeltaSeconds); }
 };
 constexpr const char* kPainter = R"(
   class WirePainter < Behaviour

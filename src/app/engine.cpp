@@ -34,6 +34,11 @@ std::optional<bool> walls_between(const PhysicsWorld* physics, bool stepping, Ve
   return static_body_between(*physics, from, to);
 }
 
+// The clock of a game that ticks that many times a second.
+FixedClock clock_for(int tick_hz) {
+  return FixedClock(config::tick_seconds(tick_hz), config::kMaxFrameSeconds, config::max_steps_per_frame(tick_hz));
+}
+
 // Logs each warning.
 void warn_of_all(const std::vector<std::string>& warnings) {
   for (const std::string& warning : warnings) log::warning(warning);
@@ -43,6 +48,7 @@ void warn_of_all(const std::vector<std::string>& warnings) {
 void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
+  if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
   warn_of_all(manifest.navigation_warnings);
@@ -55,6 +61,7 @@ void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
   context.ui_reference = settings.ui;
+  context.menu_settings = settings.menu;
 }
 
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
@@ -75,7 +82,7 @@ Engine::Engine(const EngineOptions& options)
     : options_(options),
       images_dir_(options.game_dir / config::kImagesDirName),
       presenter_(options.presenter),
-      clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame),
+      clock_(clock_for(config::kDefaultTickHz)),
       profiler_(options.profile_time),
       network_watch_(options.network_time) {}
 
@@ -129,6 +136,7 @@ void Engine::open_network(const GameSettings& settings) {
 }
 
 void Engine::build_world(const GameSettings& settings) {
+  clock_ = clock_for(settings.tick_hz);
   collision_layers_ = settings.collision_layers;
   physics_threads_ = chosen_physics_threads(settings);
   max_bodies_ = settings.max_bodies;
@@ -151,10 +159,12 @@ int Engine::chosen_physics_threads(const GameSettings& settings) const {
 void Engine::open_presenter(const GameSettings& settings) {
   if (presenter_ == nullptr) {
     // Shown by nobody, the game is as big as its settings say.
-    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height});
+    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height},
+                                                     fixed_delta());
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();
+  context_.images_dir = images_dir_;
   context_.measure_text = [this](const std::string& text, int size) {
     return presenter_->font_text_width(text, size, context_.ui_font, options_.game_dir / config::kFontsDirName);
   };
@@ -299,7 +309,7 @@ void Engine::fill_context(const GameSettings& settings) {
   connect_audio();
   connect_world();
   context_.input = &input_;
-  context_.time.fixed_delta = config::kFixedDeltaSeconds;
+  context_.time.fixed_delta = fixed_delta();
   connect_profiling();
   context_.scene_name = options_.scene_name;
   connect_context();

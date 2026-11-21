@@ -121,6 +121,7 @@ inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
 inline constexpr const char* kMotionBlur = "motionBlur";
+inline constexpr const char* kBackdropBlur = "backdropBlur";
 // Auto exposure (see shaders/exposure.hpp).
 inline constexpr const char* kCellSize = "cellSize";
 inline constexpr const char* kLuminanceTexture = "luminanceTexture";

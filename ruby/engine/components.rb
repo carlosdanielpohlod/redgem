@@ -15,12 +15,19 @@ class Transform
   def inspect = "#<Transform position=#{position} rotation=#{rotation}>"
 end
 
+# The body of a character: it walks on what is under it. To crouch, make its capsule shorter, and
+# give it back its height to stand up (refused, with false, while something is over its head):
+#   character.resize(height: 1.0, radius: 0.4)        # in fixed_update
 class CharacterController
   def self.__new(id, serial)
     controller = allocate
     controller.instance_variable_set(:@id, id)
     controller.instance_variable_set(:@serial, serial)
     controller
+  end
+
+  def resize(height:, radius:)
+    __resize(height, radius)
   end
 end
 

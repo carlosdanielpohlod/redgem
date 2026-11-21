@@ -44,4 +44,40 @@ bool SceneDocument::edit_nodes(const std::function<std::string()>& edit, std::st
   error = edit();
   return group.finish(error);
 }
+namespace {
+// Keeps a document's own checkpoints from recording while it lives: edits join the step before.
+class JoinedEdits {
+ public:
+  explicit JoinedEdits(bool& active) : active_(active) {
+    if (active_) throw std::logic_error("nested node edit");
+    active_ = true;
+  }
+  ~JoinedEdits() { active_ = false; }
+  JoinedEdits(const JoinedEdits&) = delete;
+  JoinedEdits& operator=(const JoinedEdits&) = delete;
+
+ private:
+  bool& active_;
+};
+}  // namespace
+
+bool SceneDocument::make_then_edit(const std::function<void()>& make, const std::function<std::string()>& edit,
+                                   std::string& error) {
+  make();
+  try {
+    JoinedEdits joined(node_edit_active_);
+    error = edit();
+  } catch (...) {
+    take_back_last_step();
+    throw;
+  }
+  if (!error.empty()) take_back_last_step();
+  return error.empty();
+}
+
+void SceneDocument::take_back_last_step() {
+  if (!undo()) return;
+  pop_step(redo_);
+}
+
 }  // namespace redgem

@@ -76,7 +76,7 @@ TEST_CASE("TestInput sets what the game reads on its next frame") {
   CHECK(input.is_key_down(Key::A));
   CHECK(input.mouse().x == doctest::Approx(kMouseX));
   CHECK(input.mouse().y == doctest::Approx(kMouseY));
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(*engine, "[Input.down?(:a), Input.text, TestInput.down?(:a)].inspect") == "[true, \"hi\", true]");
   ruby(*engine, "TestInput.release_all");
   CHECK_FALSE(input.is_key_down(Key::A));
@@ -163,8 +163,19 @@ TEST_CASE("a system test waits for other programs no longer in all than its wait
   SystemTestOptions options = platformer_test("tests/system/platformer/wait_for_test.rb");
   options.wait_limit_seconds = 1;
   CHECK(run_system_test(options) == 1);
-  CHECK(log.contains("after 60 frames of waits in real seconds (run alone, --wait-limit raises it)"));
+  CHECK(log.contains("after 1 s of waits in real seconds (--wait-limit raises it)"));
   CHECK(run_system_test(platformer_test("tests/system/platformer/wait_for_test.rb")) == 0);
+}
+
+TEST_CASE("the wait limit is real seconds, however slow the frames of the waits are") {
+  // tests/system/platformer/slow_wait_for_test.rb waits two real seconds in about 20 frames of a
+  // tenth of a second each: a third of a second at the game's pace, but past a limit of one.
+  const LogCapture log;
+  SystemTestOptions options = platformer_test("tests/system/platformer/slow_wait_for_test.rb");
+  options.wait_limit_seconds = 1;
+  CHECK(run_system_test(options) == 1);
+  CHECK(log.contains("after 1 s of waits in real seconds"));
+  CHECK(run_system_test(platformer_test("tests/system/platformer/slow_wait_for_test.rb")) == 0);
 }
 
 TEST_CASE("a system test that fails, or is not one, fails the run") {

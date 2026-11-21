@@ -7,10 +7,24 @@
 namespace redgem::config {
 
 // --- Time ---------------------------------------------------------------------
-inline constexpr float kFixedDeltaSeconds = 1.0f / 60.0f;
+// How many fixed steps (physics, fixed_update) a game takes a second: game.json's "tick_hz", from
+// kMinTickHz to kMaxTickHz. A game that says nothing ticks at kDefaultTickHz.
+inline constexpr int kDefaultTickHz = 60;
+inline constexpr int kMinTickHz = 30;
+inline constexpr int kMaxTickHz = 128;
+// The seconds of one step at that many steps a second.
+inline constexpr float tick_seconds(int tick_hz) { return 1.0f / static_cast<float>(tick_hz); }
+// A step of a game that says nothing: for whoever has no game (a bare physics world, a test).
+inline constexpr float kDefaultFixedDeltaSeconds = tick_seconds(kDefaultTickHz);
 // Upper bound for a single rendered frame so a debugger pause does not explode the simulation.
 inline constexpr float kMaxFrameSeconds = 0.25f;
-inline constexpr int kMaxFixedStepsPerFrame = 8;
+inline constexpr int kMaxFixedStepsPerFrame = 8;  // at kDefaultTickHz
+// How many steps a frame takes at most, at that many steps a second: as much game time as
+// kMaxFixedStepsPerFrame steps of a game that says nothing (rounded up), so a game that ticks
+// faster catches up on as long a hitch.
+inline constexpr int max_steps_per_frame(int tick_hz) {
+  return (kMaxFixedStepsPerFrame * tick_hz + kDefaultTickHz - 1) / kDefaultTickHz;
+}
 
 // --- Game folder layout ---------------------------------------------------------
 inline constexpr const char* kSceneFileName = "scene.glb";

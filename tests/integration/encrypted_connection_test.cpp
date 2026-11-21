@@ -222,9 +222,9 @@ struct EncryptedGame {
   }
 
   void round() {
-    clock += config::kFixedDeltaSeconds;
-    if (server) server->tick(config::kFixedDeltaSeconds);
-    for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
+    clock += config::kDefaultFixedDeltaSeconds;
+    if (server) server->tick(config::kDefaultFixedDeltaSeconds);
+    for (auto& machine : machines) machine->frame(config::kDefaultFixedDeltaSeconds);
   }
 
   bool until(const std::function<bool()>& done) {

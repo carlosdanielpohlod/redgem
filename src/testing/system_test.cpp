@@ -5,7 +5,6 @@
 #include <mruby/variable.h>
 
 #include <chrono>
-#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>
@@ -13,7 +12,6 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
@@ -37,10 +35,8 @@ constexpr const char* kPassed = "passed";
 constexpr const char* kFailed = "failed";
 constexpr const char* kWaiting = "waiting";  // a frame of a wait in real seconds (SystemTest#wait_for)
 
-// The frames at the game's pace that `seconds` of waits in real seconds take.
-long long frames_in(int seconds) {
-  return std::llround(static_cast<double>(seconds) / static_cast<double>(config::kFixedDeltaSeconds));
-}
+using Clock = std::chrono::steady_clock;
+using Seconds = std::chrono::duration<double>;
 
 enum class Status { Running, Passed, Failed };
 
@@ -70,7 +66,7 @@ EngineOptions engine_options(const SystemTestOptions& options, const RunFiles& f
 class SystemTestRun {
  public:
   SystemTestRun(Engine& engine, FramePictures& pictures, int wait_limit_seconds)
-      : engine_(engine), pictures_(pictures), max_waited_frames_(frames_in(wait_limit_seconds)) {}
+      : engine_(engine), pictures_(pictures), wait_limit_seconds_(wait_limit_seconds) {}
 
   // Reads the test's file. Returns what is wrong with it, if anything is.
   std::optional<std::string> load(const std::filesystem::path& file);
@@ -82,6 +78,9 @@ class SystemTestRun {
   bool timed_out();
   void heed(const std::string& said);
   void wait_a_frame();
+  void end_wait();
+  // Real seconds the test spent in waits in real seconds, the one going on included.
+  Seconds waited() const;
   void fail(const std::string& why);
   int verdict() const;
   RubyVm& vm() { return engine_.scripts().vm(); }
@@ -90,9 +89,12 @@ class SystemTestRun {
   FramePictures& pictures_;
   mrb_value test_ = mrb_nil_value();  // (the global keeps it from Ruby's garbage collector)
   Status status_ = Status::Running;
-  long long max_waited_frames_;  // frames of waits in real seconds the test may spend in all
-  long long waited_frames_ = 0;  // frames of waits in real seconds, which the limit does not count
-  std::chrono::steady_clock::time_point last_waited_;  // when the last of them started
+  int wait_limit_seconds_;       // real seconds of waits in real seconds the test may spend in all
+  long long waited_frames_ = 0;  // frames of waits in real seconds, which the limit of frames does not count
+  Seconds waits_done_{0.0};      // real seconds of the waits that ended
+  std::optional<Clock::time_point> waiting_since_;  // when the wait going on started, if one is
+  Clock::time_point last_waited_;                   // when the last frame of a wait started
+  Clock::time_point tick_started_;                  // when the test's turn of this frame started
 };
 
 std::optional<std::string> SystemTestRun::load(const std::filesystem::path& file) {
@@ -120,10 +122,24 @@ int SystemTestRun::play() {
 // makes no wait longer).
 void SystemTestRun::wait_a_frame() {
   ++waited_frames_;
-  const auto step = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-      std::chrono::duration<float>(config::kFixedDeltaSeconds));
+  if (!waiting_since_) waiting_since_ = tick_started_;  // (its block's first try counts too)
+  const auto step =
+      std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(engine_.fixed_delta()));
   std::this_thread::sleep_until(last_waited_ + step);
-  last_waited_ = std::chrono::steady_clock::now();
+  last_waited_ = Clock::now();
+}
+
+// A wait in real seconds is over: its real seconds, slow frames and all, count against the limit
+// (up to the tick it ended in: what the test does after it does not).
+void SystemTestRun::end_wait() {
+  if (!waiting_since_) return;
+  waits_done_ += tick_started_ - *waiting_since_;
+  waiting_since_.reset();
+}
+
+Seconds SystemTestRun::waited() const {
+  if (!waiting_since_) return waits_done_;
+  return waits_done_ + Seconds(Clock::now() - *waiting_since_);
 }
 
 void SystemTestRun::fail(const std::string& why) {
@@ -137,9 +153,9 @@ bool SystemTestRun::timed_out() {
     fail("system test timed out after " + std::to_string(kMaxFrames) + " frames");
     return true;
   }
-  if (waited_frames_ >= max_waited_frames_) {
-    fail("system test timed out after " + std::to_string(max_waited_frames_) +
-         " frames of waits in real seconds (run alone, --wait-limit raises it)");
+  if (waited().count() >= static_cast<double>(wait_limit_seconds_)) {
+    fail("system test timed out after " + std::to_string(wait_limit_seconds_) +
+         " s of waits in real seconds (--wait-limit raises it)");
     return true;
   }
   return false;
@@ -147,6 +163,7 @@ bool SystemTestRun::timed_out() {
 
 void SystemTestRun::tick() {
   if (timed_out()) return;
+  tick_started_ = Clock::now();
   const RubyResult result = vm().call(test_, kTickMethod);
   if (!result.ok) {
     fail("system test crashed: " + result.error);
@@ -159,7 +176,11 @@ void SystemTestRun::tick() {
 
 void SystemTestRun::heed(const std::string& said) {
   if (said == kPassed) status_ = Status::Passed;
-  if (said == kWaiting) wait_a_frame();
+  if (said == kWaiting) {
+    wait_a_frame();
+  } else {
+    end_wait();
+  }
   if (said != kFailed) return;
   const RubyResult failure = vm().call(test_, kFailureMethod);
   const bool readable = failure.ok && mrb_string_p(failure.value);
@@ -203,7 +224,7 @@ int play_with(const SystemTestOptions& options, const RunFiles& files) {
   // Made before the engine, so they outlive it: what TestInput sets and the game reads, the
   // pictures the test asks for, and where the game is shown.
   ScriptedInputSource input;
-  FramePictures pictures(options.screenshot_dir);
+  FramePictures pictures(options.screenshot_dir, options.game_dir);
   Stage stage(options, files.settings, pictures);
   if (!options.work_dir.empty()) keep_notes_in(notes_folder_in(options.work_dir));
   auto created = Engine::create(engine_options(options, files, input, stage));

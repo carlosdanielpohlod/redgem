@@ -125,6 +125,12 @@ What `set` (and `add`) take:
 | `parent=Level` | moves it under another object, keeping where it is in the world; `parent=` moves it to the top |
 | `prop.speed=2.5` | a custom property: `true`/`false`, a number, or a text (`prop.label="Big coin"`); `prop.speed=` removes it. A text that reads as a number is given in quotes that reach redgem: `prop.code='"12"'` (a list shows it as `code="12"`) |
 | `script+=Door`, `script-=Door`, `script=Door,Sound` | attaches a behaviour, takes one off, or sets the list (`Door` is `scripts/door.rb`) |
+| `light=spot` | a light's kind: `sun`, `point` or `spot` (the object must have a light) |
+| `light_color=#ffcc88` or `light_color=1,0.8,0.5` | a light's color, each channel 0 to 1 |
+| `light_intensity=500` | watts for a point or spot light, W/m² for a sun |
+| `light_range=12` | how far a point or spot light reaches, in meters (0: the engine's default) |
+| `spot_cone=15,30` | a spot light's inner and outer cone, in degrees |
+| `camera_fov=60`, `camera_near=0.1`, `camera_far=500` | a camera's vertical field of view (5 to 150 degrees) and clipping distances (`camera_far=0`: none) |
 
 ```console
 $ redgem scene set games/my_game Coin1 position=1,2,3 script+=Spinner
@@ -154,7 +160,8 @@ ran main for 180 frames (3 s): 1 errors, 0 warnings
 ```
 
 It plays the game with no window and no sound for a while (5 seconds unless `--seconds N` or
-`--frames N` says otherwise), each frame one fixed step of 1/60 s with nothing pressed, so the same
+`--frames N` says otherwise), each frame one fixed step of the game (1/60 s, unless its `game.json` sets a
+`tick_hz`: see [Tick rate](scripting/gameplay.md#tick-rate)) with nothing pressed, so the same
 run gives the same answer every time. It says each warning and error once (with how many times it
 came), led by the place in the game's scripts it points at, then one line of summary, and ends
 with an error when a script failed. `--scene level2` starts on another scene. What the game saves

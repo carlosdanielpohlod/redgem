@@ -115,22 +115,22 @@ void Engine::advance_game(float frame_seconds) {
   run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
-      options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
+      options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
 }
 
 void Engine::run_fixed_steps(int steps) {
   const int in_place = overlaps_physics() ? std::max(steps - 1, 0) : steps;
-  for (int i = 0; i < in_place; ++i) fixed_step(config::kFixedDeltaSeconds);
+  for (int i = 0; i < in_place; ++i) fixed_step(fixed_delta());
   if (in_place == steps) return;
-  prepare_fixed_step(config::kFixedDeltaSeconds);
+  prepare_fixed_step(fixed_delta());
   step_prepared_ = true;
 }
 
 void Engine::begin_prepared_step() {
   if (!step_prepared_) return;
-  overlapped_->begin_step(config::kFixedDeltaSeconds);
+  overlapped_->begin_step(fixed_delta());
   step_prepared_ = false;
   step_in_flight_ = true;
 }
@@ -140,7 +140,7 @@ void Engine::settle_physics() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
   step_in_flight_ = false;
   overlapped_->finish_step();
-  finish_fixed_step(config::kFixedDeltaSeconds);
+  finish_fixed_step(fixed_delta());
 }
 
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
@@ -242,7 +242,7 @@ void Engine::present() {
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        context_.auto_exposure, controls_, images_dir_, context_.stop_recording_requested,
                        &water_.snapshot(), shows_profile_stats(context_), &debug_draw_, &water_.surfaces(),
-                       &context_.material_emission});
+                       &context_.material_emission, context_.backdrop_blur});
   forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
 }
 
