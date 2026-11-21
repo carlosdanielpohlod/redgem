@@ -107,9 +107,19 @@ class NetworkSync < Behaviour
   def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
   # Poses a second the owner sends.
-  def send_hz
-    @send_hz ||= prop(:send_hz, Network.send_hz).to_f.clamp(Network::MIN_SEND_HZ, Network::MAX_SEND_HZ)
+  def send_hz = @send_hz ||= __usable_send_hz(prop(:send_hz, Network.send_hz))
+
+  # A send_hz setting as it is when it can be used. One out of the limits is told of and kept within
+  # them; one that is not a number is told of, and the game's rate stands in for it.
+  def __usable_send_hz(wanted)
+    return wanted.to_f if __send_hz_usable?(wanted)
+
+    Debug.warn("#{name}: NetworkSync send_hz #{wanted.inspect} is not a number from " \
+               "#{Network::MIN_SEND_HZ} to #{Network::MAX_SEND_HZ}")
+    wanted.is_a?(Numeric) ? wanted.to_f.clamp(Network::MIN_SEND_HZ, Network::MAX_SEND_HZ) : Network.send_hz.to_f
   end
+
+  def __send_hz_usable?(wanted) = wanted.is_a?(Numeric) && wanted.between?(Network::MIN_SEND_HZ, Network::MAX_SEND_HZ)
   # Seconds between two of them.
   def send_interval = 1.0 / send_hz
   # Out of a game, everything is this machine's to move (not while it reconnects: the others'
@@ -134,6 +144,7 @@ class NetworkSync < Behaviour
 
   # Nothing heard of the object yet: what came from an owner before says nothing of the next.
   def watch_afresh
+    @send_hz = nil  # (its settings may have changed since)
     @position = @rotation = nil
     @snapshots = Snapshots.new(send_interval, prop(:delay)&.to_f) if prop(:interpolate, true)
   end

@@ -146,11 +146,11 @@ TEST_CASE("objects send game.json's network send_hz poses a second, else 20") {
   const std::string fast = "{\"network\": {\"send_hz\": " + std::to_string(kFastSends) + "}}";
   CHECK(manifest_of(fast).settings.send_hz == kFastSends);
   CHECK(manifest_of(fast).send_hz_error.empty());
-  for (const char* unusable : {"0", "129", "20.5", "\"often\""}) {
+  for (const char* unusable : {"0", "4", "129", "20.5", "\"often\""}) {
     CAPTURE(unusable);
     const GameManifest manifest = manifest_of(std::string("{\"network\": {\"send_hz\": ") + unusable + "}}");
     CHECK(manifest.settings.send_hz == config::kDefaultSendHz);
-    CHECK(manifest.send_hz_error.find("network.send_hz must be a whole number from 1 to 128") != std::string::npos);
+    CHECK(manifest.send_hz_error.find("network.send_hz must be a whole number from 5 to 128") != std::string::npos);
   }
 }
 

@@ -29,6 +29,16 @@ class NetworkSendRateTest < RedGemTest::Case
     assert_in_delta Network::MIN_SEND_HZ, synced(send_hz: 0).send_hz
   end
 
+  def test_an_object_whose_send_hz_is_not_a_number_sends_at_the_game_rate
+    assert_in_delta DEFAULT_SEND_HZ, synced(send_hz: "often").send_hz
+    assert_in_delta DEFAULT_SEND_HZ, synced(send_hz: nil).send_hz
+  end
+
+  def test_the_slowest_rate_is_still_shown_smoothly
+    behind = 1.0 / Network::MIN_SEND_HZ * NetworkSync::Snapshots::INTERVALS_BEHIND
+    assert_operator behind, :<=, NetworkSync::Snapshots::MAX_DELAY
+  end
+
   def test_the_others_expect_its_poses_that_often
     assert_in_delta 1.0 / SLOW * NetworkSync::Snapshots::INTERVALS_BEHIND, shown_behind(synced(send_hz: SLOW))
     assert_in_delta 1.0 / DEFAULT_SEND_HZ * NetworkSync::Snapshots::INTERVALS_BEHIND, shown_behind(synced)

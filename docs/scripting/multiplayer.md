@@ -294,7 +294,7 @@ add_component(NetworkSync, interpolate: false)    # no delay: chases the newest 
 ### Send rate
 
 A game can send poses more often, for every object, with the `network` section of its
-`game.json` (1 to 128 a second; such a section also says the game plays online, as
+`game.json` (5 to 128 a second; such a section also says the game plays online, as
 `"network": true` does):
 
 ```json
@@ -309,7 +309,10 @@ add_component(NetworkSync, send_hz: 5)    # a slow lift: a few poses are enough
 ```
 
 Every machine needs the same rate for an object: the watchers expect its poses that often, and
-show it about one and a half intervals behind (75 ms at 20 a second, never less than 50 ms).
+show it about one and a half intervals behind (75 ms at 20 a second, never less than 50 ms
+nor more than 350 ms, which is why 5 a second is the least). An object's `send_hz` that is
+not a number from 5 to 128 is warned of: one out of those limits is kept within them, and one
+that is not a number sends at the game's rate.
 `Network.send_hz` is the game's rate. An owner sends at most one pose a frame, so a rate above
 the frame rate is the frame rate. More poses cost bandwidth: about 700 bytes a second per moving
 player at 20 a second, about 2.2 KB at 64, to every other machine.
