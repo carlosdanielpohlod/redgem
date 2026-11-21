@@ -17,6 +17,17 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A quest journal and objective markers.** The pause menu of a game with quest files has a
+  Journal page: the quests under way, each with the text of its stage and its objectives (a filled
+  box once done), then the quests completed. Its lines scroll and take the focus, so the keyboard,
+  a gamepad, the mouse and taps all work it; picking a quest tracks it (`Quests.track`,
+  `Quests.tracked`). This machine's `QuestTracker` shows where the tracked quest's objectives happen:
+  a marker over each place the camera sees, with the meters to it, and a pointer at the edge of the
+  screen toward one it does not, behind the camera too. The places are those a `go_to`, `talk_to`
+  or `deliver` names. `QuestMarkers` (experimental) turns them off, restyles them, says where any
+  objective happens, or draws them as the game wants. In a game played together each player sees
+  the party's quests (the host's) and tracks their own. `GameMenu`'s setting `journal: false`
+  leaves the page out.
 - **A manual page for the `multiplayer-levels` template**, "A game of levels played together":
   what it plays like, its scripts, its levels, playing together, its save and its tests. The
   first-game, command-line and testing pages and the README list the template.

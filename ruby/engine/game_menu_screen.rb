@@ -27,6 +27,9 @@ class GameMenu < Behaviour
     # Adds an option at a place among the others (index 0 is the first button).
     def add_option(label, index: LAST, &action) = @options.insert(index, [label, action])
 
+    # Where an option (the very [label, action] it was given) is among its options, or nil.
+    def __index(option) = @options.index { |entry| entry.equal?(option) }
+
     def opened; end                # it was just shown
     def closed; end                # another screen took its place, or the game went on
     def draw(_first_button); end   # what else it shows; the first button is at [x, y, width, height]

@@ -1,5 +1,5 @@
 ---
-description: "Quests: quest files with stages and objectives (go to, talk to, deliver, collect, defeat, a check of the game's own), their events, saving them, and how the party shares them over the network."
+description: "Quests: quest files with stages and objectives (go to, talk to, deliver, collect, defeat, a check of the game's own), their events, the menu's journal, markers and pointers to the objectives, saving them, and how the party shares them over the network."
 ---
 
 # Quests
@@ -101,6 +101,63 @@ Quests.active                        # every quest under way
 Quests.completed
 ```
 
+## The journal
+
+The pause menu of a game with quest files has a **Journal** page. It lists the quests under way,
+each with the text of the stage it is at and its objectives (a filled box once one is done), then
+the quests completed. Its lines scroll and take the focus: up and down (the arrows, a gamepad's
+D-pad) move between them, Page Up and Page Down (the bumpers), the mouse wheel and the right stick
+scroll. Enter, a gamepad's A, a click or a tap on a line of a quest tracks that quest. Back, Esc or
+Start go back to the pause menu.
+
+```ruby
+Camera.main.add_component(GameMenu, journal: false)   # no journal: the game has its own
+GameMenu.instance.show(:journal)                       # opens it, from a key of the game's
+Quests.tracked                                         # the quest the markers follow
+Quests.track(:bread)                                   # (nil: the first one under way)
+```
+
+The tracked quest is the one picked, while it is under way; else the first one under way. Each
+machine tracks its own.
+
+## Markers and pointers
+
+The `QuestTracker` of this machine's hero shows where the tracked quest's objectives happen: a
+marker over each place the camera sees, with the meters to it, and a pointer at the edge of the
+screen toward each place it does not (one behind the camera is pointed at from the bottom, on its
+side). An objective's place is the object it names: a `go_to`'s place, a `talk_to`'s speaker, a
+`deliver`'s recipient. An objective that is done, or that has no object of that name in the scene,
+shows nothing. Nothing shows while the menu is open, nor on a dedicated server. A `QuestTracker`
+that is not on the hero (one for the checks only) is added with `markers: false`.
+
+`QuestMarkers` is **experimental**: it may change in any release.
+
+```ruby
+QuestMarkers.enabled = false                    # none at all
+QuestMarkers.style(color: :ruby, size: 24, pointer_size: 30, margin: 40, height: 2.0, distance: false)
+QuestMarkers.style(image: :quest_marker)        # images/quest_marker.png in the place of the dots
+QuestMarkers.reset_style
+QuestMarkers.locate { |objective| find("Mill") if objective.kind == :collect }   # an object or a Vector3
+QuestMarkers.draw { |mark| UI.text("!", x: mark.x, y: mark.y, align: :center) }  # the game draws each
+QuestMarkers.marks                              # => what shows now: QuestMarkers::Mark each
+```
+
+| Style | What it is |
+|---|---|
+| `color` | Of the markers and the pointers. |
+| `size` | Units across a marker. |
+| `pointer_size` | Units across a pointer. |
+| `margin` | Units between a pointer and the edge of the screen. |
+| `height` | Meters above its place a marker floats. |
+| `distance` | Whether the meters to a place show under its mark. |
+| `image` | A picture of `images/` drawn in the place of the dots (`nil`: the dots). |
+
+A `Mark` has the `objective`, `x` and `y` on the screen (in the interface's units), `pointer`
+(true at the edge), `direction` (a pointer's way to its place, `[x, y]` of length 1) and `meters`.
+`QuestMarkers.edge_point(direction, width, height, margin)` is where a pointer sits.
+`enabled` and the style last for the whole run; what `locate` and `draw` register lasts until the
+next level is loaded.
+
 ## Events
 
 ```ruby
@@ -146,6 +203,8 @@ changes and tells every machine of. A newcomer hears of every quest as it joins.
 `Quests.start`, `set_stage` and `replace` raise. What a client's player collects, delivers, defeats
 or reaches is told to the host, which counts it. Conversations are followed on the host (see
 [Dialogue](dialogue.md#over-the-network)), so a `talk_to` counts there, and so do the checks.
+Every machine's journal and markers show the party's quests, as the host told them, and each
+player tracks a quest of their own.
 
 A dedicated server has no hero: it needs a `QuestTracker` on any object for its checks.
 

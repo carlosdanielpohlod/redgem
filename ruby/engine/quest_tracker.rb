@@ -1,16 +1,22 @@
 # Follows the quests for the object it is on, the player's hero (see quests.rb). Every frame it
 # tells the quests when the hero comes within reach of a go_to objective's place (an object of that
 # name, within the objective's "radius"), and, where the quests are decided (offline, on the host),
-# asks the game's checks (Quests.check).
+# asks the game's checks (Quests.check). On this machine's hero it also shows where the tracked
+# quest's objectives happen (see QuestMarkers).
 #
 #   find("Player").add_component(QuestTracker)
+#   find("GameManager").add_component(QuestTracker, markers: false)   # for its checks only
 #
-# On another machine's hero it does not look for places: that machine's own tracker does, and
-# tells the host. A dedicated server, which has no hero, needs one on any object for its checks.
+# Settings: markers (false: this one shows none, as a tracker that is not on the hero should).
+# On another machine's hero it does not look for places nor show them: that machine's own tracker
+# does, and tells the host. A dedicated server, which has no hero, needs one on any object for its checks.
 class QuestTracker < Behaviour
-  def update(_dt)
+  def update(dt)
     Quests.__poll
-    look_around if mine?
+    return unless mine?
+
+    look_around
+    QuestMarkers.__update(transform.position, dt) if prop(:markers, true)
   end
 
   private

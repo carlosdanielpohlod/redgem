@@ -66,6 +66,10 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/quest.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/quest_progress.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/quest_tracker.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quest_markers.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/quest_markers_marks.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_journal.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_journal_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_quests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/dialogue_box.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/perception.rb

@@ -1,8 +1,10 @@
 // Quest natives: reading a game's quest files (see ruby/engine/quests.rb).
 
 #include <mruby.h>
+#include <mruby/array.h>
 
 #include <string>
+#include <vector>
 
 #include "core/safe_path.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -56,12 +58,21 @@ mrb_value quest_exists(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(path.has_value());
 }
 
+// Quests.__names: the names of the game's quest files, sorted.
+mrb_value quest_names(mrb_state* mrb, mrb_value) {
+  const std::vector<std::string> names = quest::quest_names(script_host(mrb).game_dir());
+  mrb_value list = mrb_ary_new_capa(mrb, static_cast<mrb_int>(names.size()));
+  for (const std::string& name : names) mrb_ary_push(mrb, list, text_value(mrb, name));
+  return list;
+}
+
 }  // namespace
 
 void install_quest_bindings(mrb_state* mrb) {
   RClass* quests_module = mrb_define_module(mrb, "Quests");
   mrb_define_module_function(mrb, quests_module, "__read", quest_read, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, quests_module, "__exists?", quest_exists, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, quests_module, "__names", quest_names, MRB_ARGS_NONE());
 }
 
 }  // namespace redgem

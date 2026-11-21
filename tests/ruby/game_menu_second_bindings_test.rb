@@ -41,7 +41,7 @@ class GameMenuSecondBindingsTest < RedGemTest::Case
   # A menu showing the controls page, and the page.
   def opened_page
     menu = GameMenu.new
-    menu.__configure({ title: "Coin Rush", start_open: false })
+    menu.__configure({ title: "Coin Rush", start_open: false, journal: false })
     menu.start
     menu.show(:controls)
     [menu, menu.screens[:controls]]

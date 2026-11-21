@@ -263,12 +263,14 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blocker still open (see the 1.0 cut plan): a quest journal and markers.
+No 1.0 blocker is left (see the 1.0 cut plan).
 
 ### Gameplay API
 
-- [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
-  on-screen objective pointer. Games can build those views from `Quests.active`.
+- [Quest markers](docs/scripting/quests.md#markers-and-pointers) show only where the tracked quest's
+  objectives happen, and see no walls: a marker shows through what is in front of its place.
+  `collect`, `defeat` and `check` objectives have no place unless the game says where
+  (`QuestMarkers.locate`).
 - The editor's [Story panel](docs/editor.md#story-panel) runs dialogues and quests without the
   scene: `check` objectives never pass, `talk_to` objectives have no speaker, and voices are silent.
 - [NPC gizmos](docs/editor.md#npc-gizmos) show, while editing, only the parts an object's
