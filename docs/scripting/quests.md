@@ -127,7 +127,8 @@ marker over each place the camera sees, with the meters to it, and a pointer at 
 screen toward each place it does not (one behind the camera is pointed at from the bottom, on its
 side). An objective's place is the object it names: a `go_to`'s place, a `talk_to`'s speaker, a
 `deliver`'s recipient. An objective that is done, or that has no object of that name in the scene,
-shows nothing. Nothing shows while the menu is open, nor on a dedicated server.
+shows nothing. Nothing shows while the menu is open, nor on a dedicated server. A `QuestTracker`
+that is not on the hero (one for the checks only) is added with `markers: false`.
 
 `QuestMarkers` is **experimental**: it may change in any release.
 

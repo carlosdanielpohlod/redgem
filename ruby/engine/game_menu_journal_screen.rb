@@ -32,8 +32,12 @@ class GameMenu < Behaviour
       @list = UI::ScrollList.new
     end
 
-    # What it shows now (GameMenu::Journal::Line each).
-    def lines = Journal.lines
+    # What it shows now (GameMenu::Journal::Line each), worked out once a frame.
+    def lines
+      @lines = nil unless @lines_frame == Time.frame
+      @lines_frame = Time.frame
+      @lines ||= Journal.lines
+    end
 
     def rows = lines.size
     def space_above = VISIBLE_ROWS * row_step
@@ -80,8 +84,9 @@ class GameMenu < Behaviour
       size = @menu.scaled(BOX_SIZE)
       y = UI.centered(row[:y], row[:height], size)
       UI.rect(x: x, y: y, width: size, height: size, color: done ? DONE_COLOR : TO_DO_COLOR)
-      inner = size - 2 * BOX_BORDER
-      UI.rect(x: x + BOX_BORDER, y: y + BOX_BORDER, width: inner, height: inner, color: :dark) unless done
+      border = [@menu.scaled(BOX_BORDER), 1].max
+      inner = size - 2 * border
+      UI.rect(x: x + border, y: y + border, width: inner, height: inner, color: :dark) unless done
       x + size + @menu.scaled(ROW_GAP) * 2
     end
 

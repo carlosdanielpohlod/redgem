@@ -52,7 +52,7 @@ class GameMenu < Behaviour
     super
     @screen = nil
     @focus = UI::Focus.new
-    quit = [-> { I18n.t("game.menu.quit") }, -> { Game.quit }]
+    quit = @quit = [-> { I18n.t("game.menu.quit") }, -> { Game.quit }]
     title = [[-> { I18n.t("game.menu.play") }, -> { resume }], settings_option, quit]
     @screens = { title: Screen.new(options: title), pause: pause_screen(quit),
                  over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]),
@@ -145,10 +145,10 @@ class GameMenu < Behaviour
     { settings: SettingsScreen.new(self), controls: ControlsScreen.new(self), journal: JournalScreen.new(self) }
   end
 
-  # The journal goes on the pause menu, before its last option (Quit).
+  # The journal goes on the pause menu, before Quit (last, if the game took Quit away).
   def add_journal
     pause = @screens[:pause]
-    pause.add_option(-> { I18n.t("game.menu.journal") }, index: pause.options.size - 1) { show(:journal) }
+    pause.add_option(-> { I18n.t("game.menu.journal") }, index: pause.__index(@quit) || LAST) { show(:journal) }
   end
 
   def settings_option = [-> { I18n.t("game.menu.settings") }, -> { show_settings }]

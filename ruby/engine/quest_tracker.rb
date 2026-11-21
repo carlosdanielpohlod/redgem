@@ -5,7 +5,9 @@
 # quest's objectives happen (see QuestMarkers).
 #
 #   find("Player").add_component(QuestTracker)
+#   find("GameManager").add_component(QuestTracker, markers: false)   # for its checks only
 #
+# Settings: markers (false: this one shows none, as a tracker that is not on the hero should).
 # On another machine's hero it does not look for places nor show them: that machine's own tracker
 # does, and tells the host. A dedicated server, which has no hero, needs one on any object for its checks.
 class QuestTracker < Behaviour
@@ -14,7 +16,7 @@ class QuestTracker < Behaviour
     return unless mine?
 
     look_around
-    QuestMarkers.__update(transform.position, dt)
+    QuestMarkers.__update(transform.position, dt) if prop(:markers, true)
   end
 
   private

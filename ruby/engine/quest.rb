@@ -47,7 +47,7 @@ module Quests
     def description = definition&.description_key && I18n.t(definition.description_key)
 
     # The text of the stage it is at, or nil.
-    def stage_text = stage_data && I18n.t(stage_data["text"])
+    def stage_text = stage_data && stage_data["text"] && I18n.t(stage_data["text"])
 
     # What the party does now: the objectives of the stage it is at.
     def objectives

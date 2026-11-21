@@ -21,6 +21,11 @@ class QuestJournalTest < RedGemTest::Case
       "done" => { "text" => "errand.done", "end" => true }
     }
   }.freeze
+  # A quest whose stage says nothing of itself.
+  UNTOLD = { "title" => "mute.title", "start" => "go", "stages" => {
+    "go" => { "objectives" => [{ "collect" => "water", "text" => "mute.water" }], "next" => "done" },
+    "done" => { "text" => "mute.done", "end" => true }
+  } }.freeze
   NAMES = %w[well mill barn].freeze
   FIRST_BUTTON = [0, 619, 280, 58].freeze
 
@@ -114,6 +119,20 @@ class QuestJournalTest < RedGemTest::Case
     journal.draw(FIRST_BUTTON)
     UI.pick_focused = false
     assert_equal "mill", Quests.tracked.name
+  end
+
+  def test_a_stage_with_no_text_has_no_line
+    Quests.instance_variable_get(:@definitions)["mute"] = Quests::Definition.new("mute", UNTOLD)
+    Quests.start(:mute)
+    assert_equal %i[section quest objective], kinds
+  end
+
+  def test_it_goes_before_quit_even_after_an_option_the_game_added_last
+    shown = GameMenu.new
+    shown.__configure({ title: "Errands", start_open: false, journal: true })
+    shown.screens[:pause].add_option("Credits") { :credits }
+    shown.start
+    assert_equal %w[Resume Restart Settings Journal Quit Credits], shown.screens[:pause].options.map(&:first)
   end
 
   def test_the_pause_menu_offers_it_before_quit

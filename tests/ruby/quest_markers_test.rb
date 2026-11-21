@@ -9,18 +9,19 @@ class QuestMarkersTest < RedGemTest::Case
   FOCAL = 400.0           # units across the screen a meter at a meter's distance takes
   # Someone or something of the scene, as the markers see it.
   Thing = Struct.new(:transform)
-  Spot = Struct.new(:position, :right)
+  Spot = Struct.new(:position, :right, :forward)
   PLACES = { "Well" => Vector3.new(0, -1.5, -10), "Baker" => Vector3.new(0, -1.5, 10) }.freeze
-  CAMERA = Thing.new(Spot.new(Vector3.zero, Vector3.right))
+  CAMERA = Thing.new(Spot.new(Vector3.zero, Vector3.right, Vector3.forward))
+  NEAR_PLANE = 0.1        # meters: nearer, the stand-in camera shows nothing, as the engine's
 
   class << Camera
     def main = QuestMarkersTest::CAMERA
 
     # (Nil behind the camera, as the engine's.)
     def world_to_screen(point)
-      return nil unless point.z.negative?
-
       depth = -point.z
+      return nil if depth < QuestMarkersTest::NEAR_PLANE
+
       [QuestMarkersTest::WIDTH / 2 + point.x / depth * QuestMarkersTest::FOCAL,
        QuestMarkersTest::HEIGHT / 2 - point.y / depth * QuestMarkersTest::FOCAL]
     end
@@ -129,6 +130,14 @@ class QuestMarkersTest < RedGemTest::Case
     assert well.pointer
     assert_in_delta WIDTH - QuestMarkers::STYLE[:margin], well.x
     assert_in_delta HEIGHT / 2, well.y
+  end
+
+  def test_a_place_too_near_for_the_camera_to_show_is_marked_in_the_middle
+    Quests.start(:errand)
+    QuestMarkers.locate { |objective| Vector3.new(0, -1.5, -NEAR_PLANE / 2) if objective.kind == :go_to }
+    well = mark_of("Well")
+    refute well.pointer
+    assert_equal [WIDTH / 2, HEIGHT / 2], [well.x, well.y]
   end
 
   def test_a_done_objective_is_no_longer_marked

@@ -95,17 +95,21 @@ module QuestMarkers
     # Whether a point ([x, y], nil behind the camera) is on a screen `width` by `height`.
     def on_screen?(spot, width, height) = !spot.nil? && spot[0].between?(0, width) && spot[1].between?(0, height)
 
-    # Called by this machine's QuestTracker every frame, with its hero's position (the game is
-    # frozen while dt is 0: nothing is drawn).
+    # Called by this machine's QuestTracker every frame, with its hero's position. They are drawn
+    # once a frame, and not while the game is frozen (dt is 0).
     def __update(hero, dt)
       @marks = shown? ? current_marks(hero) : []
-      @marks.each { |mark| paint(mark) } unless dt.zero?
+      return if dt.zero? || @painted == Time.frame
+
+      @painted = Time.frame
+      @marks.each { |mark| paint(mark) }
     end
 
     def __scene_reset
       @locate = nil
       @draw = nil
       @marks = []
+      @painted = nil
     end
   end
 end
