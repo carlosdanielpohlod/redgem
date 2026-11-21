@@ -42,11 +42,14 @@ class Middleman {
   void block(bool blocked) { blocked_ = blocked; }
   std::size_t carried() const { return lines_.size(); }
 
-  // What a wait for its next turn watches: calls coming in, and both ends of every line (the far
-  // one for its call going through, either one while bytes wait for it).
+  // What a wait for its next turn watches: calls coming in, and both ends of every line still
+  // carrying (the far one for its call going through, either one while bytes wait for it). A line
+  // one side of which is closed has nothing more to carry: its other end, hung up on, would end
+  // every wait at once.
   std::vector<net::Watched> watched() const {
     std::vector<net::Watched> watched{{&listener_}};
     for (const Line& line : lines_) {
+      if (!carrying(line)) continue;
       watched.push_back({&line.near, !line.to_near.empty()});
       watched.push_back({&line.far, !line.far_ready || !line.to_far.empty()});
     }
@@ -61,6 +64,8 @@ class Middleman {
   };
 
   static constexpr const char* kLocalhost = "127.0.0.1";
+
+  static bool carrying(const Line& line) { return line.near.valid() && line.far.valid(); }
   static constexpr std::size_t kReadBytes = 64 * 1024;
 
   void take_calls() {

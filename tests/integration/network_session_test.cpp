@@ -125,8 +125,12 @@ TEST_CASE("a wait on a session's network watches what it listens on, then every 
   CHECK_FALSE(Socket::wait(party.second.watched(), redgem::test::kSocketPatience));
   REQUIRE(party.first.send("hit", 1, kSecondGuest));
   party.first.poll(kRoundSeconds);
-  party.host.poll(kRoundSeconds);  // (passes it on)
-  CHECK(Socket::wait(party.second.watched(), kPastJoinTimeout));
+  bool woken = false;
+  for (int round = 0; round < kMaxRounds && !woken; ++round) {
+    party.host.poll(kRoundSeconds);  // (passes it on, once it is there)
+    woken = Socket::wait(party.second.watched(), redgem::test::kSocketPatience);
+  }
+  CHECK(woken);
 }
 
 TEST_CASE("a message to everyone reaches everyone else, with who sent it and what it carries") {

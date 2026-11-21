@@ -287,7 +287,9 @@ the emulator, and the test cases still on the real clock.
   editor bridge and the agent connection, and those that check that some work ends within seconds
   (a flood of messages, many numbers to parse, a large physics world taken apart, a stuck script
   stopped). The tests of connections, sessions, relays, lobbies, approvals, reconnecting and
-  multiplayer games count rounds and wait on their sockets (`tests/socket_rounds.hpp`); the
+  multiplayer games count rounds and wait on their sockets (`tests/socket_rounds.hpp`), but for a
+  relay's wait woken by a call from another thread, a flood paced to real time for the system's
+  own TCP timers, and the join times the encrypted tests print; the
   scripts' budget and the editor's build timer run on a test's clock (`tests/fake_clock.hpp`).
 
 ### Documentation

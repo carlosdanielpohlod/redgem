@@ -183,11 +183,17 @@ struct Stranger {
   }
 };
 
+// Whether `session` hosts a game on a port of its own (not in a room on a relay).
+bool hosts_on_its_port(const NetworkSession& session) { return session.hosting() && session.room().empty(); }
+
 // Until every machine connected to `host` has sent it something it can read, unpolled.
 void wait_for_every_connection(const NetworkSession& host) {
+  REQUIRE(hosts_on_its_port(host));
   const std::vector<Watched> watched = host.watched();
-  // (The first is what the host listens on.)
-  for (std::size_t i = 1; i < watched.size(); ++i) REQUIRE(Socket::wait({{watched[i].socket}}, kArrivalPatience));
+  // (The first is what the host listens on: it hosts on its own port, not in a room on a relay.)
+  for (std::size_t i = 1; i < watched.size(); ++i) {
+    if (watched[i].socket->valid()) REQUIRE(Socket::wait({{watched[i].socket}}, kArrivalPatience));
+  }
 }
 
 bool refused_for_its_token(const nlohmann::json& answer) {

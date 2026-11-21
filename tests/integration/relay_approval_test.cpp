@@ -83,6 +83,12 @@ struct GuardedRoom {
     return redgem::test::message_in(*text);
   }
 
+  // Whether `session`'s one connection has written out all it was told to send.
+  static bool said_all(const NetworkSession& session) {
+    const std::vector<Watched> watched = session.watched();
+    return watched.size() == 1 && !watched.front().sending;
+  }
+
   void join(NetworkSession& session) {
     sessions.push_back(&session);
     std::string error;
@@ -112,9 +118,10 @@ TEST_CASE("the id of a newcomer who gives up waiting is nobody else's until the 
   room.sessions.clear();
   room.join(next);
   // Its hello is written out (once its call is through) ...
-  REQUIRE(room.sessions_until([&next] { return !next.watched().front().sending; }));
+  REQUIRE(room.sessions_until([&next] { return GuardedRoom::said_all(next); }));
   // ... and it waits at the relay's door, after the goodbye (what the relay listens on is the first
-  // socket a wait on it watches).
+  // socket a wait on it watches, while it does not rest from a newcomer it could not take).
+  REQUIRE(room.relay.sleep_seconds(kArrivalPatience) == kArrivalPatience);
   REQUIRE(Socket::wait({room.relay.watched().front()}, kArrivalPatience));
   const nlohmann::json asked = room.next_message();
   CHECK(asked["k"] == wire::kAsking);
