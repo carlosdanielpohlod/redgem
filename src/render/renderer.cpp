@@ -103,6 +103,7 @@ void Renderer::sync(const SceneDesc& desc) {
   impl_->upload_new_materials(desc);
   impl_->refresh_material_values(desc);
   impl_->upload_new_meshes(desc);
+  impl_->sync_terrains(desc);
   impl_->note_see_through_meshes();
 }
 
@@ -171,5 +172,6 @@ void Renderer::set_images_dir(const std::filesystem::path& dir) {
 }
 
 void Renderer::set_show_prefabs(bool show) { impl_->show_prefabs = show; }
+void Renderer::draw_view_models_apart(bool apart) { impl_->view_models_apart = apart; }
 
 }  // namespace redgem

@@ -380,6 +380,55 @@ terrain's smallest Z (north, for a scene made in Blender with +Y north), its fir
 smallest X. Without these pictures the first layer covers the whole terrain. The weights of a
 spot are always scaled to add up to one. The map lies over the mesh's own X and Z bounds.
 
+The layers take the place of the terrain material's color, roughness and normal map. The vertex
+tint still multiplies their color, so a terrain painted with the old tint brush keeps its tint. A
+terrain object without `terrain_layers` is drawn exactly as before, and a scene without any
+layered terrain compiles none of the layer code into its shader. The terrain's mesh must be its
+own: when another object draws the same mesh, neither gets the layers.
+
+![Top: the vertex tint alone, two layers meeting at a hard edge, and fading by weight. Bottom: the
+same fade blended by height, a striped layer seen from above on a cube, and the same layer
+triplanar.](images/terrain-layers/blending.png)
+
+How the layers meet:
+
+- **By weight.** With `sharpness` 0, two layers fade into each other over the width where their
+  weights fade.
+- **By height.** Toward `sharpness` 1, where two layers meet, the one whose height picture plus
+  weight is higher takes the spot, so the edge follows the stones and cracks of the pictures. A
+  layer without a height picture counts as half height: the stronger weight wins with a crisp
+  edge.
+- **Repeats.** Every layer repeats every `tiling` meters, in world space. `variation` adds patches
+  `variation_size` meters across, which hide the repeats seen from far away. `stochastic` hides
+  them up close as well.
+- **Slopes.** A layer seen from above is stretched on a cliff. `triplanar` projects it from the
+  side there instead. Turn it on for rock, and leave it off for layers that only lie on gentle
+  ground.
+
+Each layer samples its two pictures once, three times with `stochastic` or `triplanar`, and nine
+times with both. Layers whose weight is nothing at a pixel cost nothing there. See
+[Ground layer cost](#ground-layer-cost) below.
+
+#### Ground layer cost
+
+Frame time at 1920 x 1080 on an RTX 4050 laptop GPU, a 200 m terrain filling most of the screen.
+This is the worst case: every layer has an even share of every pixel. Real ground has two or three
+layers at a spot, and costs about as much as the row with that many layers.
+
+| Terrain | Frame time |
+|---------|-----------:|
+| No ground layers | 2.5 ms |
+| 4 layers | 4.5 ms |
+| 8 layers | 6.4 ms |
+| 4 layers, `stochastic` | 7.5 ms |
+| 8 layers, `stochastic` | 12.8 ms |
+| 8 layers, `triplanar` | 10.6 ms |
+| 8 layers, `stochastic` and `triplanar` | 25.3 ms |
+
+Measure your own card with `redgem_field_benchmark terrain 8 stochastic triplanar` (built with
+the tests). Keep `stochastic` for the one or two layers whose repeats show, and `triplanar` for
+the layers that cover cliffs.
+
 ## Editing the level in Blender
 
 ```bash
@@ -411,6 +460,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
 | `cast_shadow` | `false` / `true`                            | `false` keeps the object out of the shadows (a sky dome); `true` on a point or spot light makes it cast shadows (off unless said) |
+| `view_model` | `false` / `true`                            | `true` draws the object and what is under it as the view model: a first-person weapon drawn over the world, never into a wall (see "A first-person weapon" in [gameplay.md](scripting/gameplay.md)) |
 | `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves (see "See-through materials and wind") |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |

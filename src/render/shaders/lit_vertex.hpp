@@ -165,6 +165,7 @@ out vec3 fragNormal;
 flat out vec3 fragTint;
 flat out vec4 fragCopy;                  // kept as it fades out (x) and in (y), lit as facing up (z)
 flat out vec3 fragUp;
+out vec3 fragLocal;                      // the vertex in its mesh's own space (terrains' weights are laid over it)
 
 void main() {
   int record = int(instanceSlot) * TEXELS_PER_INSTANCE;
@@ -184,6 +185,7 @@ void main() {
   vec3 position = shaped(vertexPosition, frameTexels, shapes, POSITION_DELTA);
   vec4 world = placedBy(toWorld, position, ground, frameTexels, record, time, false);
   fragPosition = world.xyz;
+  fragLocal = position;
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;
   fragNormal = normalize(normalToWorld * shaped(vertexNormal, frameTexels, shapes, NORMAL_DELTA));

@@ -553,7 +553,11 @@ redgem_add_library(redgem_runtime
   render/renderer_environment.cpp
   render/renderer_objects.cpp
   render/renderer_see_through.cpp
+  render/renderer_terrain.cpp
+  render/terrain_textures.cpp
+  render/terrain_look.cpp
   render/renderer_water.cpp
+  render/renderer_view_model.cpp
   render/water_ripple_packet.cpp
   render/underwater.cpp
   render/renderer_water_ripples.cpp

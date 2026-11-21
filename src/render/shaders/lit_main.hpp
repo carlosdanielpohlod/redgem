@@ -37,6 +37,17 @@ void main() {
   if (fragCopy.z > 0.0) n = normalize(mix(n, fragUp, fragCopy.z));  // grass lit as the meadow it stands in
   vec3 flatNormal = n;
   if (hasNormalMap > SWITCH_ON) n = mappedNormal(n, fragPosition, fragTexCoord);
+#ifdef TERRAIN
+  float groundOcclusion = 1.0;
+  if (terrainLayers > 0) {
+    Ground ground = groundAt(flatNormal);
+    albedo = ground.albedo * fragColor.rgb * fragTint;
+    rough = clamp(ground.roughness, MIN_ROUGHNESS, 1.0);
+    metal = 0.0;
+    n = ground.normal;
+    groundOcclusion = ground.occlusion;
+  }
+#endif
 #ifdef CLEARCOAT
   prepareCoat(flatNormal);
 #endif
@@ -57,6 +68,9 @@ void main() {
   }
 
   float occlusion = mix(1.0, max(texture(occlusionMap, fragTexCoord).r, MIN_OCCLUSION), occlusionStrength);
+#ifdef TERRAIN
+  occlusion *= groundOcclusion;
+#endif
   color += ambientSurface(n, v, albedo, f0, rough, metal) * ambientStrength * occlusion;
 
   vec3 glow = emissive;
