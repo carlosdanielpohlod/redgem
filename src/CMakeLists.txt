@@ -603,6 +603,7 @@ redgem_add_library(redgem_runtime
   app/json_file.cpp
   app/android/android_settings.cpp
   app/game_settings.cpp
+  app/prefab_budget.cpp
   app/game_identity.cpp
   app/splash_screen.cpp
   app/bundled_game.cpp
