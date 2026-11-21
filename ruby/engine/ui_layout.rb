@@ -125,11 +125,11 @@ module UI
   def self.clipping(box)
     clips.push(box)
     begin
-      __clip(*box.values_at(:x, :y, :width, :height).map(&:to_i))
+      __clip(*shifted_box(box))
       yield
     ensure
       clips.pop
-      clips.empty? ? __unclip : __clip(*clips.last.values_at(:x, :y, :width, :height).map(&:to_i))
+      clips.empty? ? __unclip : __clip(*shifted_box(clips.last))
     end
   end
 

@@ -24,6 +24,7 @@ uniform float saturation;    // 1 = unchanged
 uniform float grain;         // film grain strength
 uniform float aberration;    // color fringing toward the corners
 uniform float motionBlur;    // 0..1: streaks away from the center, as when moving fast
+uniform float backdropBlur;  // 0..1: the whole picture soft, behind a menu
 uniform float time;
 uniform float underwater;            // 0 above the water, 1 under it, between while crossing
 uniform vec3 underwaterAbsorption;   // per meter
@@ -35,6 +36,11 @@ const float GAMMA = 2.2;
 const int BLUR_TAPS = 10;
 const float BLUR_REACH = 0.07;        // of the way to the center, at full motion blur
 const float BLUR_CLEAR_RADIUS = 0.3;  // the middle of the picture stays sharp
+const int BACKDROP_RINGS = 3;         // circles of taps around each pixel, at a full backdrop blur
+const int BACKDROP_SPOKES = 8;        // taps on each circle
+const float BACKDROP_REACH = 0.025;   // the outer circle's radius, as a share of the picture's height
+const float RING_TWIST = 0.5;         // spokes each circle is turned past the last
+const float TURN = 6.2831853;
 const float ABERRATION_REACH = 0.0035;
 const float MID_GREY = 0.5;
 const float GRAIN_SCALE = 0.08;
@@ -78,6 +84,22 @@ vec3 underwaterFog(vec3 scene, vec2 at) {
   return mix(scene, scene * through + water * (1.0 - through), underwater);
 }
 
+// The lit scene around a point, averaged over circles of taps (each turned half a step from the
+// last, so that they do not line up): the picture behind a menu, out of focus.
+vec3 backdrop(vec2 at, vec3 scene) {
+  vec2 size = vec2(textureSize(texture0, 0));
+  vec2 across = vec2(size.y / size.x, 1.0) * backdropBlur * BACKDROP_REACH;
+  vec3 sum = scene;
+  for (int ring = 1; ring <= BACKDROP_RINGS; ring++) {
+    float reach = float(ring) / float(BACKDROP_RINGS);
+    for (int spoke = 0; spoke < BACKDROP_SPOKES; spoke++) {
+      float angle = (float(spoke) + float(ring) * RING_TWIST) * TURN / float(BACKDROP_SPOKES);
+      sum += texture(texture0, at + vec2(cos(angle), sin(angle)) * across * reach).rgb;
+    }
+  }
+  return sum / float(BACKDROP_RINGS * BACKDROP_SPOKES + 1);
+}
+
 // The lit scene at a point, with the lens's color fringes: red and blue land a little apart.
 vec3 lens(vec2 at, vec2 fromMiddle) {
   vec2 fringe = fromMiddle * aberration * ABERRATION_REACH;
@@ -99,6 +121,7 @@ void main() {
     }
     scene /= float(BLUR_TAPS);
   }
+  if (backdropBlur > 0.0) scene = backdrop(at, scene);
   scene *= mix(1.0, texture(occlusionTexture, at).r, occlusionAmount);
   // Under water, the glow of bright things (the sun through the surface) fades into the water too.
   scene = underwaterFog(scene + texture(bloomTexture, at).rgb * bloomStrength, at);

@@ -1,0 +1,12 @@
+{
+  "title": "quest.lamp.title",
+  "start": "light",
+  "stages": {
+    "light": {
+      "text": "quest.lamp.light",
+      "objectives": [{ "go_to": "Camera", "radius": 1, "text": "quest.lamp.reach" }],
+      "next": "done"
+    },
+    "done": { "text": "quest.lamp.done", "end": true }
+  }
+}

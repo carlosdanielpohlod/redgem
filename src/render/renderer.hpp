@@ -85,6 +85,8 @@ class Renderer {
   GpuTimings gpu_timings() const;
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
+  // How much the whole picture is blurred, 0 (none) to 1 (see Camera.backdrop_blur in Ruby).
+  void set_backdrop_blur(float amount);
   // What the game's camera changes of the scene's auto exposure (see Camera.auto_exposure in Ruby):
   // what it leaves empty follows the scene's environment.
   void set_auto_exposure(const AutoExposureOverrides& overrides);

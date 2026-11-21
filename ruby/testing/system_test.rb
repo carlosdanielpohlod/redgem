@@ -12,6 +12,8 @@ class SystemTest
   include RedGemTest::Assertions
 
   DEFAULT_WAIT_UNTIL_FRAMES = 600
+  MOST_DIFFERENT_SHARE = 0.01   # of a picture's pixels that may differ from its baseline
+  PERCENT = 100
 
   attr_reader :failure
 
@@ -80,6 +82,18 @@ class SystemTest
   def screenshot(name)
     TestScreen.capture(name.to_s)
     wait
+  end
+
+  # Takes a picture of the next frame (as screenshot does) and fails unless it is close to a
+  # baseline picture of the game's folder: at most `most` of its pixels (a share) differ by more
+  # than a graphics card's rounding. REDGEM_UPDATE_BASELINES=1 writes the picture as the baseline.
+  # Returns the share that differs.
+  def match_baseline(name, baseline: "baselines/#{name}.png", most: MOST_DIFFERENT_SHARE)
+    screenshot(name)
+    share = TestScreen.difference(name.to_s, baseline)
+    raise RedGemTest::Failure, "#{name}: #{(share * PERCENT).round(2)}% of it differs from #{baseline}" if share > most
+
+    share
   end
 
   def log(message) = Debug.log("[test] #{message}")

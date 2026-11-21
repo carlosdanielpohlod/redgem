@@ -58,6 +58,8 @@
       "{file}: {where}: its voice {voice} is not in sounds/ (.wav, .ogg, .mp3 or .flac): the line plays silently",
   "project.check.missing_script": "{where}: {script} is not there; {hint}",
   "project.check.missing_sky": "{where}: sky_image {image} is not in images/ (.hdr, .png or .jpg)",
+  "project.check.menu_problem": "game.json: menu: {problem}",
+  "project.check.menu_file": "game.json: menu: {folder}/{name} is not there",
   "project.check.more": "+{count} more (--all shows every one)",
   "project.check.no_class": "{script} does not define class {class} (attached in {where})",
   "project.check.no_tester": "cannot run the tests: no redgem-test at {tester} (it is built beside redgem)",

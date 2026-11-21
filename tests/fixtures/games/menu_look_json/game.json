@@ -1,0 +1,35 @@
+{
+  "title": "Menu Look",
+  "version": "1.2.0",
+  "window_width": 640,
+  "window_height": 360,
+  "menu": {
+    "theme": {
+      "heading_font": "Mono",
+      "colors": {
+        "heading": "#ffcc33",
+        "label": "#fff4d6",
+        "caption": "#ffcc33",
+        "button": "#2a1a4a",
+        "hover": "#5a2a8a",
+        "focused": "#5a2a8a",
+        "focus_ring": "#ffcc33",
+        "accent": "#ffcc33",
+        "shade": "#120820",
+        "shade_alpha": 150
+      },
+      "button": { "skin": "panel", "skin_focused": "panel_focused", "skin_edge": 14, "icons": { "play": "play" } },
+      "layout": { "align": "right", "margins": [0, 48, 0, 0] },
+      "transition": { "kind": "fade", "seconds": 0.2 },
+      "sounds": { "move": "move", "pick": "pick" }
+    },
+    "screens": {
+      "title": {
+        "layout": { "heading": "none", "top": 0.42 },
+        "logo": { "image": "logo", "anchor": "top_left", "x": 48, "y": 60 },
+        "footer": { "text": "v{version}" },
+        "background": { "kind": "scene", "blur": 0.6 }
+      }
+    }
+  }
+}

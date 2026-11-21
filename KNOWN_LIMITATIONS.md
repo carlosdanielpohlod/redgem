@@ -197,6 +197,10 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
+- A menu theme's backdrop blur (`Camera.backdrop_blur`) is a small even blur of the lit scene:
+  bloom is added after it, sharp. A button's border is drawn under its fill, so a translucent
+  fill shows the border's color through it. A transition fades or slides the menu's content,
+  never the scene behind it.
 - `Camera.cut_to` fades through black only: there is no crossfade (the renderer draws one camera
   a frame) and no wipe. The black covers the world, never the UI.
 - The choice of camera (`Camera.main =`) belongs to the scene: a scene loaded anew is seen

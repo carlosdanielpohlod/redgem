@@ -23,6 +23,24 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
   1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
   alone.
+- **Menu and interface themes (experimental).** A game gives its menus its own look in
+  game.json's `"menu": {"theme": {...}, "screens": {...}}`, or from a script with `UI.theme=`,
+  `GameMenu.theme=` and `screen.theme=`. A theme sets the fonts (body and heading), sizes, colors
+  (text, buttons in each state, border, focus ring, accent, the shade or none), buttons (radius,
+  border, padding, width, a 9-slice skin, an icon per option), the layout (align, top, gap,
+  margins, where the heading goes), the title's background (the scene, a color, a gradient, a
+  picture that fits or covers, or the live scene blurred, with a camera path), a logo and a
+  footer, a fade or slide between screens, and sounds and music through the audio groups. A game
+  that sets no theme looks as before. `on_draw_button { |label, box, state| }` and
+  `on_draw_background` let a game draw the buttons or the background itself, on the menu or one
+  screen. An option can have an `id:` and an `enabled:` lookup (grayed while it is false). The
+  settings rows, the controls cells and the journal take the theme too. `redgem check` names an
+  unknown theme key, a wrong value, and a font or picture the game does not have. New calls:
+  `UI.gradient`, `UI.image(part:, tint:)`, `UI.image_size`, `UI.draw_button`, `UI.shifted` and
+  `Camera.backdrop_blur`. `GameMenu.open?` lets a game's HUD hide while a menu is open. The
+  platformer template has a theme of its own: a logo, a footer, and the level seen through a blur
+  as the camera flies over it, with its HUD hidden behind the menus. The manual's gameplay page has
+  "Giving the menu your game's look".
 - **Agents edit objects as the Inspector and the GameObject menu do.** MCP `scene_edit` gains
   `duplicate` (copies with their children), `group` (a new parent, keeping where the objects are)
   and `objects`, so one call sets, copies or removes several objects as one undo step. `add` takes
@@ -63,7 +81,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   load test lost a player on a dedicated server with nothing in the log to say why.
 - **`redgem-test --wait-limit <seconds>`.** A system test may wait for other programs
   (`t.wait_for`) longer than five minutes in all, up to a day: a load test whose bots play for
-  five minutes and more on a dedicated server ran out of waits before the end.
+  five minutes and more on a dedicated server ran out of waits before the end. The limit is in
+  real seconds, measured by the clock: frames that run slow on a busy machine count for the time
+  they take.
 - **A quest journal and objective markers.** The pause menu of a game with quest files has a
   Journal page: the quests under way, each with the text of its stage and its objectives (a filled
   box once done), then the quests completed. Its lines scroll and take the focus, so the keyboard,
