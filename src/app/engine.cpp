@@ -284,6 +284,7 @@ void Engine::connect_profiling() {
 
 void Engine::connect_world() {
   context_.scene = &scene_;
+  context_.scene_desc = &scene_desc_;
   context_.physics = physics_.get();
   context_.navigation = &navigation_;
   context_.water = &water_.surfaces();

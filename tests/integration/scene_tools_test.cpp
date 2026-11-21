@@ -436,14 +436,16 @@ TEST_CASE("set changes a light and a camera as the Inspector does, and refuses w
   const auto changed = scene_tool(
       {"set", game.dir(), "GoalLight", "light=spot", "light_color=1,0.5,0", "light_intensity=80", "light_range=12"});
   REQUIRE_MESSAGE(changed.exit_code == kExitSuccess, changed.err);
-  const auto& light = *node_named(load(game.scene()), "GoalLight").light;
+  const auto light_scene = load(game.scene());
+  const auto& light = *node_named(light_scene, "GoalLight").light;
   CHECK(light.type == LightType::Spot);
   CHECK(light.color.g == doctest::Approx(0.5));
   CHECK(light.intensity == doctest::Approx(80));
   CHECK(light.range == doctest::Approx(12));
   REQUIRE(scene_tool({"set", game.dir(), "Camera", "camera_fov=70", "camera_near=0.2", "camera_far=500"}).exit_code ==
           kExitSuccess);
-  const auto& camera = *node_named(load(game.scene()), "Camera").camera;
+  const auto camera_scene = load(game.scene());
+  const auto& camera = *node_named(camera_scene, "Camera").camera;
   CHECK(radians_to_degrees(camera.fov_y_radians) == doctest::Approx(70));
   CHECK(camera.far_plane == doctest::Approx(500));
   CHECK(has(scene_tool({"set", game.dir(), "Camera", "camera_near=600"}).err, "less than camera_far"));

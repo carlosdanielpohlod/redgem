@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "core/config.hpp"
+#include "scene/ground/ground_rules.hpp"
 #include "scene/property.hpp"
 
 namespace redgem {
@@ -16,6 +17,7 @@ constexpr const char* kLayersFileExtension = ".json";
 constexpr const char* kSplatPictureInfix = ".splat";
 constexpr const char* kSplatPictureExtension = ".png";
 constexpr const char* kLayersKey = "layers";
+constexpr const char* kRulesKey = "rules";
 constexpr const char* kNameKey = "name";
 constexpr const char* kTintKey = "tint";
 constexpr std::size_t kTintChannels = 3;
@@ -122,6 +124,31 @@ std::string repeated_name(const std::vector<TerrainLayer>& layers) {
   return {};
 }
 
+// The file's layers, each named once.
+std::string layers_of_file(const json& file, std::vector<TerrainLayer>& into) {
+  const auto found = file.find(kLayersKey);
+  std::string problem = read_layers(found == file.end() ? json() : *found, into);
+  if (!problem.empty()) return problem;
+  const std::string repeated = repeated_name(into);
+  return repeated.empty() ? std::string() : "two layers are called '" + repeated + "'";
+}
+
+void read_sizes(const json& file, TerrainLayers& into) {
+  into.splat_size = whole_number_of(file, "splat_size", kDefaultSplatSize, kMinSplatSize, kMaxSplatSize);
+  into.picture_size =
+      whole_number_of(file, "picture_size", kDefaultLayerPictureSize, kMinLayerPictureSize, kMaxLayerPictureSize);
+  into.variation_size = number_of(file, "variation_size", kDefaultVariationSize, kMinTiling, kMaxVariationSize);
+}
+
+// The file's "rules", naming its layers (none when it has no rules).
+std::string rules_of(const json& file, const std::vector<TerrainLayer>& layers, std::vector<GroundRule>& into) {
+  const auto found = file.find(kRulesKey);
+  if (found == file.end()) return {};
+  TerrainLayers named;
+  named.layers = layers;
+  return read_ground_rules(*found, named, into);
+}
+
 }  // namespace
 
 std::string terrain_layers_path(const std::string& name) {
@@ -136,16 +163,14 @@ std::string splat_picture_path(const std::string& name, int picture) {
 std::string read_terrain_layers(const json& file, TerrainLayers& into) {
   if (!file.is_object()) return "the file does not hold a JSON object";
   std::vector<TerrainLayer> layers;
-  const auto found = file.find(kLayersKey);
-  std::string problem = read_layers(found == file.end() ? json() : *found, layers);
+  std::string problem = layers_of_file(file, layers);
   if (!problem.empty()) return problem;
-  const std::string repeated = repeated_name(layers);
-  if (!repeated.empty()) return "two layers are called '" + repeated + "'";
+  std::vector<GroundRule> rules;
+  problem = rules_of(file, layers, rules);
+  if (!problem.empty()) return problem;
   into.layers = std::move(layers);
-  into.splat_size = whole_number_of(file, "splat_size", kDefaultSplatSize, kMinSplatSize, kMaxSplatSize);
-  into.picture_size =
-      whole_number_of(file, "picture_size", kDefaultLayerPictureSize, kMinLayerPictureSize, kMaxLayerPictureSize);
-  into.variation_size = number_of(file, "variation_size", kDefaultVariationSize, kMinTiling, kMaxVariationSize);
+  into.rules = std::move(rules);
+  read_sizes(file, into);
   return {};
 }
 

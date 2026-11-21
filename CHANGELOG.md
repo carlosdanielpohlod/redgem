@@ -51,6 +51,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   by height: sand fills the cracks between rocks. Each layer has its own `tiling`, large patches of
   `variation`, and can break up its repeats (`stochastic`) or project along three axes on cliffs
   (`triplanar`). A scene without a layered terrain draws as before, with no extra cost.
+- **Ground layers painted by rules (experimental).** A layers file's `"rules"` paint each layer by
+  height, slope and noise, with soft edges: `redgem scene paint <game> <object>` writes the
+  weights, and `Terrain.paint_by_rules` repaints them while the game runs.
+  `Terrain.layer_at(ground, position)` and `Terrain.weights_at` say which ground is under a point
+  (footsteps).
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that
