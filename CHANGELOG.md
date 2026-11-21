@@ -17,6 +17,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
+  property records, per inherited part, its position, rotation or scale, properties set or
+  dropped, its light or camera, or that the part is removed. A child added under the placement
+  can hang from an inherited part with `prefab_parent`. Editing the prefab file updates every
+  instance except the fields it overrides, also inside nested prefabs. See
+  [prefab overrides](docs/prefabs.md#overrides).
+
 - **Terrains have ground layers (experimental).** An object with `terrain_layers = "island"` takes
   up to eight ground materials from the game's `terrains/island.json`, each with its color, normal,
   roughness, occlusion and height pictures, and their weights from a splat map saved beside it as

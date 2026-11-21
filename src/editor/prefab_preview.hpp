@@ -16,6 +16,10 @@ class PrefabPreview {
   const std::string& error() const { return error_; }
   void rebuild(const SceneDesc& document, const std::filesystem::path& game_dir, const prefabs::Limits& limits = {});
   const SceneDesc* resolved() const { return resolved_.get(); }
+  // Where a placement's inherited parts are (an authored index -> its origin), empty without one.
+  const prefabs::Origins& origins() const { return origins_; }
+  // The placement-relative transform of the inherited part an authored child hangs from, or null.
+  const Transform* attachment(int node) const;
   bool refresh(const SceneDesc& document, int node);
   bool sync_assets(const SceneDesc& document, const std::vector<int>& changed_meshes);
   std::uint64_t generation() const { return generation_; }
@@ -29,9 +33,13 @@ class PrefabPreview {
   void remember_references(const SceneDesc& document);
   bool reference_unchanged(const NodeDesc& node, int id) const;
   bool refresh_root_node(const NodeDesc& authored, int node, const prefabs::Origin& origin);
+  bool refresh_plain_node(const NodeDesc& authored, int node);
+  // Whether a node's overrides and prefab_parent are what the snapshot was resolved with.
+  bool links_unchanged(const NodeDesc& node, int id) const;
   std::unique_ptr<SceneDesc> resolved_;
   prefabs::Origins origins_;
   std::map<int, PropertyValue> references_;
+  std::map<int, std::string> links_;  // overrides and prefab_parent, of the nodes that have them
   Counts base_counts_{};
   std::uint64_t generation_ = 0;
   std::string error_;
