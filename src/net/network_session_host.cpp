@@ -127,7 +127,7 @@ void NetworkSession::farewell_closed_links(std::vector<NetworkEvent>& events) {
     if (place_held_for(link)) {
       hold_place(link, events);
     } else {
-      farewell(link.peer, events, link.let_go_for);
+      farewell(link.peer, events, let_go_for(link));
     }
   }
 }
@@ -142,6 +142,12 @@ void NetworkSession::farewell(int peer, std::vector<NetworkEvent>& events, const
   queue_for_everyone_but(peer, word_about(kGone, peer));
   for (Held& held : held_) held.departed.push_back(peer);  // (they hear when they are back)
   peer_left(peer, events, why);
+}
+
+std::string NetworkSession::let_go_for(const Link& link) {
+  if (!link.let_go_for.empty() || link.connection.closed_for().empty()) return link.let_go_for;
+  log::warning("let go of machine " + std::to_string(link.peer) + ": " + link.connection.closed_for());
+  return link.connection.closed_for();
 }
 
 void NetworkSession::kick(Link& link, const std::string& why) {

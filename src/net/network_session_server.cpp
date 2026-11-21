@@ -44,7 +44,7 @@ bool NetworkSession::dismiss(int peer) {
     return true;
   }
   Link* link = link_to(peer);
-  if (link != nullptr) link->connection.close();
+  if (link != nullptr) kick(*link, "the game sent it away (Network.dismiss)");
   return link != nullptr;
 }
 

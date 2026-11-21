@@ -4,7 +4,9 @@
 // it. The others hear it left only when that time is over.
 
 #include <algorithm>
+#include <string>
 
+#include "core/log.hpp"
 #include "net/network_session.hpp"
 #include "net/resume_token.hpp"
 
@@ -24,7 +26,7 @@ void NetworkSession::issue_token(Link& link) const {
 }
 
 void NetworkSession::hold_place(const Link& link, std::vector<NetworkEvent>& events) {
-  held_.push_back({link.peer, link.token, 0.0f, {}, link.window});
+  held_.push_back({link.peer, link.token, 0.0f, {}, link.window, link.connection.closed_for()});
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Reconnecting, link.peer));
 }
 
@@ -35,7 +37,14 @@ void NetworkSession::expire_held_places(float seconds, std::vector<NetworkEvent>
   const auto expired = std::stable_partition(held_.begin(), held_.end(), still_held);
   const std::vector<Held> gone(expired, held_.end());
   held_.erase(expired, held_.end());
-  for (const Held& held : gone) farewell(held.peer, events);
+  for (const Held& held : gone) let_go_after_drop(held, events);
+}
+
+void NetworkSession::let_go_after_drop(const Held& held, std::vector<NetworkEvent>& events) {
+  const std::string why = held.dropped_for.empty() ? "it dropped and did not come back in time"
+                                                   : held.dropped_for + ", and did not come back in time";
+  log::warning("let go of machine " + std::to_string(held.peer) + ": " + why);
+  farewell(held.peer, events, why);
 }
 
 void NetworkSession::resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events) {

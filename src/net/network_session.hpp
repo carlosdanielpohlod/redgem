@@ -253,6 +253,7 @@ class NetworkSession {
     float held_for = 0.0f;
     std::vector<int> departed{};  // who left meanwhile (an id may be someone else's by its return)
     float window = 0.0f;          // how long it is held, as the machine was told
+    std::string dropped_for{};    // why the host let its connection go, if it did (Connection::closed_for)
   };
 
   // How a guest calls its host again, with what, and for how long (allow_reconnect).
@@ -418,7 +419,12 @@ class NetworkSession {
   // On the host: lets a machine go for `why` (too many moves not believed, a flood, silence),
   // saying so in the log as a warning; the game hears why in on_leave. No place is held for it.
   void kick(Link& link, const std::string& why);
+  // Why a link that closed was let go (kick's reason, else its connection's, said in the log
+  // then); empty when it left by itself.
+  static std::string let_go_for(const Link& link);
   void expire_held_places(float seconds, std::vector<NetworkEvent>& events);
+  // A held place ran out: the machine is gone for good, said in the log and to the game.
+  void let_go_after_drop(const Held& held, std::vector<NetworkEvent>& events);
   // A newcomer that asks for a held place back with `token`.
   void resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events);
   // The place `token` gets back (held, or of a link still open the host has not seen drop yet,

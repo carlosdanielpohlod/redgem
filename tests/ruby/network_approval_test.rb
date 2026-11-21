@@ -45,10 +45,11 @@ class NetworkApprovalTest < RedGemTest::Case
     heard = []
     Network.on_leave { |peer, why| heard << [peer, why] }
     Network.on_leave { |peer| heard << [peer] } # (a handler that takes the peer alone still works)
+    Network.on_leave(&->(peer) { heard << [:lambda, peer] })
     Network.__event(:left, NEWCOMER, "too many moves the host did not believe", nil)
     Network.__event(:left, NEWCOMER, "", nil)
-    assert_equal [[NEWCOMER, "too many moves the host did not believe"], [NEWCOMER], [NEWCOMER, nil], [NEWCOMER]],
-                 heard
+    assert_equal [[NEWCOMER, "too many moves the host did not believe"], [NEWCOMER], [:lambda, NEWCOMER],
+                  [NEWCOMER, nil], [NEWCOMER], [:lambda, NEWCOMER]], heard
   end
 
   def test_a_refused_join_says_why_and_a_failed_one_without_a_reason_says_nil

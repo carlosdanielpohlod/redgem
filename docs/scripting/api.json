@@ -5667,7 +5667,7 @@
             {"name": "block", "type": "^(Integer, String | nil) -> void", "block": true}
           ],
           "returns": {"type": "void"},
-          "about": "someone left: |peer, why| (why: the host let it go, or nil)"
+          "about": "someone left: |peer, why| (on the host, why it let the machine go; nil when it left by itself, and on the others)"
         },
         {
           "name": "on_fail",
