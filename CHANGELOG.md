@@ -65,6 +65,8 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **The API reference says `GameObject#props` and `Behaviour#props` have Symbol keys**, which is
+  what they return (`props[:damage]`). It said String keys, and `props["damage"]` is nil.
 - **A character that picks up the body it stands on stays on the ground.** A courier standing on
   a parcel and taking it in hand (made kinematic, put under its hand) took the parcel's rise to the
   hand as its ground's, rose with it, lifted the parcel on, and flew 60 to 90 m up. A body a
