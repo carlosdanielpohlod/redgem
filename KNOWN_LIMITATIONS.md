@@ -197,6 +197,9 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
+- `Environment` changes the scene's look on one machine only: a game played together changes it
+  on every machine. Each change of `sky_image` reads the picture from disk again and works out its
+  light, which holds up that frame: swap skies at a moment the player will not notice.
 - A menu theme's backdrop blur (`Camera.backdrop_blur`) is a small even blur of the lit scene:
   bloom is added after it, sharp. A button's border is drawn under its fill, so a translucent
   fill shows the border's color through it. A transition fades or slides the menu's content,

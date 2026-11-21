@@ -27,6 +27,8 @@ add_executable(redgem_tests
   unit/texts_test.cpp
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
+  unit/splat_map_test.cpp
+  unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -227,7 +229,9 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/environment_api_test.cpp
   integration/material_api_test.cpp
+  integration/terrain_files_test.cpp
   integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
@@ -720,6 +724,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/camera_marker_render_test.cpp
                render_system/local_shadow_render_test.cpp
                render_system/exposure_foliage_render_test.cpp
+               render_system/terrain_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

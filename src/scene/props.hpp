@@ -23,6 +23,9 @@ inline constexpr const char* kWheel = "wheel";
 inline constexpr const char* kTerrain = "terrain";
 inline constexpr const char* kTerrainSize = "terrain_size";    // meters across
 inline constexpr const char* kTerrainCells = "terrain_cells";  // quads per side
+// Any ground mesh: its ground layers, blended by weights, are those of the game's
+// terrains/<name>.json (see scene/ground/terrain_layers.hpp). Experimental.
+inline constexpr const char* kTerrainLayers = "terrain_layers";
 inline constexpr const char* kPrefab = "prefab";
 // An empty placement resolves this GLB from the game folder when its scene loads.
 inline constexpr const char* kPrefabFile = "prefab_file";
