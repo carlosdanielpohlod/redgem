@@ -194,10 +194,10 @@ struct Gathering {
   }
 
   void round() {
-    clock += config::kFixedDeltaSeconds;
-    if (server) server->tick(config::kFixedDeltaSeconds);
-    if (relay) relay->poll(config::kFixedDeltaSeconds);
-    for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
+    clock += config::kDefaultFixedDeltaSeconds;
+    if (server) server->tick(config::kDefaultFixedDeltaSeconds);
+    if (relay) relay->poll(config::kDefaultFixedDeltaSeconds);
+    for (auto& machine : machines) machine->frame(config::kDefaultFixedDeltaSeconds);
     wait_for_sockets();
   }
 

@@ -35,7 +35,7 @@ std::string ruby(Engine& engine, const std::string& code) {
   REQUIRE_MESSAGE(result.ok, result.error);
   return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
 }
-void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+void frame(Engine& engine) { engine.frame(config::kDefaultFixedDeltaSeconds); }
 bool loading(Engine& engine) { return !engine.script_context().loading_scene.empty(); }
 
 // Plays frames until the scene being loaded is the game's, each once the background read is done
@@ -224,7 +224,7 @@ TEST_CASE("a throwing scene reader reports an error without killing its worker")
 
 TEST_CASE("cancelling no load does not discard partial physics time") {
   auto engine = game();
-  const auto half = config::kFixedDeltaSeconds * 0.5f;
+  const auto half = config::kDefaultFixedDeltaSeconds * 0.5f;
   ruby(*engine, "Game.cancel_scene_load");
   engine->frame(half);
   const auto before = engine->script_context().time.elapsed;

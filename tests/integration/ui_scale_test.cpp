@@ -59,7 +59,7 @@ std::unique_ptr<Engine> engine_on(const SceneDesc& scene, Presenter& presenter) 
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
 
-void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+void frame(Engine& engine) { engine.frame(config::kDefaultFixedDeltaSeconds); }
 
 std::string ruby(Engine& engine, const std::string& code) {
   const RubyResult result = engine.scripts().eval(code, "test.rb");

@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+#include "core/math.hpp"
+
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -32,6 +34,16 @@ mrb_value character_jump(mrb_state* mrb, mrb_value self) {
 
 mrb_value character_grounded(mrb_state* mrb, mrb_value self) {
   return mrb_bool_value(physics(mrb).character_grounded(alive_id(mrb, self)));
+}
+
+// A character's new capsule: positive measures, and a height of at least its width.
+mrb_value character_resize(mrb_state* mrb, mrb_value self) {
+  mrb_float height = 0.0, radius = 0.0;
+  mrb_get_args(mrb, "ff", &height, &radius);
+  more_than(mrb, radius, 0.0, "radius");
+  at_least(mrb, height, radius / kHalf, "height");  // (twice the radius)
+  const float h = static_cast<float>(height), r = static_cast<float>(radius);
+  return mrb_bool_value(physics(mrb).resize_character(alive_id(mrb, self), h, r));
 }
 
 mrb_value body_velocity(mrb_state* mrb, mrb_value self) {
@@ -84,6 +96,7 @@ void install_body_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, character, "move", character_move, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, character, "jump", character_jump, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, character, "grounded?", character_grounded, MRB_ARGS_NONE());
+  mrb_define_method(mrb, character, "__resize", character_resize, MRB_ARGS_REQ(2));
   mrb_define_method(mrb, character, "velocity", body_velocity, MRB_ARGS_NONE());
 
   RClass* rigidbody = mrb_define_class(mrb, "Rigidbody", mrb->object_class);

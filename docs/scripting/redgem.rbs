@@ -18,7 +18,7 @@ class Behaviour
   # called every frame; dt is the seconds since the last one
   %a{redgem:stable}
   def update: (Float dt) -> void
-  # called 60 times a second, with the physics
+  # called at the game's tick (game.json's tick_hz, 60 times a second by default), with the physics
   %a{redgem:stable}
   def fixed_update: (Float dt) -> void
   # something entered this object's trigger, or it entered one
@@ -84,9 +84,9 @@ class Behaviour
   # the object's own Animator
   %a{redgem:stable}
   def animation: () -> Animator
-  # the object's custom properties, as a Hash
+  # the object's custom properties, as a Hash with Symbol keys
   %a{redgem:stable}
-  def props: () -> Hash[String, untyped]
+  def props: () -> Hash[Symbol, untyped]
   # a setting: what add_component was given, else the object's property, else the default
   %a{redgem:stable}
   def prop: (Symbol | String key, ?untyped default) -> untyped
@@ -154,9 +154,9 @@ class GameObject
   # whether its tag is value
   %a{redgem:stable}
   def tag?: (String | Symbol value) -> bool
-  # its custom properties
+  # its custom properties, as a Hash with Symbol keys
   %a{redgem:stable}
-  def props: () -> Hash[String, untyped]
+  def props: () -> Hash[Symbol, untyped]
   # the Joint it came with in the scene (its Joint component, set up in the editor), or nil
   %a{redgem:experimental}
   def joint: () -> (Joint | nil)
@@ -583,7 +583,7 @@ class Time
   # seconds since the last frame, whatever Time.scale (also while paused)
   %a{redgem:experimental}
   def self.unscaled_delta: () -> Float
-  # seconds of a physics step (1/60)
+  # seconds of a physics step: 1 / game.json's tick_hz (1/60 by default)
   %a{redgem:stable}
   def self.fixed_delta: () -> Float
   # seconds since the game started
@@ -780,6 +780,9 @@ class CharacterController
   # whether it stands on something
   %a{redgem:stable}
   def grounded?: () -> bool
+  # makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update
+  %a{redgem:experimental}
+  def resize: (height: Numeric, radius: Numeric) -> bool
   # its velocity
   %a{redgem:stable}
   def velocity: () -> Vector3

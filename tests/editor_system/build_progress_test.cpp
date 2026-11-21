@@ -84,7 +84,7 @@ struct HeldBuild {
 // Every frame counts as one fixed step, however long the machine took to draw it.
 EditorOptions even_pace() {
   EditorOptions options;
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   return options;
 }
 

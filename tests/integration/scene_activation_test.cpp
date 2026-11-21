@@ -99,7 +99,7 @@ TEST_CASE("a big level is made ready over many frames, none taking more than its
   double longest = 0.0;
   while (engine->scene_name() != kLevel && loading_frames < kFrameLimit) {
     const int before = clock.reads;
-    engine->frame(config::kFixedDeltaSeconds);
+    engine->frame(config::kDefaultFixedDeltaSeconds);
     ++loading_frames;
     // (The first reading starts the frame's share; each after it ends a piece of work.)
     const int pieces = std::max(clock.reads - before - 1, 0);
@@ -117,9 +117,9 @@ TEST_CASE("scripts of a level made ready over frames see all of its objects on t
   WorkClock clock;
   auto engine = game(loader, clock, false);
   begin_loading(*engine);
-  for (int i = 0; i < kFrameLimit && engine->scene_name() != kLevel; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kFrameLimit && engine->scene_name() != kLevel; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   REQUIRE(engine->scene_name() == kLevel);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(*engine, "$crates_seen") == std::to_string(kCrates));
   CHECK(ruby(*engine, "$level2_setup_in") == kLevel);
 }
@@ -129,9 +129,9 @@ TEST_CASE("offline fixed-step runs make a big level ready in the frame its read 
   WorkClock clock;
   auto engine = game(loader, clock, true);
   begin_loading(*engine);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine->scene_name() == "main");
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine->scene_name() == kLevel);
   CHECK(ruby(*engine, "$loading_draws") == "1");
   CHECK(clock.reads == 0);  // no frame budget: the real time cannot change what happens
@@ -143,10 +143,10 @@ TEST_CASE("cancelling a level while it is made ready keeps the running scene") {
   WorkClock clock;
   auto engine = game(loader, clock, false);
   begin_loading(*engine);
-  for (int i = 0; i < kFrameLimit && clock.reads == 0; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kFrameLimit && clock.reads == 0; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   REQUIRE(clock.reads > 0);  // the level is being made ready
   CHECK(ruby(*engine, "Game.cancel_scene_load") == "true");
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine->scene_name() == "main");
   CHECK(ruby(*engine, "Game.loading?") == "false");
   CHECK(engine->scene().find("Hero") != kNoObject);

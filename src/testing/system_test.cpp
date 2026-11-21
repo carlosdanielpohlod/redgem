@@ -12,7 +12,6 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
@@ -125,7 +124,7 @@ void SystemTestRun::wait_a_frame() {
   ++waited_frames_;
   if (!waiting_since_) waiting_since_ = tick_started_;  // (its block's first try counts too)
   const auto step =
-      std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(config::kFixedDeltaSeconds));
+      std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(engine_.fixed_delta()));
   std::this_thread::sleep_until(last_waited_ + step);
   last_waited_ = Clock::now();
 }
