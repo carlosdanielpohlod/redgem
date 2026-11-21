@@ -115,7 +115,7 @@ TEST_CASE("Ruby gives velocities to play_at, move and listener, and scales the e
   CHECK(audio.voices().at(2).sound.pitch == doctest::Approx(kAsRecorded));
   ruby(*engine, "Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0], [0, 0, -30])");
   CHECK(audio.voices().at(1).sound.pitch > kAsRecorded);
-  CHECK(ruby(*engine, "Audio.doppler = 0") == "0.0");
+  ruby(*engine, "Audio.doppler = 0");  // (an assignment gives back what was given: no getter to check)
   CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(kAsRecorded));
   for (const char* code : {"Audio.doppler = -1", "Audio.doppler = 11", "Audio.play_at(:beep, [0, 0, 0], velocity: 3)",
                            "Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0], [0, 0, Float::NAN])"}) {
