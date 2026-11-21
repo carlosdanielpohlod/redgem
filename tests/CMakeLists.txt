@@ -590,6 +590,20 @@ foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
                    ${REDGEM_SCREENSHOT_DIR}/${game} ${with_relay})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
+# A template's pairs, tests/system_pairs/templates/<template>/, play templates/<template> the same way.
+file(GLOB REDGEM_TEMPLATE_PAIRED_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/templates/*/*_host_test.rb)
+foreach(host_test IN LISTS REDGEM_TEMPLATE_PAIRED_TESTS)
+  get_filename_component(tests_dir ${host_test} DIRECTORY)
+  get_filename_component(template ${tests_dir} NAME)
+  get_filename_component(host_name ${host_test} NAME_WE)
+  string(REGEX REPLACE "_host_test$" "" pair_name ${host_name})
+  set(test_name system.template.${template}.${pair_name}_together)
+  add_test(NAME ${test_name}
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem_relay>
+                   $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/templates/${template} ${host_test}
+                   ${tests_dir}/${pair_name}_guest_test.rb ${REDGEM_SCREENSHOT_DIR}/template_${template})
+  set_tests_properties(${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
+endforeach()
 
 # Online play with nobody hosting: a game runs on a dedicated server (redgem-server, with no
 # display) and two copies of it join, each driven by its own test.

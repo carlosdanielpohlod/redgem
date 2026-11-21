@@ -19,6 +19,7 @@
 #include "app/game_settings.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
+#include "project/project_hub_card.hpp"
 #include "project/recent_games.hpp"
 #include "project/notices.hpp"
 #include "audio/audio.hpp"
@@ -73,6 +74,13 @@ BuildTarget folder_target() {
   return host_build_target() == BuildTarget::MacOS ? BuildTarget::Linux : host_build_target();
 }
 
+// Whether the hub shows a template with the icon it asks for: an icon it does not know falls back on
+// the default template's.
+bool icon_of_its_own(const GameTemplate& known) {
+  const bool falls_back = std::string(hub::template_icon(known.icon)) == hub::template_icon("");
+  return !falls_back || known.name == kDefaultTemplate;
+}
+
 }  // namespace
 
 TEST_CASE("the templates are the folders of templates/ with a template.json, each with a word about itself") {
@@ -86,9 +94,10 @@ TEST_CASE("the templates are the folders of templates/ with a template.json, eac
     names.push_back(known.name);
     CHECK_FALSE(known.description.empty());
     CHECK_FALSE(known.icon.empty());
+    CHECK(icon_of_its_own(known));
   }
   CHECK(names == folders);
-  CHECK(template_names("|") == "empty|menu-only|platformer|third-person|top-down");
+  CHECK(template_names("|") == "empty|menu-only|multiplayer-levels|platformer|third-person|top-down");
   // What a new game starts from when nothing else is asked for is one of them.
   CHECK(std::find(names.begin(), names.end(), kDefaultTemplate) != names.end());
 }
@@ -239,7 +248,9 @@ TEST_CASE("games are not created over existing work or from unknown templates") 
   CHECK_FALSE(create_game(dir, "empty", error));
   CHECK(error.find("not empty") != std::string::npos);
   CHECK_FALSE(create_game(fresh("nope"), "racing", error));
-  CHECK(error == "unknown template 'racing': the templates are empty, menu-only, platformer, third-person, top-down");
+  CHECK(error ==
+        "unknown template 'racing': the templates are empty, menu-only, multiplayer-levels, platformer, third-person, "
+        "top-down");
   // The files every game gets are no template of their own.
   CHECK_FALSE(create_game(fresh("shared"), "_shared", error));
   CHECK(error.rfind("unknown template '_shared'", 0) == 0);
