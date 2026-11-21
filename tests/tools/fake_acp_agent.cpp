@@ -36,6 +36,7 @@ constexpr const char* kCrashPrompt = "crash";
 constexpr const char* kNoLoadVariable = "FAKE_AGENT_NO_LOAD";
 constexpr const char* kHistoryFile = "/fake-agent-history-";  // + the session's id + ".txt"
 constexpr const char* kHistoryExtension = ".txt";
+constexpr const char* kTakenExtension = ".taken";  // marks a session id handed out, by any program
 constexpr const char* kAnswerStart = "Hello ";
 constexpr const char* kAnswerEnd = "from the **fake** agent.";
 constexpr int kNoSuchSession = -32002;
@@ -122,11 +123,12 @@ std::string history_file(const Session& session, const std::string& id) {
   return session.folder + kHistoryFile + id + kHistoryExtension;
 }
 
-// The next session number not taken, by this program or by a history in the session's folder.
+// The next session number no fake agent took in the session's folder, now marked taken.
 std::string new_session_id(const Session& session) {
   std::string id;
   do id = kSessionPrefix + std::to_string(++last_session_number);
-  while (std::filesystem::exists(history_file(session, id)));
+  while (std::filesystem::exists(history_file(session, id) + kTakenExtension));
+  std::ofstream(history_file(session, id) + kTakenExtension);
   return id;
 }
 

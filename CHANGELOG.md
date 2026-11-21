@@ -31,7 +31,7 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `HttpClient::wait`, `AgentConnection::wait` and `Engine::http` let a test sleep until an answer or
   a message waits to be taken; the test web server says when it heard a request or a hang-up. A
   stuck evaluation over the bridge is timed on a test's clock.
-- **Save database, build job and agent tests no longer sleep or read the clock**: two rooms'
+- **Save database, build job and agent tests no longer sleep or poll the clock**: two rooms'
   updates meet on a signal they wait for, a build still runs as its job goes because the job says
   so, and the fake agent numbers its sessions.
 - **Sound occlusion**: a sound played from inside its own static collider is no longer muffled

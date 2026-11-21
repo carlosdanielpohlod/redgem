@@ -64,13 +64,13 @@ struct HeldBuild {
   }
 };
 
-// A build that fails at once, in the way `fail` does.
 // Keeps its promise as it goes.
 struct SaysWhenItGoes {
   std::promise<void>& promise;
   ~SaysWhenItGoes() { promise.set_value(); }
 };
 
+// A build that fails at once, in the way `fail` does.
 BuildRequest failing(const std::function<void(std::string& error)>& fail) {
   BuildRequest request;
   request.choice.name = kTarget;
