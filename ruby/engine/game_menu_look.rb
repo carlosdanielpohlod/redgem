@@ -17,6 +17,7 @@ class GameMenu < Behaviour
 
     # A screen was shown, drawn with `theme`.
     def shown(theme)
+      GameMenu.opened(@menu)
       @transition = theme[:transition]
       @coming = @transition[:kind] == :none ? 0.0 : @transition[:seconds].to_f
       play_music(theme[:music])
@@ -25,6 +26,7 @@ class GameMenu < Behaviour
 
     # The menu closed: its music ends, and the camera and the picture are the game's again.
     def left
+      GameMenu.closed(@menu)
       stop_music
       blur(NO_BLUR) unless @blur_was.nil?
       @blur_was = nil

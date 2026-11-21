@@ -5,6 +5,7 @@ class GameMenuThemeTest < RedGemTest::Case
   def setup
     UI.theme = nil
     GameMenu.theme = nil
+    GameMenu.open_menus.clear   # (the menus other tests opened, which no scene ends here)
   end
 
   def menu
@@ -12,6 +13,15 @@ class GameMenuThemeTest < RedGemTest::Case
     menu.__configure({ title: "Coin Rush", start_open: false, journal: false })
     menu.start
     menu
+  end
+
+  def test_a_hud_can_ask_whether_any_menu_is_open
+    opened = menu
+    refute GameMenu.open?
+    opened.show(:pause)
+    assert GameMenu.open?, "a HUD steps aside"
+    opened.resume
+    refute GameMenu.open?
   end
 
   def test_a_menu_with_no_theme_has_the_engines_look

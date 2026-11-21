@@ -1135,6 +1135,17 @@ end
 `UI.theme` is the theme widgets draw with now, read as `UI.theme[:colors, :button]`; inside a
 menu it is the open screen's, so a screen of the game's own draws in the same colors.
 
+The game's own HUD draws over the menu unless it steps aside. `GameMenu.open?` says whether a
+menu is open, so a title or pause screen stays clean:
+
+```ruby
+def draw_hud
+  return if GameMenu.open?
+
+  UI.text("Coins: #{@coins}", x: 20, y: 20, size: 28, color: :gold)
+end
+```
+
 ### Drawing the buttons yourself
 
 When a theme is not enough, draw the buttons, or the background, in Ruby. The menu still lays

@@ -1646,6 +1646,9 @@ class GameMenu < Behaviour
   # one of the theme's margins (:top, :right, :bottom, :left), scaled
   %a{redgem:experimental}
   def margin: (Symbol side) -> Numeric
+  # whether any menu is open now; a HUD can hide while one is
+  %a{redgem:experimental}
+  def self.open?: () -> bool
 end
 
 # A screen of the GameMenu.

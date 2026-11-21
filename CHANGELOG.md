@@ -31,8 +31,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   settings rows, the controls cells and the journal take the theme too. `redgem check` names an
   unknown theme key, a wrong value, and a font or picture the game does not have. New calls:
   `UI.gradient`, `UI.image(part:, tint:)`, `UI.image_size`, `UI.draw_button`, `UI.shifted` and
-  `Camera.backdrop_blur`. The platformer template has a theme of its own: a logo, a footer, and
-  the level seen through a blur as the camera flies over it. The manual's gameplay page has
+  `Camera.backdrop_blur`. `GameMenu.open?` lets a game's HUD hide while a menu is open. The
+  platformer template has a theme of its own: a logo, a footer, and the level seen through a blur
+  as the camera flies over it, with its HUD hidden behind the menus. The manual's gameplay page has
   "Giving the menu your game's look".
 - **A game's tick rate.** `game.json`'s `"tick_hz"` (30 to 128, 60 by default) sets how many
   fixed steps the game takes a second: the physics, `fixed_update` and `Time.fixed_delta` follow

@@ -799,6 +799,7 @@ A behaviour: title screen, pause menu, end screen, settings screen with its cont
 - `column_x(Numeric width) -> Numeric`: where a box that wide starts, as the theme aligns the menu *Experimental.*
 - `column_text_x -> [Numeric, Symbol]`: where texts aligned with the menu start: [x, align] *Experimental.*
 - `margin(Symbol side) -> Numeric`: one of the theme's margins (:top, :right, :bottom, :left), scaled *Experimental.*
+- `GameMenu.open? -> bool`: whether any menu is open now; a HUD can hide while one is *Experimental.*
 
 ## GameMenu::Screen
 

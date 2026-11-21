@@ -5106,11 +5106,22 @@
           ],
           "returns": {"type": "Numeric"},
           "about": "one of the theme's margins (:top, :right, :bottom, :left), scaled"
+        },
+        {
+          "name": "open?",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether any menu is open now; a HUD can hide while one is"
         }
       ],
       "internal": [
+        "closed",
         "game_menu",
         "on_destroy",
+        "open_menus",
+        "opened",
         "read_game_menu",
         "scale",
         "scaled",

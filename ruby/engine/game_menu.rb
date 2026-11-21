@@ -62,6 +62,14 @@ class GameMenu < Behaviour
 
   def open? = !@screen.nil?
 
+  # Whether any menu is open now: a game's HUD can stay out of its way (`return if GameMenu.open?`).
+  def self.open? = !open_menus.empty?
+  def self.open_menus = @open_menus ||= []
+
+  # (A menu says it opened or closed: see GameMenu::Look.)
+  def self.opened(menu) = open_menus.include?(menu) || open_menus << menu
+  def self.closed(menu) = open_menus.delete(menu)
+
   # Opens a screen by its name and freezes the game.
   def show(name)
     return if Network.server?
