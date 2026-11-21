@@ -156,6 +156,17 @@ TEST_CASE("a system test plays the game and says how it went") {
   CHECK(log.contains("system test passed"));
 }
 
+TEST_CASE("a system test waits for other programs no longer in all than its wait limit") {
+  // tests/system/platformer/wait_for_test.rb waits two real seconds: past a limit of one, and
+  // within the usual one (a load test plays for longer than the usual five minutes).
+  const LogCapture log;
+  SystemTestOptions options = platformer_test("tests/system/platformer/wait_for_test.rb");
+  options.wait_limit_seconds = 1;
+  CHECK(run_system_test(options) == 1);
+  CHECK(log.contains("after 60 frames of waits in real seconds (run alone, --wait-limit raises it)"));
+  CHECK(run_system_test(platformer_test("tests/system/platformer/wait_for_test.rb")) == 0);
+}
+
 TEST_CASE("a system test that fails, or is not one, fails the run") {
   const LogCapture log;
   CHECK(run_system_test(platformer_test("tests/system_failing/failing_system_test.rb")) == 1);

@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "render/gpu_select.hpp"
+#include "testing/testing_config.hpp"
 
 namespace redgem::testing {
 
@@ -20,6 +21,8 @@ struct SystemTestOptions {
   // started again: it plays on copies of the save, settings and bindings that run left. Empty:
   // none, and the game starts from nothing.
   std::filesystem::path after{};
+  // The real seconds the test may spend in all in waits for another program (t.wait_for).
+  int wait_limit_seconds = config::kDefaultWaitLimitSeconds;
 };
 
 // Plays a game with a system test at the controls: the real game, frame by frame, with the keys,

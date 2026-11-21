@@ -1,5 +1,7 @@
 #include "testing/test_cli.hpp"
 
+#include <string>
+
 #include "core/command_line.hpp"
 #include "core/files.hpp"
 #include "core/translations.hpp"
@@ -51,13 +53,15 @@ std::string problem_with_ruby_tests(const TestCliOptions& options) {
   if (options.headless) return tr("testing.cli.headless_for_system_tests");
   if (!options.work_dir.empty()) return tr("testing.cli.work_for_system_tests");
   if (!options.after.empty()) return tr("testing.cli.after_for_system_tests");
+  if (options.wait_limit_seconds) return tr("testing.cli.wait_limit_for_system_tests");
   return {};
 }
 
-// A suite of every test of a game runs them as they are: no test file, no pictures, and from
-// nothing (no earlier run to go on from).
+// A suite of every test of a game runs them as they are: no test file, no pictures, from nothing
+// (no earlier run to go on from), and with the usual wait limit.
 bool has_more_than_a_suite(const TestCliOptions& options) {
-  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless || !options.after.empty();
+  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless || !options.after.empty() ||
+         options.wait_limit_seconds.has_value();
 }
 
 // Whether a run would go on from an earlier one with no folder of their own to find its files in.
@@ -87,7 +91,11 @@ std::string problem_with(const TestCliOptions& options) {
 
 }  // namespace
 
-std::string test_usage() { return tr("testing.cli.usage", {{"screenshot_dir", config::kDefaultScreenshotDir}}); }
+std::string test_usage() {
+  return tr("testing.cli.usage", {{"screenshot_dir", config::kDefaultScreenshotDir},
+                                  {"wait_limit", std::to_string(config::kDefaultWaitLimitSeconds)},
+                                  {"most_wait_limit", std::to_string(config::kMostWaitLimitSeconds)}});
+}
 
 TestCliResult parse_test_cli(const std::vector<std::string>& args) {
   Reading reading(args);

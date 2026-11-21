@@ -42,7 +42,8 @@ a Ruby file run against a game:
 `redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless] [--work <dir>] [--after <test.rb>]`
 (`--headless` runs without a window, `--work` gives the run a folder of its own for its save file
 and notes, `--after` goes on from an earlier test's run in that folder as if the game were started
-again; `redgem-test --help` lists every option).
+again, `--wait-limit <seconds>` lets it wait for other programs longer than five minutes in all;
+`redgem-test --help` lists every option).
 
 The engine knows nothing of tests. Neither `redgem` nor `redgem-player`, which is what every
 built game ships as, has test code in it: what tests are written with (`TestInput`, `SystemTest`,
