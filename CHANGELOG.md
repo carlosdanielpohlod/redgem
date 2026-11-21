@@ -23,6 +23,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   count the seconds each round tells them, so a timeout depends on rounds, not on how fast the
   computer is. `NetworkSession::watched`, `RelayServer::watched`, `Datagrams::wait` and
   `SocketDialer::watched` say what such a wait watches.
+- **Scene loading and dedicated server tests wait for what they need, not for a time**: a test
+  waits for the background reader with `Engine::wait_for_scene_read` (and
+  `SceneLoad::wait_until_ready_for`), then counts frames. The dedicated server's rounds wait on the
+  players' sockets, and a closed room is seen closed instead of half a second being slept.
 - **Sound occlusion**: a sound played from inside its own static collider is no longer muffled
   from every side. A pile of moving bodies in front of a wall no longer hides the wall. A listener
   touching a building made as one mesh still hears its inner walls, and a wall of one quad, or a

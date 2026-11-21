@@ -2,11 +2,9 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
-#include <chrono>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <thread>
 #include <stdexcept>
 
 #include "app/engine.hpp"
@@ -18,7 +16,6 @@
 using namespace redgem;
 
 namespace {
-constexpr auto kWaitLimit = std::chrono::seconds(10);  // a dead worker fails instead of hanging the suite
 constexpr int kLoadingFrames = 12;
 
 std::unique_ptr<Engine> game(SceneLoader* loader = nullptr, bool fixed = false, const std::string& room = {}) {
@@ -27,6 +24,7 @@ std::unique_ptr<Engine> game(SceneLoader* loader = nullptr, bool fixed = false, 
   options.fixed_step = fixed;
   options.server_room = room;
   options.scene_loader = loader;
+  options.activation_time = test::ticking_activation_clock();
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   return std::move(std::get<std::unique_ptr<Engine>>(created));
@@ -38,13 +36,16 @@ std::string ruby(Engine& engine, const std::string& code) {
   return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
 }
 void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+bool loading(Engine& engine) { return !engine.script_context().loading_scene.empty(); }
+
+// Plays frames until the scene being loaded is the game's, each once the background read is done
+// (a dead worker fails instead of hanging the suite).
 void finish_loading(Engine& engine) {
-  const auto deadline = std::chrono::steady_clock::now() + kWaitLimit;
-  while (!engine.script_context().loading_scene.empty() && std::chrono::steady_clock::now() < deadline) {
+  for (int i = 0; i < test::kMostActivationFrames && loading(engine); ++i) {
+    REQUIRE(engine.wait_for_scene_read(test::kSceneReadPatience));
     frame(engine);
-    std::this_thread::yield();
   }
-  REQUIRE(engine.script_context().loading_scene.empty());
+  REQUIRE_FALSE(loading(engine));
 }
 }  // namespace
 
@@ -265,12 +266,8 @@ TEST_CASE("background scene diagnostics retain levels and have bounded memory") 
     return LoadResult{false, "failed", {}, {}};
   });
   auto slot = reader.submit(test::fixture("games/sandbox"), "level2");
-  std::optional<SceneLoad::Result> result;
-  const auto deadline = std::chrono::steady_clock::now() + kWaitLimit;
-  while (!result && std::chrono::steady_clock::now() < deadline) {
-    result = slot->take();
-    std::this_thread::yield();
-  }
+  REQUIRE(slot->wait_until_ready_for(test::kSceneReadPatience));
+  const std::optional<SceneLoad::Result> result = slot->take();
   REQUIRE(result);
   REQUIRE_FALSE(result->messages.empty());
   CHECK(result->messages.size() <= 129);

@@ -16,6 +16,8 @@ bool Engine::deterministic_scene_load() const {
   return options_.fixed_step && !serves_a_room() && offline;
 }
 
+bool Engine::wait_for_scene_read(float seconds) { return !scene_load_ || scene_load_->wait_until_ready_for(seconds); }
+
 void Engine::advance_or_loading(float frame_seconds) {
   const FrameProfileScope phase(profiler_, ProfilePhase::Update);
   if (!frozen()) return advance_game(frame_seconds);

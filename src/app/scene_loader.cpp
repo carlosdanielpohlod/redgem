@@ -1,6 +1,8 @@
 #include "app/scene_loader.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <exception>
 #include <utility>
 
@@ -12,6 +14,14 @@
 
 namespace redgem {
 namespace {
+
+constexpr float kLongestReadWait = 3600.0f;  // seconds a wait for a read lasts at most
+
+// A wait's length as a condition variable takes it: never negative, never more than the longest.
+std::chrono::milliseconds wait_length(float seconds) {
+  const float bounded = std::isnan(seconds) ? 0.0f : std::clamp(seconds, 0.0f, kLongestReadWait);
+  return std::chrono::milliseconds(static_cast<long long>(bounded * std::milli::den));
+}
 constexpr std::size_t kMaxReadMessages = 128;  // plus one notice when further messages are dropped
 constexpr std::size_t kMaxReadMessageBytes = 2048;
 
@@ -61,6 +71,10 @@ void SceneLoad::finish(LoadResult result, Messages messages) {
 void SceneLoad::wait_until_ready() {
   std::unique_lock<std::mutex> hold(mutex_);
   ready_.wait(hold, [this] { return result_.has_value(); });
+}
+bool SceneLoad::wait_until_ready_for(float seconds) {
+  std::unique_lock<std::mutex> hold(mutex_);
+  return ready_.wait_for(hold, wait_length(seconds), [this] { return result_.has_value(); });
 }
 
 SceneLoader::SceneLoader(Reader reader) : reader_(std::move(reader)), worker_([this] { run(); }) {}

@@ -22,13 +22,14 @@ inline void wait_for_sockets(std::initializer_list<std::vector<net::Watched>> gr
   net::Socket::wait(all, kSocketPatience);
 }
 
-// The same for the sockets of these sessions, and `also`.
-inline void wait_for_sessions(const std::vector<net::NetworkSession*>& sessions, std::vector<net::Watched> also = {}) {
+// The same for the sockets of these sessions, and `also`; `patience` at most.
+inline void wait_for_sessions(const std::vector<net::NetworkSession*>& sessions, std::vector<net::Watched> also = {},
+                              float patience = kSocketPatience) {
   for (const net::NetworkSession* session : sessions) {
     const std::vector<net::Watched> theirs = session->watched();
     also.insert(also.end(), theirs.begin(), theirs.end());
   }
-  net::Socket::wait(also, kSocketPatience);
+  net::Socket::wait(also, patience);
 }
 
 }  // namespace redgem::test
