@@ -17,6 +17,19 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **The host can put a player's object anywhere, with no movement violation.**
+  `Network.teleport(object, position)` (experimental) is for a respawn, a spawn point, or a level's
+  entry. It moves the object on every machine, its owner's included, and the host checks its
+  moves from there. The owner's poses from before it heard are not used.
+
+- **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
+  strength: 4.0)` lights every material of that name, in every object, spawned copies and later
+  scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
+- **Recorded videos have the game's sound.** `redgem <game> --record out.mp4` now puts the game's
+  mix in the video as AAC. It is mixed by the engine's own mixer, not taken from the sound card,
+  in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
+  over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
+  are all in it. `--record-audio off` records the pictures alone.
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is

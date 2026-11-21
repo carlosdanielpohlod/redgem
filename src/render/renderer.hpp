@@ -12,6 +12,7 @@
 
 #include "core/frame_budget.hpp"
 #include "render/auto_exposure.hpp"
+#include "render/material_emission.hpp"
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/quality.hpp"
@@ -87,6 +88,9 @@ class Renderer {
   // What the game's camera changes of the scene's auto exposure (see Camera.auto_exposure in Ruby):
   // what it leaves empty follows the scene's environment.
   void set_auto_exposure(const AutoExposureOverrides& overrides);
+  // What scripts change of the materials' glow, by name (Material.set_emission in Ruby): every
+  // material of a name it holds glows with its light instead of the file's.
+  void set_material_emission(const EmissionOverrides& overrides);
   // Where the camera of the next frames is against the water: under it, they look underwater.
   void set_underwater(const UnderwaterView& view);
   // The most the scene's environment and its scattered copies get of what they ask for (the

@@ -2267,6 +2267,49 @@
       "notes": "Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game."
     },
     {
+      "name": "Material",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The glow of the scene's materials, by name, changed while the game runs: lit windows at night.",
+      "methods": [
+        {
+          "name": "set_emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"},
+            {"name": "color", "type": "Symbol | Array[Numeric]"},
+            {"name": "strength", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength (0 to 1000), over what the scene's file says",
+          "example": "Material.set_emission(\"window_glass\", [255, 190, 120], strength: 4.0)"
+        },
+        {
+          "name": "reset_emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "the materials of that name glow as the scene's file says again"
+        },
+        {
+          "name": "emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
+          "about": "what set_emission gave the materials of that name, {color:, strength:}, or nil"
+        }
+      ],
+      "guide": "../levels.md#glowing-materials-from-scripts",
+      "notes": "A material's name is the one it has in the scene's file (Blender's). The glow holds for every object with a material of that name, copies and prefabs spawned later and the scenes loaded after, until reset_emission. A negative strength raises an ArgumentError, an unknown color name too. Each machine keeps its own: over the network, set it on every machine. A game with no window (a dedicated server) keeps it and draws nothing."
+    },
+    {
       "name": "CharacterController",
       "stability": "stable",
       "kind": "class",
@@ -5521,6 +5564,18 @@
           ],
           "returns": {"type": "Integer"},
           "about": "how many moves of a machine the host did not believe in this game"
+        },
+        {
+          "name": "teleport",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject | String"},
+            {"name": "position", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "on the host (or alone): puts an object kept in step (a GameObject with a NetworkSync, or its key) there on every machine, its owner's included, with no movement violation (a respawn, a spawn point, a level's entry); false on a machine that does not host",
+          "example": "Network.teleport(hero, spawn.transform.position) if Network.host?"
         },
         {
           "name": "port",

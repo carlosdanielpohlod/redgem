@@ -219,3 +219,28 @@ TEST_CASE("turning validation off forgets what was followed and counted") {
   validator.configure(MovementRules{});
   CHECK(validator.violations(kPeer) == 0);
 }
+
+TEST_CASE("an object the host placed is checked from there, and counts nothing") {
+  // A respawn or a level's entry moves a player's hero further than any pose may: the host's game
+  // does it on purpose (Network.teleport; the poses from before its machine heard are not checked:
+  // see placed_objects_test.cpp).
+  MovementValidator validator = validating(rules(kMaxSpeed, kTeleport, kKickAfter));
+  validator.check(kPeer, kHero, along_x(0.0f));
+  const float spawn = kTeleport * kFarAway;
+  validator.place(kPeer, kHero, along_x(spawn));
+  validator.advance(kTick);
+  CHECK(validator.check(kPeer, kHero, along_x(spawn + kFairStep)).valid);
+  CHECK(validator.violations(kPeer) == 0);
+  // Placing is no pass: a teleport from the spawn counts as any other.
+  validator.advance(kPastCorrection);
+  CHECK_FALSE(validator.check(kPeer, kHero, along_x(0.0f)).valid);
+  CHECK(validator.violations(kPeer) == 1);
+}
+
+TEST_CASE("placing an object checks nothing while validation is off") {
+  MovementValidator validator;
+  validator.place(kPeer, kHero, along_x(kTeleport));
+  CHECK(validator.violations(kPeer) == 0);
+  validator.configure(rules(0.0f, kTeleport));
+  CHECK(validator.check(kPeer, kHero, along_x(0.0f)).valid);  // (nothing was followed: it starts there)
+}

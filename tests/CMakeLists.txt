@@ -132,6 +132,7 @@ add_executable(redgem_tests
   unit/font_chain_test.cpp
   unit/bidi_text_test.cpp
   unit/material_alpha_test.cpp
+  unit/material_emission_test.cpp
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
   unit/instance_records_test.cpp
@@ -181,6 +182,7 @@ add_executable(redgem_tests
   unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
   unit/movement_validator_test.cpp
+  unit/placed_objects_test.cpp
   unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp
@@ -221,6 +223,7 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/material_api_test.cpp
   integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp

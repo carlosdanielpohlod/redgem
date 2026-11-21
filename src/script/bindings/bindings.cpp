@@ -22,6 +22,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_light_bindings(mrb);  // after GameObject's: it adds to that class
   install_navigation_bindings(mrb);
   install_water_bindings(mrb);
+  install_material_bindings(mrb);
 }
 
 void install_gameplay_bindings(mrb_state* mrb) {
