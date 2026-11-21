@@ -59,10 +59,11 @@ bool safe_scene_name(const std::string& name) {
   return false;
 }
 
-std::optional<SceneDesc> read_scene(const std::filesystem::path& game_dir, const std::string& name) {
+std::optional<SceneDesc> read_scene(const std::filesystem::path& game_dir, const std::string& name,
+                                    TerrainReading reading) {
   if (!safe_scene_name(name)) return std::nullopt;
   if (through_link(game_dir, scene_in_game(name))) return std::nullopt;
-  auto scene = read_scene_file(scene_file(game_dir, name), game_dir, TerrainReading::WeightsAndPictures);
+  auto scene = read_scene_file(scene_file(game_dir, name), game_dir, reading);
   if (auto* loaded = std::get_if<SceneDesc>(&scene)) return std::move(*loaded);
   log::error("cannot load scene '" + name + "': " + std::get<std::string>(scene));
   return std::nullopt;

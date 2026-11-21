@@ -32,23 +32,34 @@ constexpr std::uint8_t kFullByteValue = 255;
 
 using Pixels = std::vector<std::uint8_t>;
 
-// A picture of the game's folder, decoded, RGBA8, `side` x `side`; nullopt for "" or a picture
-// that cannot be read (warned of).
-std::optional<Pixels> picture_pixels(const std::filesystem::path& game_dir, const std::string& relative, int side) {
-  if (relative.empty()) return std::nullopt;
-  const auto file = file_inside(game_dir, relative);
-  const auto encoded = file ? read_file_up_to(*file, kMaxEncodedImageBytes) : std::nullopt;
-  Image image = encoded ? render_detail::decode_picture(*encoded) : Image{};
-  if (image.data == nullptr) {
-    log::warning("terrain picture '" + printable(relative) + "' cannot be read: the layer goes without it");
-    return std::nullopt;
-  }
-  ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-  ImageResize(&image, side, side);
+// An RGBA8 picture's pixels, the picture released.
+Pixels taken_pixels(Image& image, int side) {
   const auto* bytes = static_cast<const std::uint8_t*>(image.data);
   Pixels pixels(bytes, bytes + static_cast<std::size_t>(side) * static_cast<std::size_t>(side) * kChannels);
   UnloadImage(image);
   return pixels;
+}
+
+Image decoded_file(const std::filesystem::path& game_dir, const std::string& relative) {
+  const auto file = file_inside(game_dir, relative);
+  const auto encoded = file ? read_file_up_to(*file, kMaxEncodedImageBytes) : std::nullopt;
+  return encoded ? render_detail::decode_picture(*encoded) : Image{};
+}
+
+// A picture of the game's folder, decoded, RGBA8, `side` x `side`; nullopt for "" or a picture
+// that cannot be read (warned of).
+std::optional<Pixels> picture_pixels(const std::filesystem::path& game_dir, const std::string& relative, int side) {
+  if (relative.empty()) return std::nullopt;
+  Image image = decoded_file(game_dir, relative);
+  if (image.data == nullptr) {
+    log::warning("terrain picture '" + printable(relative) + "' cannot be read: the layer goes without it");
+    return std::nullopt;
+  }
+  // (Without its alpha first: resizing weighs the colors by it.)
+  ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+  ImageResize(&image, side, side);
+  ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  return taken_pixels(image, side);
 }
 
 std::uint8_t byte_of(float value) { return static_cast<std::uint8_t>(std::lround(std::clamp(value, 0.0f, kFullByte))); }

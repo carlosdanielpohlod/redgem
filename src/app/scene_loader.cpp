@@ -36,6 +36,9 @@ LoadResult read_and_decode(const SceneLoader::Reader& reader, const std::filesys
                            const std::string& name, bool decode_pictures) {
   LoadResult loaded = reader(game, name);
   if (!loaded.ok) return loaded;
+  // (A game that draws nothing, a dedicated server, needs the terrains' weights alone.)
+  attach_terrain_layers(loaded.scene, game,
+                        decode_pictures ? TerrainReading::WeightsAndPictures : TerrainReading::Weights);
   if (decode_pictures) decode_scene_pictures(loaded.scene);
   return loaded;
 }
@@ -148,9 +151,7 @@ LoadResult read_scene_data(const std::filesystem::path& game, const std::string&
     result.error = "scene must be a regular file inside the game without symbolic links";
     return result;
   }
-  result = load_gltf_scene(file.string());
-  if (result.ok) attach_terrain_layers(result.scene, game);
-  return result;
+  return load_gltf_scene(file.string());
 }
 
 void decode_scene_pictures(SceneDesc& scene) {

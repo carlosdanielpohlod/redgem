@@ -105,6 +105,8 @@ TEST_CASE("weights saved as pictures read back the same, the second picture only
 
   game.write("terrains/ground.json", layers_file(3));
   TerrainLayers fewer = read_back(game, "ground", TerrainReading::Weights);
+  CHECK(texel_weights(fewer.splat, 3, 4)[1] == doctest::Approx(1.0f));  // layer 5's share went to the rest
+  CHECK(texel_weights(fewer.splat, kSplatSize - 1, kSplatSize - 1)[0] == doctest::Approx(1.0f));
   REQUIRE(write_splat_pictures(game.dir, fewer, error));
   CHECK_FALSE(std::filesystem::exists(game.dir / "terrains/ground.splat1.png"));
 }
@@ -130,6 +132,21 @@ TEST_CASE("a scene's terrain that names its layers gets them when the game reads
   CHECK(terrain_layers_of(desc, node)->layers[1].name == "layer1");
   CHECK(terrain_layers_of(desc, desc.find_node("Other")) == nullptr);
   CHECK(log.contains("terrains/missing.json"));
+}
+
+TEST_CASE("weights saved at another size are resampled to the layers file's") {
+  GameFolder game;
+  game.write("terrains/ground.json", layers_file(2));
+  TerrainLayers layers = read_back(game, "ground", TerrainReading::Weights);
+  set_texel(layers.splat, 0, 0, only(1));
+  std::string error;
+  REQUIRE(write_splat_pictures(game.dir, layers, error));
+  CHECK_FALSE(std::filesystem::exists(game.dir / "terrains/ground.splat0.png.tmp"));
+  game.write("terrains/ground.json", R"({"splat_size": 64, "layers": [{"name": "a"}, {"name": "b"}]})");
+  const TerrainLayers bigger = read_back(game, "ground", TerrainReading::Weights);
+  CHECK(bigger.splat.size == 64);
+  CHECK(texel_weights(bigger.splat, 0, 0)[1] == doctest::Approx(1.0f));
+  CHECK(texel_weights(bigger.splat, 40, 40)[0] == doctest::Approx(1.0f));
 }
 
 TEST_CASE("a layers name that leaves the game's folder is refused") {

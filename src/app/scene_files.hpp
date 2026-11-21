@@ -25,6 +25,7 @@ std::filesystem::path scene_file(const std::filesystem::path& game_dir, const st
 bool safe_scene_name(const std::string& name);
 
 // The scene a script asked for by name; nothing, with the reason logged, when it cannot be had.
-std::optional<SceneDesc> read_scene(const std::filesystem::path& game_dir, const std::string& name);
+std::optional<SceneDesc> read_scene(const std::filesystem::path& game_dir, const std::string& name,
+                                    TerrainReading reading = TerrainReading::WeightsAndPictures);
 
 }  // namespace redgem

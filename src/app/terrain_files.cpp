@@ -40,41 +40,64 @@ std::optional<nlohmann::json> layers_json(const std::filesystem::path& game_dir,
   return json.is_discarded() ? std::nullopt : std::optional<nlohmann::json>(std::move(json));
 }
 
-// One of the map's pictures, as RGBA8 of its size; nullopt when there is none (or it cannot be read).
-std::optional<std::vector<std::uint8_t>> splat_pixels(const std::filesystem::path& game_dir, const std::string& name,
-                                                      int picture, int size) {
-  const auto file = file_inside(game_dir, splat_picture_path(name, picture));
+bool uses_second_picture(const TerrainLayers& layers) {
+  return layers.layers.size() > static_cast<std::size_t>(kLayersPerSplatPicture);
+}
+
+// One of the map's pictures, RGBA8.
+struct SplatPixels {
+  int size = 0;
+  std::vector<std::uint8_t> rgba;
+};
+
+bool usable_splat_side(const Image& image) {
+  return image.width == image.height && image.width >= kMinSplatSize && image.width <= kMaxSplatSize;
+}
+
+// A picture of the game's folder, decoded; nothing (no data) when it is not there.
+Image decoded_file(const std::filesystem::path& game_dir, const std::string& relative) {
+  const auto file = file_inside(game_dir, relative);
   const auto encoded = file ? read_file_up_to(*file, kMaxEncodedImageBytes) : std::nullopt;
-  if (!encoded) return std::nullopt;
-  Image image = render_detail::decode_picture(*encoded);
-  if (image.data == nullptr) {
-    log::warning(splat_picture_path(name, picture) + " cannot be read: its layers start empty");
+  return encoded ? render_detail::decode_picture(*encoded) : Image{};
+}
+
+// One of the map's pictures; nullopt when there is none, or it cannot be used (warned of).
+std::optional<SplatPixels> splat_pixels(const std::filesystem::path& game_dir, const std::string& name, int picture) {
+  const std::string relative = splat_picture_path(name, picture);
+  if (!file_inside(game_dir, relative)) return std::nullopt;
+  Image image = decoded_file(game_dir, relative);
+  if (image.data == nullptr || !usable_splat_side(image)) {
+    log::warning(splat_picture_path(name, picture) +
+                 " is not a square picture of 16 to 4096 pixels: its spots go to the first layer");
+    UnloadImage(image);
     return std::nullopt;
   }
   ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-  if (image.width != size || image.height != size) ImageResize(&image, size, size);
   const auto* bytes = static_cast<const std::uint8_t*>(image.data);
-  std::vector<std::uint8_t> pixels(bytes, bytes + splat_bytes(size));
+  SplatPixels pixels{image.width, std::vector<std::uint8_t>(bytes, bytes + splat_bytes(image.width))};
   UnloadImage(image);
   return pixels;
 }
 
-// The weights beside the layers file: a map all of the first layer when there are none yet.
-SplatMap read_splat(const std::filesystem::path& game_dir, const std::string& name, int size) {
-  SplatMap splat = make_splat(size, 0);
-  bool found = false;
-  for (int picture = 0; picture < kSplatPictures; ++picture) {
-    const auto pixels = splat_pixels(game_dir, name, picture, splat.size);
-    if (!pixels) continue;
-    if (!found) splat = SplatMap{splat.size, std::vector<std::uint8_t>(splat.weights.size(), 0), 0};
-    found = take_splat_picture(splat, picture, *pixels) || found;
-  }
-  if (found) renormalize(splat);
-  return splat;
+// Takes a picture into the map read so far (made at the picture's size by the first one).
+void take_into(std::optional<SplatMap>& read, int picture, const SplatPixels& pixels, const std::string& name) {
+  if (!read) read = SplatMap{pixels.size, std::vector<std::uint8_t>(splat_bytes(pixels.size) * kSplatPictures, 0), 0};
+  if (!take_splat_picture(*read, picture, pixels.rgba))
+    log::warning(splat_picture_path(name, picture) + " is not the size of the other weights: it is left out");
 }
 
-bool uses_second_picture(const TerrainLayers& layers) {
-  return layers.layers.size() > static_cast<std::size_t>(kLayersPerSplatPicture);
+// The weights beside the layers file, at its splat_size: all of the first layer when there are
+// none yet. Only the pictures its layers need are read, and no weight is left on a layer it lost.
+SplatMap read_splat(const std::filesystem::path& game_dir, const TerrainLayers& layers) {
+  std::optional<SplatMap> read;
+  const int pictures = uses_second_picture(layers) ? kSplatPictures : 1;
+  for (int picture = 0; picture < pictures; ++picture) {
+    const auto pixels = splat_pixels(game_dir, layers.name, picture);
+    if (pixels) take_into(read, picture, *pixels, layers.name);
+  }
+  if (!read) return make_splat(layers.splat_size, 0);
+  keep_layers(*read, static_cast<int>(layers.layers.size()));
+  return read->size == layers.splat_size ? std::move(*read) : resampled(*read, layers.splat_size);
 }
 
 bool write_splat_picture(const std::filesystem::path& file, const std::vector<std::uint8_t>& rgba, int size,
@@ -89,6 +112,35 @@ bool write_splat_picture(const std::filesystem::path& file, const std::vector<st
   const std::vector<std::uint8_t> bytes(png, png + length);
   MemFree(png);
   return write_bytes_file(file, bytes, error);
+}
+
+std::filesystem::path writing_path(const std::filesystem::path& file) {
+  return file.string() + config::kSceneWritingSuffix;
+}
+
+// Writes the map's pictures beside where they go (see put_in_place), listing where they go.
+bool write_aside(const std::filesystem::path& game_dir, const TerrainLayers& layers,
+                 std::vector<std::filesystem::path>& files, std::string& error) {
+  const int pictures = uses_second_picture(layers) ? kSplatPictures : 1;
+  for (int picture = 0; picture < pictures; ++picture) {
+    files.push_back(game_dir / splat_picture_path(layers.name, picture));
+    const auto rgba = splat_picture(layers.splat, picture);
+    if (!write_splat_picture(writing_path(files.back()), rgba, layers.splat.size, error)) return false;
+  }
+  return true;
+}
+
+// Moves the pictures written aside into place, once all of them are written.
+bool put_in_place(const std::vector<std::filesystem::path>& files, std::string& error) {
+  for (const auto& file : files) {
+    std::error_code problem;
+    std::filesystem::rename(writing_path(file), file, problem);
+    if (problem) {
+      error = "cannot replace " + file.filename().string() + ": " + problem.message();
+      return false;
+    }
+  }
+  return true;
 }
 
 void remove_stale_picture(const std::filesystem::path& file) {
@@ -106,7 +158,7 @@ std::optional<TerrainLayers> read_terrain_files(const std::filesystem::path& gam
   layers.name = name;
   error = read_terrain_layers(*json, layers);
   if (!error.empty()) return std::nullopt;
-  layers.splat = read_splat(game_dir, name, layers.splat_size);
+  layers.splat = read_splat(game_dir, layers);
   if (reading == TerrainReading::WeightsAndPictures) layers.pictures = pack_terrain_pictures(game_dir, layers);
   return layers;
 }
@@ -145,11 +197,8 @@ bool write_splat_pictures(const std::filesystem::path& game_dir, const TerrainLa
   }
   std::error_code ignored;
   std::filesystem::create_directories(game_dir / config::kTerrainsDirName, ignored);
-  const int pictures = uses_second_picture(layers) ? kSplatPictures : 1;
-  for (int picture = 0; picture < pictures; ++picture) {
-    const auto file = game_dir / splat_picture_path(layers.name, picture);
-    if (!write_splat_picture(file, splat_picture(layers.splat, picture), layers.splat.size, error)) return false;
-  }
+  std::vector<std::filesystem::path> files;
+  if (!write_aside(game_dir, layers, files, error) || !put_in_place(files, error)) return false;
   if (!uses_second_picture(layers)) remove_stale_picture(game_dir / splat_picture_path(layers.name, 1));
   return true;
 }

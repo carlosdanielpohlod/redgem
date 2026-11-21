@@ -154,6 +154,30 @@ bool take_splat_picture(SplatMap& splat, int picture, const std::vector<std::uin
   return true;
 }
 
+void keep_layers(SplatMap& splat, int count) {
+  if (!well_formed(splat)) return;
+  const auto first_gone = static_cast<std::size_t>(std::clamp(count, 1, kMaxTerrainLayers));
+  for (std::size_t at = 0; at < splat.weights.size(); at += kLayers) {
+    std::fill(splat.weights.begin() + static_cast<std::ptrdiff_t>(at + first_gone),
+              splat.weights.begin() + static_cast<std::ptrdiff_t>(at + kLayers), 0);
+  }
+  renormalize(splat);
+}
+
+SplatMap resampled(const SplatMap& splat, int size) {
+  SplatMap result = make_splat(size);
+  if (!well_formed(splat)) return result;
+  const float side = static_cast<float>(result.size);
+  for (int row = 0; row < result.size; ++row) {
+    for (int column = 0; column < result.size; ++column) {
+      const float u = (static_cast<float>(column) + kHalf) / side;
+      set_texel(result, column, row, splat_weights_at(splat, u, (static_cast<float>(row) + kHalf) / side));
+    }
+  }
+  result.version = splat.version + 1;
+  return result;
+}
+
 void renormalize(SplatMap& splat) {
   if (!well_formed(splat)) return;
   for (int row = 0; row < splat.size; ++row) {

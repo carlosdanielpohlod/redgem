@@ -50,6 +50,14 @@ std::vector<std::uint8_t> splat_picture(const SplatMap& splat, int picture);
 // Takes those layers' weights from such a picture. False, the map unchanged, when the picture is
 // not of the map's size.
 bool take_splat_picture(SplatMap& splat, int picture, const std::vector<std::uint8_t>& rgba);
+// Gives the weights of layers from `count` on to the others (a layers file that lost layers):
+// every texel still adds up to a whole.
+void keep_layers(SplatMap& splat, int count);
+
+// The same weights over a map of `size` texels a side, each texel mixed from the four around it
+// (no channel weighs on another).
+SplatMap resampled(const SplatMap& splat, int size);
+
 // Every texel scaled to add up to kFullSplatWeight again (after its pictures were read in, or
 // edited by hand); a texel of nothing goes to the first layer.
 void renormalize(SplatMap& splat);

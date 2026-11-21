@@ -135,3 +135,30 @@ TEST_CASE("renormalizing a hand-edited map makes every texel whole again") {
     REQUIRE(total == kFullSplatWeight);
   }
 }
+
+TEST_CASE("weights of layers a terrain no longer has go to the ones it keeps") {
+  SplatMap splat = make_splat(kSize);
+  LayerWeights weights{};
+  weights[kGrass] = 0.5f;
+  weights[kRock] = 0.5f;
+  set_texel(splat, 2, 2, weights);
+  set_texel(splat, 3, 3, only(kRock));
+  keep_layers(splat, 3);
+  CHECK(texel_weights(splat, 2, 2)[kGrass] == doctest::Approx(1.0f));
+  CHECK(texel_weights(splat, 2, 2)[kRock] == 0.0f);
+  CHECK(texel_weights(splat, 3, 3)[kSand] == doctest::Approx(1.0f));  // nothing left: the first layer
+}
+
+TEST_CASE("a map resampled to another size keeps its weights, each channel on its own") {
+  SplatMap splat = make_splat(kSize, kSand);
+  for (int row = 0; row < kSize; ++row) {
+    for (int column = kSize / 2; column < kSize; ++column) set_texel(splat, column, row, only(kRock));
+  }
+  const SplatMap bigger = resampled(splat, kSize * 2);
+  CHECK(bigger.size == kSize * 2);
+  CHECK(texel_weights(bigger, 0, 5)[kSand] == doctest::Approx(1.0f));
+  CHECK(texel_weights(bigger, kSize * 2 - 1, 5)[kRock] == doctest::Approx(1.0f));
+  const LayerWeights edge = splat_weights_at(bigger, 0.5f, 0.5f);
+  CHECK(edge[kSand] == doctest::Approx(0.5f).epsilon(0.05));
+  CHECK(bigger.version != splat.version);
+}
