@@ -57,16 +57,6 @@ struct GuardedRoom {
     return false;
   }
 
-  // Polls only the sessions until `done`.
-  bool sessions_until(const std::function<bool()>& done) {
-    for (int round = 0; round < kMaxRounds; ++round) {
-      poll_sessions();
-      if (done()) return true;
-      wait_for_sockets();
-    }
-    return false;
-  }
-
   // Until one of the sockets of the relay or of the sessions is ready (see socket_rounds.hpp).
   void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions, relay.watched()); }
 
@@ -97,9 +87,19 @@ struct GuardedRoom {
   // Until the relay has something to read from each of its last `count` machines.
   void wait_until_relay_can_read_last(std::size_t count) const {
     const std::vector<Watched> watched = relay.watched();
+    REQUIRE(watched.size() >= count);
     for (std::size_t i = watched.size() - count; i < watched.size(); ++i) {
       REQUIRE(Socket::wait(std::vector<Watched>{Watched{watched[i].socket, false}}, kArrivalPatience));
     }
+  }
+
+  // Writes all of `bytes` on `socket`, waiting on it alone: the relay is not polled meanwhile.
+  static bool write_out(Socket& socket, std::vector<std::uint8_t> bytes) {
+    for (int round = 0; round < kMaxRounds; ++round) {
+      if (socket.write(bytes) == IoStatus::Ok && bytes.empty()) return true;
+      Socket::wait(std::vector<Watched>{Watched{&socket, true}}, redgem::test::kSocketPatience);
+    }
+    return false;
   }
 
   void join(NetworkSession& session) {
@@ -130,9 +130,8 @@ TEST_CASE("the id of a newcomer who gives up waiting is nobody else's until the 
   Socket next = room.knock();
   leaving.leave();
   room.sessions.clear();
-  std::vector<std::uint8_t> hello = redgem::test::wire_frame(nlohmann::json{{"k", "h"}, {"r", room.code}}.dump());
   // (Written without polling the relay, which would hear the goodbye alone.)
-  REQUIRE(room.sessions_until([&] { return next.write(hello) == IoStatus::Ok && hello.empty(); }));
+  REQUIRE(GuardedRoom::write_out(next, redgem::test::wire_frame(nlohmann::json{{"k", "h"}, {"r", room.code}}.dump())));
   // The relay hears the goodbye and the hello in one poll: both wait to be read before it polls.
   constexpr std::size_t kLeaverAndNewcomer = 2;  // the relay's last machines, taken in in that order
   room.wait_until_relay_can_read_last(kLeaverAndNewcomer);
