@@ -31,7 +31,7 @@ constexpr int kFound = 302;
 // polls at most (a bound for an answer that never comes, never a measure).
 constexpr float kAnswerLook = 0.005f;
 constexpr int kMostPolls = 2000;
-constexpr float kConnectPatience = 10.0f;  // seconds: a bound for a call to this machine, never a measure
+[[maybe_unused]] constexpr float kConnectPatience = 10.0f;  // seconds: a bound for a call to this machine, never a measure
 constexpr float kShortTimeout = 0.3f;
 constexpr int kTimeoutSteps = 10;  // the fake clock passes a short timeout in this many polls
 
