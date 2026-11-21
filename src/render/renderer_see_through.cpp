@@ -31,7 +31,7 @@ void Renderer::Impl::draw_see_through(std::size_t first, Vec3 viewer) {
   rlSetBlendMode(RL_BLEND_ALPHA);
   rlDisableDepthMask();
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
-  face_forward(pass);
+  finish_lit_pass(pass);
   rlEnableDepthMask();
   end_mesh_pass();
 }

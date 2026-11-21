@@ -28,6 +28,7 @@ add_executable(redgem_tests
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
+  unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
@@ -827,7 +828,8 @@ add_executable(redgem_field_benchmark
   benchmark/field_benchmark.cpp
   benchmark/field_scene.cpp
   benchmark/field_placements.cpp
-  benchmark/field_textures.cpp)
+  benchmark/field_textures.cpp
+  benchmark/terrain_scene.cpp)
 target_link_libraries(redgem_field_benchmark PRIVATE redgem_runtime)
 target_include_directories(redgem_field_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

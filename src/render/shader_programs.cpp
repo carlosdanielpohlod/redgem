@@ -8,6 +8,7 @@
 #include "render/mesh_pass.hpp"
 #include "render/shaders/motion.hpp"
 #include "render/shaders/particle.hpp"
+#include "render/shaders/lit_terrain.hpp"
 #include "render/shaders/temporal.hpp"
 #include "render/shaders/uniforms.hpp"
 
@@ -24,6 +25,20 @@ constexpr std::pair<int, const char*> kKnownUniforms[] = {
     {SHADER_LOC_MAP_DIFFUSE + kCoatFactorMap, shaders::kCoatFactorMap},
     {SHADER_LOC_MAP_DIFFUSE + kCoatRoughnessMap, shaders::kCoatRoughnessMap},
     {SHADER_LOC_MAP_DIFFUSE + kCoatNormalMap, shaders::kCoatNormalMap},
+};
+
+constexpr std::pair<int TerrainUniforms::*, const char*> kTerrainUniforms[] = {
+    {&TerrainUniforms::layers, shaders::kTerrainLayers},
+    {&TerrainUniforms::area, shaders::kTerrainArea},
+    {&TerrainUniforms::tiling, shaders::kTerrainTiling},
+    {&TerrainUniforms::sharpness, shaders::kTerrainSharpness},
+    {&TerrainUniforms::variation, shaders::kTerrainVariation},
+    {&TerrainUniforms::stochastic, shaders::kTerrainStochastic},
+    {&TerrainUniforms::triplanar, shaders::kTerrainTriplanar},
+    {&TerrainUniforms::variation_scale, shaders::kTerrainVariationScale},
+    {&TerrainUniforms::colors, shaders::kTerrainColors},
+    {&TerrainUniforms::surfaces, shaders::kTerrainSurfaces},
+    {&TerrainUniforms::splat, shaders::kTerrainSplat},
 };
 
 constexpr std::pair<int ShadowUniforms::*, const char*> kShadowUniforms[] = {
@@ -172,6 +187,12 @@ LitUniforms find_lit_uniforms(Shader& lit) {
   LitUniforms found;
   found.shadows = find_shadow_uniforms(lit);
   for (const LitUniform& uniform : kLitUniforms) found.*uniform.location = GetShaderLocation(lit, uniform.name);
+  return found;
+}
+
+TerrainUniforms find_terrain_uniforms(const Shader& lit) {
+  TerrainUniforms found;
+  for (const auto& [member, name] : kTerrainUniforms) found.*member = GetShaderLocation(lit, name);
   return found;
 }
 
