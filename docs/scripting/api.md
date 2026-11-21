@@ -84,7 +84,7 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 
 - `start -> void`: called once, before the first update
 - `update(Float dt) -> void`: called every frame; dt is the seconds since the last one
-- `fixed_update(Float dt) -> void`: called 60 times a second, with the physics
+- `fixed_update(Float dt) -> void`: called at the game's tick (game.json's tick_hz, 60 times a second by default), with the physics
 - `on_trigger_enter(GameObject other) -> void`: something entered this object's trigger, or it entered one
 - `on_trigger_exit(GameObject other) -> void`: something left this object's trigger
 - `on_collision_enter(GameObject other) -> void`: this object's body touched another
@@ -303,7 +303,7 @@ The game's clock (added to Ruby's Time).
 
 - `Time.delta -> Float`: seconds since the last frame
 - `Time.unscaled_delta -> Float`: seconds since the last frame, whatever Time.scale (also while paused) *Experimental.*
-- `Time.fixed_delta -> Float`: seconds of a physics step (1/60)
+- `Time.fixed_delta -> Float`: seconds of a physics step: 1 / game.json's tick_hz (1/60 by default)
 - `Time.elapsed -> Float`: seconds since the game started
 - `Time.frame -> Integer`: how many frames have run
 - `Time.scale -> Float`: how fast game time runs (1 is normal)

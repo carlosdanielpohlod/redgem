@@ -18,7 +18,7 @@ class Behaviour
   # called every frame; dt is the seconds since the last one
   %a{redgem:stable}
   def update: (Float dt) -> void
-  # called 60 times a second, with the physics
+  # called at the game's tick (game.json's tick_hz, 60 times a second by default), with the physics
   %a{redgem:stable}
   def fixed_update: (Float dt) -> void
   # something entered this object's trigger, or it entered one
@@ -583,7 +583,7 @@ class Time
   # seconds since the last frame, whatever Time.scale (also while paused)
   %a{redgem:experimental}
   def self.unscaled_delta: () -> Float
-  # seconds of a physics step (1/60)
+  # seconds of a physics step: 1 / game.json's tick_hz (1/60 by default)
   %a{redgem:stable}
   def self.fixed_delta: () -> Float
   # seconds since the game started
