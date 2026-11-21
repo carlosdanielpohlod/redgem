@@ -98,6 +98,15 @@ class SystemTest
 
   def log(message) = Debug.log("[test] #{message}")
 
+  # Plays the game from the next frame as a window drawing `fps` frames a second would: each frame
+  # that much game time, with as many fixed steps as it holds (none, one or more), and the bodies
+  # drawn between their steps. The same every run. nil goes back to a fixed step a frame.
+  def frame_rate=(fps)
+    raise ArgumentError, "frame_rate takes a number of frames a second, or nil" unless fps.nil? || fps.is_a?(Numeric)
+
+    TestInput.frame_seconds = fps ? 1.0 / fps : 0.0
+  end
+
   private
 
   def real_time_frame

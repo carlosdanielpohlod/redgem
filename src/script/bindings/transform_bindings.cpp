@@ -34,6 +34,21 @@ mrb_value transform_set_position(mrb_state* mrb, mrb_value self) {
   return value;
 }
 
+// Where the object is drawn this frame (see ScriptContext::drawn_transform).
+Transform drawn_of(mrb_state* mrb, mrb_value self) {
+  const ObjectId id = alive_id(mrb, self);
+  const ScriptContext& ctx = context(mrb);
+  return ctx.drawn_transform ? ctx.drawn_transform(id) : scene(mrb).world_transform(id);
+}
+
+mrb_value transform_render_position(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, drawn_of(mrb, self).position);
+}
+
+mrb_value transform_render_rotation(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, quat_to_euler_degrees(drawn_of(mrb, self).rotation));
+}
+
 mrb_value transform_local_position(mrb_state* mrb, mrb_value self) {
   return vec3_value(mrb, alive_object(mrb, self).local.position);
 }
@@ -112,6 +127,8 @@ mrb_value transform_up(mrb_state* mrb, mrb_value self) { return vec3_value(mrb, 
 void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "position", transform_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "position=", transform_set_position, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, transform, "render_position", transform_render_position, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "render_rotation", transform_render_rotation, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position", transform_local_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position=", transform_set_local_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "rotation", transform_rotation, MRB_ARGS_NONE());

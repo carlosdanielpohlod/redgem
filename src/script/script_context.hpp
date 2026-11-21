@@ -178,6 +178,13 @@ struct ScriptContext {
   std::string game_version;
   bool quit_requested = false;
   bool stop_recording_requested = false;  // Game.stop_recording: the video being recorded ends here
+  // In a run that steps fixedly (EngineOptions::fixed_step), how much game time each frame is: 0
+  // for a step a frame. A test sets it (SystemTest#frame_rate=) to play the game as a window
+  // drawing that often would, steps and all, the same way every time.
+  float fixed_frame_seconds = 0.0f;
+  // Where an object is drawn this frame (app/render_poses.hpp): between its body's last two steps,
+  // or the body's it rides on; where it is otherwise. Transform#render_position. Null: where it is.
+  std::function<Transform(ObjectId)> drawn_transform;
   // Called when a script writes a transform, so physics can follow.
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.

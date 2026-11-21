@@ -55,7 +55,7 @@ module Camera
 
     # The point followed: the object, or as far behind it as the dead zone lets it lag.
     def focus
-      point = @target.transform.position
+      point = @target.transform.render_position  # (where it is drawn: between its steps, for a body)
       return point if follows_exactly?
 
       away = point - @focus

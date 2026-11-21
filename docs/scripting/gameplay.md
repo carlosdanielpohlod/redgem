@@ -483,6 +483,19 @@ object a script places each `update` from a body's `transform.position` (a camer
 it) follows the step pose, not the drawn one. The tools that take a whole step a frame (`redgem run`,
 `redgem shot`, `redgem-test`) draw the steps' poses, as before.
 
+A script that places something by a body each frame (a camera, a marker, a light) reads where the
+body is drawn, `transform.render_position` (and `render_rotation`), not where the physics has it,
+or the thing it places moves in steps while the body moves smoothly. `Camera.follow` and
+`Camera.orbit` do. A camera parented to a character needs nothing: it is drawn with it.
+
+```ruby
+def update(_dt)
+  @marker.transform.position = @hero.transform.render_position + Vector3.up * 2.5
+end
+```
+
+A system test can play at a frame rate of its own, `t.frame_rate = 240`, to check this.
+
 ## How many bodies a scene holds
 
 A scene's physics world holds 4096 bodies unless `game.json` asks for another number, from 64 to

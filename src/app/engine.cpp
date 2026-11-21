@@ -292,6 +292,7 @@ void Engine::connect_world() {
   context_.navigation = &navigation_;
   context_.water = &water_.surfaces();
   context_.bake_navigation = [this] { bake_navigation(); };
+  context_.drawn_transform = [this](ObjectId id) { return render_poses_.drawn(scene_, id, drawn_share()); };
 }
 
 void Engine::connect_network() {
