@@ -105,12 +105,13 @@ std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& te
   return std::nullopt;
 }
 
-// The game's game.json, for its physics and its tick (warning of what is wrong with its physics,
-// as the game does); just the default layer, body limit and tick without a game.
+// The game's game.json, for its physics and its tick (warning of what is wrong with them, as the
+// game does); just the default layer, body limit and tick without a game.
 GameSettings game_physics(const std::filesystem::path& game_dir) {
   if (game_dir.empty()) return {};
   GameManifest manifest = read_game_manifest(game_dir);
   for (const std::string& problem : physics_problems(manifest)) log::warning(problem);
+  if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
   return std::move(manifest.settings);
 }
 

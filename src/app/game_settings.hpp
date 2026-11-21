@@ -48,8 +48,8 @@ struct GameSettings {
   // script/script_budget.hpp), in milliseconds, 1 to config::kMaxScriptBudgetMs:
   //   "script_budget_ms": 2000
   int script_budget_ms = config::kDefaultScriptBudgetMs;
-  // How many fixed steps the game takes a second (physics, fixed_update, Time.fixed_delta, a test's
-  // frame, a dedicated server's room), config::kMinTickHz to config::kMaxTickHz:
+  // How many fixed steps the game takes a second (physics, fixed_update, Time.fixed_delta, a
+  // tool's or a test's frame), config::kMinTickHz to config::kMaxTickHz:
   //   "tick_hz": 128
   int tick_hz = config::kDefaultTickHz;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).

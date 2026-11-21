@@ -410,8 +410,8 @@ still runs once per drawn frame, whatever the tick.
 A faster tick makes movement and contacts finer and costs more: each step solves the whole world,
 so 128 Hz takes about twice the physics time of 60 Hz. Keep anything that must keep pace with the
 physics in `fixed_update`, and anything that counts frames to measure time in `Time.delta` or
-`Time.fixed_delta` instead. After a long frame (a hitch), a game catches up on at most about
-133 ms of steps, whatever its tick. `redgem check` refuses a `tick_hz` out of bounds; a game played
+`Time.fixed_delta` instead. After a long frame (a hitch), a game catches up on about 133 ms of
+steps at most (a step's worth more at some ticks), whatever its tick. `redgem check` refuses a `tick_hz` out of bounds; a game played
 with one ticks at 60.
 
 ## How many bodies a scene holds
