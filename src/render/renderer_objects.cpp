@@ -149,7 +149,7 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects = object_pass(depth_pass, view);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
-  face_forward(objects);
+  finish_lit_pass(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
@@ -196,6 +196,7 @@ void Renderer::Impl::face_by_winding(bool mirrored, ObjectPass& pass) {
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {
   if (omits_water(factors_of(primitive.material), pass.alpha)) return;
   use_material(primitive.material, pass);
+  use_terrain(primitive.terrain, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
   send_part(primitive, pass);

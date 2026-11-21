@@ -258,6 +258,7 @@ void Renderer::Impl::remake_morph_texture() {
 }
 
 void Renderer::Impl::release_assets() {
+  release_terrains();
   release_meshes();
   skins.clear();
   if (scene_textures_in_use) {

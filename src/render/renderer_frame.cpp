@@ -94,7 +94,7 @@ void Renderer::Impl::use_environment(const Environment& env, const Camera3D& cam
   use_sky_picture(env);
   const bool clearcoat = std::any_of(material_factors.begin(), material_factors.end(), coated);
   const bool water = std::any_of(material_factors.begin(), material_factors.end(), water_surface);
-  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat, water});
+  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat, water, has_terrains()});
   if (water) ensure_water_target();
   send(shader, lit_uniforms.water_ready, render_math::kOff);
   begin_temporal(env, camera);

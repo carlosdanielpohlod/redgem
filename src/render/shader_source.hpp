@@ -13,7 +13,7 @@ inline constexpr const char* kDesktopVersionLine = "#version 330";
 // picture's light is brighter than white: a sampler of low precision would clip it).
 inline constexpr const char* kMobileHeader =
     "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n"
-    "precision highp samplerCube;";
+    "precision highp samplerCube;\nprecision highp sampler2DArray;";
 // What the shaders and the engine agree on, defined for every shader from the engine's own
 // numbers: how wide the texture of the frame's matrices is, and the size of the lights' arrays.
 inline constexpr const char* kTexelRowName = "TEXELS_PER_ROW";

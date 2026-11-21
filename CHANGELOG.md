@@ -30,6 +30,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
   1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
   alone.
+- **Ground layers are drawn, blended (experimental).** Layers meet by weight or, with `sharpness`,
+  by height: sand fills the cracks between rocks. Each layer has its own `tiling`, large patches of
+  `variation`, and can break up its repeats (`stochastic`) or project along three axes on cliffs
+  (`triplanar`). A scene without a layered terrain draws as before, with no extra cost.
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that

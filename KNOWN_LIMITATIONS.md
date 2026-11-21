@@ -252,9 +252,14 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
-- Terrain is one 100 m square with vertex tint painting and one material, no texture-layer painting,
-  no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
-  is an ordinary mesh.
+- Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
+  several terrains. A terrain re-exported from Blender is an ordinary mesh.
+- Ground layers have no brush or rules yet: their weights are painted by editing the splat
+  pictures. Their textures are three texture arrays in slots 17 to 19: a graphics card with fewer
+  than 20 texture units for the fragment shader (most phones) draws the terrain without them. A
+  terrain's mesh must be its own: a mesh another object also draws gets no layers. Changed layer
+  pictures show after the scene is loaded again. Each layer's pictures are sampled even where the
+  layer is covered by others with a sharp height blend.
 
 ## Tools
 
