@@ -89,7 +89,7 @@ Both answer one JSON document:
   default 60 Hz, 7.8125 ms for a game whose `game.json` sets `"tick_hz": 128`): rooms are
   falling behind: raise `--threads` (up to the machine's cores) or get a bigger machine. A room's
   frame time is the turn of the thread it runs on, every room of that thread one after the
-  other, over its last 300 frames (about five seconds). Loading a new room's game is left out.
+  other, over its last 300 frames (five seconds at 60 Hz, about 2.3 at 128 Hz). Loading a new room's game is left out.
 - `bytes_per_second` is everything the server's game connections received and sent over the last
   ten seconds.
 

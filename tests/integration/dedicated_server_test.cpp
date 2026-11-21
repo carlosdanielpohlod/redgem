@@ -15,6 +15,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "core/log.hpp"
 #include "fake_clock.hpp"
 #include "integration/middleman.hpp"
 #include "integration/swordsman.hpp"
@@ -76,6 +77,7 @@ constexpr double kStepTolerance = kTick + kFloatRounding;
 constexpr double kClockTolerance = 1e-9;
 constexpr int kFastTick = 128;
 constexpr double kFastTickSeconds = 1.0 / kFastTick;
+constexpr int kTooFastTick = 500;  // past config::kMaxTickHz
 constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr double kStatusRounding = 0.0005;  // the status says milliseconds to a thousandth
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
@@ -124,11 +126,11 @@ struct FastGame {
   std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-fast-tick-test";
   std::filesystem::path game = root / "game";
 
-  FastGame() {
+  explicit FastGame(int tick_hz = kFastTick) {
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
-    std::ofstream(game / "game.json") << "{\"tick_hz\": " << kFastTick << "}";
+    std::ofstream(game / "game.json") << "{\"tick_hz\": " << tick_hz << "}";
   }
   ~FastGame() { std::filesystem::remove_all(root); }
 };
@@ -463,6 +465,18 @@ TEST_CASE("a server of a game at 128 Hz takes its lobby's turns at 128 Hz, and i
   const nlohmann::json status = server::status_json(online_game.server.status());
   const double budget_ms = status["frame_ms"]["budget"].get<double>();
   CHECK(std::abs(budget_ms - kFastTickSeconds * kMillisecondsPerSecond) <= kStatusRounding);
+}
+
+TEST_CASE("a server of a game with a tick it cannot use warns, and runs at the default tick") {
+  const FastGame too_fast(kTooFastTick);
+  std::vector<std::string> warnings;
+  const log::Capture capture([&](log::Level level, const std::string& message) {
+    if (level == log::Level::Warning) warnings.push_back(message);
+  });
+  Online online_game(kRoomy, too_fast.game, kOneThread);
+  CHECK(online_game.server.tick_hz() == config::kDefaultTickHz);
+  const auto of_tick = [](const std::string& warning) { return warning.find("tick_hz") != std::string::npos; };
+  CHECK(std::count_if(warnings.begin(), warnings.end(), of_tick) == 1);
 }
 
 TEST_CASE("a room of a game at 128 Hz plays a frame and a fixed step each 1/128 s of its clock") {

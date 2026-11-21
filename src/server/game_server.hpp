@@ -136,6 +136,7 @@ class GameServer {
     bool runs_on(const RoomThread& other) const { return thread == &other && !slot->closed(); }
   };
 
+  void read_tick();
   bool open_saves(std::string& error);
   bool take_identity(std::string& error);
   bool open_status(std::string& error);
