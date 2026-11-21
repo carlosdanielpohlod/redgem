@@ -263,9 +263,7 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, a multi-level
-multiplayer template, the packed Android app on a phone (on the emulator it played, see Shipping),
-and the test cases still on the real clock.
+The 1.0 blocker still open (see the 1.0 cut plan): a quest journal and markers.
 
 ### Gameplay API
 
