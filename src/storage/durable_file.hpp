@@ -22,6 +22,10 @@ bool flush_to_disk(std::FILE* file);
 // else can have chosen (a file in a folder just made for it). replace_file_via is for any other.
 bool write_flushed(const std::filesystem::path& file, const std::string& text, const Flush& flush = flush_to_disk);
 
+// Pushes a file already written (and closed), streamed out by some other writer, to the disk as it
+// is: nothing in it changes. False when it is not there or could not be flushed.
+bool flush_file(const std::filesystem::path& file, const Flush& flush = flush_to_disk);
+
 // Pushes a folder's list of files to the disk, so that a file just renamed into it stays renamed
 // after a power cut (fsync of the folder). Windows has no such flush: there it does nothing.
 // False when it could not.
