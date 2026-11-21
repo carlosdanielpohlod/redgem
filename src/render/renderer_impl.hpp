@@ -656,8 +656,9 @@ struct Renderer::Impl {
 
   // --- The view model (renderer_view_model.cpp) ---------------------------------------------------
 
-  // A first-person weapon or hands: drawn after the world over a cleared depth (it never goes into
-  // a wall), with a field of view of its own, the sun unshadowed and a fill light of its own.
+  // A first-person weapon or hands: drawn after the world, its depths in front of all of it (it
+  // never goes into a wall), with a field of view of its own, the sun unshadowed and a fill light
+  // of its own.
   void draw_view_model(const Camera3D& camera);
   // Whether an object is drawn as the view model this frame: it or an object it is under says so,
   // and the view draws view models apart.

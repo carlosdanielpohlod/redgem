@@ -81,7 +81,7 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
 - **A first-person weapon: the view model** (experimental). `view_model = true` on an object
   (in the Inspector, or `weapon.view_model = true`) draws it, and everything under it, after the
-  world over a cleared depth: pressed against a wall, the weapon no longer goes into it. It has a
+  world, in front of all of it: pressed against a wall, the weapon no longer goes into it. It has a
   field of view of its own (`Camera.view_model_fov`, 50 degrees unless set), apart from
   `Camera.fov`. It is lit by the sun without the world's shadows and by a fill light from the eye,
   so it reads indoors; it casts no shadow on the world, and no frustum culls it. A muzzle socket
