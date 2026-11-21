@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the scene.glb of the third-person, top-down and menu-only templates.
+"""Writes the scenes of the third-person, top-down, menu-only and multiplayer-levels templates.
 
     python3 -I tools/templates/build_template_scenes.py
 
@@ -54,6 +54,19 @@ HERO_HEIGHT = 1.2                  # the capsule's middle: its 2 meters stand on
 CRATE_COLOR = [0.62, 0.42, 0.22]
 ROCK_COLOR = [0.45, 0.45, 0.5]
 LEDGE_COLOR = [0.15, 0.35, 0.75]
+SECOND_GROUND_COLOR = [0.55, 0.5, 0.38]
+TEAMMATE_COLOR = [0.2, 0.55, 0.95]
+GUIDE_COLOR = [0.25, 0.7, 0.35]
+EXIT_COLOR = [0.55, 0.25, 0.75]
+BEACON_COLOR = [0.95, 0.8, 0.2]
+SPAWN_COLOR = [0.85, 0.85, 0.85]
+SPAWN_SIZE = (1.2, 0.02, 1.2)      # a flat mark on the ground (the cube is 1 meter wide)
+SPAWN_HEIGHT = 0.01
+EXIT_SIZE = (2.0, 3.0, 0.5)        # a door frame to walk up to
+EXIT_HEIGHT = 1.5
+BEACON_SIZE = (1.0, 4.0, 1.0)
+BEACON_HEIGHT = 2.0
+HIDDEN_DEPTH = -50.0               # where the teammate prefab waits, under the ground
 
 
 def pitch_rotation(degrees):
@@ -171,8 +184,8 @@ def ground():
     return thing("Ground", PLANE, GROUND_COLOR, (0.0, 0.0, 0.0), GROUND_SIZE, collider="box")
 
 
-def hero(script):
-    return thing("Player", CAPSULE, HERO_COLOR, (0.0, HERO_HEIGHT, 0.0), body="character", collider="capsule",
+def hero(script, x=0.0, z=0.0):
+    return thing("Player", CAPSULE, HERO_COLOR, (x, HERO_HEIGHT, z), body="character", collider="capsule",
                  script=script, tag="player")
 
 
@@ -197,21 +210,56 @@ def menu_only():
     return [ground()]
 
 
-# Each template's objects, and where its camera starts: position, pitch (degrees), extras.
+def spawns(z):
+    """Where each player's hero starts a level: Spawn1 for the first, Spawn2 for the second."""
+    return [thing(f"Spawn{number}", CUBE, SPAWN_COLOR, (x, SPAWN_HEIGHT, z), SPAWN_SIZE, tag="spawn")
+            for number, x in ((1, -2.0), (2, 2.0))]
+
+
+def party(z):
+    """The hero (on Spawn1), the spawn marks and the prefab the other players' heroes are copies of."""
+    teammate = thing("Teammate", CAPSULE, TEAMMATE_COLOR, (0.0, HIDDEN_DEPTH, 0.0), prefab=True)
+    return [hero("player.rb", -2.0, z), *spawns(z), teammate]
+
+
+def level_exit(position, to):
+    return thing("Exit", CUBE, EXIT_COLOR, position, EXIT_SIZE, collider="box", script="level_exit.rb", to=to)
+
+
+def first_level():
+    """The level the game starts in: the guide to talk to, and the way to the second level."""
+    guide = thing("Guide", CAPSULE, GUIDE_COLOR, (-6.0, HERO_HEIGHT, -4.0), collider="capsule", script="guide.rb",
+                  dialogue="guide")
+    return [ground(), *party(4.0), guide, level_exit((0.0, EXIT_HEIGHT, -12.0), "level2")]
+
+
+def second_level():
+    """The second level: the beacon the quest sends the party to, and the way back."""
+    beacon = thing("Beacon", CUBE, BEACON_COLOR, (0.0, BEACON_HEIGHT, -8.0), BEACON_SIZE, collider="box")
+    return [thing("Ground", PLANE, SECOND_GROUND_COLOR, (0.0, 0.0, 0.0), GROUND_SIZE, collider="box"),
+            *party(10.0), beacon, level_exit((8.0, EXIT_HEIGHT, 6.0), "main")]
+
+
+FOLLOW_CAMERA = {"script": "follow_camera.rb"}
+
+# Each scene's objects, and where its camera starts: position, pitch (degrees), extras. By the
+# file of templates/ it is written to.
 SCENES = {
-    "third-person": (third_person, (0.0, 4.0, 8.0), -15.0, {"script": "orbit_camera.rb"}),
-    "top-down": (top_down, (0.0, 15.2, 9.0), -57.0, {"script": "top_down_camera.rb"}),
-    "menu-only": (menu_only, (0.0, 4.0, 8.0), -23.6, {}),
+    "third-person/scene.glb": (third_person, (0.0, 4.0, 8.0), -15.0, {"script": "orbit_camera.rb"}),
+    "top-down/scene.glb": (top_down, (0.0, 15.2, 9.0), -57.0, {"script": "top_down_camera.rb"}),
+    "menu-only/scene.glb": (menu_only, (0.0, 4.0, 8.0), -23.6, {}),
+    "multiplayer-levels/scene.glb": (first_level, (0.0, 10.0, 16.0), -35.0, FOLLOW_CAMERA),
+    "multiplayer-levels/scenes/level2.glb": (second_level, (0.0, 10.0, 22.0), -35.0, FOLLOW_CAMERA),
 }
 
 
 def main():
-    for template, (objects, camera_position, camera_pitch, camera_extras) in SCENES.items():
+    for scene, (objects, camera_position, camera_pitch, camera_extras) in SCENES.items():
         writer = GlbWriter()
         for spec in objects():
             writer.add_object(spec)
         writer.add_sun_and_camera(camera_position, camera_pitch, camera_extras)
-        path = os.path.join(TEMPLATES, template, "scene.glb")
+        path = os.path.join(TEMPLATES, scene)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         writer.write(path)
         print(f"wrote {os.path.relpath(path, REPO_ROOT)} ({os.path.getsize(path)} bytes)")
