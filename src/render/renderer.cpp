@@ -150,6 +150,12 @@ void Renderer::set_backdrop_blur(float amount) {
 }
 
 void Renderer::set_auto_exposure(const AutoExposureOverrides& overrides) { impl_->exposure_overrides = overrides; }
+void Renderer::set_material_emission(const EmissionOverrides& overrides) {
+  if (same_emission(overrides, impl_->emission_overrides)) return;
+  impl_->emission_overrides = overrides;
+  impl_->material_factors = with_emission(impl_->loaded_factors, overrides);
+}
+
 void Renderer::set_underwater(const UnderwaterView& view) { impl_->underwater = view; }
 
 void Renderer::set_quality(const QualityCaps& caps) { impl_->quality = caps; }

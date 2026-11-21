@@ -288,6 +288,8 @@ struct Renderer::Impl {
   bool scene_textures_in_use = false;
   std::vector<Material> materials;
   std::vector<MaterialDesc> material_factors;  // per material, read at draw time
+  std::vector<MaterialDesc> loaded_factors;    // the same, as the scene's file has them
+  EmissionOverrides emission_overrides;        // what scripts change of their glow, by name
   const MaterialDesc fallback_factors;         // of parts without a material: white dielectric
   Material fallback_material{};
   std::vector<std::vector<GpuPrimitive>> meshes;  // per MeshDesc

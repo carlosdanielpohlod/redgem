@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <optional>
 #include <string>
 
 #include "app/recording.hpp"
@@ -65,6 +67,7 @@ TEST_CASE("the encoder takes raw frames of the drawn size, flips them, and scale
   RecordOptions options;
   options.file = "clip.mp4";
   options.fps = kFps;
+  options.sound = false;  // (the pictures go straight into the video)
   const std::vector<std::string> plain = encoder_arguments(options, FrameSize{640, 360});
   CHECK(plain.front() == kEncoderProgram);
   CHECK(plain.back() == "clip.mp4");
@@ -109,5 +112,65 @@ TEST_CASE("a picture is fitted in the middle of a window of another shape, and t
 TEST_CASE("the video's path goes to the encoder exactly as given, whatever it holds") {
   RecordOptions options;
   options.file = "clips/it's $HOME `now` \"quoted\" \\.mp4";
+  CHECK(muxer_arguments(options).back() == options.file.string());
+  options.sound = false;
   CHECK(encoder_arguments(options, FrameSize{640, 360}).back() == options.file.string());
+}
+
+TEST_CASE("each recorded picture takes its share of sound, and the shares never drift over a long run") {
+  constexpr std::int64_t kHourOfPictures = 3600;  // seconds, times each fps below
+  for (const int fps : {1, 7, 24, 30, 60, 144, kMostRecordFps}) {
+    CAPTURE(fps);
+    SoundClock clock(kRecordSampleRate, fps);
+    const std::int64_t pictures = kHourOfPictures * fps;
+    const std::int64_t fewest = kRecordSampleRate / fps;
+    const std::int64_t most = fewest + (kRecordSampleRate % fps == 0 ? 0 : 1);
+    std::int64_t sum = 0;
+    bool within_one = true;  // no picture takes more than one frame of sound over another
+    for (std::int64_t picture = 0; picture < pictures; ++picture) {
+      const std::int64_t frames = clock.next();
+      within_one = within_one && frames >= fewest && frames <= most;
+      sum += frames;
+    }
+    CHECK(within_one);
+    CHECK(clock.pictures() == pictures);
+    CHECK(sum == clock.total());
+    CHECK(clock.total() == kHourOfPictures * kRecordSampleRate);  // an hour of sound, to the frame
+  }
+}
+
+TEST_CASE("sound that does not divide into pictures carries its fraction: 44100 at 60 is 735 a picture") {
+  constexpr int kCdRate = 44100;
+  SoundClock clock(kCdRate, 60);
+  CHECK(clock.next() == 735);
+  SoundClock seven(kRecordSampleRate, 7);  // 6857.14... a picture
+  std::int64_t sum = 0;
+  for (int picture = 0; picture < 7; ++picture) sum += seven.next();
+  CHECK(sum == kRecordSampleRate);  // a second of pictures is a second of sound
+}
+
+TEST_CASE("--record-audio is on or off") {
+  CHECK(record_sound_from("on") == std::optional<bool>(true));
+  CHECK(record_sound_from("off") == std::optional<bool>(false));
+  CHECK_FALSE(record_sound_from("yes"));
+  CHECK_FALSE(record_sound_from(""));
+}
+
+TEST_CASE("a video with sound is encoded beside it, then joined to the sound, which is AAC") {
+  RecordOptions options;
+  options.file = "clips/trailer.mp4";
+  CHECK(pictures_file(options) == std::filesystem::path("clips/trailer.pictures.mp4"));
+  CHECK(sound_file(options) == std::filesystem::path("clips/trailer.sound.f32"));
+  CHECK(encoder_arguments(options, FrameSize{640, 360}).back() == pictures_file(options).string());
+  const std::vector<std::string> joining = muxer_arguments(options);
+  CHECK(joining.front() == kEncoderProgram);
+  CHECK(joining.back() == "clips/trailer.mp4");
+  CHECK(has(joining, pictures_file(options).string()));
+  CHECK(has(joining, sound_file(options).string()));
+  CHECK(has(joining, "f32le"));
+  CHECK(has(joining, std::to_string(kRecordSampleRate)));
+  CHECK(has(joining, "aac"));
+  CHECK(has(joining, "copy"));  // the pictures are not encoded again
+  options.sound = false;
+  CHECK(encoder_arguments(options, FrameSize{640, 360}).back() == "clips/trailer.mp4");
 }

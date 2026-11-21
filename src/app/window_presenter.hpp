@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "app/frame_painter.hpp"
 #include "app/game_display.hpp"
@@ -87,6 +88,12 @@ class WindowPresenter final : public Presenter {
   // How the game is shown now (the player's display settings it was given last).
   const DisplaySettings& shown() const { return shown_; }
 
+  // Whether the recording takes the game's sound in (see record_sound).
+  bool records_sound() const { return recording() && recorder_->records_sound(); }
+  // What the recording takes the sound of each frame from, mixed in step with the frame; none to
+  // stop (before the mixdown goes).
+  void record_sound(AudioMixdown* mixdown) { mixdown_ = mixdown; }
+
   // Whether a recording broke off: the encoder stopped before the game did.
   bool recording_failed() const { return recording_failed_ || (recording() && recorder_->failed()); }
 
@@ -104,6 +111,8 @@ class WindowPresenter final : public Presenter {
   // While recording: what the game is drawn into, and where its frames go.
   RenderTexture2D recorded_{};
   std::unique_ptr<VideoRecorder> recorder_;
+  AudioMixdown* mixdown_ = nullptr;
+  std::vector<float> passed_sound_;  // what pass_sound mixes, thrown away
 
   // While the world is drawn at another size than the window's (DisplaySettings::render_scale):
   // what it is drawn into, before it is stretched over the window.
@@ -121,6 +130,7 @@ class WindowPresenter final : public Presenter {
   bool recording_failed_ = false;
   void start_recording(const RecordOptions& record);
   void stop_recording();
+  void pass_sound();
   void present_recorded(const FrameView& view);
   void present_scaled(const FrameView& view);
   bool fit_scaled(SurfaceSize asked);
