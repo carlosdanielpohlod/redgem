@@ -331,6 +331,55 @@ The terrain's collider follows its shape, so characters walk and things roll on 
 make. Its color and roughness are in the Mesh card, like any object's. A terrain is made and
 shaped in the editor; one re-exported from Blender is an ordinary mesh.
 
+### Ground layers (experimental)
+
+A terrain can blend up to eight ground materials (sand, grass, rock, dirt...), each with its own
+pictures. A picture of weights, the splat map, says how much of each layer covers each spot. It
+has its own resolution (1024 texels across by default), not the mesh's vertices, so the layers
+meet in smooth, detailed edges.
+
+Any ground mesh can have layers: a terrain made in the editor, or one exported from Blender. Give
+the object the property `terrain_layers` with a name, and write the game's
+`terrains/<name>.json`:
+
+```json
+{
+  "splat_size": 1024,
+  "picture_size": 1024,
+  "variation_size": 40,
+  "layers": [
+    { "name": "grass", "albedo": "textures/Grass004/Color.jpg",
+      "normal": "textures/Grass004/NormalGL.jpg", "roughness": "textures/Grass004/Roughness.jpg",
+      "tiling": 3, "variation": 0.3, "stochastic": true },
+    { "name": "sand", "albedo": "textures/coastal-sand/Color.jpg",
+      "normal": "textures/coastal-sand/NormalGL.jpg", "tiling": 4, "sharpness": 0.2 },
+    { "name": "rock", "albedo": "textures/Rock030/Color.jpg", "normal": "textures/Rock030/NormalGL.jpg",
+      "roughness": "textures/Rock030/Roughness.jpg", "height": "textures/Rock030/Displacement.jpg",
+      "tiling": 6, "sharpness": 0.8, "triplanar": true }
+  ]
+}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `splat_size` | Texels across the weights (16 to 4096). |
+| `picture_size` | Pixels across each layer's pictures once loaded (64 to 2048): bigger files are scaled down. |
+| `variation_size` | Meters across the large patches of `variation`. |
+| `albedo`, `normal`, `roughness`, `occlusion`, `height` | The layer's pictures, relative to the game's folder. Normal maps are OpenGL style (green up); the others are grey. All are optional. |
+| `tint` | `"#rrggbb"` or `[r, g, b]` (linear), times the color picture. |
+| `roughness_scale`, `normal_scale` | Multiply the roughness and the normal map's bumps. |
+| `tiling` | Meters one repeat of the pictures covers. |
+| `sharpness` | 0 blends by weight. Toward 1, the layer with the higher height picture takes the spot near an edge: sand fills the cracks between rocks. |
+| `variation` | 0 to 1: large patches of the layer a little darker, lighter or shifted in hue, which hide the repeats. |
+| `stochastic` | Breaks up the repeats: the pictures are sampled at random shifts over a grid of hexagons and mixed. Costs three samples instead of one. |
+| `triplanar` | Projects the layer along the three axes, so steep slopes and cliffs are not stretched. Costs three samples. |
+
+The weights are saved beside the file: `terrains/<name>.splat0.png` holds layers 1 to 4 in its
+red, green, blue and alpha, `terrains/<name>.splat1.png` layers 5 to 8. Its first row is the
+terrain's smallest Z (north, for a scene made in Blender with +Y north), its first column the
+smallest X. Without these pictures the first layer covers the whole terrain. The weights of a
+spot are always scaled to add up to one. The map lies over the mesh's own X and Z bounds.
+
 ## Editing the level in Blender
 
 ```bash

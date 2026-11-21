@@ -18,7 +18,7 @@ std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir) {
 }
 
 bool GameServer::start(std::string& error) {
-  auto scene = read_game_scene(settings_.game_dir);
+  auto scene = read_game_scene(settings_.game_dir, TerrainReading::Weights);  // (nothing is drawn here)
   if (const auto* failed = std::get_if<std::string>(&scene)) {
     error = *failed;
     return false;

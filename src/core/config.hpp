@@ -39,6 +39,8 @@ inline constexpr const char* kLocalesDirName = "locales";      // the game's tra
 inline constexpr const char* kDialoguesDirName = "dialogues";  // its conversations: <name>.json (Dialogue)
 inline constexpr const char* kQuestsDirName = "quests";        // its quests: <name>.json (Quests)
 inline constexpr const char* kItemsDirName = "items";          // the items its quests name: <name>.json
+// The ground layers of its terrains: <name>.json, with their weights beside it (<name>.splat0.png).
+inline constexpr const char* kTerrainsDirName = "terrains";
 inline constexpr const char* kSceneExtension = ".glb";
 inline constexpr const char* kMainSceneName = "main";  // the game's scene.glb
 // scripts/<scene>_scene.rb sets a scene up from Ruby when it loads (see ruby/engine/scene_script.rb).

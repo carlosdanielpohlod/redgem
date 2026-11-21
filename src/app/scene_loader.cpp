@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "app/scene_files.hpp"
+#include "app/terrain_files.hpp"
 #include "core/wait_length.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
@@ -35,6 +36,9 @@ LoadResult read_and_decode(const SceneLoader::Reader& reader, const std::filesys
                            const std::string& name, bool decode_pictures) {
   LoadResult loaded = reader(game, name);
   if (!loaded.ok) return loaded;
+  // (A game that draws nothing, a dedicated server, needs the terrains' weights alone.)
+  attach_terrain_layers(loaded.scene, game,
+                        decode_pictures ? TerrainReading::WeightsAndPictures : TerrainReading::Weights);
   if (decode_pictures) decode_scene_pictures(loaded.scene);
   return loaded;
 }

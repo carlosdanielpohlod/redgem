@@ -375,6 +375,8 @@ redgem_add_library(redgem_runtime
   scene/water_interactions.cpp
   scene/water_volume.cpp
   scene/shapes/terrain.cpp
+  scene/ground/splat_map.cpp
+  scene/ground/terrain_layers_file.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
@@ -626,6 +628,8 @@ redgem_add_library(redgem_runtime
   app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
+  app/terrain_files.cpp
+  app/terrain_pictures.cpp
   app/touch_circles.cpp
   app/game_texts.cpp
   app/crash_text.cpp
