@@ -17,6 +17,14 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents edit objects as the Inspector and the GameObject menu do.** MCP `scene_edit` gains
+  `duplicate` (copies with their children), `group` (a new parent, keeping where the objects are)
+  and `objects`, so one call sets, copies or removes several objects as one undo step. `add` takes
+  a `kind` (cube, sphere, plane, cylinder, capsule, sun, point_light, spot_light, camera, terrain,
+  environment) and, in the live editor too, `from` to copy an object. `redgem scene set` and
+  `scene_edit` change lights and cameras: `light=spot`, `light_color=#ffcc88`, `light_intensity`,
+  `light_range`, `camera_fov`, `camera_near` and `camera_far`. The editor tool's `select` takes
+  `objects`. An agent could place only empty objects live and edit one object a call.
 - **A game's tick rate.** `game.json`'s `"tick_hz"` (30 to 128, 60 by default) sets how many
   fixed steps the game takes a second: the physics, `fixed_update` and `Time.fixed_delta` follow
   it, and so do the tools that play a step a frame (`redgem run`, `redgem shot`, `redgem-test`,

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <map>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include "core/command_line.hpp"
@@ -11,7 +12,10 @@
 #include "core/message_lines.hpp"
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
+#include "core/config.hpp"
 #include "project/mcp_game_tools.hpp"
+#include "project/scene_command.hpp"
+#include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
 #include "project/search_command.hpp"
 #include "project/tool_commands.hpp"
@@ -45,18 +49,19 @@ Words scene_words(const Options& options, const Json& args, const char* action) 
   return words;
 }
 
-Words edit_words(const Options& options, const Json& args) {
-  const std::string action = args.at("action");
-  if (action == "remove" && !args.value("confirm", false)) throw std::invalid_argument("remove needs confirm=true");
-  if (action != "add" && (args.contains("from") || args.contains("parent")))
-    throw std::invalid_argument("from and parent are only accepted by add");
-  const auto assignments = args.value("assignments", Words{});
-  if (action == "remove" && !assignments.empty()) throw std::invalid_argument("remove does not take assignments");
-  Words words = scene_words(options, args, action.c_str());
-  words.insert(words.end(), assignments.begin(), assignments.end());
-  option(words, args, "from");
-  option(words, args, "parent");
-  return words;
+// scene_edit on the saved scene: opened, edited as the editor would, and saved (not saved when
+// the call is wrong, which throws what to change).
+Json edit_files(const Options& options, const Json& args) {
+  std::string error;
+  const auto file = named_scene_file(options.game, args.value("scene", std::string(config::kMainSceneName)), error);
+  if (!file) throw std::invalid_argument(error);
+  auto opened = SceneDocument::open(*file);
+  if (const auto* problem = std::get_if<std::string>(&opened)) throw std::invalid_argument(*problem);
+  SceneDocument& document = std::get<SceneDocument>(opened);
+  SceneEdit edit{document, options.game / config::kScriptsDirName, {}};
+  const EditOutcome outcome = edit_scene(edit, args);
+  if (!document.save(error)) return tool_result(error, true);
+  return tool_result(outcome.text);
 }
 
 Words run_words(const Options& options, const Json& args) {
@@ -131,7 +136,6 @@ Words reading_command(const Options& options, const std::string& name, const Jso
 }
 
 Words command(const Options& options, const std::string& name, const Json& args) {
-  if (name == "scene_edit") return edit_words(options, args);
   if (name == "game_run") return run_words(options, args);
   if (name == "game_check") return {"check", options.game.string()};
   return reading_command(options, name, args);
@@ -191,6 +195,7 @@ Json native_result(const Options& options, const std::string& name, const Json& 
   if (name == "events") return tool_result(events_text(events(options, args)));
   if (name == "game_shot") return game_shot(options, args);
   if (name == "game_query") return game_query(options, args);
+  if (name == "scene_edit") return edit_files(options, args);
   const auto result = run_tool_command(command(options, name, args));
   if (!result) throw std::logic_error("missing native command");
   return tool_result(result->out + result->err, result->exit_code != kExitSuccess);

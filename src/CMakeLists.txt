@@ -706,6 +706,7 @@ if(NOT ANDROID)
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
     editor/editor_session_create.cpp
+    editor/new_object_kinds.cpp
     editor/editor_session_play.cpp
     editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
@@ -857,6 +858,8 @@ if(NOT ANDROID)
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp
     project/scene_assignments.cpp
+    project/component_words.cpp
+    project/scene_edits.cpp
     project/scene_command.cpp
     project/script_messages.cpp
     project/tool_play.cpp

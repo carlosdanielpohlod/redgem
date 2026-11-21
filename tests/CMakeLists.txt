@@ -46,6 +46,7 @@ add_executable(redgem_tests
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
   unit/mcp_test.cpp
+  unit/new_object_kinds_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
