@@ -81,7 +81,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_preview.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_gizmos.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/environment.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/environment.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/material.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
