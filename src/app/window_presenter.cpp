@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -39,6 +40,7 @@ namespace {
 
 constexpr ::Color kBlackBars{0, 0, 0, 255};  // around a recorded picture of another shape than the window
 constexpr ::Color kUntinted{255, 255, 255, 255};
+constexpr float kMostPassedSoundSeconds = 1.0f;  // of a frame's sound passed by, after a long frame
 
 bool loaded(const RenderTexture2D& picture) { return picture.id != 0; }
 
@@ -111,6 +113,7 @@ void WindowPresenter::start_recording(const RecordOptions& record) {
 
 // What is recorded so far stays a video; the game goes on in the window, in real time.
 void WindowPresenter::stop_recording() {
+  recorder_->finish();
   recording_failed_ = recorder_->failed();
   recorder_.reset();
   renderer_.set_clock(std::nullopt);
@@ -151,6 +154,7 @@ void WindowPresenter::present(const FrameView& view) {
     present_recorded(view);
     return;
   }
+  pass_sound();
   if (draws_scaled() && fit_scaled(scaled_size(window_.drawing_size(), render_scale_))) {
     present_scaled(view);
     return;
@@ -158,6 +162,16 @@ void WindowPresenter::present(const FrameView& view) {
   window_.begin_frame();
   painter_.paint(view);
   finish_frame(view.statistics_overlay);
+}
+
+// A mixdown whose recording ended still moves on with the game, unheard: its sounds come to
+// their ends.
+void WindowPresenter::pass_sound() {
+  if (mixdown_ == nullptr) return;
+  const float seconds = std::min(window_.frame_seconds(), kMostPassedSoundSeconds);
+  const auto frames = static_cast<std::size_t>(std::lround(seconds * static_cast<float>(kRecordSampleRate)));
+  passed_sound_.resize(frames * static_cast<std::size_t>(kRecordChannels));
+  mixdown_->render(passed_sound_.data(), frames);
 }
 
 void WindowPresenter::finish_frame(bool statistics_overlay) {
@@ -247,17 +261,29 @@ struct GameSound {
   AudioSystem& audio() const { return mixdown ? mixdown->audio() : *device; }
 };
 
-GameSound game_sound(WindowPresenter& window, const GameWindowOptions& options) {
+GameSound game_sound(WindowPresenter& window) {
   if (!window.records_sound()) return {create_raylib_audio(), nullptr};
-  const int fps = options.record->fps;
-  GameSound sound{nullptr, create_raylib_mixdown({kRecordSampleRate, most_sound_frames(kRecordSampleRate, fps)})};
+  GameSound sound{nullptr, create_raylib_mixdown({kRecordSampleRate})};
   window.record_sound(sound.mixdown.get());
   return sound;
 }
 
+// The window lets go of the mixdown before it goes, however the game ends.
+class SoundTaken {
+ public:
+  explicit SoundTaken(WindowPresenter& window) : window_(&window) {}
+  ~SoundTaken() { window_->record_sound(nullptr); }
+  SoundTaken(const SoundTaken&) = delete;
+  SoundTaken& operator=(const SoundTaken&) = delete;
+
+ private:
+  WindowPresenter* window_;
+};
+
 // Plays the game of `window` in it from `scene`, read from `input`, with its sound.
 int play(WindowPresenter& window, InputSource& input, const GameWindowOptions& options, SceneDesc scene) {
-  const GameSound sound = game_sound(window, options);
+  const GameSound sound = game_sound(window);
+  const SoundTaken taken{window};
   EngineOptions game;
   game.game_dir = options.game_dir;
   game.presenter = &window;
@@ -267,7 +293,6 @@ int play(WindowPresenter& window, InputSource& input, const GameWindowOptions& o
   game.display_kept_in = options.display_kept_in;
   game.data_folder = options.data_folder;
   const int status = Engine::create(game, std::move(scene))->run();
-  window.record_sound(nullptr);
   return window.recording_failed() ? kExitFailure : status;
 }
 

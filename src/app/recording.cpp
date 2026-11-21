@@ -169,8 +169,6 @@ std::int64_t SoundClock::next() {
   return frames;
 }
 
-int most_sound_frames(int sample_rate, int fps) { return (sample_rate + fps - 1) / fps; }
-
 std::filesystem::path pictures_file(const RecordOptions& options) {
   return beside(options, kPicturesSuffix, options.file.extension().string());
 }
@@ -184,22 +182,11 @@ std::vector<std::string> encoder_arguments(const RecordOptions& options, FrameSi
   return arguments;
 }
 
-std::vector<std::string> muxer_arguments(const RecordOptions& options) {
-  return {kEncoderProgram,
-          "-y",
-          "-loglevel",
-          "error",
-          "-i",
-          pictures_file(options).string(),
-          "-f",
-          kRawSound,
-          "-ar",
-          std::to_string(kRecordSampleRate),
-          "-ac",
-          std::to_string(kRecordChannels),
-          "-i",
-          sound_file(options).string(),
-          "-map",
+namespace {
+
+// The pictures as they are and the sound as AAC, into the video.
+std::vector<std::string> joined_output_arguments(const RecordOptions& options) {
+  return {"-map",
           "0:v:0",
           "-map",
           "1:a:0",
@@ -210,6 +197,25 @@ std::vector<std::string> muxer_arguments(const RecordOptions& options) {
           "-b:a",
           kSoundBitrate,
           options.file.string()};
+}
+
+// The sound's file, as raw samples of the mix.
+std::vector<std::string> sound_input_arguments(const RecordOptions& options) {
+  return {"-f",  kRawSound,
+          "-ar", std::to_string(kRecordSampleRate),
+          "-ac", std::to_string(kRecordChannels),
+          "-i",  sound_file(options).string()};
+}
+
+}  // namespace
+
+std::vector<std::string> muxer_arguments(const RecordOptions& options) {
+  std::vector<std::string> arguments = {kEncoderProgram, "-y", "-loglevel",
+                                        "error",         "-i", pictures_file(options).string()};
+  for (const auto& part : {sound_input_arguments(options), joined_output_arguments(options)}) {
+    arguments.insert(arguments.end(), part.begin(), part.end());
+  }
+  return arguments;
 }
 
 std::string shell_command(const std::vector<std::string>& arguments) {

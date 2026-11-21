@@ -168,11 +168,9 @@ class MixedAudio : public AudioSystem {
 // Plays through raylib. Falls back to silence when no audio device is available.
 std::unique_ptr<AudioSystem> create_raylib_audio();
 
-// What a mixdown mixes: interleaved float stereo at `sample_rate`, and the most frames asked for
-// between two updates of the audio (the streams hold that much, fed once an update).
+// What a mixdown mixes: interleaved float stereo at `sample_rate`.
 struct MixdownFormat {
   int sample_rate = 0;
-  int most_frames_per_update = 0;
 };
 
 // A game's audio mixed with no device, the mix pulled a block at a time (a recording's sound):

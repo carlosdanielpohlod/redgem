@@ -42,7 +42,8 @@ class VideoRecorder {
  private:
   void write(const std::uint8_t* pixels, std::size_t bytes);
   void end_encoder();
-  void join_sound();
+  bool sound_joinable(const SoundTrack& sound) const;
+  void join_sound(SoundTrack& sound);  // (then sound_ goes)
   void keep_pictures_alone();
 
   RecordOptions options_;

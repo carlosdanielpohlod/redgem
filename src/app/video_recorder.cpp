@@ -53,17 +53,21 @@ void VideoRecorder::add_sound(AudioMixdown& mixdown) {
 void VideoRecorder::finish() {
   if (!finished()) readback_.drain([this](const std::uint8_t* pixels, std::size_t bytes) { write(pixels, bytes); });
   if (!finished()) end_encoder();
-  if (sound_) join_sound();
+  if (sound_) join_sound(*sound_);
+}
+
+// Whether the video can have the sound: its pictures are whole, and so is some sound.
+bool VideoRecorder::sound_joinable(const SoundTrack& sound) const {
+  return !failed_ && sound.written() && sound.frames() > 0;
 }
 
 // The pictures and the sound into the video. Without the sound (it could not be written, or
 // putting it in failed), the pictures are the video alone. Neither file stays.
-void VideoRecorder::join_sound() {
-  sound_->close();
-  const bool joinable = !failed_ && sound_->written() && sound_->frames() > 0;
-  const bool joined = joinable && runs(muxer_arguments(options_));
+void VideoRecorder::join_sound(SoundTrack& sound) {
+  sound.close();
+  const bool joined = sound_joinable(sound) && runs(muxer_arguments(options_));
   if (!joined) keep_pictures_alone();
-  if (joinable && !joined) log::warning(tr("game.record.no_sound", {{"file", options_.file.string()}}));
+  if (!failed_ && !joined) log::warning(tr("game.record.no_sound", {{"file", options_.file.string()}}));
   std::error_code ignored;
   std::filesystem::remove(sound_file(options_), ignored);
   std::filesystem::remove(pictures_file(options_), ignored);

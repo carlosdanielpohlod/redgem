@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "app/frame_painter.hpp"
 #include "app/game_display.hpp"
@@ -111,6 +112,7 @@ class WindowPresenter final : public Presenter {
   RenderTexture2D recorded_{};
   std::unique_ptr<VideoRecorder> recorder_;
   AudioMixdown* mixdown_ = nullptr;
+  std::vector<float> passed_sound_;  // what pass_sound mixes, thrown away
 
   // While the world is drawn at another size than the window's (DisplaySettings::render_scale):
   // what it is drawn into, before it is stretched over the window.
@@ -128,6 +130,7 @@ class WindowPresenter final : public Presenter {
   bool recording_failed_ = false;
   void start_recording(const RecordOptions& record);
   void stop_recording();
+  void pass_sound();
   void present_recorded(const FrameView& view);
   void present_scaled(const FrameView& view);
   bool fit_scaled(SurfaceSize asked);

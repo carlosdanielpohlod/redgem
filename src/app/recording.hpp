@@ -94,8 +94,6 @@ class SoundClock {
   std::int64_t pictures_ = 0;
   std::int64_t total_ = 0;
 };
-// The most sound frames one picture takes.
-int most_sound_frames(int sample_rate, int fps);
 
 // Where a video with sound is made, next to it: the pictures first, then the sound, which are put
 // together into the video once both are done (and then deleted).

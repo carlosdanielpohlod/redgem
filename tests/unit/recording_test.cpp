@@ -124,11 +124,12 @@ TEST_CASE("each recorded picture takes its share of sound, and the shares never 
     SoundClock clock(kRecordSampleRate, fps);
     const std::int64_t pictures = kHourOfPictures * fps;
     const std::int64_t fewest = kRecordSampleRate / fps;
+    const std::int64_t most = fewest + (kRecordSampleRate % fps == 0 ? 0 : 1);
     std::int64_t sum = 0;
     bool within_one = true;  // no picture takes more than one frame of sound over another
     for (std::int64_t picture = 0; picture < pictures; ++picture) {
       const std::int64_t frames = clock.next();
-      within_one = within_one && frames >= fewest && frames <= most_sound_frames(kRecordSampleRate, fps);
+      within_one = within_one && frames >= fewest && frames <= most;
       sum += frames;
     }
     CHECK(within_one);
@@ -146,7 +147,6 @@ TEST_CASE("sound that does not divide into pictures carries its fraction: 44100 
   std::int64_t sum = 0;
   for (int picture = 0; picture < 7; ++picture) sum += seven.next();
   CHECK(sum == kRecordSampleRate);  // a second of pictures is a second of sound
-  CHECK(most_sound_frames(kRecordSampleRate, 7) == 6858);
 }
 
 TEST_CASE("--record-audio is on or off") {
