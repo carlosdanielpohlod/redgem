@@ -5,6 +5,7 @@
 #include <mruby/variable.h>
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>
@@ -38,7 +39,7 @@ constexpr const char* kWaiting = "waiting";  // a frame of a wait in real second
 
 // The frames at the game's pace that `seconds` of waits in real seconds take.
 long long frames_in(int seconds) {
-  return static_cast<long long>(static_cast<float>(seconds) / config::kFixedDeltaSeconds);
+  return std::llround(static_cast<double>(seconds) / static_cast<double>(config::kFixedDeltaSeconds));
 }
 
 enum class Status { Running, Passed, Failed };
@@ -138,7 +139,7 @@ bool SystemTestRun::timed_out() {
   }
   if (waited_frames_ >= max_waited_frames_) {
     fail("system test timed out after " + std::to_string(max_waited_frames_) +
-         " frames of waits in real seconds (--wait-limit raises it)");
+         " frames of waits in real seconds (run alone, --wait-limit raises it)");
     return true;
   }
   return false;

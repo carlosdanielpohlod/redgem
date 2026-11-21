@@ -163,7 +163,7 @@ TEST_CASE("a system test waits for other programs no longer in all than its wait
   SystemTestOptions options = platformer_test("tests/system/platformer/wait_for_test.rb");
   options.wait_limit_seconds = 1;
   CHECK(run_system_test(options) == 1);
-  CHECK(log.contains("frames of waits in real seconds (--wait-limit raises it)"));
+  CHECK(log.contains("after 60 frames of waits in real seconds (run alone, --wait-limit raises it)"));
   CHECK(run_system_test(platformer_test("tests/system/platformer/wait_for_test.rb")) == 0);
 }
 
