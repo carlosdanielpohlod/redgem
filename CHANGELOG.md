@@ -15,6 +15,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+### Added
+
+- **A manual page for the `multiplayer-levels` template**, "A game of levels played together":
+  what it plays like, its scripts, its levels, playing together, its save and its tests. The
+  first-game, command-line and testing pages and the README list the template.
+
 ### Fixed
 
 - **Network tests count rounds, not real time**: the tests of connections, sessions, relays,

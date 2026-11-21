@@ -141,9 +141,9 @@ scripts first, so the line reopens the game's `Fighter` instead of making a new,
 
 ## The tests a new game comes with
 
-The `third-person`, `top-down` and `menu-only` templates come with tests of their own, in the new
-game's `tests/` folder: system tests that walk the hero, jump, turn the camera, walk to a spot or
-go through the menus, and unit tests of the scripts' arithmetic. They pass as the game is made:
+The `third-person`, `top-down`, `menu-only` and `multiplayer-levels` templates come with tests of
+their own, in the new game's `tests/` folder: system tests that walk the hero, jump, turn the
+camera, walk to a spot, go through the menus or play a quest through two levels, and unit tests of the scripts' arithmetic. They pass as the game is made:
 
 ```bash
 ./build/src/redgem new my_game --template third-person

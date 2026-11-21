@@ -250,10 +250,10 @@ the same pull request.
 - The scripts that record the site's video are not part of the repository.
 - The CI example every new game gets (`.github/workflows/test.yml`) is for GitHub Actions on
   Linux only, and downloads the latest release: a game made from templates newer than that
-  release (the `third-person`, `top-down` and `menu-only` ones, until the next release) may use
-  scripting the release does not have yet. Its system tests run with no window: they take no
-  pictures, and a click lands on no screen (a template's own tests call `walk_to` instead of
-  clicking).
+  release (the `third-person`, `top-down`, `menu-only` and `multiplayer-levels` ones, until the
+  next release) may use scripting the release does not have yet. Its system tests run with no
+  window: they take no pictures, and a click lands on no screen (a template's own tests call
+  `walk_to` instead of clicking).
 - A game's `tests/` folder goes into its builds with the rest of the game (the tests are not run
   there, and the player has no test code).
 - The template scenes are written by `tools/templates/build_template_scenes.py` from the editor's
@@ -293,10 +293,6 @@ real clock.
   joins, navigation baking, async scene frames) or check a lower bound that cannot fail early (a
   save key's bounded wait). Every other test counts rounds or frames, waits for the other thread or
   socket, or runs on a test's clock (`tests/fake_clock.hpp`, `tests/socket_rounds.hpp`).
-
-### Documentation
-
-- No template is a game of several levels with multiplayer: each template has one scene.
 
 ## After 1.0
 

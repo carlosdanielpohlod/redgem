@@ -32,9 +32,10 @@ The templates (the project hub offers the same ones):
 | `third-person` | A hero that walks and jumps, the camera behind it orbited by the mouse or the right stick |
 | `top-down` | A hero seen from above, walked by the keys or the stick or sent to a spot by a click |
 | `menu-only` | A title screen, the engine's settings and controls pages, and rolling credits: no 3D play |
+| `multiplayer-levels` | Two levels played together (host, join or a dedicated server), a spawn point per player, a save, an NPC and a quest (see [A game of levels played together](multiplayer-levels.md)) |
 
-The `third-person`, `top-down` and `menu-only` games come with tests of their own (`tests/`), which
-`redgem check --run-tests` runs. Every new game also comes with `.github/workflows/test.yml`, a
+The `third-person`, `top-down`, `menu-only` and `multiplayer-levels` games come with tests of
+their own (`tests/`), which `redgem check --run-tests` runs. Every new game also comes with `.github/workflows/test.yml`, a
 GitHub Actions workflow that runs them on pushes and pull requests (see
 [Testing your game](testing.md#running-the-tests-on-every-push)).
 
