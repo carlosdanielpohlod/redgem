@@ -620,7 +620,7 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.gradient(x: Numeric, y: Numeric, width: Numeric, height: Numeric, top: Color, bottom: Color, alpha: Integer = 255, anchor: Symbol | nil = nil) -> void`: draws a rectangle that goes from the top color to the bottom one *Experimental.*
 - `UI.image_size(String | Symbol name) -> [Integer, Integer] | nil`: a picture's [width, height] in its own pixels; nil when there is none *Experimental.*
 - `UI.theme -> UI::Theme`: the theme widgets are drawn with now *Experimental.*
-- `UI.theme = Hash[Symbol, untyped] | nil changes`: changes the engine's look for every widget; nil goes back to it; raises ArgumentError on a wrong key or value *Experimental.*
+- `UI.theme = Hash[Symbol, untyped] | nil changes`: changes the engine's look for every widget (a font it names becomes UI.font); nil goes back to it; raises ArgumentError on a wrong key or value *Experimental.*
 - `UI.with_theme(UI::Theme theme) { () -> void } -> void`: draws what the block draws with another theme *Experimental.*
 - `UI.shifted(x: Numeric = 0, y: Numeric = 0, alpha: Numeric = 1.0) { () -> void } -> void`: draws what the block draws moved and at a share of its opacity; the pointer follows *Experimental.*
 - `UI.draw_button(String label, Hash[Symbol, Numeric] box, UI::ButtonState state, Hash[Symbol, untyped] look = {}) -> void`: draws a button in a box as the theme says, without hearing the mouse or the keys *Experimental.*

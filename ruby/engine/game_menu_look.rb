@@ -32,7 +32,9 @@ class GameMenu < Behaviour
     end
 
     # The background (or what `custom` draws instead), the logo and the footer.
+    # (A camera path taken by something else since, such as Camera.follow, flies again.)
     def backdrop(custom)
+      fly(@path.path) if @path && !flying?(@path.path)
       theme = UI.theme
       custom ? custom.call : background(theme)
       logo(theme[:logo])
@@ -142,18 +144,42 @@ class GameMenu < Behaviour
       values.reduce(shown) { |filled, (name, value)| filled.gsub("{#{name}}", value) }
     end
 
+    # The game's track playing before the menu's is kept, to give back when the menu closes.
     def play_music(music)
       name = music[:name]
-      return if name.nil? || @music&.first == name
+      return if same_music?(name)
 
-      @music = [name, music[:fade]] if Audio.music(name, volume: music[:volume], fade: music[:fade])
+      game_track = track_before_menu
+      return unless Audio.music(name, volume: music[:volume], fade: music[:fade])
+
+      keep_music(name, music[:fade], game_track)
     end
 
+    # Whether a screen's music is what plays already: none, or the menu's track.
+    def same_music?(name) = name.nil? || @music&.first == name
+
+    def track_before_menu = @music ? @game_track : Audio.__track
+
+    def keep_music(name, fade, game_track)
+      @music = [name, fade]
+      @game_track = game_track
+    end
+
+    # Only the menu's own track ends (one the game started since plays on), and the game's comes back.
     def stop_music
       return unless @music
 
-      Audio.stop_music(fade: @music.last)
-      @music = nil
+      give_back_music(@music.last) if menus_track_playing?
+      @music = @game_track = nil
+    end
+
+    def menus_track_playing? = Audio.__track&.first == @music.first.to_s
+
+    def give_back_music(fade)
+      return Audio.stop_music(fade: fade) unless @game_track
+
+      name, loop, volume = @game_track
+      Audio.music(name, loop: loop, volume: volume, fade: fade)
     end
 
     # The scene behind a screen: blurred as its theme says, seen from a camera on a path when it has one.
@@ -173,7 +199,7 @@ class GameMenu < Behaviour
     end
 
     def fly(path)
-      return if @path&.flies?(path) || Camera.main.nil?
+      return if Camera.main.nil? || flying?(path)
 
       land
       rig = Camera.__rig("GameMenu's camera path")
@@ -181,11 +207,15 @@ class GameMenu < Behaviour
       rig.motion = @path
     end
 
-    def land
-      return unless @path
+    # Whether the camera flies that path now: something else (Camera.follow) may have taken it since.
+    def flying?(path) = @path&.flies?(path) && Camera.__current_rig&.motion.equal?(@path)
 
-      @path.give_back(Camera.__current_rig, Camera.main&.transform)
+    # (A camera that went with its scene has nothing to give back to.)
+    def land
+      @path.give_back(Camera.__current_rig, Camera.main.transform) if @path && camera_alive?
       @path = nil
     end
+
+    def camera_alive? = Camera.main&.alive?
   end
 end

@@ -5,6 +5,8 @@
 # the camera back where it was, to what moved it before.
 class GameMenu < Behaviour
   class CameraPath
+    attr_reader :path   # the theme's camera_path it flies
+
     def initialize(path, motion_was, transform)
       @path = path
       @motion_was = motion_was

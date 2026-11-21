@@ -56,6 +56,11 @@ class UiThemeTest < RedGemTest::Case
     assert_includes_text problems[2], "colors.text must be a color"
   end
 
+  def test_no_margin_is_less_than_nothing
+    _, problems = UI::Theme.read({ layout: { margins: [0, -10, 0, 0] } })
+    assert_includes_text problems.first, "layout.margins must be a number, 0 or more, or [top, right, bottom, left]"
+  end
+
   def test_a_section_must_be_a_table
     _, problems = UI::Theme.read({ colors: :red })
     assert_includes_text problems.first, "theme.colors must be a table of settings"
@@ -93,6 +98,8 @@ class UiThemeTest < RedGemTest::Case
     _, problems = UI::Theme.read_menu("theme" => {}, "colours" => {}, "screens" => { "pause" => { "x" => 1 } })
     assert_includes_text problems[0], "colours is not a menu setting"
     assert_includes_text problems[1], "screens.pause.x is not a theme setting"
+    _, wrong = UI::Theme.read_menu("screens" => [])
+    assert_equal ["screens must be a table of settings (a Hash)"], wrong
   end
 
   def test_the_files_a_layer_names_are_listed_by_folder
@@ -127,6 +134,7 @@ class UiThemeTest < RedGemTest::Case
     columns = UI.slices(64, 100, 200)
     assert_equal [[0, 10, 100, 10], [10, 44, 110, 180], [54, 10, 290, 10]], columns
     assert_equal 4, UI.slices(8, 0, 40).first[1], "no corner larger than half the picture"
+    refute UI.slice_shows?(UI.slices(20, 0, 40)[1]), "a picture of only corners has no middle"
     assert_equal [[0, 10, 0, 6], [10, 44, 6, 0], [54, 10, 6, 6]], UI.slices(64, 0, 12), "smaller, whole corners"
   end
 

@@ -209,8 +209,9 @@ module UI
 
       def known?(key) = MENU_KEYS.include?(key.to_s)
 
-      def refused(result)
-        @problems << "must be a table of settings (a Hash)"
+      # (`where`: the key it is under; none for the whole section.)
+      def refused(result, where = nil)
+        @problems << [where, "must be a table of settings (a Hash)"].compact.join(" ")
         { theme: result, screens: {} }
       end
 
@@ -222,7 +223,7 @@ module UI
 
       def screens(given)
         return {} if given.nil?
-        return refused({})[:screens] unless given.is_a?(Hash)
+        return refused({}, "screens")[:screens] unless given.is_a?(Hash)
 
         read = {}
         given.each { |name, value| read[name.to_s] = layer(value, "screens.#{name}") }

@@ -4002,7 +4002,7 @@
             {"name": "changes", "type": "Hash[Symbol, untyped] | nil"}
           ],
           "returns": {"type": "Hash[Symbol, untyped] | nil"},
-          "about": "changes the engine's look for every widget; nil goes back to it; raises ArgumentError on a wrong key or value",
+          "about": "changes the engine's look for every widget (a font it names becomes UI.font); nil goes back to it; raises ArgumentError on a wrong key or value",
           "example": "UI.theme = { colors: { button: :blue }, button: { radius: 0 } }"
         },
         {
@@ -4091,6 +4091,7 @@
         "mouse_over?",
         "nine_slice",
         "overlap",
+        "own_fill?",
         "padding",
         "paragraphs",
         "placed",
@@ -4106,8 +4107,10 @@
         "shifted_box",
         "shifted_point",
         "shifts",
+        "shown_slices",
         "sideways",
         "slice",
+        "slice_shows?",
         "slices",
         "slider_at",
         "slider_bar",

@@ -23,7 +23,7 @@ module UI
         color: "a color (a name such as \"gold\", \"#rrggbb\" or [r, g, b])", colors: "a list of two colors",
         image: "a picture of images/ (its name)", sound: "a sound of sounds/ (its name)", text: "a text",
         group: "an audio group's name (such as \"effects\")", icons: "a table of option names and pictures",
-        margins: "a number, or [top, right, bottom, left]", points: "a list of points ([x, y, z] each)",
+        margins: "a number, 0 or more, or [top, right, bottom, left]", points: "a list of points ([x, y, z] each)",
         point: "a point ([x, y, z])"
       }.freeze
 
@@ -131,7 +131,7 @@ module UI
         sides?(value) ? value : BAD
       end
 
-      def self.sides?(value) = list?(value, [SIDES]) && value.all? { |side| number?(side) }
+      def self.sides?(value) = list?(value, [SIDES]) && value.all? { |side| number?(side) && !side.negative? }
 
       def self.read_point(value)
         return value if value.is_a?(Vector3)

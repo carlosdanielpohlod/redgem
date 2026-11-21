@@ -27,7 +27,7 @@ module UI
   # theme's unless given.
   def self.draw_button(label, box, state, look = {})
     focus_ring(box) if state.focused?
-    face(box, button_fill(state, look), button_skin(state))
+    face(box, button_fill(state, look), button_skin(state, look))
     size = look[:size] || label_size(box[:height])
     x = centered(box[:x], box[:width], 0)
     x = button_icon(look[:icon], box, label, size) if look[:icon]
@@ -65,7 +65,13 @@ module UI
   end
 
   # The skin of a state: its own, else the button's (nil: drawn as a rounded box).
-  def self.button_skin(state)
+  # Whether a button was given colors of its own, which a theme's skin would hide.
+  def self.own_fill?(look) = look[:color] || look[:hover_color]
+
+  # The theme's skin for a state (nil when the button has colors of its own).
+  def self.button_skin(state, look = {})
+    return if own_fill?(look)
+
     own = theme[:button, :"skin_#{state.name}"] if %i[focused pressed disabled].include?(state.name)
     own || theme[:button, :skin]
   end
@@ -104,9 +110,16 @@ module UI
     size = image_size(name)
     return image(name, **box, alpha: theme[:colors, :button_alpha]) unless size
 
-    columns = slices(size[0], box[:x], box[:width])
-    slices(size[1], box[:y], box[:height]).each { |row| columns.each { |column| slice(name, column, row) } }
+    columns = shown_slices(size[0], box[:x], box[:width])
+    shown_slices(size[1], box[:y], box[:height]).each { |row| columns.each { |column| slice(name, column, row) } }
   end
+
+  def self.shown_slices(picture, start, length) = slices(picture, start, length).select { |part| slice_shows?(part) }
+
+  # Whether a slice has some of the picture and room to draw it: a picture no larger than its
+  # corners has no middle, and neither has a box no larger than them. (A part or a size of 0 would
+  # be read as the whole picture.)
+  def self.slice_shows?(slice) = slice[1].positive? && slice[3].positive?
 
   # The three slices along one side: [from, length in the picture, at, length drawn] each. A box
   # too small for the corners draws them smaller, whole.

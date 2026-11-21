@@ -136,6 +136,43 @@ class GameMenuThemeTest < RedGemTest::Case
     assert_vector points[0], path.at(4.0)
   end
 
+  def test_the_menus_music_gives_the_games_track_back
+    played = with_fake_music do |look|
+      look.__send__(:play_music, MENU_MUSIC)
+      look.__send__(:stop_music)
+    end
+    assert_equal([%w[menu_theme 0.7], %w[level 0.5]], played.map { |name, _, volume| [name, volume.to_s] })
+  end
+
+  def test_a_track_the_game_started_over_the_menus_plays_on
+    played = with_fake_music do |look|
+      look.__send__(:play_music, MENU_MUSIC)
+      Audio.music("boss")
+      look.__send__(:stop_music)
+    end
+    assert_equal %w[menu_theme boss], played.map(&:first)
+  end
+
+  MENU_MUSIC = { name: "menu_theme", volume: 0.7, fade: 1.0 }.freeze
+
+  # What Audio.music was asked to play while the block ran, with "level" playing before it (no
+  # sound file is needed: Audio's two calls are stood in for).
+  def with_fake_music
+    played = []
+    fake_music(played)
+    yield GameMenu::Look.new(nil)
+    played
+  ensure
+    Audio.singleton_class.__send__(:alias_method, :__music, :__real_music)
+    Audio.instance_variable_set(:@track, nil)
+  end
+
+  def fake_music(played)
+    Audio.instance_variable_set(:@track, ["level", true, 0.5])
+    Audio.singleton_class.__send__(:alias_method, :__real_music, :__music)
+    Audio.define_singleton_method(:__music) { |*asked| played << asked }
+  end
+
   # Where a camera would be, for a path made with no scene around it.
   class Transformless
     def position = Vector3.zero

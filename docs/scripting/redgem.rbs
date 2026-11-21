@@ -1291,7 +1291,7 @@ module UI
   # the theme widgets are drawn with now
   %a{redgem:experimental}
   def self.theme: () -> UI::Theme
-  # changes the engine's look for every widget; nil goes back to it; raises ArgumentError on a wrong key or value
+  # changes the engine's look for every widget (a font it names becomes UI.font); nil goes back to it; raises ArgumentError on a wrong key or value
   %a{redgem:experimental}
   def self.theme=: (Hash[Symbol, untyped] | nil changes) -> (Hash[Symbol, untyped] | nil)
   # draws what the block draws with another theme

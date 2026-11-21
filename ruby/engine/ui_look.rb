@@ -10,11 +10,12 @@ module UI
   # The theme widgets are drawn with now: the one UI.with_theme gives, or the game's.
   def self.theme = themes.last || base_theme
 
-  # The game's changes to the engine's look, for every widget (nil goes back to it). Raises an
-  # ArgumentError that says what is wrong with a key or a value.
+  # The game's changes to the engine's look, for every widget (nil goes back to it); a font it
+  # names becomes UI.font. Raises an ArgumentError that says what is wrong with a key or a value.
   def self.theme=(changes)
     @theme_layer = Theme.read!(changes)
     @base_theme = nil
+    UI.font = @theme_layer[:font] if @theme_layer[:font]
     Theme.changed
   end
 

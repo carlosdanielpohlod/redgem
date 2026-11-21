@@ -138,7 +138,7 @@ module UI
 
   # A text field's box and what it shows, with the caret after it.
   def self.draw_field(shown, box, color, text_color)
-    color ? face(box, rgb(color), theme[:button, :skin]) : plain_face(box)
+    color ? face(box, rgb(color)) : plain_face(box)   # (a color of its own: not the theme's skin)
     size = label_size(box[:height])
     text(shown + FIELD_CARET, x: box[:x] + padding, y: centered(box[:y], box[:height], size), size: size,
                               color: text_color || theme[:colors, :text])
