@@ -28,7 +28,7 @@ std::string text(const fs::path& file) {
   return read_text_file(file, error).value_or("");
 }
 
-const project_files::Problems kNone = [] { return std::vector<std::string>{}; };
+const project_files::Check kNone = [] { return project_files::Findings{}; };
 }  // namespace
 
 TEST_CASE("file names are small words in folders, and languages are like en or pt-BR") {
@@ -55,8 +55,8 @@ TEST_CASE("write_checked keeps a write that brings no new problem and puts back 
   project_files::write_checked(file, {{"a", 1}}, kNone);
   CHECK(Json::parse(text(file))["a"] == 1);
   int calls = 0;
-  const project_files::Problems second_breaks = [&] {
-    return ++calls == 1 ? std::vector<std::string>{"old"} : std::vector<std::string>{"old", "new"};
+  const project_files::Check second_breaks = [&] {
+    return ++calls == 1 ? project_files::Findings{{"old"}, {}} : project_files::Findings{{"old", "new"}, {}};
   };
   CHECK_THROWS_WITH_AS(project_files::write_checked(file, {{"a", 2}}, second_breaks), doctest::Contains("new"),
                        std::invalid_argument);
@@ -65,4 +65,28 @@ TEST_CASE("write_checked keeps a write that brings no new problem and puts back 
   const fs::path fresh = folder.path / "b.json";
   CHECK_THROWS_AS(project_files::write_checked(fresh, {{"b", 1}}, second_breaks), std::invalid_argument);
   CHECK_FALSE(fs::exists(fresh));
+}
+
+TEST_CASE("write_checked keeps a write that only brings warnings, and tells them") {
+  const Folder folder;
+  const fs::path file = folder.path / "a.json";
+  int calls = 0;
+  const project_files::Check warns = [&] {
+    return ++calls == 1 ? project_files::Findings{{}, {"old"}} : project_files::Findings{{}, {"old", "lacks pt"}};
+  };
+  CHECK(project_files::write_checked(file, {{"a", 1}}, warns) == project_files::Lines{"lacks pt"});
+  CHECK(fs::exists(file));
+}
+
+TEST_CASE("write_checked puts the file back when its check throws") {
+  const Folder folder;
+  const fs::path file = folder.path / "a.json";
+  project_files::write_checked(file, {{"a", 1}}, kNone);
+  int calls = 0;
+  const project_files::Check throws_after = [&]() -> project_files::Findings {
+    if (++calls == 2) throw std::runtime_error("unreadable");
+    return {};
+  };
+  CHECK_THROWS_AS(project_files::write_checked(file, {{"a", 2}}, throws_after), std::runtime_error);
+  CHECK(Json::parse(text(file))["a"] == 1);
 }

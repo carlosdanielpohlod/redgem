@@ -96,6 +96,17 @@ TEST_CASE("project texts lists a language's texts by prefix, bounded, and set_te
   CHECK(has(copy.call({{"action", "texts"}, {"prefix", "tree.hello"}}), "1 texts"));
   CHECK_THROWS_AS(copy.call({{"action", "set_texts"}, {"texts", {{"hud.x", 3}}}}), std::invalid_argument);
   CHECK_THROWS_AS(copy.call({{"action", "texts"}, {"language", "../en"}}), std::invalid_argument);
+  CHECK_THROWS_WITH_AS(copy.call({{"action", "texts"}, {"language", "pt"}}), doctest::Contains("it has: en"),
+                       std::invalid_argument);
+}
+
+TEST_CASE("project set_texts starts a new language, telling the texts it still lacks") {
+  const GameCopy copy;
+  const Json start{{"action", "set_texts"}, {"language", "pt-BR"}, {"texts", {{"hud.coins", "Moedas"}}}};
+  const Json started = copy.call(start);
+  CHECK(has(started, "warnings:"));
+  CHECK(has(started, "tree.hello"));
+  CHECK(fs::exists(copy.game() / "locales" / "pt-BR.json"));
 }
 
 TEST_CASE("project story lists, reads and writes dialogues and quests, refusing broken ones") {

@@ -7,6 +7,7 @@
 #include "core/config.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_assignments.hpp"
+#include "project/scene_command.hpp"
 #include "project/scene_diff.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
@@ -157,8 +158,18 @@ bool drops_unsaved(EditorSession& session, const std::string& action, const Json
   return action == "open_scene" && session.document().dirty() && !args.value("discard", false);
 }
 
+// Whether open_scene names a scene the game has: only those are opened (no path out of the game).
+bool names_no_scene(const EditorSession& session, const std::string& action, const Json& args) {
+  if (action != "open_scene") return false;
+  const auto names = scene_names(session.game_dir());
+  return std::find(names.begin(), names.end(), args["scene"].get<std::string>()) == names.end();
+}
+
 void require_scene_change(EditorSession& session, const std::string& action, const Json& args) {
   require_editable(session, false);
+  if (names_no_scene(session, action, args))
+    throw std::invalid_argument("the game has no scene called " + args["scene"].get<std::string>() +
+                                "; project action=scenes lists them");
   if (drops_unsaved(session, action, args))
     throw std::invalid_argument("the open scene has unsaved edits: save first, or pass discard=true to drop them");
 }

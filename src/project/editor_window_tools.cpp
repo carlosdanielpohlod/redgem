@@ -60,8 +60,15 @@ void change_scene(EditorApp& app, const std::string& action, const std::string& 
   app.rescan_files();
 }
 
+// Whether open_scene names the scene already open, with nothing to drop: then it stays as it is,
+// its undo history too, as the Project panel leaves it.
+bool opens_open_scene(EditorApp& app, const std::string& action, const mcp::Json& args) {
+  return action == "open_scene" && args["scene"] == app.session().scene_name() && !args.value("discard", false);
+}
+
 void act(EditorApp& app, const std::string& action, const mcp::Json& args) {
   if (action == "frame") return frame(app);
+  if (opens_open_scene(app, action, args)) return;
   if (args.contains("scene")) return change_scene(app, action, args["scene"]);
   advance(app, action);
 }

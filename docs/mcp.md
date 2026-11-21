@@ -154,8 +154,10 @@ changed, with its id, so the next call can name it by `#id`.
 
 Every write is checked as `game_check` checks the game: `game.json` for its physics, input and
 menu sections (the menu theme's keys and values, and the fonts, pictures and sounds it names; see
-[Giving the menu your game's look](scripting/gameplay.md#giving-the-menu-your-games-look)), the locales, dialogues and quests for what they name of each other. A write that brings a
-problem the game did not have is refused, with the problems, and the file stays as it was. The
+[Giving the menu your game's look](scripting/gameplay.md#giving-the-menu-your-games-look)), the locales, dialogues and quests for what they name of each other. A write that brings an
+error the game did not have is refused, with the errors, and the file stays as it was. The
+warnings it brings, such as texts a new language still lacks, come with the answer. An item is
+checked only through the quests that name it. The
 `changes`, `texts` and `content` objects are free-form; the checks, not the schema, judge them.
 
 ## Live editor

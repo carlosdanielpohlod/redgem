@@ -809,7 +809,9 @@ TEST_CASE("open_scene asks for discard over unsaved edits, and both scene action
     asked.push_back(action);
     return mcp::tool_result("done");
   };
-  const Json open{{"action", "open_scene"}, {"scene", "cave"}};
+  const Json open{{"action", "open_scene"}, {"scene", "main"}};
+  CHECK_FALSE(
+      ok(invoke_editor(session, "editor", {{"action", "open_scene"}, {"scene", "../../elsewhere"}}, false, window)));
   CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "open_scene"}}, false, window)));
   CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "status"}, {"scene", "cave"}}, false, window)));
   CHECK_FALSE(ok(

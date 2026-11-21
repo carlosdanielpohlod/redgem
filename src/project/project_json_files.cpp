@@ -42,15 +42,25 @@ void put_back(const fs::path& file, const std::optional<std::string>& before) {
   fs::remove(file, ignored);
 }
 
-std::vector<std::string> new_ones(const std::vector<std::string>& before, const std::vector<std::string>& after) {
-  std::vector<std::string> added;
+Lines new_ones(const Lines& before, const Lines& after) {
+  Lines added;
   for (const auto& line : after) {
     if (std::find(before.begin(), before.end(), line) == before.end()) added.push_back(line);
   }
   return added;
 }
 
-std::string lines(const std::vector<std::string>& problems) {
+// What `check` finds of the file just written; the file put back as it was when it throws.
+Findings checked_or_put_back(const fs::path& file, const std::optional<std::string>& before, const Check& check) {
+  try {
+    return check();
+  } catch (...) {
+    put_back(file, before);
+    throw;
+  }
+}
+
+std::string lines(const Lines& problems) {
   std::string text;
   for (const auto& problem : problems) text += (text.empty() ? "" : "\n") + problem;
   return text;
@@ -66,12 +76,13 @@ Json read_object(const fs::path& file) {
   return value;
 }
 
-void write_checked(const fs::path& file, const Json& value, const Problems& problems) {
+Lines write_checked(const fs::path& file, const Json& value, const Check& check) {
   const auto before = contents(file);
-  const std::vector<std::string> known = problems();
+  const Findings known = check();
   write_text(file, value.dump(kIndent) + "\n");
-  const std::vector<std::string> added = new_ones(known, problems());
-  if (added.empty()) return;
+  const Findings now = checked_or_put_back(file, before, check);
+  const Lines added = new_ones(known.errors, now.errors);
+  if (added.empty()) return new_ones(known.warnings, now.warnings);
   put_back(file, before);
   throw std::invalid_argument("not written, as it would make the game wrong:\n" + lines(added));
 }

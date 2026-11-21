@@ -16,7 +16,7 @@ namespace redgem::tools::mcp {
 namespace {
 
 namespace fs = std::filesystem;
-using Lines = std::vector<std::string>;
+using project_files::Lines;
 
 constexpr int kIndent = 2;
 constexpr std::size_t kDefaultTexts = 50;
@@ -39,18 +39,27 @@ std::string text_of(const Json& args, const char* key, const char* fallback) {
 
 // --- game.json -------------------------------------------------------------------------------
 
+project_files::Findings findings_of(const CheckReport& report) { return {report.errors, report.warnings}; }
+
 // What game.json says that the game cannot use, as `redgem check` says it, and its input
-// section's bindings that read as nothing.
-Lines settings_problems(const fs::path& game) {
+// section's bindings that read as nothing (errors: those bindings are dropped).
+project_files::Findings settings_findings(const fs::path& game) {
   CheckReport report;
   check_game_file(game, report);
   check_menu(game, report);
-  Lines problems = report.errors;
-  problems.insert(problems.end(), report.warnings.begin(), report.warnings.end());
   const Json settings = project_files::read_object(game / kGameSettingsFile);
-  if (settings.contains(kInputSection)) input_map_from_json(settings[kInputSection], problems);
-  return problems;
+  if (settings.contains(kInputSection)) input_map_from_json(settings[kInputSection], report.errors);
+  return findings_of(report);
 }
+
+Lines all_of(const project_files::Findings& findings) {
+  Lines lines = findings.errors;
+  lines.insert(lines.end(), findings.warnings.begin(), findings.warnings.end());
+  return lines;
+}
+
+// What a write leaves to look at: the warnings it brought, if any.
+std::string warned(const Lines& warnings) { return warnings.empty() ? "" : "\nwarnings:\n" + joined(warnings); }
 
 // The whole file, or the one section asked for ("menu": how the game's menus look).
 Json settings_shown(const Json& file, const Json& args) {
@@ -62,7 +71,7 @@ Json settings_shown(const Json& file, const Json& args) {
 
 Json settings(const Options& options, const Json& args) {
   const Json file = project_files::read_object(options.game / kGameSettingsFile);
-  const Lines problems = settings_problems(options.game);
+  const Lines problems = all_of(settings_findings(options.game));
   std::string text = settings_shown(file, args).dump(kIndent) + "\n";
   if (!problems.empty()) text += "problems:\n" + joined(problems);
   return tool_result(text);
@@ -75,8 +84,8 @@ Json set_settings(const Options& options, const Json& args) {
   const fs::path file = options.game / kGameSettingsFile;
   Json merged = project_files::read_object(file);
   merged.merge_patch(args["changes"]);
-  project_files::write_checked(file, merged, [&] { return settings_problems(options.game); });
-  return tool_result("game.json is now:\n" + merged.dump(kIndent));
+  const Lines warnings = project_files::write_checked(file, merged, [&] { return settings_findings(options.game); });
+  return tool_result("game.json is now:\n" + merged.dump(kIndent) + warned(warnings));
 }
 
 // --- locales ---------------------------------------------------------------------------------
@@ -102,8 +111,27 @@ std::string texts_header(const std::string& language, std::size_t matched, std::
   return header + "\n";
 }
 
+// The languages the game has texts in ("en", "pt-BR").
+Lines languages(const Options& options) {
+  Lines names;
+  std::error_code missing;
+  for (const auto& file : fs::directory_iterator(options.game / config::kLocalesDirName, missing)) {
+    if (file.path().extension() == kJsonExtension) names.push_back(file.path().stem().string());
+  }
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+std::string listed(const Lines& names) {
+  std::string text;
+  for (const auto& name : names) text += (text.empty() ? "" : ", ") + name;
+  return text.empty() ? "none" : text;
+}
+
 Json texts(const Options& options, const Json& args) {
   const std::string language = language_of(args);
+  if (!fs::exists(locale_file(options, language)))
+    throw wrong("the game has no texts in " + language + "; it has: " + listed(languages(options)));
   const Json file = project_files::read_object(locale_file(options, language));
   const std::string prefix = text_of(args, "prefix", "");
   const std::size_t most = args.value("limit", kDefaultTexts);
@@ -124,13 +152,11 @@ void check_texts(const Json& changes) {
 }
 
 // What the game's check says of its dialogues and quests, whose texts are keys of the locales.
-Lines story_problems(const fs::path& game) {
+project_files::Findings story_findings(const fs::path& game) {
   CheckReport report;
   check_dialogues(game, report);
   check_quests(game, report);
-  Lines problems = report.errors;
-  problems.insert(problems.end(), report.warnings.begin(), report.warnings.end());
-  return problems;
+  return findings_of(report);
 }
 
 Json set_texts(const Options& options, const Json& args) {
@@ -140,8 +166,9 @@ Json set_texts(const Options& options, const Json& args) {
   const fs::path file = locale_file(options, language);
   Json merged = project_files::read_object(file);
   merged.merge_patch(args["texts"]);
-  project_files::write_checked(file, merged, [&] { return story_problems(options.game); });
-  return tool_result("locales/" + language + ".json has " + std::to_string(merged.size()) + " texts");
+  const Lines warnings = project_files::write_checked(file, merged, [&] { return story_findings(options.game); });
+  return tool_result("locales/" + language + ".json has " + std::to_string(merged.size()) + " texts" +
+                     warned(warnings));
 }
 
 // --- dialogues, quests, items ----------------------------------------------------------------
@@ -188,8 +215,9 @@ Json set_story(const Options& options, const Json& args) {
   const fs::path file = story_file(options, args);
   if (!args.contains("content")) throw wrong("set_story needs content: the whole file, as JSON");
   if (replaces_unconfirmed(file, args)) throw wrong("that file is there already; replacing it needs confirm=true");
-  project_files::write_checked(file, args["content"], [&] { return story_problems(options.game); });
-  return tool_result("wrote " + fs::relative(file, options.game).generic_string());
+  const Lines warnings =
+      project_files::write_checked(file, args["content"], [&] { return story_findings(options.game); });
+  return tool_result("wrote " + fs::relative(file, options.game).generic_string() + warned(warnings));
 }
 
 // --- scenes and games ------------------------------------------------------------------------
@@ -208,7 +236,7 @@ Json new_scene(const Options& options, const Json& args) {
 fs::path new_game_folder(const Options& options, const Json& args) {
   const std::string name = text_of(args, "path", "");
   if (!valid_game_name(name)) throw wrong("path must be a folder name: letters, digits, spaces, - and _");
-  const fs::path folder = fs::absolute(options.game).lexically_normal().parent_path() / name;
+  const fs::path folder = fs::weakly_canonical(fs::absolute(options.game)).parent_path() / name;
   if (fs::exists(folder)) throw wrong(folder.string() + " is there already");
   return folder;
 }
