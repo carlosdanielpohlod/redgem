@@ -7,6 +7,8 @@ namespace redgem::config {
 
 // --- Cameras --------------------------------------------------------------------
 inline constexpr float kDefaultFovYDegrees = 45.0f;
+// The view model's (a first-person weapon's) field of view unless the game says.
+inline constexpr float kDefaultViewModelFovYDegrees = 50.0f;
 
 // --- Meshes ---------------------------------------------------------------------
 // Skinning: joints and weights per vertex (glTF), and the most joints one skeleton may have (a

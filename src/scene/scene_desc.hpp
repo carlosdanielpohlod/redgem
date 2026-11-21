@@ -159,6 +159,9 @@ struct CameraDesc {
   float fov_y_radians = 0.0f;
   float near_plane = 0.0f;
   float far_plane = 0.0f;
+  // The view model's field of view (Camera.view_model_fov), apart from the world's; 0 leaves it
+  // to the engine.
+  float view_model_fov_y_radians = 0.0f;
 };
 
 enum class LightType { Directional, Point, Spot };

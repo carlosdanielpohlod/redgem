@@ -51,6 +51,12 @@ the same pull request.
   the physics only: root motion leaves them alone. Root motion is not sent over the network:
   `NetworkSync` sends where the owner's character went, and on the other machines a character
   following a graph received from the owner is not pinned (its root moves in the pose).
+- The view model (`view_model = true`) is drawn over the world in one layer: particles, lights
+  and debug lines are the world's, drawn with the world's field of view (start them at
+  `Camera.from_view_model`), and the weapon is never hidden behind particles. It writes no motion
+  for temporal anti-aliasing: where it is, the frames before count for less, so its edges are
+  smoothed less. The world's ambient occlusion may darken its edges a little. Point and spot
+  lights of the scene do not light it, and its own fill light is fixed (white, from the eye).
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -273,6 +279,7 @@ menu whose look each game sets:
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
 - A first-person weapon drawn with its own field of view that never goes into walls.
+- A character that changes shape (crouching) and will not stand up under a ceiling.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.
 - Rooms of more than 16 machines.

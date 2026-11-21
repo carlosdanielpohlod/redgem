@@ -486,6 +486,22 @@
           "about": "shows or hides it"
         },
         {
+          "name": "view_model?",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it is drawn as the view model (its view_model property), with what is under it"
+        },
+        {
+          "name": "view_model=",
+          "stability": "experimental",
+          "params": [
+            {"name": "value", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "makes it (and what is under it) the view model: a first-person weapon drawn over the world (never into a wall), with Camera.view_model_fov, its own light, no shadow on the world"
+        },
+        {
           "name": "behaviours",
           "stability": "stable",
           "params": [],
@@ -2675,6 +2691,34 @@
           ],
           "returns": {"type": "Numeric"},
           "about": "sets the field of view"
+        },
+        {
+          "name": "view_model_fov",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float | nil"},
+          "about": "the view model's own vertical field of view in degrees (50 unless set), apart from the world's; nil without a camera"
+        },
+        {
+          "name": "view_model_fov=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "degrees", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
+          "about": "sets the view model's field of view (10 to 150 degrees); the world's (fov) does not change it"
+        },
+        {
+          "name": "from_view_model",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "point", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
+          "about": "where a point of the view model (a muzzle socket under the weapon) shows in the world, through the world's field of view: where a muzzle flash or a tracer drawn in the world starts"
         },
         {
           "name": "motion_blur",
