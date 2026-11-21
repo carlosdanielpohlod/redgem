@@ -19,6 +19,7 @@
 #include "net/network_session.hpp"
 #include "integration/swordsman.hpp"
 #include "net/rooms/relay_server.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -26,8 +27,7 @@ using redgem::test::fixture;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of one frame on every machine, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;    // of one frame on every machine (see Lan::round)
 constexpr int kSettleRounds = 90;   // frames for a watched object to close in
 constexpr float kBallStart = 3.0f;  // where the ball's template sits, along x
 constexpr float kNear = 0.05f;      // meters: "the same place" across machines
@@ -82,8 +82,11 @@ struct Lan {
   bool level_from_files = false;
   // A relay the machines may meet on, kept going with them.
   std::unique_ptr<net::RelayServer> relay;
-  // The real time as the machines' networks read it, when not the clock's (set before they start).
-  Stopwatch::Reading network_time;
+  // The real time as the machines' networks read it (set before they start). Unless a test says
+  // otherwise, a round's frame of it: the seconds the network counts (a join that gets no answer,
+  // a place held for a machine that dropped) are the rounds', however fast the computer plays them.
+  Stopwatch::Reading network_time = [this] { return rounds_played * static_cast<double>(config::kFixedDeltaSeconds); };
+  long rounds_played = 0;
 
   Lan() { std::filesystem::remove_all(dir); }
   ~Lan() {
@@ -96,7 +99,7 @@ struct Lan {
     options.game_dir = fixture("games/sandbox");
     options.fixed_step = true;
     if (!level_from_files) options.scene = &scene;
-    if (network_time) options.network_time = network_time;
+    options.network_time = network_time;
     options.save_file = dir / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);
     if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -116,25 +119,35 @@ struct Lan {
     return machine;
   }
 
-  void round() {
-    if (relay) relay->poll(config::kFixedDeltaSeconds);
-    for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
-    std::this_thread::sleep_for(kRoundPause);
-  }
+  // A frame of every machine (and a poll of the relay), then a wait for what they sent to arrive.
+  void round() { rounds_without(nullptr, 1); }
 
   void rounds(int count) {
     for (int i = 0; i < count; ++i) round();
   }
 
-  // Rounds in which `stalled` plays no frame: its network is not read, as if it were busy loading.
-  void rounds_without(const Engine& stalled, int count) {
+  // Rounds in which `stalled` (when there is one) plays no frame: its network is not read, as if it
+  // were busy loading.
+  void rounds_without(const Engine* stalled, int count) {
     for (int i = 0; i < count; ++i) {
+      ++rounds_played;
       if (relay) relay->poll(config::kFixedDeltaSeconds);
       for (auto& machine : machines) {
-        if (machine.get() != &stalled) machine->frame(config::kFixedDeltaSeconds);
+        if (machine.get() != stalled) machine->frame(config::kFixedDeltaSeconds);
       }
-      std::this_thread::sleep_for(kRoundPause);
+      wait_for_sockets(stalled);
     }
+  }
+
+  // Until one of the sockets of the machines that play (and the relay's) is ready.
+  void wait_for_sockets(const Engine* stalled) const {
+    std::vector<net::Watched> watched = relay ? relay->watched() : std::vector<net::Watched>{};
+    for (const auto& machine : machines) {
+      if (machine.get() == stalled) continue;  // (what waits for it would end every wait at once)
+      const std::vector<net::Watched> theirs = machine->network().watched();
+      watched.insert(watched.end(), theirs.begin(), theirs.end());
+    }
+    test::wait_for_sockets({watched});
   }
 
   bool until(const std::function<bool()>& done) {
@@ -878,7 +891,7 @@ TEST_CASE("the host waits for a machine slow to load the level, and lets go one 
 
   // Late within the timeout: nobody plays the level until the slow machine has it too.
   ruby(*host, "Game.load_scene('level2')");
-  lan.rounds_without(slow, kWithinTimeoutFrames);  // (the others have the level by then)
+  lan.rounds_without(&slow, kWithinTimeoutFrames);  // (the others have the level by then)
   CHECK(ruby(*host, "Network.changing_level?") == "true");
   CHECK(ruby(*quick, "[Game.scene_name, Network.changing_level?].inspect") == "[\"level2\", true]");
   REQUIRE(lan.until([&] { return plays(*host, "level2") && plays(*quick, "level2") && plays(slow, "level2"); }));
@@ -886,7 +899,7 @@ TEST_CASE("the host waits for a machine slow to load the level, and lets go one 
 
   // Late past it: the others play on without it, and it is let go.
   ruby(*host, "Game.load_scene('main')");
-  lan.rounds_without(slow, kPastTimeoutFrames);
+  lan.rounds_without(&slow, kPastTimeoutFrames);
   CHECK(plays(*host, "main"));
   CHECK(plays(*quick, "main"));
   // (The handlers of $log ended with the first level: what is left of the game says who is there.)
@@ -947,7 +960,7 @@ TEST_CASE("in a room on a relay, the opener's game lets go a machine past the le
   lan.round();
   watch_level_changes({&opener, &quick, &slow});
   ruby(opener, "Game.load_scene('level2')");
-  lan.rounds_without(slow, kPastTimeoutFrames);
+  lan.rounds_without(&slow, kPastTimeoutFrames);
   CHECK(plays(opener, "level2"));
   CHECK(plays(quick, "level2"));
   CHECK(ruby(opener, "Network.peers.inspect") == "[2]");

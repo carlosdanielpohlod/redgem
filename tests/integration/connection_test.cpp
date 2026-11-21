@@ -1,12 +1,12 @@
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <functional>
 #include <optional>
-#include <thread>
+#include <vector>
 
 #include "integration/wire_text.hpp"
 #include "net/connection.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem::net;
@@ -15,8 +15,7 @@ using redgem::test::wire_frame;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of pumping, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of pumping, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr std::size_t kBigTextBytes = 300 * 1024;  // more than one read or write takes
 constexpr int kMoreThanAPoll = 3 * kMaxMessagesPerPoll / 2;
@@ -32,10 +31,11 @@ constexpr std::uint8_t kTooLongAnnounced[kLengthBytes] = {0x7F, 0x00, 0x00, 0x00
 constexpr const char* kTinyMessage = R"({"k":"m","n":"x"})";
 constexpr float kArrivalWaitSeconds = 3.0f;  // far longer than a message on this machine takes
 
-bool until(const std::function<bool()>& done) {
+// Tries `done` until it is, waiting between two tries for one of `sockets` to be ready.
+bool until(const std::vector<Watched>& sockets, const std::function<bool()>& done) {
   for (int round = 0; round < kMaxRounds; ++round) {
     if (done()) return true;
-    std::this_thread::sleep_for(kRoundPause);
+    redgem::test::wait_for_sockets({sockets});
   }
   return false;
 }
@@ -51,7 +51,7 @@ struct BothEnds {
     REQUIRE_MESSAGE(listener.valid(), error);
     caller = Connection::calling(Socket::connect_to(kLocalhost, listener.local_port(), error));
     Socket taken;
-    REQUIRE(until([&] { return listener.accept(taken) == IoStatus::Ok; }));
+    REQUIRE(until({{&listener}}, [&] { return listener.accept(taken) == IoStatus::Ok; }));
     taker = Connection::accepted(std::move(taken), taker_pending_limit);
     // (Each side's first words say the protocol's version, as a connection's always do.)
     caller.send(wire::hello());
@@ -63,7 +63,7 @@ struct BothEnds {
   // The messages `to` takes, pumping both ends until there are `wanted` of them.
   std::vector<nlohmann::json> heard_by(Connection& to, std::size_t wanted) {
     std::vector<nlohmann::json> heard;
-    until([&] {
+    until(watched(), [&] {
       caller.pump();
       taker.pump();
       while (const auto message = to.next_message()) heard.push_back(*message);
@@ -71,6 +71,8 @@ struct BothEnds {
     });
     return heard;
   }
+
+  std::vector<Watched> watched() const { return {caller.watched(), taker.watched()}; }
 };
 
 // One end as a Connection, the other a plain socket that says whatever it likes.
@@ -85,9 +87,9 @@ struct WithStranger {
     REQUIRE_MESSAGE(listener.valid(), error);
     stranger = Socket::connect_to(kLocalhost, listener.local_port(), error);
     Socket taken;
-    REQUIRE(until([&] { return listener.accept(taken) == IoStatus::Ok; }));
+    REQUIRE(until({{&listener}}, [&] { return listener.accept(taken) == IoStatus::Ok; }));
     taker = Connection::accepted(std::move(taken));
-    REQUIRE(until([this] { return stranger.connect_status() == IoStatus::Ok; }));
+    REQUIRE(until({{&stranger, true}}, [this] { return stranger.connect_status() == IoStatus::Ok; }));
   }
 
   // A stranger that has said its first words already, as the tests below need.
@@ -109,7 +111,7 @@ struct WithStranger {
   nlohmann::json heard_by_stranger() {
     FrameBuffer heard;
     std::optional<std::string> bytes;
-    until([&] {
+    until(watched(), [&] {
       taker.pump();
       std::vector<std::uint8_t> arrived;
       stranger.read(arrived, kBigTextBytes);
@@ -121,13 +123,16 @@ struct WithStranger {
   }
 
   void write(std::vector<std::uint8_t> bytes) {
-    REQUIRE(until([&] { return stranger.write(bytes) == IoStatus::Ok; }));
+    REQUIRE(until({{&stranger, true}}, [&] { return stranger.write(bytes) == IoStatus::Ok; }));
   }
+
+  // Both ends: what arrives for the stranger, and the taker.
+  std::vector<Watched> watched() const { return {{&stranger}, taker.watched()}; }
 
   // Takes messages until the stranger is seen to have hung up; how many there were.
   int messages_until_gone() {
     int taken = 0;
-    REQUIRE(until([&] {
+    REQUIRE(until(watched(), [&] {
       taker.pump();
       ++pumps;
       while (taker.next_message()) ++taken;
@@ -139,7 +144,7 @@ struct WithStranger {
   // Pumps until `bytes` more have arrived (or the other side is seen to have hung up).
   void take_in(std::size_t bytes) {
     std::size_t arrived = 0;
-    REQUIRE(until([&] {
+    REQUIRE(until(watched(), [&] {
       arrived += taker.pump();
       return arrived >= bytes;
     }));
@@ -194,7 +199,7 @@ TEST_CASE("a call nobody answers is a closed connection") {
   listener.close();
   Connection caller = Connection::calling(Socket::connect_to(kLocalhost, port, error));
   caller.send({{"k", "h"}});
-  CHECK(until([&caller] {
+  CHECK(until({caller.watched()}, [&caller] {
     caller.pump();
     return caller.closed();
   }));
@@ -262,7 +267,7 @@ TEST_CASE("half a message from a machine that hung up is nothing to wait for") {
   half.pop_back();
   pair.write(half);
   pair.stranger.close();
-  CHECK(until([&pair] {
+  CHECK(until(pair.watched(), [&pair] {
     pair.taker.pump();
     return pair.taker.closed();
   }));
@@ -279,7 +284,7 @@ TEST_CASE("a connection that is closed forgets what was not taken, and hangs up"
   CHECK_FALSE(pair.taker.next_message().has_value());
   CHECK(pair.taker.held() == 0);
   std::vector<std::uint8_t> ignored;
-  CHECK(until([&] { return pair.stranger.read(ignored, kBigTextBytes) == IoStatus::Closed; }));
+  CHECK(until(pair.watched(), [&] { return pair.stranger.read(ignored, kBigTextBytes) == IoStatus::Closed; }));
 }
 
 TEST_CASE("a machine that stopped listening is let go once too much waits to be sent to it") {
@@ -297,15 +302,23 @@ TEST_CASE("a machine that stopped listening is let go once too much waits to be 
 TEST_CASE("a quiet connection says it is there; a silent one is given up on") {
   BothEnds ends;
   // The taker hears nothing but keeps saying "I am here": the caller, which hears that, stays.
-  for (float waited = 0.0f; waited < kSilenceTimeoutSeconds + kQuietStep; waited += kQuietStep) {
-    ends.taker.keep_in_touch(kQuietStep);
-    std::this_thread::sleep_for(kRoundPause);
+  int pings = 0;
+  const auto hear_pings = [&ends, &pings] {
     ends.caller.pump();
     ends.caller.keep_in_touch(0.0f);
+    while (const auto message = ends.caller.next_message()) pings += (*message)["k"] == "i" ? 1 : 0;
+  };
+  for (float waited = 0.0f; waited < kSilenceTimeoutSeconds + kQuietStep; waited += kQuietStep) {
+    ends.taker.keep_in_touch(kQuietStep);
+    redgem::test::wait_for_sockets({ends.watched()});
+    hear_pings();
   }
   CHECK(ends.taker.closed());  // nothing ever came from the caller
-  int pings = 0;
-  while (const auto message = ends.caller.next_message()) pings += (*message)["k"] == "i" ? 1 : 0;
+  // (Every ping it sent before it gave up arrives, however late.)
+  CHECK(until(ends.watched(), [&] {
+    hear_pings();
+    return ends.caller.closed();
+  }));
   CHECK(pings == kPingsBeforeGivingUp);
 }
 
@@ -340,11 +353,11 @@ TEST_CASE("to a machine that called, the first words of another version are a re
   Socket listener = Socket::listen_on(0, error);
   Connection caller = Connection::calling(Socket::connect_to(kLocalhost, listener.local_port(), error));
   Socket host;
-  REQUIRE(until([&] { return listener.accept(host) == IoStatus::Ok; }));
+  REQUIRE(until({{&listener}}, [&] { return listener.accept(host) == IoStatus::Ok; }));
   std::vector<std::uint8_t> welcome = wire_frame(R"({"k":"w","t":"two","v":7})");
-  REQUIRE(until([&] { return host.write(welcome) == IoStatus::Ok && welcome.empty(); }));
+  REQUIRE(until({{&host, true}}, [&] { return host.write(welcome) == IoStatus::Ok && welcome.empty(); }));
   std::optional<nlohmann::json> heard;
-  REQUIRE(until([&] {
+  REQUIRE(until({caller.watched()}, [&] {
     caller.pump();
     heard = caller.next_message();
     return heard.has_value();
@@ -353,7 +366,7 @@ TEST_CASE("to a machine that called, the first words of another version are a re
   CHECK(wire::protocol_of(*heard) == 7);
   // A message after the first is read as this version's, and in the wrong shape closes the connection.
   ends.taker.send({{wire::kKind, wire::kGameMessage}, {wire::kName, "x"}, {wire::kTo, "two"}});
-  CHECK(until([&ends] {
+  CHECK(until(ends.watched(), [&ends] {
     ends.taker.pump();
     ends.caller.pump();
     ends.caller.next_message();

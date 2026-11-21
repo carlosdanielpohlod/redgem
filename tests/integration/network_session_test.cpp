@@ -1,11 +1,10 @@
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <functional>
-#include <thread>
 
 #include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem::net;
@@ -13,9 +12,8 @@ using redgem::test::wire_frame;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
-constexpr float kRoundSeconds = 0.001f;
+constexpr int kMaxRounds = 3000;          // of polling, each after a wait for the sockets (see socket_rounds.hpp)
+constexpr float kRoundSeconds = 0.001f;   // what a round tells the sessions went by
 constexpr float kPastJoinTimeout = 6.0f;  // seconds: longer than a join waits
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr int kFirstGuest = kHostId + 1;
@@ -30,7 +28,6 @@ constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep
 constexpr std::size_t kShownBytes = 60;          // of a bad message, when a check fails
 constexpr int kSilentStrangers = kMaxPeers - 1;  // as many as a game has places for guests
 constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
-constexpr std::chrono::milliseconds kArrivalPause{50};     // for what was written to be there to read
 constexpr int kNextProtocol = wire::kProtocolVersion + 1;  // what a newer version of the engine speaks
 
 // Sessions on this machine, and everything that happened to each.
@@ -50,10 +47,15 @@ struct Table {
         for (NetworkEvent& event : sessions[i]->poll(kRoundSeconds)) events[i].push_back(std::move(event));
       }
       if (done()) return true;
-      std::this_thread::sleep_for(kRoundPause);
+      wait_for_sockets();
     }
     return false;
   }
+
+  // Until one of the sessions' sockets is ready (see socket_rounds.hpp). (Not the test's own: one
+  // that is never read from would end every wait at once. Each talks to a session, whose end of
+  // it is watched.)
+  void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions); }
 
   int count(std::size_t seat_index, NetworkEvent::Kind kind) const {
     int total = 0;
@@ -109,6 +111,26 @@ TEST_CASE("a host and the machines that join it know who is in the game") {
   CHECK(party.table.count(Party::kHostSeat, NetworkEvent::Kind::PeerJoined) == 2);
   CHECK(party.table.count(Party::kFirstSeat, NetworkEvent::Kind::PeerJoined) == 1);
   CHECK(party.table.count(Party::kSecondSeat, NetworkEvent::Kind::PeerJoined) == 0);
+}
+
+TEST_CASE("a wait on a session's network watches what it listens on, then every connection") {
+  NetworkSession offline;
+  CHECK(offline.watched().empty());
+  Party party;
+  const std::vector<Watched> hosts = party.host.watched();
+  REQUIRE(hosts.size() == 3);  // its listener and the two guests'
+  CHECK(hosts.front().socket->local_port() == party.host.port());
+  CHECK(party.first.watched().size() == 1);  // its connection to the host
+  // Nothing on its way: only the time ends the wait. Then a message wakes the one it is for.
+  CHECK_FALSE(Socket::wait(party.second.watched(), redgem::test::kSocketPatience));
+  REQUIRE(party.first.send("hit", 1, kSecondGuest));
+  party.first.poll(kRoundSeconds);
+  bool woken = false;
+  for (int round = 0; round < kMaxRounds && !woken; ++round) {
+    party.host.poll(kRoundSeconds);  // (passes it on, once it is there)
+    woken = Socket::wait(party.second.watched(), redgem::test::kSocketPatience);
+  }
+  CHECK(woken);
 }
 
 TEST_CASE("a message to everyone reaches everyone else, with who sent it and what it carries") {
@@ -385,7 +407,7 @@ TEST_CASE("a machine that goes silent without hanging up is given up on; one tha
   for (float waited = 0.0f; waited < kPastSilenceTimeout; waited += kQuietStep) {
     lone.host.poll(kQuietStep);
     for (NetworkEvent& event : quiet_guest.poll(kQuietStep)) lone.table.events[1].push_back(std::move(event));
-    std::this_thread::sleep_for(kRoundPause);
+    lone.table.wait_for_sockets();
   }
   REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 1; }));
   CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});  // the real guest, which said nothing either
@@ -433,10 +455,10 @@ TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth a
   const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   REQUIRE(lone.table.until([&] { return flooder.socket.write(flood) == IoStatus::Ok && flood.empty(); }));
-  std::this_thread::sleep_for(kArrivalPause);
   int most_in_a_poll = 0;
   int heard = 0;
   for (int round = 0; round < kMaxRounds && heard < kFloodMessages; ++round) {
+    redgem::test::wait_for_sockets({lone.host.watched()});  // (for what was written to be there to read)
     const int in_this_poll = static_cast<int>(lone.host.poll(kRoundSeconds).size());
     most_in_a_poll = std::max(most_in_a_poll, in_this_poll);
     heard += in_this_poll;

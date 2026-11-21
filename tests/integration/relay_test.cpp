@@ -20,6 +20,7 @@
 #include "net/network_session.hpp"
 #include "net/rooms/relay_program.hpp"
 #include "net/rooms/relay_server.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem::net;
@@ -34,8 +35,7 @@ constexpr float kQuarterSecond = 0.25f;
 constexpr int kQuarterSecondMs = 250;
 constexpr float kSliver = 0.0001f;  // far less than a millisecond
 constexpr double kMillisecondsPerSecond = 1000.0;
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of polling, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr std::chrono::milliseconds kCallerDelay{20};
 // What a test waits for another thread at most before it gives up (a bound, never a measure).
 constexpr std::chrono::seconds kGuard{30};
@@ -91,10 +91,13 @@ struct Meeting {
         for (NetworkEvent& event : sessions[i]->poll(kRoundSeconds)) events[i].push_back(std::move(event));
       }
       if (done()) return true;
-      std::this_thread::sleep_for(kRoundPause);
+      wait_for_sockets();
     }
     return false;
   }
+
+  // Until one of the sockets of the relay or of the sessions is ready (see socket_rounds.hpp).
+  void wait_for_sockets() const { redgem::test::wait_for_sessions(sessions, relay.watched()); }
 
   int count(std::size_t seat_index, NetworkEvent::Kind kind) const {
     int total = 0;
@@ -182,6 +185,16 @@ struct RawMachine {
   }
 };
 
+// Until a search or an answer arrives for one of `machines` (see socket_rounds.hpp).
+void wait_for_datagrams(std::initializer_list<const LanDiscovery*> machines) {
+  std::vector<const Datagrams*> watched;
+  for (const LanDiscovery* machine : machines) {
+    const std::vector<const Datagrams*> theirs = machine->watched();
+    watched.insert(watched.end(), theirs.begin(), theirs.end());
+  }
+  Datagrams::wait(watched, redgem::test::kSocketPatience);
+}
+
 // An answer to a search, written as JSON text, as the bytes that travel (MessagePack).
 std::string answer(const std::string& text) {
   const std::vector<std::uint8_t> bytes = nlohmann::json::to_msgpack(nlohmann::json::parse(text));
@@ -253,6 +266,7 @@ TEST_CASE("a relay's wait ends when a machine it knows says something, or hangs 
   Meeting meeting;
   RawMachine machine(meeting);
   REQUIRE(meeting.until([&] { return meeting.relay.connection_count() == 1; }));
+  CHECK(meeting.relay.watched().size() == 2);  // what it listens on, and the machine's connection
   // Connected and silent: only the time ends the wait.
   CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
   std::vector<std::uint8_t> words = wire_frame(R"({"k":"h","r":"new"})");
@@ -330,7 +344,7 @@ TEST_CASE("the relay program's turns sleep until there is work, then do it") {
   REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
   for (int round = 0; round < kMaxRounds && opener.state() != NetworkSession::State::Online; ++round) {
     opener.poll(kRoundSeconds);
-    std::this_thread::sleep_for(kRoundPause);
+    redgem::test::wait_for_sockets({opener.watched()});
   }
   stopped = true;
   program.join();
@@ -527,6 +541,18 @@ TEST_CASE("a guest cannot pass for someone else in a room") {
   CHECK(room.meeting.last(RoomOfThree::kSecondSeat, NetworkEvent::Kind::Message)->peer == kFirstGuestId + 2);
 }
 
+TEST_CASE("a wait on datagrams ends when one arrives; only the time ends it when none does") {
+  std::string error;
+  Datagrams sender = Datagrams::open_on(0, error);
+  Datagrams receiver = Datagrams::open_on(0, error);
+  REQUIRE_MESSAGE(receiver.valid(), error);
+  CHECK_FALSE(Datagrams::wait({&receiver}, kShortWaitSeconds));
+  REQUIRE(sender.send_to(kLocalhost, receiver.local_port(), "hello"));
+  CHECK(Datagrams::wait({&receiver, &sender}, kLongWaitSeconds));
+  receiver.close();
+  CHECK_FALSE(Datagrams::wait({&receiver}, kSliver));  // (a closed one is not watched)
+}
+
 TEST_CASE("games on the local network are found without typing an address") {
   LanDiscovery host, finder;
   REQUIRE(host.announce("Friday night", kGamePort, kTestDiscoveryPort));
@@ -538,13 +564,13 @@ TEST_CASE("games on the local network are found without typing an address") {
     host.update(kRoundSeconds);
     finder.update(kRoundSeconds);
     found = !finder.games().empty();
-    std::this_thread::sleep_for(kRoundPause);
+    wait_for_datagrams({&host, &finder});
   }
   REQUIRE(found);
   for (int round = 0; round < kSettleRounds; ++round) {  // time for its second answer to arrive too
     host.update(kRoundSeconds);
     finder.update(kRoundSeconds);
-    std::this_thread::sleep_for(kRoundPause);
+    wait_for_datagrams({&host, &finder});
   }
   REQUIRE(finder.games().size() == 1);  // once, though it answers as this machine and by its address
   const NearbyGame& game = finder.games().front();
@@ -577,7 +603,9 @@ TEST_CASE("what is not an answer to a search is ignored") {
     finder.update(kRoundSeconds);
     found = !finder.games().empty();
     answer_with_nonsense(listener);
-    std::this_thread::sleep_for(kRoundPause);
+    std::vector<const Datagrams*> watched = finder.watched();
+    watched.push_back(&listener);
+    Datagrams::wait(watched, redgem::test::kSocketPatience);
   }
   REQUIRE(found);
   REQUIRE(finder.games().size() == 1);
@@ -612,7 +640,7 @@ TEST_CASE("guessing room codes gets an address kept out for a while") {
   for (float waited = 0.0f; waited < kPastKeptOut; waited += kQuietStep) {
     room.meeting.relay.poll(kQuietStep);
     for (NetworkSession* session : room.meeting.sessions) session->poll(kQuietStep);
-    std::this_thread::sleep_for(kRoundPause);
+    room.meeting.wait_for_sockets();
   }
   REQUIRE(late.join_room(kLocalhost, room.meeting.relay.port(), room.opener.room(), error));
   REQUIRE(room.meeting.until([&late] { return late.state() == NetworkSession::State::Online; }));
@@ -684,7 +712,7 @@ TEST_CASE("a room whose opener goes silent is closed, and its guests are told th
   for (float waited = 0.0f; waited < kSilenceTimeoutSeconds + 3.0f * kQuietStep; waited += kQuietStep) {
     meeting.relay.poll(kQuietStep);
     for (NetworkEvent& event : guest.poll(kQuietStep)) meeting.events[0].push_back(std::move(event));
-    std::this_thread::sleep_for(kRoundPause);
+    meeting.wait_for_sockets();
   }
   REQUIRE(meeting.until([&meeting] { return meeting.count(0, NetworkEvent::Kind::Disconnected) == 1; }));
   CHECK(meeting.relay.room_count() == 0);

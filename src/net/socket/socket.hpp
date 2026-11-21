@@ -120,6 +120,10 @@ class Datagrams {
   bool send_to(const std::string& address, std::uint16_t port, const std::string& message);
   // The next message waiting, with who sent it; false when there is none.
   bool receive(std::string& message, std::string& from_address, std::uint16_t& from_port);
+  // Sleeps until a message arrives on one of `datagrams` (those closed are not watched), for
+  // `seconds` at most; with none to watch, on the steady clock. True when a message ended the
+  // wait. For a program with nothing else to do meanwhile, as Socket::wait is.
+  static bool wait(const std::vector<const Datagrams*>& datagrams, float seconds);
   std::uint16_t local_port() const;
   void close();
 

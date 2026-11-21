@@ -35,6 +35,14 @@ bool went_whole(Count sent, std::size_t size) {
 
 }  // namespace
 
+bool Datagrams::wait(const std::vector<const Datagrams*>& datagrams, float seconds) {
+  std::vector<Waiting> waiting;
+  for (const Datagrams* watched : datagrams) {
+    if (watched != nullptr && watched->valid()) waiting.push_back({native(watched->handle_), kArrivals, 0});
+  }
+  return wait_or_sleep(waiting, seconds, steady_clock());
+}
+
 Datagrams::Datagrams(Datagrams&& other) noexcept : handle_(std::exchange(other.handle_, kNoHandle)) {}
 
 Datagrams& Datagrams::operator=(Datagrams&& other) noexcept {

@@ -11,7 +11,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <mruby.h>
@@ -27,6 +26,7 @@
 #include "net/secure/tls_identity.hpp"
 #include "net/wire.hpp"
 #include "server/game_server.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -36,8 +36,7 @@ using redgem::test::fixture;
 namespace {
 
 constexpr const char* kLocalhost = "127.0.0.1";
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;  // of polling, each after a wait for the sockets (see socket_rounds.hpp)
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastHandshakeTimeout = kHandshakeTimeoutSeconds + 0.5f;
 constexpr int kSettleRounds = 50;
@@ -48,13 +47,17 @@ constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr const char* kSecret = "a session token nobody else may read";
 constexpr const char* kTalk = "talk";
 
-bool until(const std::function<bool()>& done) {
+// Tries `done` until it is, waiting between two tries for one of `sockets` to be ready.
+bool until(const std::vector<Watched>& sockets, const std::function<bool()>& done) {
   for (int round = 0; round < kMaxRounds; ++round) {
     if (done()) return true;
-    std::this_thread::sleep_for(kRoundPause);
+    redgem::test::wait_for_sockets({sockets});
   }
   return false;
 }
+
+// What a test's own socket is watched for while it waits to read.
+std::vector<Watched> reading(const Socket& socket) { return {{&socket}}; }
 
 double milliseconds_since(std::chrono::steady_clock::time_point start) {
   return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * kMillisecondsPerSecond;
@@ -79,9 +82,11 @@ struct BothEnds {
     REQUIRE_MESSAGE(listener.valid(), error);
     caller = Connection::calling(Socket::connect_to(kLocalhost, listener.local_port(), error), trust);
     Socket taken;
-    REQUIRE(until([&] { return listener.accept(taken) == IoStatus::Ok; }));
+    REQUIRE(until(reading(listener), [&] { return listener.accept(taken) == IoStatus::Ok; }));
     taker = Connection::accepted(std::move(taken), kMaxPendingBytes, identity);
   }
+
+  std::vector<Watched> watched() const { return {caller.watched(), taker.watched()}; }
 
   void pump() {
     caller.pump();
@@ -91,7 +96,7 @@ struct BothEnds {
   // The first message `to` takes, pumping both ends until one comes or `to` closes.
   std::optional<nlohmann::json> heard_by(Connection& to) {
     std::optional<nlohmann::json> heard;
-    until([&] {
+    until(watched(), [&] {
       pump();
       heard = to.next_message();
       return heard.has_value() || to.closed();
@@ -133,10 +138,19 @@ struct EncryptedMeeting {
   }
 
   bool until(const std::function<bool()>& done) {
-    return ::until([&] {
+    return ::until(watched(), [&] {
       round();
       return done();
     });
+  }
+
+  std::vector<Watched> watched() const {
+    std::vector<Watched> watched = relay.watched();
+    for (const NetworkSession* session : sessions) {
+      const std::vector<Watched> theirs = session->watched();
+      watched.insert(watched.end(), theirs.begin(), theirs.end());
+    }
+    return watched;
   }
 
   const NetworkEvent* last(std::size_t seat_index, NetworkEvent::Kind kind) const {
@@ -168,6 +182,9 @@ struct EncryptedGame {
   std::filesystem::path data = root / "data";
   std::unique_ptr<server::GameServer> server;
   std::vector<std::unique_ptr<Engine>> machines;
+  // The real time as the machines' networks read it: a frame's worth each round, so that a
+  // handshake's time runs out in rounds, however fast the computer plays them.
+  double clock = 0.0;
 
   EncryptedGame() {
     std::filesystem::remove_all(root);
@@ -194,6 +211,7 @@ struct EncryptedGame {
     EngineOptions options;
     options.game_dir = game;
     options.fixed_step = true;
+    options.network_time = [this] { return clock; };
     options.save_file = root / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);
     if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -204,15 +222,28 @@ struct EncryptedGame {
   }
 
   void round() {
+    clock += config::kFixedDeltaSeconds;
     if (server) server->tick(config::kFixedDeltaSeconds);
     for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
   }
 
   bool until(const std::function<bool()>& done) {
-    return ::until([&] {
+    for (int i = 0; i < kMaxRounds; ++i) {
       round();
-      return done();
-    });
+      if (done()) return true;
+      wait_for_sockets();
+    }
+    return false;
+  }
+
+  // Until one of the machines' sockets is ready (the server's are the other ends of theirs).
+  void wait_for_sockets() const {
+    std::vector<Watched> watched;
+    for (const auto& machine : machines) {
+      const std::vector<Watched> theirs = machine->network().watched();
+      watched.insert(watched.end(), theirs.begin(), theirs.end());
+    }
+    redgem::test::wait_for_sockets({watched});
   }
 
   std::string server_port() const { return std::to_string(server->port()); }
@@ -262,7 +293,7 @@ TEST_CASE("a machine with another fingerprint is refused, and nothing of the gam
   CHECK(ends.caller.failure().find("not the one this game expects") != std::string::npos);
   CHECK(ends.caller.failure().find(readable_fingerprint(impostor->fingerprint())) != std::string::npos);
   // (Whatever the impostor got, it was never the hello: it is let go without a message.)
-  REQUIRE(until([&] {
+  REQUIRE(until(ends.watched(), [&] {
     ends.pump();
     return ends.taker.closed();
   }));
@@ -294,7 +325,7 @@ TEST_CASE("plaintext is refused where encryption is required, either way") {
     ends.caller.send(hello_with_secret());
     CHECK_FALSE(ends.heard_by(ends.taker).has_value());
     CHECK(ends.taker.closed());
-    REQUIRE(until([&] {
+    REQUIRE(until(ends.watched(), [&] {
       ends.pump();
       return ends.caller.closed();
     }));
@@ -307,9 +338,9 @@ TEST_CASE("plaintext is refused where encryption is required, either way") {
                                             TlsTrust::pinned(identity->fingerprint()));
     caller.send(hello_with_secret());
     Socket spy;
-    REQUIRE(until([&] { return listener.accept(spy) == IoStatus::Ok; }));
+    REQUIRE(until(reading(listener), [&] { return listener.accept(spy) == IoStatus::Ok; }));
     std::vector<std::uint8_t> seen;
-    REQUIRE(until([&] {
+    REQUIRE(until({caller.watched(), {&spy}}, [&] {
       caller.pump();
       spy.read(seen, kSomeBytes);
       return seen.size() >= kTlsRecordHeaderBytes;
@@ -325,9 +356,9 @@ TEST_CASE("a handshake that hangs is let go in time, and holds up nobody meanwhi
   // Connects, and never says a word of TLS (one byte of a record's header, and nothing more).
   Socket slow = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
   REQUIRE_MESSAGE(slow.valid(), error);
-  REQUIRE(until([&] { return slow.connect_status() == IoStatus::Ok; }));
+  REQUIRE(until({{&slow, true}}, [&] { return slow.connect_status() == IoStatus::Ok; }));
   std::vector<std::uint8_t> one_byte{kTlsHandshakeRecord};
-  REQUIRE(until([&] { return slow.write(one_byte) == IoStatus::Ok && one_byte.empty(); }));
+  REQUIRE(until({{&slow, true}}, [&] { return slow.write(one_byte) == IoStatus::Ok && one_byte.empty(); }));
   REQUIRE(meeting.until([&] { return meeting.relay.connection_count() == 1; }));
 
   // Someone else opens a room, encrypted, while that handshake hangs.
@@ -342,7 +373,7 @@ TEST_CASE("a handshake that hangs is let go in time, and holds up nobody meanwhi
   CHECK(meeting.relay.connection_count() == 1);
   CHECK(online(opener));
   std::vector<std::uint8_t> ignored;
-  CHECK(until([&] { return slow.read(ignored, kSomeBytes) == IoStatus::Closed; }));
+  CHECK(until(reading(slow), [&] { return slow.read(ignored, kSomeBytes) == IoStatus::Closed; }));
 }
 
 TEST_CASE("a relay carries an encrypted room from end to end, pinned by its fingerprint") {

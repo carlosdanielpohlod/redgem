@@ -74,6 +74,9 @@ int connection_answered(NativeSocket socket);
 // Sleeps until one of `waiting` has what it waits for, `milliseconds` at most. How many have;
 // negative when the system refused (or a signal cut the sleep short).
 int wait_native(std::vector<Waiting>& waiting, int milliseconds);
+// Sleeps until one of `waiting` has what it waits for, `seconds` at most (see Socket::wait); with
+// nothing to watch, on `clock`. True when one of them ended the wait.
+bool wait_or_sleep(std::vector<Waiting>& waiting, float seconds, Clock& clock);
 
 void set_option(NativeSocket socket, int level, int option);
 // Makes sending on a connection the other side closed an error to handle, not a signal that ends

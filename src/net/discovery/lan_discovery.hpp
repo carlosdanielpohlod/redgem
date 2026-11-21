@@ -31,6 +31,8 @@ class LanDiscovery {
   const std::vector<NearbyGame>& games() const { return games_; }
 
   void update(float seconds);
+  // What a wait for what arrives watches (see Datagrams::wait): what it announces and searches on.
+  std::vector<const Datagrams*> watched() const { return {&announcer_, &finder_}; }
 
  private:
   // Whether a search on that port is already going.

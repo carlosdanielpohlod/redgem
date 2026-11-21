@@ -4,11 +4,10 @@
 
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <functional>
-#include <thread>
+#include <vector>
 
 #include <mruby.h>
 #include <mruby/string.h>
@@ -17,6 +16,7 @@
 #include "core/config.hpp"
 #include "net/rooms/relay_server.hpp"
 #include "server/game_server.hpp"
+#include "socket_rounds.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -24,8 +24,7 @@ using redgem::test::fixture;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of one frame on every machine, a millisecond apart
-constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr int kMaxRounds = 3000;    // of one frame on every machine (see Gathering::round)
 constexpr int kWhileDeciding = 60;  // frames a newcomer is kept waiting on purpose
 constexpr server::RoomLimits kRoomOfFour{4, 1};
 constexpr int kPastJoinTimeoutRounds = 6 * 60;  // frames: longer than a join may keep quiet at a relay
@@ -199,7 +198,18 @@ struct Gathering {
     if (server) server->tick(config::kFixedDeltaSeconds);
     if (relay) relay->poll(config::kFixedDeltaSeconds);
     for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
-    std::this_thread::sleep_for(kRoundPause);
+    wait_for_sockets();
+  }
+
+  // Until one of the sockets of the machines (and the relay's) is ready. (The server's are the
+  // other ends of the machines'.)
+  void wait_for_sockets() const {
+    std::vector<net::Watched> watched = relay ? relay->watched() : std::vector<net::Watched>{};
+    for (const auto& machine : machines) {
+      const std::vector<net::Watched> theirs = machine->network().watched();
+      watched.insert(watched.end(), theirs.begin(), theirs.end());
+    }
+    test::wait_for_sockets({watched});
   }
 
   bool until(const std::function<bool()>& done) {

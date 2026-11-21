@@ -96,6 +96,9 @@ class SocketDialer final : public Dialer {
   DialStatus status() override;
   // The connection, once status() said Connected; the dialer holds none after.
   Socket take() { return std::move(socket_); }
+  // What a wait for the call watches (see Socket::wait): its socket, which can send once the call
+  // is through, and ends a wait at once when it was refused.
+  Watched watched() const { return {&socket_, true}; }
 
  private:
   Socket socket_;
