@@ -74,7 +74,7 @@ class McpStdioTest(unittest.TestCase):
             game = Path(folder) / "game"
             shutil.copytree(GAME, game)
             replies, _ = exchange(game, [modern_call(1, "build", {"action": "start", "folder": "shipped"}),
-                                         modern_call(2, "build", {"action": "status", "wait": 60}),
+                                         modern_call(2, "build", {"action": "status", "wait": 25}),
                                          modern_call(3, "events", {})])
             self.assertFalse(replies[0]["result"]["isError"], replies[0])
             status = replies[1]["result"]["content"][0]["text"]

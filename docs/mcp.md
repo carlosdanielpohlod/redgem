@@ -168,7 +168,7 @@ and `status` says how it goes.
 
 ```json
 {"action": "start", "target": "android", "format": "bundle"}
-{"action": "status", "wait": 60}
+{"action": "status", "wait": 25}
 ```
 
 | Argument | Meaning |
@@ -177,7 +177,7 @@ and `status` says how it goes.
 | `format` | `apk` (default) or `bundle` (an App Bundle for Google Play), for Android. |
 | `loose` | `true` keeps the game's files in a `game/` folder instead of `game.rgpak`, to look into a build. |
 | `folder` | The folder next to the game it goes into; default `<game>-build`, or `<game>-build-<target>` for another system. |
-| `wait` | For `status`: how many seconds to wait for the build to end first (up to 60). |
+| `wait` | For `status`: how many seconds to wait for the build to end first (up to 25; call it again for a longer build). |
 
 `status` gives the build's step and time while it runs. Once it ended, it gives what it made (the
 executable, the app, the APK or bundle) or why not, with the last lines the build logged; these

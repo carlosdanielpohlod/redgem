@@ -29,15 +29,22 @@ struct Builds {
   std::string step_told;  // the step status last put in the events
 };
 
+// Never destroyed: a build's thread may still run while the program's statics go (the server
+// waits for it first, see wait_for_builds).
 Builds& builds() {
-  static Builds state;
-  return state;
+  static auto* const state = new Builds();
+  return *state;
+}
+
+bool needs_a_mac(BuildTarget target) {
+  return target == BuildTarget::MacOS && host_build_target() != BuildTarget::MacOS;
 }
 
 BuildTarget target_of(const Json& args) {
   if (!args.contains("target")) return host_build_target();
   const auto target = build_target_from_name(args["target"].get<std::string>());
   if (!target) throw wrong("target must be one of: linux, windows, android, macos");
+  if (needs_a_mac(*target)) throw wrong("a game for the Mac is built on a Mac");
   return *target;
 }
 
@@ -54,9 +61,10 @@ fs::path game_folder(const Options& options) { return fs::weakly_canonical(fs::a
 // Where it goes: next to the game, as the editor's Build puts it, or in the folder named there.
 fs::path out_folder(const Options& options, const Json& args, BuildTarget target) {
   const fs::path game = game_folder(options);
-  const std::string name =
-      args.value("folder", editor_logic::build_folder_name(game.filename().string(), build_target_name(target),
-                                                           target == host_build_target()));
+  if (!args.contains("folder"))
+    return game.parent_path() / editor_logic::build_folder_name(game.filename().string(), build_target_name(target),
+                                                                target == host_build_target());
+  const std::string name = args["folder"];
   if (!valid_game_name(name)) throw wrong("folder must be a folder name: letters, digits, spaces, - and _");
   return game.parent_path() / name;
 }
@@ -75,9 +83,16 @@ BuildChoice choice_for(BuildTarget target, AndroidFormat format, GameLayout layo
 
 Json just_ended(BuildOutcome outcome);
 
-// A build that ended and was not asked about yet becomes the last one, told in the events.
-void settle() {
-  if (auto ended = builds().job.take_outcome()) just_ended(std::move(*ended));
+std::string ended_text(const BuildOutcome& outcome);
+
+// A build that ended and was not asked about yet becomes the last one, told in the events; what
+// the start's answer says of it.
+std::string settle() {
+  auto ended = builds().job.take_outcome();
+  if (!ended) return "";
+  const std::string told = "the build before: " + ended_text(*ended) + "\n";
+  just_ended(std::move(*ended));
+  return told;
 }
 
 Json start(const Options& options, const Json& args) {
@@ -85,14 +100,14 @@ Json start(const Options& options, const Json& args) {
   BuildRequest request{choice_for(target, format_of(args, target), layout_of(args)), game_folder(options),
                        out_folder(options, args, target)};
   const fs::path out = request.out_dir;
-  settle();
+  const std::string before = settle();
   if (builds().job.busy())
     throw wrong("a build for " + builds().job.target() + " runs; wait for it with action=status");
   if (!builds().job.start(std::move(request))) throw std::runtime_error("cannot start a build: no thread for it");
   builds().step_told.clear();
   log::info("building for " + std::string(build_target_name(target)) + " into " + out.string());
-  return tool_result("building for " + std::string(build_target_name(target)) + " into " + out.string() +
-                     " from the saved files; follow it with action=status (wait up to 60 s a call)");
+  return tool_result(before + "building for " + std::string(build_target_name(target)) + " into " + out.string() +
+                     " from the saved files; follow it with action=status (wait up to 25 s a call)");
 }
 
 // The build's step, put in the events once each.
@@ -118,7 +133,7 @@ std::string messages_of(const BuildOutcome& outcome) {
   std::string text;
   const std::size_t first = outcome.messages.size() > kMessagesShown ? outcome.messages.size() - kMessagesShown : 0;
   for (std::size_t i = 0; i < outcome.messages.size(); ++i) {
-    log::info("build: " + outcome.messages[i].text);
+    log::write(outcome.messages[i].level, "build: " + outcome.messages[i].text);
     if (i >= first) text += outcome.messages[i].text + "\n";
   }
   return text;
@@ -126,14 +141,14 @@ std::string messages_of(const BuildOutcome& outcome) {
 
 std::string ended_text(const BuildOutcome& outcome) {
   const std::string took = " (" + elapsed_text(outcome.seconds) + ")";
-  if (const auto& made = outcome.made) return "built for " + outcome.target + took + ": " + made->string() + "\n";
-  return "the build for " + outcome.target + " failed" + took + ": " + outcome.error + "\n";
+  if (const auto& made = outcome.made) return "built for " + outcome.target + took + ": " + made->string();
+  return "the build for " + outcome.target + " failed" + took + ": " + outcome.error;
 }
 
 // A build that ended now: told once in the events, then kept as the last one.
 Json just_ended(BuildOutcome outcome) {
-  const std::string text = ended_text(outcome) + messages_of(outcome);
-  log::info(ended_text(outcome));
+  const std::string text = ended_text(outcome) + "\n" + messages_of(outcome);
+  log::write(outcome.succeeded() ? log::Level::Info : log::Level::Error, ended_text(outcome));
   const bool failed = !outcome.succeeded();
   builds().last = std::move(outcome);
   return tool_result(text, failed);
@@ -159,6 +174,8 @@ Json status(const Json& args) {
 }
 
 }  // namespace
+
+void wait_for_builds() { builds().job.wait(); }
 
 Json build_tool(const Options& options, const Json& args) {
   const std::string action = args.at("action");
