@@ -15,6 +15,7 @@
 #include "http_test_server.hpp"
 #include "storage/save_file.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -28,7 +29,7 @@ namespace {
 constexpr float kAnswerLook = 0.002f;
 constexpr int kMostFrames = 5000;
 
-std::filesystem::path save_file() { return std::filesystem::temp_directory_path() / "redgem-http-game-test.json"; }
+std::filesystem::path save_file() { return redgem::test::temp_root() / "redgem-http-game-test.json"; }
 
 std::unique_ptr<Engine> sandbox_game() {
   EngineOptions options;

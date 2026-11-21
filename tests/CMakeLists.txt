@@ -20,6 +20,7 @@ add_executable(redgem_tests
   unit/log_test.cpp
   unit/event_journal_test.cpp
   unit/files_test.cpp
+unit/temp_dirs_test.cpp
   unit/game_archive_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
@@ -27,6 +28,8 @@ add_executable(redgem_tests
   unit/texts_test.cpp
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
+  unit/splat_map_test.cpp
+  unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
@@ -41,6 +44,7 @@ add_executable(redgem_tests
   unit/scene_identity_test.cpp
   unit/prefabs_test.cpp
   unit/prefab_export_test.cpp
+  unit/prefab_overrides_test.cpp
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
@@ -227,7 +231,9 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/environment_api_test.cpp
   integration/material_api_test.cpp
+  integration/terrain_files_test.cpp
   integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
@@ -686,6 +692,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
 add_dependencies(redgem_editor_system_tests redgem_player redgem_fake_acp_agent)
+target_include_directories(redgem_editor_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(redgem_editor_system_tests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:redgem_player>)
 target_compile_definitions(redgem_editor_system_tests PRIVATE
@@ -721,6 +728,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/camera_marker_render_test.cpp
                render_system/local_shadow_render_test.cpp
                render_system/exposure_foliage_render_test.cpp
+               render_system/terrain_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

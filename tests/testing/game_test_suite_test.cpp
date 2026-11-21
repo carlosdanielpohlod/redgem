@@ -6,12 +6,13 @@
 #include <vector>
 
 #include "testing/game_test_suite.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem::testing;
 namespace fs = std::filesystem;
 
 TEST_CASE("a game's tests are the files of its tests folder that end in _test.rb") {
-  const fs::path game = fs::temp_directory_path() / "redgem_suite_files";
+  const fs::path game = redgem::test::temp_root() / "redgem_suite_files";
   fs::remove_all(game);
   fs::create_directories(game / "tests");
   for (const char* name : {"b_test.rb", "a_test.rb", "helper.rb"}) std::ofstream(game / "tests" / name) << "";

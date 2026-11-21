@@ -15,6 +15,7 @@
 #include "project/mcp_command.hpp"
 #include "project/mcp_game_tools.hpp"
 #include "project/runtime_query.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -51,7 +52,7 @@ class ScriptedGame {
   const std::filesystem::path& root() const { return root_; }
 
  private:
-  std::filesystem::path root_ = std::filesystem::temp_directory_path() / "redgem-game-query-test";
+  std::filesystem::path root_ = redgem::test::temp_root() / "redgem-game-query-test";
 };
 
 std::string answer_in(const ScriptedGame& game, const Json& args) {
@@ -127,7 +128,7 @@ TEST_CASE("query points are three finite numbers") {
 
 TEST_CASE("redgem mcp with no game, no such folder or an unknown option is a usage error, as any command's") {
   const std::string game = REDGEM_PLATFORMER_DIR;
-  const std::string missing = (std::filesystem::temp_directory_path() / "redgem_mcp_no_such_game").string();
+  const std::string missing = (redgem::test::temp_root() / "redgem_mcp_no_such_game").string();
   std::filesystem::remove_all(missing);
   CHECK(run_mcp_command({}) == kExitUsage);
   CHECK(run_mcp_command({game, game}) == kExitUsage);
@@ -139,7 +140,7 @@ TEST_CASE("redgem mcp with no game, no such folder or an unknown option is a usa
 
 #ifndef _WIN32
 TEST_CASE("a program run to its end reports its output, its exit code and a crash as its own") {
-  const auto output = std::filesystem::temp_directory_path() / "redgem-run-to-end.txt";
+  const auto output = redgem::test::temp_root() / "redgem-run-to-end.txt";
   const ProcessEnd exited = run_to_end({"/bin/sh", "-c", "echo said; echo warned >&2; exit 3"}, output);
   CHECK(exited.started);
   CHECK(exited.exited);
@@ -155,8 +156,8 @@ TEST_CASE("a program run to its end reports its output, its exit code and a cras
 }
 
 TEST_CASE("a program run to its end can keep its errors apart from its output") {
-  const auto output = std::filesystem::temp_directory_path() / "redgem-run-to-end-output.txt";
-  const auto errors = std::filesystem::temp_directory_path() / "redgem-run-to-end-errors.txt";
+  const auto output = redgem::test::temp_root() / "redgem-run-to-end-output.txt";
+  const auto errors = redgem::test::temp_root() / "redgem-run-to-end-errors.txt";
   const ProcessEnd ended = run_to_end({"/bin/sh", "-c", "echo said; echo warned >&2; exit 3"}, output, errors);
   CHECK(ended.exited);
   CHECK(ended.code == 3);

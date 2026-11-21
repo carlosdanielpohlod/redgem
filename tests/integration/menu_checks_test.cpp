@@ -7,6 +7,7 @@
 #include <string>
 
 #include "project/game_checks.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem::tools;
 namespace fs = std::filesystem;
@@ -15,7 +16,7 @@ namespace {
 
 // A game of only a game.json with this text, in a folder of its own.
 fs::path game_with(const std::string& name, const std::string& game_json) {
-  const fs::path dir = fs::temp_directory_path() / ("redgem-menu-check-" + name);
+  const fs::path dir = redgem::test::temp_root() / ("redgem-menu-check-" + name);
   fs::remove_all(dir);
   fs::create_directories(dir);
   std::ofstream(dir / "game.json") << game_json;

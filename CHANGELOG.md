@@ -23,6 +23,23 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   write is checked as `redgem check` checks the game, and refused, the file kept, when it brings a
   new problem. `--read-only` keeps its reading actions. The editor tool gains `open_scene` (with
   `discard: true` to drop unsaved edits) and `save_as`.
+- **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
+  property records, per inherited part, its position, rotation or scale, properties set or
+  dropped, its light or camera, or that the part is removed. A child added under the placement
+  can hang from an inherited part with `prefab_parent`. Editing the prefab file updates every
+  instance except the fields it overrides, also inside nested prefabs. See
+  [prefab overrides](docs/prefabs.md#overrides).
+
+- **Terrains have ground layers (experimental).** An object with `terrain_layers = "island"` takes
+  up to eight ground materials from the game's `terrains/island.json`, each with its color, normal,
+  roughness, occlusion and height pictures, and their weights from a splat map saved beside it as
+  `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
+  1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
+  alone.
+- **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
+  `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
+  fog, light and effects of the environment object, and the next frame shows them. A day that
+  turns to night needed a scene of its own for every hour.
 - **Menu and interface themes (experimental).** A game gives its menus its own look in
   game.json's `"menu": {"theme": {...}, "screens": {...}}`, or from a script with `UI.theme=`,
   `GameMenu.theme=` and `screen.theme=`. A theme sets the fonts (body and heading), sizes, colors
@@ -73,6 +90,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **A dedicated server keeps to the game's tick.** `redgem-server` takes its lobby's turns and
+  its rooms' frames at the game's `tick_hz`, and its status budget (`frame_ms.budget`, the
+  status line's "of N ms") is a step of it. The start line says the rate.
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is
@@ -81,7 +101,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   load test lost a player on a dedicated server with nothing in the log to say why.
 - **`redgem-test --wait-limit <seconds>`.** A system test may wait for other programs
   (`t.wait_for`) longer than five minutes in all, up to a day: a load test whose bots play for
-  five minutes and more on a dedicated server ran out of waits before the end.
+  five minutes and more on a dedicated server ran out of waits before the end. The limit is in
+  real seconds, measured by the clock: frames that run slow on a busy machine count for the time
+  they take.
 - **A quest journal and objective markers.** The pause menu of a game with quest files has a
   Journal page: the quests under way, each with the text of its stage and its objectives (a filled
   box once done), then the quests completed. Its lines scroll and take the focus, so the keyboard,
@@ -108,6 +130,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **The engine's tests can run side by side.** Each C++ test run writes in a temporary folder of its
+  own, removed when it ends, so two runs on one machine no longer read each other's temporary files (one
+  failed with "scene.glb file not found" while another worktree's run was going on).
+  `REDGEM_KEEP_TEST_DIRS=1` keeps the folders.
 - **The API reference says `GameObject#props` and `Behaviour#props` have Symbol keys**, which is
   what they return (`props[:damage]`). It said String keys, and `props["damage"]` is nil.
 - **A character that picks up the body it stands on stays on the ground.** A courier standing on

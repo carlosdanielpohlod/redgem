@@ -11,6 +11,7 @@
 #include "core/log.hpp"
 #include "render/texture_loading.hpp"
 #include "render_system/render_stage.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::render_detail;
@@ -37,7 +38,7 @@ bool green(::Color c) { return c.g > kBright && c.r < kDark && c.b < kDark; }
 
 class PictureFiles {
  public:
-  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-missing-picture-render";
+  const std::filesystem::path folder = redgem::test::temp_root() / "redgem-missing-picture-render";
   PictureFiles() {
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);

@@ -159,8 +159,7 @@ void EditorSession::set_roots_axis(inspector_logic::TransformPart part, int axis
 
 void EditorSession::place_in_world(ObjectId id, const Transform& world) {
   if (!can_edit(id)) return;
-  const int parent = document_.node(id).parent;
-  const Transform local = parent == kNoIndex ? world : relative_to(preview_.world_transform(parent), world);
+  const Transform local = relative_to(authored_parent_world(id), world);
   document_.set_local(id, local, false);
   refresh_node(id);
 }
@@ -204,7 +203,9 @@ void EditorSession::reparent(ObjectId child, ObjectId parent) {
   const auto selected = selected_names();
   const Transform world = placement_world(child);
   const Transform local = parent == kNoObject ? world : relative_to(preview_.world_transform(parent), world);
-  document_.reparent(child, parent, true, &local);
+  const bool moves = document_.node(child).parent != parent;
+  const int moved = document_.reparent(child, parent, true, &local);
+  if (moves) unhang(moved);
   refresh_and_reselect(selected);
 }
 

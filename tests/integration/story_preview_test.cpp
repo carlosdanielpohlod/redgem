@@ -9,6 +9,7 @@
 
 #include "core/config.hpp"
 #include "editor/story_preview.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace fs = std::filesystem;
@@ -41,7 +42,7 @@ void write(const fs::path& file, const std::string& text) {
 
 // A game with a dialogue and a quest, and no scene of its own beyond an empty one.
 fs::path story_game() {
-  const fs::path game = fs::temp_directory_path() / "redgem_story_preview";
+  const fs::path game = redgem::test::temp_root() / "redgem_story_preview";
   fs::remove_all(game);
   fs::create_directories(game / config::kScriptsDirName);
   write(game / "dialogues/baker.json", kBaker);

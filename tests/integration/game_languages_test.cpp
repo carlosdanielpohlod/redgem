@@ -21,6 +21,7 @@
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -40,7 +41,7 @@ std::string ruby(ScriptHost& scripts, const std::string& code) {
 
 // A game in the temporary folder with a translation file for each of `files` ({name, json}).
 fs::path game_with(const std::string& name, std::initializer_list<std::pair<std::string, std::string>> files) {
-  const fs::path game = fs::temp_directory_path() / name;
+  const fs::path game = redgem::test::temp_root() / name;
   fs::remove_all(game);
   fs::create_directories(game / config::kLocalesDirName);
   fs::create_directories(game / config::kScriptsDirName);

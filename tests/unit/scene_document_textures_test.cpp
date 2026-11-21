@@ -12,6 +12,7 @@
 #include "editor/document/scene_document.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -49,7 +50,7 @@ void edit_material(SceneDocument& doc, Change change) {
 }
 
 LoadResult saved_and_loaded(SceneDocument& doc, const std::string& name) {
-  const std::filesystem::path out = std::filesystem::temp_directory_path() / ("redgem_textures_" + name + ".glb");
+  const std::filesystem::path out = redgem::test::temp_root() / ("redgem_textures_" + name + ".glb");
   std::string error;
   REQUIRE_MESSAGE(doc.save_as(out, error), error);
   LoadResult loaded = load_gltf_scene(out.string());
@@ -193,7 +194,7 @@ TEST_CASE("a WebP picture makes the file require its extension, until no texture
   SceneDocument doc = open_hierarchy();
   const int webp = add(doc, "images/lossy.webp");
   edit_material(doc, [&](MaterialDesc& material) { material.base_color_image = webp; });
-  const std::filesystem::path out = std::filesystem::temp_directory_path() / "redgem_textures_webp.glb";
+  const std::filesystem::path out = redgem::test::temp_root() / "redgem_textures_webp.glb";
   std::string error;
   REQUIRE_MESSAGE(doc.save_as(out, error), error);
   const auto lists_webp = [&out, &error](const char* list) {

@@ -18,6 +18,7 @@
 #include "scene/props.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -66,7 +67,7 @@ int texture_of(const nlohmann::json& material) {
 int position_of(const nlohmann::json& mesh) { return mesh["primitives"][0]["attributes"]["POSITION"].get<int>(); }
 
 std::filesystem::path temp_scene(const std::string& name) {
-  return std::filesystem::temp_directory_path() / ("redgem_dedup_" + name + ".glb");
+  return redgem::test::temp_root() / ("redgem_dedup_" + name + ".glb");
 }
 
 GlbFile read_scene(const std::filesystem::path& file) {

@@ -21,6 +21,7 @@
 #include "project/mcp_tools.hpp"
 #include "project/ruby_eval.hpp"
 #include "script/ruby_vm.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -66,7 +67,7 @@ class Game {
   }
   Game(const Game&) = delete;
   Game& operator=(const Game&) = delete;
-  fs::path root = fs::temp_directory_path() / "redgem-ruby-eval-test";
+  fs::path root = redgem::test::temp_root() / "redgem-ruby-eval-test";
   fs::path path = root / "game";
   std::unique_ptr<EditorSession> session;
 };
@@ -199,7 +200,7 @@ TEST_CASE("game_eval is listed only for a connected editor, as a tool that chang
 }
 
 TEST_CASE("with no editor running, game_eval says how to start one that has it") {
-  const fs::path root = fs::temp_directory_path() / "redgem-ruby-eval-no-editor";
+  const fs::path root = redgem::test::temp_root() / "redgem-ruby-eval-no-editor";
   fs::create_directories(root);
   mcp::Options options;
   options.game = REDGEM_PLATFORMER_DIR;

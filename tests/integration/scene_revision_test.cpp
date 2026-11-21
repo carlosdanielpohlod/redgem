@@ -17,6 +17,7 @@
 #include "project/scene_diff.hpp"
 #include "project/scene_revision.hpp"
 #include "project/tool_commands.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -46,7 +47,7 @@ bool git(const fs::path& folder, std::vector<std::string> words) {
 class CeilingAtTemp {
  public:
   CeilingAtTemp() : before_(platform::environment(kGitCeiling)) {
-    platform::set_environment(kGitCeiling, fs::temp_directory_path().string(), true);
+    platform::set_environment(kGitCeiling, redgem::test::temp_root().string(), true);
   }
   ~CeilingAtTemp() { platform::set_environment(kGitCeiling, before_, true); }
   CeilingAtTemp(const CeilingAtTemp&) = delete;
@@ -60,7 +61,7 @@ class CeilingAtTemp {
 // scene committed; gone with the test.
 class GameCopy {
  public:
-  GameCopy(const std::string& name, bool in_git) : dir_(fs::temp_directory_path() / ("redgem_scene_revision_" + name)) {
+  GameCopy(const std::string& name, bool in_git) : dir_(redgem::test::temp_root() / ("redgem_scene_revision_" + name)) {
     fs::remove_all(dir_);
     fs::copy(kPlatformer, dir_, fs::copy_options::recursive);
     if (in_git) commit_scene();

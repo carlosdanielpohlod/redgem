@@ -22,8 +22,7 @@ void Engine::advance_or_loading(float frame_seconds) {
   const FrameProfileScope phase(profiler_, ProfilePhase::Update);
   if (!frozen()) return advance_game(frame_seconds);
   context_.time.delta = 0.0f;
-  const float delta =
-      options_.fixed_step ? fixed_delta() : std::clamp(frame_seconds, 0.0f, config::kMaxFrameSeconds);
+  const float delta = options_.fixed_step ? fixed_delta() : std::clamp(frame_seconds, 0.0f, config::kMaxFrameSeconds);
   if (context_.level_held) scripts_->wait_for_level(delta);
   scripts_->draw_loading(delta);
 }
@@ -40,7 +39,8 @@ void Engine::request_scene(const std::string& name) {
   cancel_scene_load();
   context_.loading_error.clear();
   if (background) return begin_scene_load(name);
-  auto loaded = read_scene(options_.game_dir, name);
+  const auto reading = presenter_->draws_pictures() ? TerrainReading::WeightsAndPictures : TerrainReading::Weights;
+  auto loaded = read_scene(options_.game_dir, name, reading);
   if (!loaded) return;
   switch_to(name, std::move(*loaded));
   log::info("scene '" + name + "' loaded");
@@ -103,6 +103,10 @@ void Engine::drop_activation() {
 }
 
 void Engine::forget_decoded_pictures() {
+  // (The terrains' layer pictures too: the presenter has them on the graphics card by now.)
+  for (TerrainLayers& terrain : scene_desc_.terrains) {
+    if (!terrain.pictures.empty()) terrain.pictures = {};
+  }
   if (scene_desc_.decoded_images.empty()) return;
   scene_desc_.decoded_images.clear();
   scene_desc_.decoded_images.shrink_to_fit();

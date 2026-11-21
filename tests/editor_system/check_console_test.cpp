@@ -12,6 +12,7 @@
 #include "editor/editor_app.hpp"
 #include "editor/scripts/script_workspace.hpp"
 #include "project/editor_setup.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -23,8 +24,8 @@ void frames(EditorApp& app) {
 }
 
 std::filesystem::path broken_game() {
-  const auto game = std::filesystem::temp_directory_path() /
-                    ("redgem_check_console_editor_" + std::to_string(std::random_device{}()));
+  const auto game =
+      redgem::test::temp_root() / ("redgem_check_console_editor_" + std::to_string(std::random_device{}()));
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);

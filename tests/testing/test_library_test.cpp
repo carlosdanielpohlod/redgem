@@ -16,6 +16,7 @@
 #include "testing/system_test.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_notes.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -121,7 +122,7 @@ TEST_CASE("notes go from one test to another, by plain names only") {
 
 TEST_CASE("a run with a folder of its own keeps its notes there, whole, away from every other run's") {
   const std::filesystem::path shared = notes_folder();
-  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-tests-work";
+  const std::filesystem::path work = redgem::test::temp_root() / "redgem-testing-tests-work";
   std::filesystem::remove_all(work);
   ScriptedInputSource input;
   auto engine = sandbox(input);
@@ -163,8 +164,19 @@ TEST_CASE("a system test waits for other programs no longer in all than its wait
   SystemTestOptions options = platformer_test("tests/system/platformer/wait_for_test.rb");
   options.wait_limit_seconds = 1;
   CHECK(run_system_test(options) == 1);
-  CHECK(log.contains("after 60 frames of waits in real seconds (run alone, --wait-limit raises it)"));
+  CHECK(log.contains("after 1 s of waits in real seconds (--wait-limit raises it)"));
   CHECK(run_system_test(platformer_test("tests/system/platformer/wait_for_test.rb")) == 0);
+}
+
+TEST_CASE("the wait limit is real seconds, however slow the frames of the waits are") {
+  // tests/system/platformer/slow_wait_for_test.rb waits two real seconds in about 20 frames of a
+  // tenth of a second each: a third of a second at the game's pace, but past a limit of one.
+  const LogCapture log;
+  SystemTestOptions options = platformer_test("tests/system/platformer/slow_wait_for_test.rb");
+  options.wait_limit_seconds = 1;
+  CHECK(run_system_test(options) == 1);
+  CHECK(log.contains("after 1 s of waits in real seconds"));
+  CHECK(run_system_test(platformer_test("tests/system/platformer/slow_wait_for_test.rb")) == 0);
 }
 
 TEST_CASE("a system test that fails, or is not one, fails the run") {

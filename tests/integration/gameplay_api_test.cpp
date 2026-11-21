@@ -12,6 +12,7 @@
 #include "editor/document/scene_document.hpp"
 #include "scene/props.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -55,7 +56,7 @@ SceneDesc small_scene() {
 
 // A save file of the test's own, removed when the test ends.
 struct TempSave {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-gameplay-api-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-gameplay-api-test";
   std::filesystem::path file = dir / "save.json";
   TempSave() { std::filesystem::remove_all(dir); }
   ~TempSave() { std::filesystem::remove_all(dir); }

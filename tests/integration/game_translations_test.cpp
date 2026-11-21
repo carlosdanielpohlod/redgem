@@ -19,6 +19,7 @@
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -43,7 +44,7 @@ struct TranslatedGame {
 
 // A game of its own in the temporary folder, with an English translation file.
 std::filesystem::path scratch_game(const std::string& name) {
-  const std::filesystem::path game = std::filesystem::temp_directory_path() / name;
+  const std::filesystem::path game = redgem::test::temp_root() / name;
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / config::kLocalesDirName);
   std::ofstream(game / config::kLocalesDirName / "en.json") << R"({"hello": "Hello"})";

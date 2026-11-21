@@ -18,6 +18,7 @@
 #include "app/recording.hpp"
 #include "app/window_presenter.hpp"
 #include "core/exit_codes.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -84,7 +85,7 @@ double sound_seconds_in(const std::filesystem::path& video) {
 
 // The video's sound decoded, mono, at the rate it was recorded at.
 std::vector<float> sound_in(const std::filesystem::path& video) {
-  const std::filesystem::path raw = std::filesystem::temp_directory_path() / "redgem_recorded_sound.f32";
+  const std::filesystem::path raw = redgem::test::temp_root() / "redgem_recorded_sound.f32";
   const std::string command =
       shell_command({kEncoderProgram, "-y", "-v", "error", "-i", video.string(), "-map", "0:a:0", "-f", "f32le", "-ac",
                      "1", "-ar", std::to_string(kRecordSampleRate), raw.string()});
@@ -127,7 +128,7 @@ TEST_CASE("a game recorded for a second at ten frames a second makes a video of 
     return;
   }
   // (A name a shell would read otherwise: the encoder is given it as it is.)
-  const std::filesystem::path video = std::filesystem::temp_directory_path() / "redgem $HOME it's.mp4";
+  const std::filesystem::path video = redgem::test::temp_root() / "redgem $HOME it's.mp4";
   std::filesystem::remove(video);
   GameWindowOptions options = recording_into(video);
   int shown = 0;  // the brightest channel of the window's middle, as the last frame left it
@@ -151,7 +152,7 @@ TEST_CASE("a recording whose encoder stops ends the run at once, with an error")
     return;
   }
   // The encoder cannot write into a folder that is not there: it stops on the first frames.
-  const std::filesystem::path nowhere = std::filesystem::temp_directory_path() / "redgem_no_such_folder" / "x.mp4";
+  const std::filesystem::path nowhere = redgem::test::temp_root() / "redgem_no_such_folder" / "x.mp4";
   CHECK(play_in_window(recording_into(nowhere)) == kExitFailure);
 }
 
@@ -160,7 +161,7 @@ TEST_CASE("a game playing a tone is recorded with its sound: the tone, for as lo
     MESSAGE("ffmpeg or ffprobe is not on this machine: the recording's sound is not checked");
     return;
   }
-  const std::filesystem::path video = std::filesystem::temp_directory_path() / "redgem_tone.mp4";
+  const std::filesystem::path video = redgem::test::temp_root() / "redgem_tone.mp4";
   std::filesystem::remove(video);
   const std::filesystem::path game = std::filesystem::path(REDGEM_FIXTURES_DIR) / "games" / "tone";
   REQUIRE(play_in_window(recording_into(video, game, kToneSeconds)) == kExitSuccess);
@@ -185,7 +186,7 @@ TEST_CASE("a recording asked for with no sound has none") {
     MESSAGE("ffmpeg or ffprobe is not on this machine: nothing to record with");
     return;
   }
-  const std::filesystem::path video = std::filesystem::temp_directory_path() / "redgem_silent.mp4";
+  const std::filesystem::path video = redgem::test::temp_root() / "redgem_silent.mp4";
   std::filesystem::remove(video);
   GameWindowOptions options = recording_into(video, std::filesystem::path(REDGEM_FIXTURES_DIR) / "games" / "tone");
   options.record->sound = false;
