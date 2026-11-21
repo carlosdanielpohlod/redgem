@@ -144,6 +144,9 @@ class EditorApp {
   // open_scene (nothing is made when the user cancels). False, with why in the console, when no
   // scene can be made with that name.
   bool new_scene(const std::string& name);
+  // Opens a scene now, dropping the open one's unsaved edits (for tools, which ask about them
+  // themselves). False, and why in `error`, when it cannot be read.
+  bool replace_scene(const std::string& name, std::string& error);
   // Saves the open scene as scenes/<name>.glb, which is then the one edited.
   bool save_scene_as(const std::string& name);
   // What waits for the user's answer about the unsaved edits, if anything.

@@ -52,15 +52,24 @@ void frame(EditorApp& app) {
   if (app.session().selected().ids().empty()) throw std::invalid_argument("frame needs an object, or a selection");
   app.frame_selection();
 }
+// Opens the scene, or saves the open one as it; the Project panel then lists it.
+void change_scene(EditorApp& app, const std::string& action, const std::string& scene) {
+  std::string error;
+  const bool done = action == "open_scene" ? app.replace_scene(scene, error) : app.session().save_as(scene, error);
+  if (!done) throw std::invalid_argument(error);
+  app.rescan_files();
+}
+
+void act(EditorApp& app, const std::string& action, const mcp::Json& args) {
+  if (action == "frame") return frame(app);
+  if (args.contains("scene")) return change_scene(app, action, args["scene"]);
+  advance(app, action);
+}
 }  // namespace
 
 mcp::Json editor_window_tool(EditorApp& app, const std::string& action, const mcp::Json& args) {
   if (action == "capture") return capture(app, args);
-  if (action == "frame") {
-    frame(app);
-  } else {
-    advance(app, action);
-  }
+  act(app, action, args);
   return invoke_editor(app.session(), "editor", {{"action", "status"}});
 }
 }  // namespace redgem::tools

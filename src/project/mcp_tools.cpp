@@ -14,6 +14,7 @@
 #include "core/short_text.hpp"
 #include "core/config.hpp"
 #include "project/mcp_game_tools.hpp"
+#include "project/mcp_project_tools.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
@@ -191,11 +192,24 @@ std::string events_text(const Json& data) {
   return text;
 }
 
+using NativeTool = Json (*)(const Options&, const Json&);
+struct Native {
+  const char* name;
+  NativeTool run;
+};
+// The tools this process answers itself, not through a redgem command.
+constexpr Native kNativeTools[] = {
+    {"events", [](const Options& o, const Json& a) { return tool_result(events_text(events(o, a))); }},
+    {"game_shot", game_shot},
+    {"game_query", game_query},
+    {"scene_edit", edit_files},
+    {"project", project_tool},
+};
+
 Json native_result(const Options& options, const std::string& name, const Json& args) {
-  if (name == "events") return tool_result(events_text(events(options, args)));
-  if (name == "game_shot") return game_shot(options, args);
-  if (name == "game_query") return game_query(options, args);
-  if (name == "scene_edit") return edit_files(options, args);
+  for (const auto& tool : kNativeTools) {
+    if (name == tool.name) return tool.run(options, args);
+  }
   const auto result = run_tool_command(command(options, name, args));
   if (!result) throw std::logic_error("missing native command");
   return tool_result(result->out + result->err, result->exit_code != kExitSuccess);

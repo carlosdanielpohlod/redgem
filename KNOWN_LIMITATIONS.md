@@ -725,11 +725,16 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
   bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials, terrain brushes and scene switching still use files or the editor UI. Native
+  materials and terrain brushes still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `project` tool checks a write as `redgem check` does: `game.json`'s physics and input
+  sections, and what the locales, dialogues and quests name of each other. Other sections of
+  `game.json` and items no quest names are written as given. It edits files only: an open editor
+  sees a new scene once it rescans its files, and a game must be restarted to read changed
+  settings.
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.

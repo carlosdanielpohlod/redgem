@@ -860,6 +860,8 @@ if(NOT ANDROID)
     project/scene_assignments.cpp
     project/component_words.cpp
     project/scene_edits.cpp
+    project/project_json_files.cpp
+    project/mcp_project_tools.cpp
     project/scene_command.cpp
     project/script_messages.cpp
     project/tool_play.cpp

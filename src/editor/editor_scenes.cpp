@@ -44,15 +44,18 @@ void EditorApp::open_scene(const std::string& name) {
 
 void EditorApp::switch_scene(const std::string& name) {
   std::string error;
-  if (!session_->open_scene(name, error)) {
-    log::error("cannot open scene " + name + ": " + error);
-    return;
-  }
+  if (!replace_scene(name, error)) log::error("cannot open scene " + name + ": " + error);
+}
+
+bool EditorApp::replace_scene(const std::string& name, std::string& error) {
+  if (!editing()) stop();
+  if (!session_->open_scene(name, error)) return false;
   upload_preview_assets();  // the last scene's meshes and textures are let go
   ui::forget_scene(panel_state_);
   look_through_main_camera();
   stroke_started_ = false;
   gizmo_dragging_ = false;
+  return true;
 }
 
 bool EditorApp::new_scene(const std::string& name) {
