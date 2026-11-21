@@ -14,6 +14,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,30 @@ struct TerrainPictures {
   bool empty() const { return layers == 0; }
 };
 
+inline constexpr float kDefaultNoiseSize = 10.0f;  // meters across a patch of a rule's noise
+
+// A range of a rule (heights, slopes, noise) with soft edges: a value well inside it counts
+// whole, one well outside it not at all, and over `soft` around each edge it fades from one to the
+// other (0: a hard edge). Either end may be left open.
+struct SoftRange {
+  float min = -std::numeric_limits<float>::infinity();
+  float max = std::numeric_limits<float>::infinity();
+  float soft = 0.0f;
+};
+
+// Where a layer goes, painted by rules (see ground_rules.hpp): the spots whose height (meters, in
+// the mesh's own space), slope (degrees from flat) and noise (0 to 1) are in its ranges, `strength`
+// of the way. A rule without ranges covers the whole terrain.
+struct GroundRule {
+  int layer = 0;
+  SoftRange height;
+  SoftRange slope;
+  SoftRange noise;
+  float noise_size = kDefaultNoiseSize;  // meters across a patch of the noise
+  std::uint32_t seed = 0;                // another seed, other patches
+  float strength = 1.0f;                 // 0 to 1: how far toward the layer a spot fully in range goes
+};
+
 // A terrain's ground layers and their weights, for the scene's node `node` (whose mesh they cover:
 // the splat map is laid over the mesh's own X and Z bounds).
 struct TerrainLayers {
@@ -96,6 +121,7 @@ struct TerrainLayers {
   int picture_size = kDefaultLayerPictureSize;
   float variation_size = kDefaultVariationSize;
   std::vector<TerrainLayer> layers;
+  std::vector<GroundRule> rules;  // how the layers are painted over the terrain, in order
   SplatMap splat;
   TerrainPictures pictures;
 };

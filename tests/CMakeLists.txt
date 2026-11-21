@@ -29,6 +29,7 @@ unit/temp_dirs_test.cpp
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
+  unit/ground_rules_test.cpp
   unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
@@ -235,6 +236,8 @@ unit/temp_dirs_test.cpp
   integration/navigation_api_test.cpp
   integration/environment_api_test.cpp
   integration/material_api_test.cpp
+  integration/terrain_api_test.cpp
+  integration/terrain_paint_test.cpp
   integration/terrain_files_test.cpp
   integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp

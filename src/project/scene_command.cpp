@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "app/scene_files.hpp"
+#include "app/terrain_files.hpp"
 #include "core/command_line.hpp"
 #include "core/config.hpp"
 #include "core/translations.hpp"
@@ -22,6 +23,9 @@
 #include "project/scene_prefab_words.hpp"
 #include "editor/prefab_instances.hpp"
 #include "project/scene_revision.hpp"
+#include "scene/ground/ground_rules.hpp"
+#include "scene/ground/terrain_layers_file.hpp"
+#include "scene/property.hpp"
 #include "scene/props.hpp"
 
 namespace redgem::tools {
@@ -36,6 +40,7 @@ constexpr const char* kAgainstOption = "--against";
 constexpr const char* kRevisionOption = "--revision";
 constexpr const char* kDiffWord = "diff";
 constexpr const char* kCompactWord = "compact";
+constexpr const char* kPaintWord = "paint";
 // The words after the object that `scene override` and `scene revert` take.
 constexpr std::size_t kPartWord = 2;
 constexpr std::size_t kFieldWord = 3;
@@ -311,6 +316,54 @@ ToolResult compact(OpenScene& scene) {
   return result;
 }
 
+// The weights the rules of a terrain's layers file paint, written beside the file: what was
+// written, or why nothing was.
+std::variant<std::string, ToolResult> painted_files(const OpenScene& scene, const TerrainLayers& layers,
+                                                    std::size_t texels) {
+  std::string error;
+  if (!write_splat_pictures(scene.game_dir, layers, error)) return failed(error);
+  std::string files = splat_picture_path(layers.name, 0);
+  if (layers.layers.size() > static_cast<std::size_t>(kLayersPerSplatPicture))
+    files += " " + splat_picture_path(layers.name, 1);
+  return tr("project.scene.painted", {{"texels", std::to_string(texels)},
+                                      {"object", object_word(scene)},
+                                      {"rules", std::to_string(layers.rules.size())},
+                                      {"files", files}});
+}
+
+// The ground layers the object names, read with their weights; why not, as the result.
+std::variant<TerrainLayers, ToolResult> layers_named_by(const OpenScene& scene, const NodeDesc& node) {
+  const auto name = get_string(node.props, props::kTerrainLayers);
+  if (!name) return failed(tr("project.scene.paint_no_layers", {{"object", object_word(scene)}}));
+  std::string error;
+  auto layers = read_terrain_files(scene.game_dir, *name, TerrainReading::Weights, error);
+  if (!layers) return failed(error);
+  if (layers->rules.empty()) return failed(tr("project.scene.paint_no_rules", {{"name", *name}}));
+  return std::move(*layers);
+}
+
+ToolResult paint_object(OpenScene& scene, int index) {
+  const SceneDesc& desc = scene.document.desc();
+  const NodeDesc& node = desc.nodes[static_cast<std::size_t>(index)];
+  if (!is_index_of(node.mesh, desc.meshes.size()))
+    return failed(tr("project.scene.paint_no_mesh", {{"object", object_word(scene)}}));
+  auto read = layers_named_by(scene, node);
+  if (auto* problem = std::get_if<ToolResult>(&read)) return *problem;
+  TerrainLayers& layers = std::get<TerrainLayers>(read);
+  const std::size_t texels = paint_ground(layers, layers.rules, desc.meshes[static_cast<std::size_t>(node.mesh)]);
+  auto written = painted_files(scene, layers, texels);
+  if (auto* problem = std::get_if<ToolResult>(&written)) return *problem;
+  return answer(std::get<std::string>(written) + "\n");
+}
+
+// Paints the object's ground layers by the rules of its layers file, and writes the weights. The
+// scene itself is not changed.
+ToolResult paint(OpenScene& scene) {
+  const auto object = named_object(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&object)) return *problem;
+  return paint_object(scene, std::get<int>(object));
+}
+
 // A line that takes as many words as it wants after those it needs (what to set).
 constexpr std::size_t kAnyMore = std::numeric_limits<std::size_t>::max();
 
@@ -325,6 +378,7 @@ constexpr Known kSubcommands[] = {
     {"get", get, kFirstAssignment, kFirstAssignment},  {"set", set, kFirstAssignment, kAnyMore},
     {"add", add, kFirstAssignment, kAnyMore},          {"remove", remove, kFirstAssignment, kFirstAssignment},
     {kCompactWord, compact, kObjectWord, kObjectWord},
+    {kPaintWord, paint, kFirstAssignment, kFirstAssignment},
     {"overrides", overrides, kFirstAssignment, kFirstAssignment},
     {"override", override_part, kFirstOverrideWord + 1, kAnyMore},
     {"revert", revert_overrides, kFirstAssignment, kFieldWord + 1},
@@ -332,7 +386,7 @@ constexpr Known kSubcommands[] = {
     {"unpack", unpack_placement, kFirstAssignment, kFirstAssignment},
 };
 
-// The options diff and compact have no use for.
+// The options diff, compact and paint have no use for.
 constexpr const char* kDiffRefuses[] = {kFromOption, kParentOption, kDepthOption};
 constexpr const char* kCompactRefuses[] = {kFromOption,  kParentOption,  kDepthOption,
                                            kLimitOption, kAgainstOption, kRevisionOption};
@@ -349,6 +403,7 @@ std::string first_refused(const ToolLine& line, const char* const (&options)[N],
 std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
   const std::string word = subcommand.word;
   if (word == kCompactWord) return first_refused(line, kCompactRefuses, "project.scene.compact_bad_option");
+  if (word == kPaintWord) return first_refused(line, kCompactRefuses, "project.scene.paint_bad_option");
   const bool diff_command = word == kDiffWord;
   if (!diff_command && names_baseline(line)) return tr("project.scene.diff_against_only");
   if (!diff_command) return {};

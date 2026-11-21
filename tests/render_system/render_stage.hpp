@@ -49,6 +49,8 @@ class RenderStage {
   // Brings the uploaded scene up to date with what changed in `desc` since, as the editor does
   // every frame (new pictures and materials, and their values).
   void sync(const SceneDesc& desc) { renderer_->sync(desc); }
+  // Sends the terrains' weights a script painted since (what a running game does every frame).
+  void follow_terrain_weights(const SceneDesc& desc) { renderer_->follow_terrain_weights(desc); }
   // Readies the next scene's assets ahead of its upload, about `bytes` a call (Renderer::stage).
   bool stage(const SceneDesc& desc, int scene, std::size_t bytes) {
     return renderer_->stage(desc, scene, bytes, FrameBudget({}, kStageSeconds));

@@ -64,6 +64,12 @@ void Renderer::Impl::sync_terrains(const SceneDesc& desc) {
   mark_terrain_parts(desc);  // (parts uploaded since are marked too)
 }
 
+// Only the weights that changed, for terrains already on the card (what a script painted).
+void Renderer::Impl::follow_terrain_weights(const SceneDesc& desc) {
+  if (!same_terrains(terrains, desc)) return;  // (the next upload or sync takes them whole)
+  for (std::size_t i = 0; i < terrains.size(); ++i) update_terrain_splat(terrains[i].textures, desc.terrains[i].splat);
+}
+
 // A terrain already on the card follows its layers: new weights, settings and mesh. Its pictures
 // are sent once (they are freed after), or again only while none could be sent.
 void Renderer::Impl::sync_terrain(GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc) {
