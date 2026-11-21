@@ -15,7 +15,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kDt = config::kFixedDeltaSeconds;
+constexpr float kDt = config::kDefaultFixedDeltaSeconds;
 constexpr int kOneSecond = 60;
 constexpr int kSettleSteps = 120;
 constexpr float kTolerance = 0.05f;

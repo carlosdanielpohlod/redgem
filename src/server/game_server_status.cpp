@@ -25,7 +25,7 @@ ServerStatus GameServer::status() const {
   status.uptime_seconds = clock().now() - started_at_;
   status.max_rooms = settings_.limits.max_rooms;
   status.max_players = settings_.limits.max_players;
-  status.tick_seconds = config::kFixedDeltaSeconds;
+  status.tick_seconds = config::kDefaultFixedDeltaSeconds;
   status.threads = threads_.size();
   status.max_threads = settings_.threads;
   status.traffic = traffic_.per_second();

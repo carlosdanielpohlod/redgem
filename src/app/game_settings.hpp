@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "app/android/android_settings.hpp"
+#include "core/config.hpp"
 #include "net/movement_rules.hpp"
 #include "net/secure/server_pins.hpp"
 #include "navigation/nav_settings.hpp"
@@ -47,6 +48,10 @@ struct GameSettings {
   // script/script_budget.hpp), in milliseconds, 1 to config::kMaxScriptBudgetMs:
   //   "script_budget_ms": 2000
   int script_budget_ms = config::kDefaultScriptBudgetMs;
+  // How many fixed steps the game takes a second (physics, fixed_update, Time.fixed_delta, a
+  // tool's or a test's frame), config::kMinTickHz to config::kMaxTickHz:
+  //   "tick_hz": 128
+  int tick_hz = config::kDefaultTickHz;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
   // How many threads solve the game's physics: the "threads" key of the "physics" section (see
@@ -87,6 +92,9 @@ struct GameManifest {
   // What is wrong with "script_budget_ms"; empty when it can be used or the file has none. (The
   // scripts get the engine's default instead.)
   std::string script_budget_error;
+  // What is wrong with "tick_hz"; empty when it can be used or the file has none. (The game ticks
+  // at config::kDefaultTickHz instead; `redgem check` refuses it.)
+  std::string tick_hz_error;
   // What is wrong with the "physics" section; each problem is left out, the rest is used.
   std::vector<std::string> physics_warnings;
   // What is wrong with the "physics" section's "max_bodies"; empty when it can be used or the

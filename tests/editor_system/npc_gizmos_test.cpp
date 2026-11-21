@@ -66,7 +66,7 @@ int red_pixels(EditorApp& app) {
 
 std::unique_ptr<EditorApp> open_editor(const std::filesystem::path& game) {
   auto options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   auto created = EditorApp::create(game, options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto app = std::move(std::get<std::unique_ptr<EditorApp>>(created));

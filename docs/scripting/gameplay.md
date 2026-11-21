@@ -270,6 +270,30 @@ def update(_dt)
 end
 ```
 
+To crouch, make its capsule shorter; to stand up, give it its height back. The feet stay where
+they are. Standing up is refused (`resize` returns false and nothing changes) while something is
+over its head, so try again on a later step. Change the size in `fixed_update`, between physics
+steps:
+
+```ruby
+STANDING = 1.8
+CROUCHING = 1.0
+RADIUS = 0.35
+
+def fixed_update(_dt)
+  wants_to_crouch = Input.action?(:crouch)
+  @crouched = true if wants_to_crouch && character.resize(height: CROUCHING, radius: RADIUS)
+  @crouched = false if stands_up?(wants_to_crouch)
+end
+
+def stands_up?(wants_to_crouch)
+  @crouched && !wants_to_crouch && character.resize(height: STANDING, radius: RADIUS)
+end
+```
+
+`resize` always makes an upright capsule, whatever collider the character had. Move the camera
+(the eye) down yourself: the object's origin does not move.
+
 ## Push things around
 
 A **dynamic** body falls, rolls and gets pushed. From a script:
@@ -391,6 +415,28 @@ steps. That last step is taken after `update`, so it is a little later than with
 - `Time.elapsed` during `update` counts the steps finished, not that last one.
 
 A dedicated server's rooms solve their physics on one thread whatever the setting.
+
+## Tick rate
+
+A game takes 60 fixed steps a second unless its `game.json` asks for another number, from 30 to
+128:
+
+```json
+{ "title": "Arena", "tick_hz": 128 }
+```
+
+Everything that runs on the fixed step follows it: the physics (bodies, characters, vehicles,
+water), every behaviour's `fixed_update`, and `Time.fixed_delta`, which is `1.0 / tick_hz`. So do
+the tools that play a game a step a frame: a frame of `redgem run`, `redgem shot`, `redgem-test`
+and the editor's Step is one step of the game, and `--seconds 1` plays `tick_hz` frames. `update`
+still runs once per drawn frame, whatever the tick.
+
+A faster tick makes movement and contacts finer and costs more: each step solves the whole world,
+so 128 Hz takes about twice the physics time of 60 Hz. Keep anything that must keep pace with the
+physics in `fixed_update`, and anything that counts frames to measure time in `Time.delta` or
+`Time.fixed_delta` instead. After a long frame (a hitch), a game catches up on about 133 ms of
+steps at most (a step's worth more at some ticks), whatever its tick. `redgem check` refuses a `tick_hz` out of bounds; a game played
+with one ticks at 60.
 
 ## How many bodies a scene holds
 

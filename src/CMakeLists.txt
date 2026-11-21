@@ -265,6 +265,7 @@ redgem_add_library(redgem_net
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
   net/movement_validator.cpp
+  net/placed_objects.cpp
   net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp

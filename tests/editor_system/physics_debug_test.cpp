@@ -87,7 +87,7 @@ int green_pixels(EditorApp& app) {
 TEST_CASE("the editor can show actual collider wires while paused and remove them without editing the scene") {
   const auto game = game_files();
   auto options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   auto created = EditorApp::create(game, options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);

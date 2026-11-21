@@ -63,6 +63,9 @@ void OverlappedPhysicsWorld::set_carried_bodies(ObjectId character, const std::v
 }
 void OverlappedPhysicsWorld::character_jump(ObjectId object, float speed) { settled().character_jump(object, speed); }
 bool OverlappedPhysicsWorld::character_grounded(ObjectId object) const { return settled().character_grounded(object); }
+bool OverlappedPhysicsWorld::resize_character(ObjectId object, float height, float radius) {
+  return settled().resize_character(object, height, radius);
+}
 void OverlappedPhysicsWorld::set_vehicle_input(ObjectId object, const VehicleInput& input) {
   settled().set_vehicle_input(object, input);
 }

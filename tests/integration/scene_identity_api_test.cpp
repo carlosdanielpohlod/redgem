@@ -55,7 +55,7 @@ TEST_CASE("script lookup refuses unknown identities and does not bind clones to 
 TEST_CASE("a stored scene identity never revives a stale reference after switching scenes") {
   IdentityGame game;
   game.ruby("$old = Scene.objects.first; $id = $old.stable_id; Game.load_scene('level2')");
-  game.engine->frame(config::kFixedDeltaSeconds);
+  game.engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(game.ruby("!$old.alive?") == "true");
   CHECK(game.ruby("begin; $old.stable_id; rescue RuntimeError; 'gone'; end") == "gone");
   CHECK(game.ruby("$current = Scene.find_by_id($id); $current.nil? || $current != $old") == "true");

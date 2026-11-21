@@ -13,7 +13,6 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
@@ -37,9 +36,9 @@ constexpr const char* kPassed = "passed";
 constexpr const char* kFailed = "failed";
 constexpr const char* kWaiting = "waiting";  // a frame of a wait in real seconds (SystemTest#wait_for)
 
-// The frames at the game's pace that `seconds` of waits in real seconds take.
-long long frames_in(int seconds) {
-  return std::llround(static_cast<double>(seconds) / static_cast<double>(config::kFixedDeltaSeconds));
+// The frames at the game's pace (`step` seconds each) that `seconds` of waits in real seconds take.
+long long frames_in(int seconds, float step) {
+  return std::llround(static_cast<double>(seconds) / static_cast<double>(step));
 }
 
 enum class Status { Running, Passed, Failed };
@@ -70,7 +69,7 @@ EngineOptions engine_options(const SystemTestOptions& options, const RunFiles& f
 class SystemTestRun {
  public:
   SystemTestRun(Engine& engine, FramePictures& pictures, int wait_limit_seconds)
-      : engine_(engine), pictures_(pictures), max_waited_frames_(frames_in(wait_limit_seconds)) {}
+      : engine_(engine), pictures_(pictures), max_waited_frames_(frames_in(wait_limit_seconds, engine.fixed_delta())) {}
 
   // Reads the test's file. Returns what is wrong with it, if anything is.
   std::optional<std::string> load(const std::filesystem::path& file);
@@ -121,7 +120,7 @@ int SystemTestRun::play() {
 void SystemTestRun::wait_a_frame() {
   ++waited_frames_;
   const auto step = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-      std::chrono::duration<float>(config::kFixedDeltaSeconds));
+      std::chrono::duration<float>(engine_.fixed_delta()));
   std::this_thread::sleep_until(last_waited_ + step);
   last_waited_ = std::chrono::steady_clock::now();
 }

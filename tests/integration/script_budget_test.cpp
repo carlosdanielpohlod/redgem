@@ -164,7 +164,7 @@ constexpr double kTickSeconds = kTestBudgetMs / kMillisecondsPerSecond / kTicksP
 // Runs frames; how long they took.
 SteadyClock::duration frames(Engine& engine, int count) {
   const SteadyClock::time_point start = SteadyClock::now();
-  for (int i = 0; i < count; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < count; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
   return SteadyClock::now() - start;
 }
 

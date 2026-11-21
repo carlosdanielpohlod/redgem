@@ -74,7 +74,7 @@ std::filesystem::path copy_game() {
 // Every frame counts as one fixed step, however long the machine took to draw it.
 EditorOptions even_pace() {
   EditorOptions options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   return options;
 }
 

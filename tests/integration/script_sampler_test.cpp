@@ -123,7 +123,7 @@ TEST_CASE("profiling a game samples its scripts, lists them and exports them to 
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   REQUIRE(engine.scripts().eval("Debug.profiling = true", "profile.rb").ok);
-  engine.frame(config::kFixedDeltaSeconds);  // the engine turns the sampler on with profiling
+  engine.frame(config::kDefaultFixedDeltaSeconds);  // the engine turns the sampler on with profiling
   REQUIRE(engine.scripts().vm().sampler().enabled());
   engine.scripts().vm().sampler().sample(engine.scripts().vm().state());
   const RubyResult listed = engine.scripts().eval("Debug.script_profile(3).size", "profile.rb");

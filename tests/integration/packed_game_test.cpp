@@ -68,7 +68,7 @@ int behaviour_count(Engine& engine) {
 // Plays a game for a while; how many behaviours it runs, checking it ran without a script error.
 int played(const std::filesystem::path& game) {
   auto engine = play_headless(game);
-  for (int i = 0; i < kPlayFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kPlayFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine->scripts().error_count() == 0);
   return behaviour_count(*engine);
 }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 #include "physics/buoyancy.hpp"
 #include "physics/physics_config.hpp"
@@ -57,6 +58,15 @@ Bounds collider_bounds(const Scene& scene, const SceneDesc& desc, ObjectId id, c
   return water_world_bounds(box.local, box.world);
 }
 
+// Where a body is: a character's collider may have changed size since it was made (a crouch), so
+// the physics world says; any other one's is its collider's.
+Bounds body_bounds(const Scene& scene, const SceneDesc& desc, const PhysicsWorld& physics, ObjectId id) {
+  const std::optional<Bounds> character =
+      physics.body_type(id) == BodyType::Character ? physics.body_bounds(id) : std::nullopt;
+  if (character) return *character;
+  return collider_bounds(scene, desc, id, body_config_from_props(scene.at(id).props));
+}
+
 // Whether an object could reach into the water at all: within reach of the box around every
 // surface (the object's mesh, scaled, from its origin; no collider is larger).
 bool near_water(const Scene& scene, const SceneDesc& desc, ObjectId id, const Bounds& water) {
@@ -76,8 +86,7 @@ std::vector<WaterBodySample> water_bodies(const Scene& scene, const SceneDesc& d
   for (const ObjectId id : scene.alive_ids()) {
     if (bodies.size() >= kMaxWaterBodies) break;
     if (!live_object(scene, id) || !moves_water(physics, id)) continue;
-    const Bounds bounds = collider_bounds(scene, desc, id, body_config_from_props(scene.at(id).props));
-    bodies.push_back({scene.handle(id), bounds, physics.velocity(id)});
+    bodies.push_back({scene.handle(id), body_bounds(scene, desc, physics, id), physics.velocity(id)});
   }
   return bodies;
 }

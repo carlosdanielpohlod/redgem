@@ -87,7 +87,7 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 
 - `start -> void`: called once, before the first update
 - `update(Float dt) -> void`: called every frame; dt is the seconds since the last one
-- `fixed_update(Float dt) -> void`: called 60 times a second, with the physics
+- `fixed_update(Float dt) -> void`: called at the game's tick (game.json's tick_hz, 60 times a second by default), with the physics
 - `on_trigger_enter(GameObject other) -> void`: something entered this object's trigger, or it entered one
 - `on_trigger_exit(GameObject other) -> void`: something left this object's trigger
 - `on_collision_enter(GameObject other) -> void`: this object's body touched another
@@ -109,7 +109,7 @@ A Ruby class attached to an object: the engine calls its methods as the game run
 - `rigidbody -> Rigidbody | nil`: the object's Rigidbody, or nil
 - `vehicle -> Vehicle | nil`: the object's Vehicle, or nil
 - `animation -> Animator`: the object's own Animator
-- `props -> Hash[String, untyped]`: the object's custom properties, as a Hash
+- `props -> Hash[Symbol, untyped]`: the object's custom properties, as a Hash with Symbol keys
 - `prop(Symbol | String key, untyped default = nil) -> untyped`: a setting: what add_component was given, else the object's property, else the default
 - `find(String | Symbol name) -> GameObject | nil`: the object called name, or nil
 - `find!(String | Symbol name) -> GameObject`: find that stops with a clear error when the object is missing
@@ -139,7 +139,7 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `restore_state(Hash[Symbol, untyped] state) -> self`: validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self *Experimental.*
 - `tag -> String | nil`: its tag property
 - `tag?(String | Symbol value) -> bool`: whether its tag is value
-- `props -> Hash[String, untyped]`: its custom properties
+- `props -> Hash[Symbol, untyped]`: its custom properties, as a Hash with Symbol keys
 - `joint -> Joint | nil`: the Joint it came with in the scene (its Joint component, set up in the editor), or nil *Experimental.*
 - `alive? -> bool`: false once it was destroyed
 - `destroy -> void`: removes it at the end of the step
@@ -306,7 +306,7 @@ The game's clock (added to Ruby's Time).
 
 - `Time.delta -> Float`: seconds since the last frame
 - `Time.unscaled_delta -> Float`: seconds since the last frame, whatever Time.scale (also while paused) *Experimental.*
-- `Time.fixed_delta -> Float`: seconds of a physics step (1/60)
+- `Time.fixed_delta -> Float`: seconds of a physics step: 1 / game.json's tick_hz (1/60 by default)
 - `Time.elapsed -> Float`: seconds since the game started
 - `Time.frame -> Integer`: how many frames have run
 - `Time.scale -> Float`: how fast game time runs (1 is normal)
@@ -407,6 +407,7 @@ The body of an object with body = "character": walks, jumps, climbs steps. See [
 - `move(Vector3 velocity) -> void`: walks with that velocity (m/s) this frame
 - `jump(Numeric speed) -> void`: jumps up at that speed
 - `grounded? -> bool`: whether it stands on something
+- `resize(height: Numeric, radius: Numeric) -> bool`: makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update *Experimental.*
 - `velocity -> Vector3`: its velocity
 - `layer -> Symbol`: its collision layer, a Symbol *Experimental.*
 - `layer = Symbol name`: moves it to another collision layer *Experimental.*
@@ -928,6 +929,7 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.validate_movement(max_speed: Numeric = 0.0, teleport_distance: Numeric = 0.0, tolerance: Numeric = 0.25, kick_after: Integer = 0, undo: bool = false) -> nil`: on the host: corrects the others' objects that move faster or further than this (no limits: off) *Experimental.*
 - `Network.movement_rules -> Hash[Symbol, Numeric | bool]`: the movement validation settings, as a hash *Experimental.*
 - `Network.movement_violations(Integer peer) -> Integer`: how many moves of a machine the host did not believe in this game *Experimental.*
+- `Network.teleport(GameObject | String object, Vector3 | Array[Numeric] position) -> bool`: on the host (or alone): puts an object kept in step (a GameObject with a NetworkSync, or its key) there on every machine, its owner's included, with no movement violation (a respawn, a spawn point, a level's entry); false on a machine that does not host *Experimental.*
 - `Network.port -> Integer`: the port of the game
 - `Network.room -> String | nil`: the room code, on a relay
 - `Network.relay -> String | nil`: the relay's address

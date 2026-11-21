@@ -32,6 +32,7 @@ constexpr const char* kFpsCapKey = "fps_cap";
 constexpr const char* kRenderScaleKey = "render_scale";
 constexpr const char* kQualityKey = "quality";
 constexpr const char* kScriptBudgetKey = config::kScriptBudgetKey;
+constexpr const char* kTickHzKey = "tick_hz";
 constexpr const char* kPhysicsKey = "physics";
 constexpr const char* kUiKey = "ui";
 constexpr const char* kUiReferenceKey = "reference";
@@ -116,6 +117,25 @@ std::string read_script_budget(const nlohmann::json& json, GameSettings& setting
   return std::string(kGameSettingsFile) + ": " + kScriptBudgetKey + " must be a whole number from 1 to " +
          std::to_string(config::kMaxScriptBudgetMs) + "; the scripts get " +
          std::to_string(config::kDefaultScriptBudgetMs) + " ms";
+}
+
+bool within_tick_range(std::int64_t asked) { return asked >= config::kMinTickHz && asked <= config::kMaxTickHz; }
+
+bool holds_usable_tick(const nlohmann::json& json) {
+  return holds_whole_number(json, kTickHzKey) && within_tick_range(json[kTickHzKey].get<std::int64_t>());
+}
+
+// The game's steps a second, when the file gives a number that can be used; what is wrong with it
+// otherwise.
+std::string read_tick_hz(const nlohmann::json& json, GameSettings& settings) {
+  if (!json.contains(kTickHzKey)) return {};
+  if (holds_usable_tick(json)) {
+    settings.tick_hz = json[kTickHzKey].get<int>();
+    return {};
+  }
+  return std::string(kGameSettingsFile) + ": " + kTickHzKey + " must be a whole number from " +
+         std::to_string(config::kMinTickHz) + " to " + std::to_string(config::kMaxTickHz) + "; the game ticks at " +
+         std::to_string(config::kDefaultTickHz) + " Hz";
 }
 
 void read_physics(const nlohmann::json& json, GameManifest& manifest) {
@@ -248,6 +268,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
+  manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
   read_sections(json, manifest);
   return manifest;
 }

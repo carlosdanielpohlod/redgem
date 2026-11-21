@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/math.hpp"
 #include "physics/physics_config.hpp"
 #include "scene/scene_config.hpp"
 
@@ -114,6 +115,24 @@ std::variant<ShapeInfo, std::string> with_shape(ShapeInfo info, const ShapeResul
 }
 
 }  // namespace
+
+CapsuleSize capsule_size_of(const ShapeInfo& info) {
+  return {(info.capsule_half_height + info.capsule_radius) / kHalf, info.capsule_radius};
+}
+
+Vec3 collider_bottom(const ShapeInfo& info) {
+  return info.center_offset - Vec3{0.0f, capsule_size_of(info).height * kHalf, 0.0f};
+}
+
+std::variant<ShapeInfo, std::string> capsule_standing_on(Vec3 bottom, CapsuleSize size) {
+  ShapeInfo info;
+  info.half_extents = {size.radius, size.height * kHalf, size.radius};
+  ShapeResult centered = capsule_shape(info.half_extents, info);
+  // (A capsule too short for its width is made a little taller: its bottom stays put.)
+  info.half_extents.y = info.capsule_half_height + info.capsule_radius;
+  info.center_offset = bottom + Vec3{0.0f, info.half_extents.y, 0.0f};
+  return with_shape(info, moved(std::move(centered), info.center_offset));
+}
 
 std::variant<ShapeInfo, std::string> build_shape(const BodyDesc& desc) {
   if (desc.config.collider == ColliderShape::Mesh) return with_shape(ShapeInfo{}, build_mesh(desc));

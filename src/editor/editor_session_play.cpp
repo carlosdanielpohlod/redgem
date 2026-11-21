@@ -193,7 +193,7 @@ void EditorSession::tick(float frame_seconds) {
 
 bool EditorSession::step() {
   if (play_state_ != PlayState::Paused || !runtime_) return false;
-  runtime_->frame(config::kFixedDeltaSeconds);
+  runtime_->frame(runtime_->fixed_delta());
   if (runtime_->finished()) stop();
   return true;
 }
