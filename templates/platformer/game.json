@@ -22,7 +22,7 @@
     },
     "screens": {
       "title": {
-        "logo": { "image": "logo", "anchor": "top_left", "x": 72, "y": 40 },
+        "logo": { "image": "logo", "anchor": "top_left", "x": 72, "y": 64 },
         "footer": { "text": "{title} v{version}" },
         "background": {
           "kind": "scene",
