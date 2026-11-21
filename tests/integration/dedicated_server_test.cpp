@@ -80,7 +80,7 @@ constexpr int kFastTick = 128;
 constexpr double kFastTickSeconds = 1.0 / kFastTick;
 constexpr int kTooFastTick = 500;  // past config::kMaxTickHz
 constexpr double kMillisecondsPerSecond = 1000.0;
-constexpr double kStatusRounding = 0.0005;  // the status says milliseconds to a thousandth
+constexpr double kStatusRounding = 0.0005;      // the status says milliseconds to a thousandth
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
 constexpr const char* kHeadEnd = "\r\n\r\n";
@@ -124,7 +124,7 @@ struct SlowGame {
 
 // The sandbox game in a folder of its own, ticking at kFastTick.
 struct FastGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-fast-tick-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-fast-tick-test";
   std::filesystem::path game = root / "game";
 
   explicit FastGame(int tick_hz = kFastTick) {
