@@ -5,14 +5,12 @@
 #   Material.set_emission("window_glass", [255, 190, 120], strength: 4.0)
 #   Material.reset_emission("window_glass")    # as the file says again
 module Material
-  CHANNEL_MAX = 255.0 # a color's channels go from 0 to this
   RGB = 3
 
   # color: a name (:orange) or [r, g, b] from 0 to 255; strength: how bright, 1 being the color as it is.
   def self.set_emission(name, color, strength: 1.0)
-    light = UI.rgb(color).first(RGB).map { |channel| channel / CHANNEL_MAX * strength }
-    __set_emission(name.to_s, *light)
-    __emissions[name.to_s] = { color: color, strength: strength }
+    __set_emission(name.to_s, *UI.rgb(color).first(RGB), strength)
+    __emissions[name.to_s] = { color: color.is_a?(Array) ? color.dup : color, strength: strength }
     nil
   end
 

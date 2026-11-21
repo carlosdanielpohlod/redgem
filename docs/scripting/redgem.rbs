@@ -757,7 +757,7 @@ end
 # The glow of the scene's materials, by name, changed while the game runs: lit windows at night.
 %a{redgem:experimental}
 module Material
-  # every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength, over what the scene's file says
+  # every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength (0 to 1000), over what the scene's file says
   %a{redgem:experimental}
   def self.set_emission: (Symbol | String name, Symbol | Array[Numeric] color, ?strength: Numeric) -> nil
   # the materials of that name glow as the scene's file says again

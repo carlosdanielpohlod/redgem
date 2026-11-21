@@ -191,7 +191,8 @@ Material.reset_emission("window_glass")                                 # as the
 ```
 
 Every material of that name glows, in every object that has it, copies and prefabs spawned later
-and the scenes loaded after, until `reset_emission`. Strengths above 1 glow through bloom. Each
+and the scenes loaded after, until `reset_emission`. The color is given as color pickers show it and glows as a light of that
+color would. The strength goes from 0 to 1000; above 1 it glows through bloom. Each
 machine keeps its own glow, so a game played together sets it on every machine.
 
 ### Coated materials

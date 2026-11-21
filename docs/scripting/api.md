@@ -392,7 +392,7 @@ Every surface whose material has `water = true` fills the column under it down t
 
 The glow of the scene's materials, by name, changed while the game runs: lit windows at night. *Experimental.* See [../levels.md#glowing-materials-from-scripts](../levels.md#glowing-materials-from-scripts).
 
-- `Material.set_emission(Symbol | String name, Symbol | Array[Numeric] color, strength: Numeric = 1.0) -> nil`: every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength, over what the scene's file says *Experimental.*
+- `Material.set_emission(Symbol | String name, Symbol | Array[Numeric] color, strength: Numeric = 1.0) -> nil`: every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength (0 to 1000), over what the scene's file says *Experimental.*
 - `Material.reset_emission(Symbol | String name) -> nil`: the materials of that name glow as the scene's file says again *Experimental.*
 - `Material.emission(Symbol | String name) -> Hash[Symbol, untyped] | nil`: what set_emission gave the materials of that name, {color:, strength:}, or nil *Experimental.*
 
