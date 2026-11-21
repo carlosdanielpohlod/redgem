@@ -104,6 +104,7 @@
   "game.quest.distance": "{meters} m",
   "game.record.failed": "the video {file} could not be finished: the encoder stopped with an error",
   "game.record.no_encoder": "cannot record {file}: {program} was not found; install it and put it on the PATH",
+  "game.record.no_sound": "the video {file} has no sound: its sound could not be written or put in",
   "game.settings.audio": "Audio",
   "game.settings.borderless": "Borderless",
   "game.settings.controls": "Controls",

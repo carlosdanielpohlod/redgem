@@ -10,9 +10,12 @@
 // Each sound goes through a slot of the effect rack (its group's low-pass and reverb send), and
 // the buses' reverbs go into the device's mix after every sound of a period. Raylib's processors
 // take no context, so each slot has a function of its own.
+//
+// A mixdown (a recording's sound) opens no device: the same mix is pulled a block at a time.
 
 #include <raylib.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <map>
@@ -25,6 +28,7 @@
 #include "audio/audio.hpp"
 #include "audio/effect_rack.hpp"
 #include "audio/game_music.hpp"
+#include "audio/raylib_mixdown.h"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -253,6 +257,12 @@ class RaylibSoundDriver final : public SoundDriver {
     meter(id, stream_of(id));
   }
   float level(SoundSourceId id) const override { return meters_.level(id); }
+  // Every stream fed (the loops), as update does for one.
+  void feed() {
+    for (auto& [id, playing] : voices_) {
+      if (auto* music = std::get_if<Music>(&playing.voice)) UpdateMusicStream(*music);
+    }
+  }
   void stop(SoundSourceId id) override {
     const auto found = voices_.find(id);
     if (found == voices_.end()) return;
@@ -295,6 +305,9 @@ class RaylibMusicDriver final : public MusicDriver {
     return true;
   }
   void update(MusicTrackId id) override { UpdateMusicStream(tracks_.at(id)); }
+  void feed() {
+    for (auto& [id, music] : tracks_) UpdateMusicStream(music);
+  }
   void volume(MusicTrackId id, float volume) override { SetMusicVolume(tracks_.at(id), volume); }
   void pitch(MusicTrackId id, float pitch) override { SetMusicPitch(tracks_.at(id), pitch); }
   void stop(MusicTrackId id) override {
@@ -310,16 +323,36 @@ class RaylibMusicDriver final : public MusicDriver {
   std::map<MusicTrackId, Music> tracks_;
 };
 
-// The device, opened first and closed last.
+// What raylib's streams hold when nothing else is asked for: its own size (a 30th of a second).
+constexpr int kRaylibStreamFrames = 0;
+// The most frames a mixdown mixes at once (about what a device asks for at once), the streams fed
+// before each block.
+constexpr std::size_t kMixdownBlockFrames = 512;
+// How many times a block's frames a stream of a mixdown holds: a block takes more of a stream's own
+// frames than it mixes when the stream plays faster (its pitch, the Doppler effect) or was
+// recorded at a higher rate (up to 8 times: twice as fast at 192 kHz, or kMaxSpatialPitch at 48).
+constexpr int kMixdownStreamBlocks = 8;
+
+// Opens raylib's audio for a mixdown, its streams holding what a block can take of them.
+void open_mixdown(const MixdownFormat& format) {
+  InitAudioMixdown(static_cast<unsigned int>(format.sample_rate));
+  SetAudioStreamBufferSizeDefault(static_cast<int>(kMixdownBlockFrames) * kMixdownStreamBlocks);
+}
+
+// The device, opened first and closed last: the machine's, or none for a mixdown.
 class RaylibDevice {
  public:
-  RaylibDevice() {
-    InitAudioDevice();
+  explicit RaylibDevice(const std::optional<MixdownFormat>& mixdown) {
+    if (mixdown) open_mixdown(*mixdown);
+    if (!mixdown) InitAudioDevice();
     ready_ = IsAudioDeviceReady();
-    if (!ready_) log::warning("no audio device: the game runs silently");
+    if (!ready_)
+      log::warning(mixdown ? "the game's sound cannot be mixed: the recording is silent"
+                           : "no audio device: the game runs silently");
     if (ready_) AttachAudioMixedProcessor(mix_callback);
   }
   ~RaylibDevice() {
+    SetAudioStreamBufferSizeDefault(kRaylibStreamFrames);
     if (!ready_) return;
     DetachAudioMixedProcessor(mix_callback);
     CloseAudioDevice();
@@ -335,6 +368,7 @@ class RaylibDevice {
 // What the pool and the music player play through, made before them and gone after them (in
 // reverse: the drivers, the decoded sounds, then the device).
 struct RaylibParts {
+  explicit RaylibParts(const std::optional<MixdownFormat>& mixdown) : device(mixdown) {}
   RaylibDevice device;
   SoundLibrary library;
   RaylibSoundDriver sound_driver{library};
@@ -343,7 +377,16 @@ struct RaylibParts {
 
 class RaylibAudio final : private RaylibParts, public MixedAudio {
  public:
-  RaylibAudio() : MixedAudio(sound_driver, music_driver) { library.open(device.ready()); }
+  explicit RaylibAudio(const std::optional<MixdownFormat>& mixdown)
+      : RaylibParts(mixdown), MixedAudio(sound_driver, music_driver) {
+    library.open(device.ready());
+  }
+  bool ready() const { return device.ready(); }
+  // Every stream fed: a mixdown mixes more than one block between two updates.
+  void feed_streams() {
+    sound_driver.feed();
+    music_driver.feed();
+  }
 
   void set_master_volume(float volume) override {
     const float heard = heard_volume(volume);
@@ -357,8 +400,33 @@ class RaylibAudio final : private RaylibParts, public MixedAudio {
   }
 };
 
+class RaylibMixdown final : public AudioMixdown {
+ public:
+  explicit RaylibMixdown(const MixdownFormat& format) : audio_(format) {}
+  AudioSystem& audio() override { return audio_; }
+  // In blocks of what a device asks for at once (the reverb buses hold a device's period, no more),
+  // the streams fed before each one.
+  // Silence when raylib's audio did not open.
+  void render(float* samples, std::size_t frames) override {
+    if (!audio_.ready()) std::fill(samples, samples + frames * kDeviceChannels, kSilence);
+    if (!audio_.ready()) return;
+    for (std::size_t done = 0; done < frames; done += kMixdownBlockFrames) {
+      const std::size_t block = std::min(kMixdownBlockFrames, frames - done);
+      audio_.feed_streams();
+      RenderAudioMix(samples + done * kDeviceChannels, static_cast<unsigned int>(block));
+    }
+  }
+
+ private:
+  RaylibAudio audio_;
+};
+
 }  // namespace
 
-std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(); }
+std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(std::nullopt); }
+
+std::unique_ptr<AudioMixdown> create_raylib_mixdown(const MixdownFormat& format) {
+  return std::make_unique<RaylibMixdown>(format);
+}
 
 }  // namespace redgem

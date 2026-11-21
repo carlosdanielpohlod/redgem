@@ -249,6 +249,8 @@ TEST_CASE("a game recorded to a video from the command line, with what the recor
   CHECK(record.scale == FrameSize{1920, 1080});
   REQUIRE(record.seconds);
   CHECK(*record.seconds == doctest::Approx(2.5));
+  CHECK(record.sound);  // with the game's sound unless asked otherwise
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-audio", "off"}).options.record.sound);
   const GameWindowOptions window = developer_play_options(result.options);
   REQUIRE(window.record);
   CHECK(window.record->file == "out.mp4");
@@ -261,5 +263,7 @@ TEST_CASE("a recording asked for wrongly is refused, saying what it needs") {
   CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-size", "1920"}).ok);
   CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-scale", "0x1080"}).ok);
   CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-seconds", "-1"}).ok);
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-audio", "maybe"}).ok);
+  CHECK(usage().find("--record-audio on|off") != std::string::npos);
   CHECK(usage().find("--record") != std::string::npos);
 }
