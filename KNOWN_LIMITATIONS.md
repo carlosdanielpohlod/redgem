@@ -285,7 +285,7 @@ real clock.
 
 - Some test cases still sleep or measure the real clock, a source of rare timing failures: those
   that check that some work ends within seconds (a flood of messages, many numbers to parse, a
-  large physics world taken apart, a game whose web requests end at once). The network tests count
+  large physics world taken apart, games whose web requests are answered as they end). The network tests count
   rounds and wait on their sockets (`tests/socket_rounds.hpp`), but for a relay's wait woken by a
   call from another thread, a flood paced to real time for the system's own TCP timers, the join
   times the encrypted tests print, and a dedicated server's rooms, which play on threads of their

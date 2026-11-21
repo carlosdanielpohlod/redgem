@@ -51,8 +51,10 @@ class AgentConnection {
   void write_messages();
   void keep_error_line(const std::string& line);
   bool take_inbox(std::deque<Json>& messages, bool& ended);
-  // Whether a poll has something to take in (under lock_).
-  bool news_waiting() const { return !inbox_.empty() || output_ended_ || unreadable_; }
+  // Whether a poll has something to take in (under lock_, on the editor's thread): a message, or
+  // the agent's end not reported yet.
+  bool news_waiting() const { return !inbox_.empty() || end_to_report(); }
+  bool end_to_report() const { return (output_ended_ || unreadable_) && !end_reported_; }
   std::string why_it_ended() const;
 
   AgentClient client_;

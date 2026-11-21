@@ -1,9 +1,7 @@
 #include "editor/agent/agent_connection.hpp"
 
-#include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <utility>
 
 #include "core/wait_length.hpp"

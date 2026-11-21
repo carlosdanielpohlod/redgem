@@ -1,7 +1,5 @@
 #include "net/http/http_client.hpp"
 
-#include <algorithm>
-#include <cmath>
 #include <condition_variable>
 #include <mutex>
 #include <optional>

@@ -11,7 +11,6 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <thread>
 #include <variant>
 
 #include "core/files.hpp"
