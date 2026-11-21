@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "server/server_command.hpp"
@@ -34,7 +33,8 @@ struct Census {
 // Says where a server that started listens, where it keeps its saves and TLS identity, and the
 // fingerprint games pin it by.
 void say_started(const GameServer& server, const ServerSettings& settings) {
-  log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
+  log::info("game server listening on port " + std::to_string(server.port()) + ", its rooms at " +
+            std::to_string(server.tick_hz()) + " Hz (Ctrl+C stops it)");
   log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
   log::info("its TLS identity is kept in " + settings.data_dir.string());
   log::info(net::fingerprint_notice(server.fingerprint()));
@@ -61,7 +61,7 @@ int run_server(const ServerSettings& settings) {
 
 void serve_until(GameServer& server, const std::function<bool()>& stop, const std::function<bool()>& status_asked) {
   Clock& clock = server.clock();
-  TickPacer pacer(config::kDefaultFixedDeltaSeconds, clock.now());
+  TickPacer pacer(server.tick_seconds(), clock.now());
   Census census;
   while (!stop()) {
     clock.sleep(pacer.until_next(clock.now()));

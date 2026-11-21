@@ -8,6 +8,7 @@
 
 #include "app/engine.hpp"
 #include "core/clock.hpp"
+#include "core/config.hpp"
 #include "server/room_slot.hpp"
 
 namespace redgem::server {
@@ -20,6 +21,8 @@ struct RoomStart {
   const SceneDesc* scene = nullptr;
   SaveStore* save = nullptr;
   Clock* clock = &steady_clock();
+  // How long each of its turns is: the game's fixed step (1 / game.json's "tick_hz").
+  double tick_seconds = config::kDefaultFixedDeltaSeconds;
 };
 
 // One of a dedicated server's threads: it runs the rooms it is given, each a frame every turn,

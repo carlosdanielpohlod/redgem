@@ -336,6 +336,8 @@ redgem_add_library(redgem_runtime
   scene/prefab_nodes.cpp
   scene/prefab_origins.cpp
   scene/prefab_loader.cpp
+  scene/prefab_overrides.cpp
+  scene/prefab_customize.cpp
   scene/gltf/gltf_checks.cpp
   scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp

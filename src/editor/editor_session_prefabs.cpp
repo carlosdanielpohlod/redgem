@@ -19,9 +19,18 @@ ObjectId EditorSession::authored_object(ObjectId id) const {
   }
   return id;
 }
-Transform EditorSession::placement_world(ObjectId id) const {
+Transform EditorSession::authored_parent_world(ObjectId id) const {
   const auto& node = document_.node(id);
-  return node.parent == kNoIndex ? node.local : combine(preview_.world_transform(node.parent), node.local);
+  const Transform parent = node.parent == kNoIndex ? Transform{} : preview_.world_transform(node.parent);
+  const auto* chain = prefab_preview_.attachment(id);
+  return chain ? combine(parent, *chain) : parent;
+}
+Transform EditorSession::placement_world(ObjectId id) const {
+  return combine(authored_parent_world(id), document_.node(id).local);
+}
+void EditorSession::unhang(int index) {
+  if (document_.node(index).props.count(props::kPrefabParent) != 0)
+    document_.remove_prop(index, props::kPrefabParent, false);
 }
 void EditorSession::sync_preview_assets(const std::vector<int>& changed_meshes) {
   if (!prefab_preview_.sync_assets(document_.desc(), changed_meshes)) refresh_preview();
@@ -42,7 +51,8 @@ void EditorSession::move_roots(const std::vector<std::string>& names, const std:
                                const std::vector<Transform>& locals) {
   for (std::size_t i = 0; i < names.size(); ++i) {
     const int under = parent.empty() ? kNoIndex : document_.desc().find_node(parent);
-    document_.reparent(document_.desc().find_node(names[i]), under, false, &locals[i]);
+    const int index = document_.desc().find_node(names[i]);
+    if (document_.node(index).parent != under) unhang(document_.reparent(index, under, false, &locals[i]));
   }
 }
 void EditorSession::place_pasted(const std::vector<int>& objects, const std::string& parent,
