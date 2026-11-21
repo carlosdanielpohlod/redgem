@@ -77,6 +77,7 @@ constexpr double kClockTolerance = 1e-9;
 constexpr int kFastTick = 128;
 constexpr double kFastTickSeconds = 1.0 / kFastTick;
 constexpr double kMillisecondsPerSecond = 1000.0;
+constexpr double kStatusRounding = 0.0005;  // the status says milliseconds to a thousandth
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
 constexpr const char* kHeadEnd = "\r\n\r\n";
@@ -460,7 +461,8 @@ TEST_CASE("a server of a game at 128 Hz takes its lobby's turns at 128 Hz, and i
   CHECK(on_time);
   CHECK(clock.slept() == doctest::Approx(kServedTurns * kFastTickSeconds));
   const nlohmann::json status = server::status_json(online_game.server.status());
-  CHECK(status["frame_ms"]["budget"].get<double>() == doctest::Approx(kFastTickSeconds * kMillisecondsPerSecond));
+  const double budget_ms = status["frame_ms"]["budget"].get<double>();
+  CHECK(std::abs(budget_ms - kFastTickSeconds * kMillisecondsPerSecond) <= kStatusRounding);
 }
 
 TEST_CASE("a room of a game at 128 Hz plays a frame and a fixed step each 1/128 s of its clock") {
