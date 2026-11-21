@@ -14,6 +14,7 @@
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using nlohmann::json;
@@ -41,7 +42,7 @@ std::vector<std::uint8_t> lossless_of_size(std::uint32_t width, std::uint32_t he
   return encoded;
 }
 struct WebpScene {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-webp-scene-test";
+  std::filesystem::path folder = redgem::test::temp_root() / "redgem-webp-scene-test";
   WebpScene() {
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);

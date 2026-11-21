@@ -44,6 +44,7 @@
 #include "project/editor_bridge_wire.hpp"
 #include "project/editor_live_tools.hpp"
 #include "project/editor_bridge_run.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::save_window_picture;
@@ -65,7 +66,7 @@ std::filesystem::path screenshot(const std::string& name) {
 }
 
 std::filesystem::path copy_game() {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_editor_window";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_editor_window";
   std::filesystem::remove_all(dir);
   std::filesystem::copy(REDGEM_PLATFORMER_DIR, dir, std::filesystem::copy_options::recursive);
   return dir;
@@ -386,7 +387,7 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
 
 TEST_CASE("files dropped on the editor become the game's models and sounds, and new ground comes with the brush on") {
   const std::filesystem::path game = copy_game();
-  const std::filesystem::path desk = std::filesystem::temp_directory_path() / "redgem_editor_desk";
+  const std::filesystem::path desk = redgem::test::temp_root() / "redgem_editor_desk";
   std::filesystem::remove_all(desk);
   std::filesystem::create_directories(desk);
   std::filesystem::copy_file(std::filesystem::path(REDGEM_FIXTURES_DIR) / "hierarchy.glb", desk / "tower.glb");
@@ -474,7 +475,7 @@ TEST_CASE("another game opens with panels that remember nothing of the last one"
 }
 
 TEST_CASE("the project hub creates a game from a template and lists it next time") {
-  const std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem_hub";
+  const std::filesystem::path root = redgem::test::temp_root() / "redgem_hub";
   std::filesystem::remove_all(root);
   const ProjectHub::Options options{root / "games", root / "recent.json"};
   {
@@ -831,7 +832,7 @@ TEST_CASE("objects are selected by clicks and a rectangle, duplicated, and copie
 
 TEST_CASE("a picture dropped on the editor goes to images/, and a material shows it once saved") {
   const std::filesystem::path game = copy_game();
-  const std::filesystem::path desk = std::filesystem::temp_directory_path() / "redgem_editor_pictures";
+  const std::filesystem::path desk = redgem::test::temp_root() / "redgem_editor_pictures";
   std::filesystem::remove_all(desk);
   std::filesystem::create_directories(desk);
   std::filesystem::copy_file(std::filesystem::path(REDGEM_FIXTURES_DIR) / "images" / "sniff.png", desk / "wood.png");
@@ -995,5 +996,25 @@ TEST_CASE("a hinge added in the Inspector holds a lid that swings to its limit o
   app.stop();
   CHECK(y_of(session, name) == doctest::Approx(spot.y));
   CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("MCP saves the open scene as another and opens the game's scenes in the real editor") {
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  test::FrameWaitClock clock;
+  auto server = enable_editor_bridge(app, clock.reading());
+  REQUIRE(server);
+  editor_call(app, *server, clock, {{"action", "save_as"}, {"scene", "cave"}});
+  CHECK(app.session().scene_name() == "cave");
+  CHECK(std::filesystem::exists(game / config::kScenesDirName / "cave.glb"));
+  editor_call(app, *server, clock, {{"action", "open_scene"}, {"scene", config::kMainSceneName}});
+  CHECK(app.session().scene_name() == config::kMainSceneName);
+  run(app, kFrameFrames);
+  CHECK(app.console().error_count() == 0);
+  app.set_frame_hook({});
   std::filesystem::remove_all(game);
 }

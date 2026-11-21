@@ -46,6 +46,14 @@ RenderTexture2D target_of(const Multisampled& samples) {
   return target;
 }
 
+// The view model's field of view, in degrees: the main camera's own, else the engine's.
+float view_model_fov_of(const Scene& scene) {
+  const ObjectId id = scene.main_camera();
+  const std::optional<CameraDesc>& lens = id == kNoObject ? std::nullopt : scene.at(id).camera;
+  const float fov = lens ? lens->view_model_fov_y_radians : kUnsetFov;
+  return fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultViewModelFovYDegrees;
+}
+
 }  // namespace
 
 Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
@@ -76,6 +84,7 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
+  view_model_fov = view_model_fov_of(scene);
   draw_shadow_map(camera, env, particles);
   capture_reflection_face(camera);
   send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
@@ -85,7 +94,7 @@ void Renderer::Impl::use_environment(const Environment& env, const Camera3D& cam
   use_sky_picture(env);
   const bool clearcoat = std::any_of(material_factors.begin(), material_factors.end(), coated);
   const bool water = std::any_of(material_factors.begin(), material_factors.end(), water_surface);
-  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat, water});
+  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat, water, has_terrains()});
   if (water) ensure_water_target();
   send(shader, lit_uniforms.water_ready, render_math::kOff);
   begin_temporal(env, camera);
@@ -116,6 +125,7 @@ void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem
   draw_scene_particles(particles, camera);
   EndMode3D();
   if (glow_gathered) add_gathered_glow();
+  draw_view_model(camera);
   EndTextureMode();
   if (sampled) resolve_samples();
 }

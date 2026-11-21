@@ -4,11 +4,12 @@
 #include <string>
 
 #include "core/files.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
 TEST_CASE("a file's text is written whole and read back as it was") {
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_files_test";
+  const std::filesystem::path dir = redgem::test::temp_root() / "redgem_files_test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
   const std::string text = std::string("first line\nsecond\r\n") + '\0' + "after a zero byte";
@@ -22,7 +23,7 @@ TEST_CASE("a file's text is written whole and read back as it was") {
 }
 
 TEST_CASE("a file that cannot be read or written says which one") {
-  const std::filesystem::path missing = std::filesystem::temp_directory_path() / "redgem_files_test_missing" / "a.txt";
+  const std::filesystem::path missing = redgem::test::temp_root() / "redgem_files_test_missing" / "a.txt";
   std::filesystem::remove_all(missing.parent_path());
   std::string error;
   CHECK_FALSE(read_text_file(missing, error).has_value());

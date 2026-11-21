@@ -20,6 +20,7 @@
 #include "core/files.hpp"
 #include "script/script_config.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 namespace redgem::test::physics_game {
 
@@ -45,7 +46,7 @@ inline std::string shooter_game_saving_slowly() {
 
 // A game folder of the test's own holding only a game.json, removed when the test ends.
 struct TempGame {
-  fs::path dir = fs::temp_directory_path() / "redgem-physics-api-test";
+  fs::path dir = redgem::test::temp_root() / "redgem-physics-api-test";
   explicit TempGame(const std::string& game_json) {
     fs::remove_all(dir);
     fs::create_directories(dir);

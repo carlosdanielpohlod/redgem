@@ -11,6 +11,7 @@
 #include "test_support.hpp"
 #include "storage/save_file.hpp"
 #include "storage/save_view.hpp"
+#include "temp_dirs.hpp"
 using namespace redgem;
 namespace {
 struct SlotGame {
@@ -33,7 +34,7 @@ struct SlotGame {
   void frame() { engine->frame(config::kDefaultFixedDeltaSeconds); }
 };
 struct SlotData {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-slot-api-test";
+  std::filesystem::path folder = redgem::test::temp_root() / "redgem-slot-api-test";
   std::filesystem::path file = folder / "save.json";
   SlotData() { std::filesystem::remove_all(folder); }
   ~SlotData() { std::filesystem::remove_all(folder); }

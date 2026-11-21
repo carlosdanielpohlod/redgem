@@ -26,6 +26,7 @@
 #include "server/stop_signals.hpp"
 #include "socket_rounds.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -79,7 +80,7 @@ constexpr int kFastTick = 128;
 constexpr double kFastTickSeconds = 1.0 / kFastTick;
 constexpr int kTooFastTick = 500;  // past config::kMaxTickHz
 constexpr double kMillisecondsPerSecond = 1000.0;
-constexpr double kStatusRounding = 0.0005;  // the status says milliseconds to a thousandth
+constexpr double kStatusRounding = 0.0005;      // the status says milliseconds to a thousandth
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 constexpr std::size_t kStatusReadBytes = 64 * 1024;
 constexpr const char* kHeadEnd = "\r\n\r\n";
@@ -108,7 +109,7 @@ std::string in_room(server::GameServer& server, const std::string& room, const s
 // The sandbox game in a folder of its own, with a level that may load slowly (kSlowScene), and
 // scripts given the time for it (past the engine's default budget).
 struct SlowGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-slow-level-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-slow-level-test";
   std::filesystem::path game = root / "game";
 
   SlowGame() {
@@ -123,7 +124,7 @@ struct SlowGame {
 
 // The sandbox game in a folder of its own, ticking at kFastTick.
 struct FastGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-fast-tick-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-fast-tick-test";
   std::filesystem::path game = root / "game";
 
   explicit FastGame(int tick_hz = kFastTick) {
@@ -146,7 +147,7 @@ bool offline(Engine& engine) { return engine.network().state() == net::NetworkSe
 
 // A dedicated server on this machine and the players who join it, each with an engine of its own.
 struct Online {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-dedicated-server-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-dedicated-server-test";
   server::GameServer server;
   std::vector<std::unique_ptr<Engine>> players;
 
@@ -508,7 +509,8 @@ TEST_CASE("a player whose connection to a full room drops gets its place back, w
   const auto until = [&](const std::function<bool()>& done) {
     return online_game.until([&] {
       network.pump();
-      for (net::NetworkEvent& event : dropping.poll(config::kDefaultFixedDeltaSeconds)) events.push_back(std::move(event));
+      for (net::NetworkEvent& event : dropping.poll(config::kDefaultFixedDeltaSeconds))
+        events.push_back(std::move(event));
       return done();
     });
   };

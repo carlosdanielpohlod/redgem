@@ -16,6 +16,7 @@
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using nlohmann::json;
@@ -115,7 +116,7 @@ std::vector<std::uint8_t> with_byte(std::vector<std::uint8_t> bytes, std::size_t
 }
 
 struct Ktx2Scene {
-  std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-ktx2-scene-test";
+  std::filesystem::path folder = redgem::test::temp_root() / "redgem-ktx2-scene-test";
   Ktx2Scene() {
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);

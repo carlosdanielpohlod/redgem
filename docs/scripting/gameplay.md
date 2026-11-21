@@ -256,6 +256,34 @@ if Input.mouse_pressed?(:left)
 end
 ```
 
+## A first-person weapon: the view model
+
+Put the weapon (or the hands) under the camera and set `view_model = true` on it, in the
+Inspector or from a script (`weapon.view_model = true`). Everything under it is drawn with it.
+The view model is drawn after the world, over it: pressed against a wall, the weapon stays whole
+instead of going into the wall. It has its own field of view, so a wide world (`Camera.fov = 100`)
+does not stretch the weapon:
+
+```ruby
+Camera.view_model_fov = 55   # degrees; 50 unless set
+```
+
+It is lit by the sun without the world's shadows, and by a fill light from the eye, so it reads
+indoors too. It casts no shadow on the world, and the world casts none on it.
+
+A muzzle flash goes on a socket: an empty under the weapon, at the end of the barrel. A flash
+that is part of the weapon (a mesh under it) is drawn with it. Particles, lights and tracers are
+drawn in the world, with the world's field of view: start them where the socket shows there.
+
+```ruby
+muzzle = find!("Muzzle")
+flash_at = Camera.from_view_model(muzzle.transform.position)
+Particles.burst(flash_at, count: 6, glow: true, speed: 1.0)
+```
+
+Aim with the camera, not the weapon: a ray from `Camera.main.transform.position` along its
+forward hits what is under the crosshair.
+
 ## Move a character
 
 Give the object a **character** body: set *Body* in the Inspector's **Physics** card (objects made

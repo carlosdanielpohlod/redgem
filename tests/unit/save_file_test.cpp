@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "storage/save_file.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -16,7 +17,7 @@ constexpr std::size_t kDeeperThanKept = 40;  // levels of arrays in one another
 
 // A save file in a folder of its own that does not exist yet, removed when the test ends.
 struct TempSave {
-  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-save-store-test";
+  std::filesystem::path dir = redgem::test::temp_root() / "redgem-save-store-test";
   std::filesystem::path file = dir / "nested" / "game.json";
   TempSave() { std::filesystem::remove_all(dir); }
   ~TempSave() { std::filesystem::remove_all(dir); }

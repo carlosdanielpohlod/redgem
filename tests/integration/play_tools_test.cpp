@@ -20,6 +20,7 @@
 #include "project/script_messages.hpp"
 #include "project/tool_commands.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -41,7 +42,7 @@ bool has(const std::string& text, const std::string& part) { return text.find(pa
 // A copy of the platformer of the test's own, gone with it.
 class GameCopy {
  public:
-  explicit GameCopy(const std::string& name) : dir_(fs::temp_directory_path() / ("redgem_play_tools_" + name)) {
+  explicit GameCopy(const std::string& name) : dir_(redgem::test::temp_root() / ("redgem_play_tools_" + name)) {
     fs::remove_all(dir_);
     fs::copy(kPlatformer, dir_, fs::copy_options::recursive);
   }
@@ -322,18 +323,18 @@ TEST_CASE("what redgem-test says of a game's tests is read a file a line") {
       "PASS tests/a_test.rb\nFAIL tests/b_test.rb: tests/b_test.rb:8: expected 1, got 2\ntests: 1 passed, 1 failed\n");
   CHECK(run.passed == 1);
   CHECK(run.failures == std::vector<std::string>{"tests/b_test.rb: tests/b_test.rb:8: expected 1, got 2"});
-  CHECK(run_game_tests(kPlatformer, "no/redgem-test", fs::temp_directory_path()).problem.find("no redgem-test") !=
+  CHECK(run_game_tests(kPlatformer, "no/redgem-test", redgem::test::temp_root()).problem.find("no redgem-test") !=
         std::string::npos);
 }
 
 #ifndef _WIN32
 TEST_CASE("a redgem-test that ends without a word about the tests fails the check") {
   // (A program that says nothing and fails, standing for one that crashed.)
-  const fs::path tester = fs::temp_directory_path() / "redgem_silent_tester.sh";
+  const fs::path tester = redgem::test::temp_root() / "redgem_silent_tester.sh";
   std::string error;
   REQUIRE(write_text_file(tester, "#!/bin/sh\nexit 3\n", error));
   fs::permissions(tester, fs::perms::owner_all);
-  const TestsRun run = run_game_tests(kPlatformer, tester, fs::temp_directory_path());
+  const TestsRun run = run_game_tests(kPlatformer, tester, redgem::test::temp_root());
   fs::remove(tester);
   CHECK(run.passed == 0);
   CHECK(run.problem.find("redgem-test ended without saying how the tests went") != std::string::npos);

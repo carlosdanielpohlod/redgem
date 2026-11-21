@@ -37,6 +37,7 @@
 #include "project/tool_commands.hpp"
 #include "script/ruby_vm.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -118,7 +119,7 @@ std::set<std::string> lines_of(const std::string& text) {
 
 // The engine playing a game with no scripts of its own: what Ruby has then is the engine's.
 std::unique_ptr<Engine> engine() {
-  const fs::path game = fs::temp_directory_path() / "redgem_api_reference_game";
+  const fs::path game = redgem::test::temp_root() / "redgem_api_reference_game";
   fs::remove_all(game);
   fs::create_directories(game);
   fs::copy_file(fs::path(REDGEM_FIXTURES_DIR) / "games/sandbox/scenes/level2.glb", game / "scene.glb");
@@ -444,7 +445,7 @@ TEST_CASE("the guide of new games lists 25 calls that exist, with examples that 
 }
 
 TEST_CASE("a new game comes with its guide and the API's type signatures, which stay out of its builds") {
-  const fs::path game = fs::temp_directory_path() / "redgem_api_guide_game";
+  const fs::path game = redgem::test::temp_root() / "redgem_api_guide_game";
   fs::remove_all(game);
   std::string error;
   REQUIRE_MESSAGE(create_game(game, kDefaultTemplate, error), error);

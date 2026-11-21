@@ -14,6 +14,7 @@
 #include "script/bindings/message_values.hpp"
 #include "storage/save_file.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using nlohmann::json;
@@ -87,7 +88,7 @@ TEST_CASE("what a message cannot carry is refused, saying why") {
 }
 
 TEST_CASE("Save keeps arrays and hashes of any size, which a message could not carry, but no deeper") {
-  const std::filesystem::path save = std::filesystem::temp_directory_path() / "redgem-message-values-save.json";
+  const std::filesystem::path save = redgem::test::temp_root() / "redgem-message-values-save.json";
   remove_save(save);
   static const SceneDesc scene;
   EngineOptions options;

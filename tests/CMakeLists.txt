@@ -20,6 +20,7 @@ add_executable(redgem_tests
   unit/log_test.cpp
   unit/event_journal_test.cpp
   unit/files_test.cpp
+unit/temp_dirs_test.cpp
   unit/game_archive_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
@@ -28,6 +29,7 @@ add_executable(redgem_tests
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
+  unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
@@ -44,11 +46,13 @@ add_executable(redgem_tests
   unit/prefabs_test.cpp
   unit/prefab_export_test.cpp
   unit/prefab_overrides_test.cpp
+  unit/prefab_instances_test.cpp
   unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
   unit/mcp_test.cpp
+  unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
@@ -303,6 +307,7 @@ add_executable(redgem_tests
   integration/game_project_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
+  integration/project_tools_test.cpp
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/menu_checks_test.cpp
@@ -689,6 +694,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
 add_dependencies(redgem_editor_system_tests redgem_player redgem_fake_acp_agent)
+target_include_directories(redgem_editor_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(redgem_editor_system_tests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:redgem_player>)
 target_compile_definitions(redgem_editor_system_tests PRIVATE
@@ -711,6 +717,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/mirrored_render_test.cpp
+               render_system/view_model_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/ktx2_render_test.cpp
@@ -828,7 +835,8 @@ add_executable(redgem_field_benchmark
   benchmark/field_benchmark.cpp
   benchmark/field_scene.cpp
   benchmark/field_placements.cpp
-  benchmark/field_textures.cpp)
+  benchmark/field_textures.cpp
+  benchmark/terrain_scene.cpp)
 target_link_libraries(redgem_field_benchmark PRIVATE redgem_runtime)
 target_include_directories(redgem_field_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

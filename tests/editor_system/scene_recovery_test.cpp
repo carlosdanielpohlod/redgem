@@ -11,6 +11,7 @@
 #include "editor/ui/dpi.hpp"
 #include "project/editor_setup.hpp"
 #include "window_picture.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 namespace {
@@ -29,7 +30,7 @@ std::unique_ptr<EditorApp> editor(const std::filesystem::path& game) {
 }
 }  // namespace
 TEST_CASE("the editor offers crash recovery and saves the recovered scene to its original file") {
-  const auto game = std::filesystem::temp_directory_path() / "redgem_editor_recovery_window";
+  const auto game = redgem::test::temp_root() / "redgem_editor_recovery_window";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game);
   const auto file = game / config::kSceneFileName;

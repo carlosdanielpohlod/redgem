@@ -18,6 +18,7 @@
 #include "server/game_server.hpp"
 #include "socket_rounds.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using redgem::test::fixture;
@@ -90,7 +91,7 @@ bool offline(Engine& engine) { return engine.network().state() == net::NetworkSe
 
 // The sandbox game in a folder of its own, whose server keeps players out unless they log in.
 struct GuardedGame {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-approval-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-approval-test";
   std::filesystem::path game = root / "game";
   std::filesystem::path data = root / "data";
 

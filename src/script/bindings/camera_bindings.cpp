@@ -146,6 +146,20 @@ mrb_value camera_set_fov(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, degrees);
 }
 
+mrb_value camera_view_model_fov(mrb_state* mrb, mrb_value) {
+  const CameraDesc* camera = main_camera(mrb);
+  if (camera == nullptr) return mrb_nil_value();
+  const float fov = camera->view_model_fov_y_radians;
+  return mrb_float_value(mrb, fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultViewModelFovYDegrees);
+}
+
+mrb_value camera_set_view_model_fov(mrb_state* mrb, mrb_value) {
+  const mrb_float degrees = from_to(mrb, float_arg(mrb), kMinFovDegrees, kMaxFovDegrees, "Camera.view_model_fov");
+  CameraDesc* camera = main_camera(mrb);
+  if (camera != nullptr) camera->view_model_fov_y_radians = degrees_to_radians(static_cast<float>(degrees));
+  return mrb_float_value(mrb, degrees);
+}
+
 mrb_value camera_motion_blur(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).motion_blur); }
 
 mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
@@ -187,6 +201,8 @@ void install_camera_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, camera_module, "world_to_screen", camera_world_to_screen, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "fov", camera_fov, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "fov=", camera_set_fov, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, camera_module, "view_model_fov", camera_view_model_fov, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "view_model_fov=", camera_set_view_model_fov, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "motion_blur", camera_motion_blur, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "motion_blur=", camera_set_motion_blur, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "backdrop_blur", camera_backdrop_blur, MRB_ARGS_NONE());

@@ -18,6 +18,7 @@
 #include "script/ruby_vm.hpp"
 #include "script/script_sampler.hpp"
 #include "test_support.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -113,7 +114,7 @@ TEST_CASE("a sampler that is off, or not given to the interpreter, samples nothi
 }
 
 TEST_CASE("profiling a game samples its scripts, lists them and exports them to its data folder") {
-  const std::filesystem::path data = std::filesystem::temp_directory_path() / "redgem_script_profile_data";
+  const std::filesystem::path data = redgem::test::temp_root() / "redgem_script_profile_data";
   std::filesystem::remove_all(data);
   EngineOptions options;
   options.game_dir = test::fixture("games/sandbox");

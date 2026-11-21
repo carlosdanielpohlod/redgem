@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "editor/agent/agent_connection.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem::agent;
 namespace fs = std::filesystem;
@@ -23,7 +24,7 @@ constexpr float kPollLook = 0.005f;
 constexpr int kMostPolls = 4000;
 
 fs::path game_folder() {
-  const fs::path folder = fs::temp_directory_path() / "redgem_agent_connection_test";
+  const fs::path folder = redgem::test::temp_root() / "redgem_agent_connection_test";
   fs::remove_all(folder);
   fs::create_directories(folder);
   return folder;

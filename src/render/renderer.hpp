@@ -112,6 +112,9 @@ class Renderer {
                       const std::filesystem::path& folder) const;
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
+  // View model objects (a first-person weapon) are drawn apart, over the world, with their own
+  // field of view in a game; the editor's view, from a camera of its own, draws them where they are.
+  void draw_view_models_apart(bool apart);
   // Draws a touch screen's controls over everything: see-through, brighter where a finger is.
   void draw_controls(const std::vector<ControlCircle>& controls);
 

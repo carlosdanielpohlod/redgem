@@ -9,6 +9,8 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include <string>
+#include <vector>
 
 #include "core/files.hpp"
 #include "editor/editor_session.hpp"
@@ -19,6 +21,7 @@
 #include "project/editor_live_tools.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_lookup.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 using namespace redgem::tools;
@@ -43,7 +46,7 @@ class Game {
   }
   Game(const Game&) = delete;
   Game& operator=(const Game&) = delete;
-  fs::path root = fs::temp_directory_path() / "redgem-editor-bridge-test";
+  fs::path root = redgem::test::temp_root() / "redgem-editor-bridge-test";
   fs::path path = root / "game";
   std::unique_ptr<EditorSession> session;
 };
@@ -236,15 +239,19 @@ TEST_CASE("live MCP catalog exposes status only under read-only and narrows edit
   options.editor_connection = "connection.json";
   options.read_only = true;
   const auto read = mcp::catalog(options);
-  CHECK(read.size() == 8);
+  CHECK(read.size() == 9);
   for (const auto& tool : read) {
     if (tool["name"] == "editor")
       CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"status", "capture"}));
+    if (tool["name"] == "project")
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] ==
+            Json::array({"settings", "texts", "story", "scenes"}));
   }
   options.read_only = false;
   for (const auto& tool : mcp::catalog(options)) {
     if (tool["name"] == "scene_edit")
-      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set", "add", "duplicate", "group", "remove"}));
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] ==
+            Json::array({"set", "add", "duplicate", "group", "remove"}));
   }
 }
 
@@ -794,4 +801,30 @@ TEST_CASE("discovery forgets refused connection files and backs off from unprove
   const auto started = std::chrono::steady_clock::now();
   CHECK(ok(mcp::invoke(options, "scene_list", {{"limit", 1}})));
   CHECK(std::chrono::steady_clock::now() - started < bridge::kHandshakeTimeout);
+}
+
+TEST_CASE("open_scene asks for discard over unsaved edits, and both scene actions take a scene") {
+  Game game;
+  auto& session = *game.session;
+  std::vector<std::string> asked;
+  const mcp::Invoke window = [&](const std::string& action, const Json&) {
+    asked.push_back(action);
+    return mcp::tool_result("done");
+  };
+  const Json open{{"action", "open_scene"}, {"scene", "main"}};
+  CHECK_FALSE(
+      ok(invoke_editor(session, "editor", {{"action", "open_scene"}, {"scene", "../../elsewhere"}}, false, window)));
+  CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "open_scene"}}, false, window)));
+  CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "status"}, {"scene", "cave"}}, false, window)));
+  CHECK_FALSE(ok(
+      invoke_editor(session, "editor", {{"action", "save_as"}, {"scene", "cave"}, {"discard", true}}, false, window)));
+  REQUIRE(ok(invoke_editor(session, "scene_edit", set({"position=1,2,3"}))));
+  const Json refused = invoke_editor(session, "editor", open, false, window);
+  CHECK(text_of(refused).find("discard=true") != std::string::npos);
+  CHECK(asked.empty());
+  Json discarding = open;
+  discarding["discard"] = true;
+  CHECK(ok(invoke_editor(session, "editor", discarding, false, window)));
+  CHECK(ok(invoke_editor(session, "editor", {{"action", "save_as"}, {"scene", "cave"}}, false, window)));
+  CHECK(asked == std::vector<std::string>{"open_scene", "save_as"});
 }

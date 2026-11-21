@@ -11,6 +11,7 @@
 #include "app/game_data_location.hpp"
 #include "app/game_settings.hpp"
 #include "core/platform.hpp"
+#include "temp_dirs.hpp"
 
 using namespace redgem;
 
@@ -22,7 +23,7 @@ constexpr std::size_t kTwoFolders = 2;
 
 // A game folder of the test's own, with a game.json saying `json`, removed when the test ends.
 struct TempGames {
-  std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-game-data-location-test";
+  std::filesystem::path root = redgem::test::temp_root() / "redgem-game-data-location-test";
   TempGames() { std::filesystem::remove_all(root); }
   ~TempGames() { std::filesystem::remove_all(root); }
   TempGames(const TempGames&) = delete;
@@ -120,7 +121,7 @@ TEST_CASE("a game its developer plays keeps its data in the developer's folder, 
 
 TEST_CASE("platform folders of the desktops: XDG_DATA_HOME or .local/share, APPDATA, Application Support") {
   const std::filesystem::path home = "home";
-  const std::filesystem::path named = std::filesystem::temp_directory_path() / "named";  // absolute everywhere
+  const std::filesystem::path named = redgem::test::temp_root() / "named";  // absolute everywhere
   CHECK(platform::programs_data_dir_on(platform::Desktop::Linux, home, named) == named);
   CHECK(platform::programs_data_dir_on(platform::Desktop::Linux, home, {}) == home / ".local" / "share");
   CHECK(platform::programs_data_dir_on(platform::Desktop::Linux, home, "relative") == home / ".local" / "share");
