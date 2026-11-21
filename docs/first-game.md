@@ -20,10 +20,9 @@ redgem my_game
 The other templates start other kinds of game: `third-person` (a hero seen from behind),
 `top-down` (a hero seen from above, that walks where you click), `menu-only` (title, settings and
 credits screens, for a game of menus), `multiplayer-levels` (two levels played together, with an
-NPC and a quest: see [A game of levels played together](multiplayer-levels.md)) and `empty`. They
-come with tests of their own, and every
-new game comes with a workflow that runs its tests on GitHub (see
-[Testing your game](testing.md)).
+NPC and a quest: see [A game of levels played together](multiplayer-levels.md)) and `empty`. All
+but `empty` and `platformer` come with tests of their own, and every new game comes with a
+workflow that runs its tests on GitHub (see [Testing your game](testing.md)).
 
 The editor opens:
 

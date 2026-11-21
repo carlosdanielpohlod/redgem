@@ -41,6 +41,7 @@ does. `main_scene.rb` sets every level up and lists them.
 | `progress.rb` | The save: the level the party is on and its quests |
 | `guide.rb` | Someone to talk to (the engine's `Talkable`, with `dialogues/guide.json`) |
 | `hud.rb` | The controls, who you play with, and the quest's objectives |
+| `follow_camera.rb` | The camera behind and above the hero (each level's Camera has it) |
 
 The conversation is `dialogues/guide.json` (see [Dialogue](scripting/dialogue.md)), the quest is
 `quests/beacon.json` (see [Quests](scripting/quests.md)), and every text players read is in
@@ -55,9 +56,11 @@ server), and the host's level change takes every machine along (see
 sets the new level up again: its hero goes back to its spawn point, and the other players' heroes
 are made again.
 
-To add a level, save a new scene as `scenes/level3.glb` with a `Player`, a `Teammate` prefab,
-spawn points tagged `spawn`, and a door. Add `scripts/level3_scene.rb`
-(`class Level3Scene < MainScene; end`), and point a door's `to` at `level3`.
+To add a level, copy `scenes/level2.glb` to `scenes/level3.glb` and change it in the editor: it
+already has what a level needs (the `Player`, the `Teammate` prefab, the Camera with
+`follow_camera.rb`, the spawn points and a door with `level_exit.rb`). Spawn points are named
+`Spawn1`, `Spawn2`... and tagged `spawn`. Add `scripts/level3_scene.rb`
+(`class Level3Scene < MainScene; end`), and set a door's `to` property to `level3`.
 
 ## Playing together
 
@@ -69,21 +72,24 @@ spawn points tagged `spawn`, and a door. Add `scripts/level3_scene.rb`
 - **Play on the server**: joins the game's dedicated server. Set its address in `SERVER`, in
   `scripts/session.rb` (`"play.example.com"` or `"play.example.com:7777"`), and run
   `redgem-server` on the game (see [Dedicated server](dedicated-server.md)).
+- **Leave the game**: ends the game played together; this machine goes on alone, from its own
+  save.
 
 The host (or the server) decides what counts: uses of the doors and of the guide, the quest's
 progress, and the level. Each player sees their own conversation with the guide.
 
 ## The save
 
-`Progress` keeps the level the party is on and its quests with `Save`. It saves each time a level
-loads and each time a quest changes, so the save lasts across levels and between runs. Play and
-Host go on from it: the quests come back, and the party goes to the saved level.
+`Progress` keeps the level the party is on and its quests with `Save`. Play and Host (and a
+dedicated server as it starts) put the save in play: the quests come back, and the party goes to
+the saved level. From then on it saves each time a level loads and each time a quest changes, so
+the save lasts across levels and between runs. The title screen writes nothing.
 
 Only the machine that decides writes it: the one playing alone, the host, or the dedicated server
 (in its own database). A player who joins someone else's game plays the host's progress and keeps
 nothing of it. When that player leaves, their game goes back to their own save. On a dedicated
-server, every room shares the server's save. A game with many rooms keys it by room or by player
-(see [Online services](scripting/online-services.md)).
+server, every room shares the server's save. A game with many rooms keeps progress by player
+instead (see [Online services](scripting/online-services.md)).
 
 ## Its tests
 
