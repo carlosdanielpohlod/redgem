@@ -394,6 +394,7 @@ The body of an object with body = "character": walks, jumps, climbs steps. See [
 - `move(Vector3 velocity) -> void`: walks with that velocity (m/s) this frame
 - `jump(Numeric speed) -> void`: jumps up at that speed
 - `grounded? -> bool`: whether it stands on something
+- `resize(height: Numeric, radius: Numeric) -> bool`: makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update *Experimental.*
 - `velocity -> Vector3`: its velocity
 - `layer -> Symbol`: its collision layer, a Symbol *Experimental.*
 - `layer = Symbol name`: moves it to another collision layer *Experimental.*

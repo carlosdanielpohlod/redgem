@@ -2298,6 +2298,16 @@
           "about": "whether it stands on something"
         },
         {
+          "name": "resize",
+          "stability": "experimental",
+          "params": [
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "radius", "type": "Numeric", "keyword": true}
+          ],
+          "returns": {"type": "bool"},
+          "about": "makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update"
+        },
+        {
           "name": "velocity",
           "stability": "stable",
           "params": [],

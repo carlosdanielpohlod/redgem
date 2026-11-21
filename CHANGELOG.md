@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Characters crouch: `character.resize(height:, radius:)`** (experimental). It makes a
+  character's collider an upright capsule of that size, with its feet where they were. Growing
+  into something is refused: standing up under a low ceiling returns false and changes nothing,
+  so a crouching player stays crouched until there is room. Call it in `fixed_update`. A
+  character's shape was fixed when it was made, so a crouch could only lower the camera.
 - **The host says why it lets a machine go.** A machine let go for too many moves the host did
   not believe (movement validation), a flood of bytes or messages, a message that is not the
   game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is

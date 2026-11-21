@@ -150,3 +150,32 @@ TEST_CASE("a sleeping body hangs in the air until a script wakes it") {
   frames(*engine, kTwoSeconds);
   CHECK(number(*engine, "Scene.find('Crate').transform.position.y") == doctest::Approx(0.5f).epsilon(0.05));
 }
+
+TEST_CASE("Ruby crouches a character under a slab, is refused standing there, and stands once out") {
+  const TempGame game(kShooterGame);
+  const SceneDesc scene = scene_with({node("Hero", {0, 1, 0}, {0.8f, 2, 0.8f}, moving("character")),
+                                      node("Slab", {3.5f, 1.4f, 0}, {3, 0.2f, 4}, solid())});
+  auto engine = engine_for(game, scene);
+  frames(*engine, kOneSecond);
+  ruby(*engine, "$hero = Scene.find('Hero').character");
+  CHECK(ruby(*engine, "$hero.resize(height: 1.0, radius: 0.4)") == "true");
+  CHECK(ruby(*engine, "$hero.resize(height: 1.0, radius: 0.4)") == "false");  // already that size
+  ruby(*engine, "$hero.move(Vector3.new(3.5, 0, 0))");
+  frames(*engine, kOneSecond);
+  CHECK(number(*engine, "Scene.find('Hero').transform.position.x") > 2.0f);
+  CHECK(ruby(*engine, "$hero.resize(height: 2.0, radius: 0.4)") == "false");
+  frames(*engine, kOneSecond);
+  CHECK(number(*engine, "Scene.find('Hero').transform.position.x") > 5.4f);
+  CHECK(ruby(*engine, "$hero.resize(height: 2.0, radius: 0.4)") == "true");
+  CHECK(number(*engine, "Scene.find('Hero').transform.position.y") == doctest::Approx(1.0f).epsilon(0.05));
+}
+
+TEST_CASE("Ruby is told what a character's capsule cannot be") {
+  const TempGame game(kShooterGame);
+  const SceneDesc scene = scene_with({node("Hero", {0, 1, 0}, {0.8f, 2, 0.8f}, moving("character"))});
+  auto engine = engine_for(game, scene);
+  const std::string thin = error_of(*engine, "Scene.find('Hero').character.resize(height: 1.0, radius: 0)");
+  CHECK(thin.find("radius must be more than 0") != std::string::npos);
+  const std::string squat = error_of(*engine, "Scene.find('Hero').character.resize(height: 0.5, radius: 0.4)");
+  CHECK(squat.find("height must be at least 0.8") != std::string::npos);
+}

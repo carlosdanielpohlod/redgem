@@ -40,6 +40,14 @@
 
 namespace redgem::jolt {
 
+// A character whose supporting volume (what part of it can stand on things) follows its shape when
+// that changes.
+class Character final : public JPH::CharacterVirtual {
+ public:
+  using JPH::CharacterVirtual::CharacterVirtual;
+  void set_supporting_volume(const JPH::Plane& volume) { mSupportingVolume = volume; }
+};
+
 // What the world keeps for one object: a rigid body, a character, a vehicle on a body, or (for a
 // trigger) only a shape and where it is.
 struct Record {
@@ -47,7 +55,9 @@ struct Record {
   bool trigger = false;
   std::size_t layer = kDefaultLayer;
   JPH::BodyID body;
-  JPH::Ref<JPH::CharacterVirtual> character;
+  JPH::Ref<Character> character;
+  Vec3 character_bottom;       // characters: their feet, from the object's origin (a resize keeps them)
+  CapsuleSize character_size;  // characters: their collider's size now
   JPH::Ref<JPH::VehicleConstraint> vehicle;
   std::vector<ObjectHandle> wheel_objects;  // same order as the vehicle's wheels
   JPH::RefConst<JPH::Shape> shape;
@@ -107,6 +117,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
+  bool resize_character(ObjectId object, float height, float radius) override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
   float vehicle_forward_speed(ObjectId object) const override;
   std::vector<WheelPose> wheel_poses(ObjectId object) const override;
@@ -204,6 +215,8 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void update_character(Record& record, float dt);
   // Moves a character by its velocity, sliding along what it meets, climbing steps and keeping to the floor.
   void move_character(const Record& record, float dt);
+  // Gives a character this shape, unless (when `check` is set) it would sink into something.
+  bool switch_character_shape(Record& record, const ShapeInfo& info, bool check);
 
   // Vehicles.
   void attach_vehicle(const BodyDesc& desc, Record& record);

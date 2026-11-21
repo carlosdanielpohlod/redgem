@@ -6,8 +6,11 @@
 #include <Jolt/Physics/Body/BodyFilter.h>
 
 #include <algorithm>
+#include <cfloat>
+#include <cmath>
 #include <vector>
 
+#include "core/math.hpp"
 #include "physics/physics_config.hpp"
 
 namespace redgem::jolt {
@@ -15,6 +18,12 @@ namespace {
 
 // Vertical speed (relative to the ground) below which a grounded character sticks to the ground.
 constexpr float kGroundedVerticalTolerance = 0.1f;
+
+// Only contacts on the lower hemisphere of the capsule can support the character.
+JPH::Plane supporting_volume(const ShapeInfo& info) {
+  const float bottom_sphere_center = info.center_offset.y - info.capsule_half_height;
+  return JPH::Plane(JPH::Vec3::sAxisY(), -bottom_sphere_center);
+}
 
 JPH::Ref<JPH::CharacterVirtualSettings> character_settings(const ShapeInfo& info, JPH::ObjectLayer layer) {
   JPH::Ref<JPH::CharacterVirtualSettings> settings = new JPH::CharacterVirtualSettings();
@@ -27,9 +36,7 @@ JPH::Ref<JPH::CharacterVirtualSettings> character_settings(const ShapeInfo& info
   settings->mCharacterPadding = config::kCharacterPadding;
   settings->mPenetrationRecoverySpeed = config::kCharacterPenetrationRecoverySpeed;
   settings->mPredictiveContactDistance = config::kCharacterPredictiveContactDistance;
-  // Only contacts on the lower hemisphere of the capsule can support the character.
-  const float bottom_sphere_center = info.center_offset.y - info.capsule_half_height;
-  settings->mSupportingVolume = JPH::Plane(JPH::Vec3::sAxisY(), -bottom_sphere_center);
+  settings->mSupportingVolume = supporting_volume(info);
   return settings;
 }
 
@@ -56,6 +63,42 @@ class CarrierFilter final : public JPH::BodyFilter {
   const std::vector<JPH::BodyID>& carried_;
 };
 
+// What a character's moves (and its changes of shape) meet: the bodies on the layers its own
+// collides with, but not its inner body or what it carries.
+struct CharacterFilters {
+  CharacterFilters(const ObjectVsBroadPhase& broad_phase, const ObjectPairs& pairs, JPH::ObjectLayer layer,
+                   const Record& record)
+      : broad(broad_phase, layer), layers(pairs, layer), bodies(record.character->GetInnerBodyID(), record.carried) {}
+  JPH::DefaultBroadPhaseLayerFilter broad;
+  JPH::DefaultObjectLayerFilter layers;
+  CarrierFilter bodies;
+  JPH::ShapeFilter shapes;
+};
+
+bool is_positive(float measure) { return std::isfinite(measure) && measure > 0.0f; }
+
+// A capsule a character can have: both measures positive, and no shorter than it is wide.
+bool is_valid_capsule(CapsuleSize size) {
+  return is_positive(size.height) && is_positive(size.radius) && size.height >= size.radius / kHalf;
+}
+
+bool same_size(CapsuleSize a, CapsuleSize b) { return a.height == b.height && a.radius == b.radius; }
+
+// Whether a resize to that size can change anything: the object is a character, the size is one a
+// capsule can have, and not the one it has.
+bool can_resize(const Record* record, CapsuleSize size) {
+  return is_character(record) && is_valid_capsule(size) && !same_size(record->character_size, size);
+}
+
+// Whether a character's new capsule reaches out of its old one anywhere: only then can it meet what
+// the old one did not.
+bool grows(CapsuleSize from, CapsuleSize to) { return to.height > from.height || to.radius > from.radius; }
+
+// How deep a new shape may sink into what is around it: what Jolt lets bodies rest in anyway.
+float allowed_penetration(const JPH::PhysicsSystem& system) {
+  return system.GetPhysicsSettings().mPenetrationSlop * config::kCharacterResizePenetrationSlopFactor;
+}
+
 // Whether a character stands on a body it carries: the box it picked up from under its feet is
 // still its ground until its next move, which passes through the box.
 bool stands_on_what_it_carries(const Record& record) {
@@ -79,9 +122,11 @@ JPH::Vec3 carried_velocity(const Record& record) {
 
 void World::create_character(const BodyDesc& desc, const ShapeInfo& info, Record& record) {
   // Characters stay upright: physics only drives their position.
-  record.character = new JPH::CharacterVirtual(character_settings(info, object_layer_of(record)),
-                                               JPH::RVec3(to_jolt(desc.world.position)), JPH::Quat::sIdentity(),
-                                               static_cast<JPH::uint64>(desc.object), &system_);
+  record.character = new Character(character_settings(info, object_layer_of(record)),
+                                   JPH::RVec3(to_jolt(desc.world.position)), JPH::Quat::sIdentity(),
+                                   static_cast<JPH::uint64>(desc.object), &system_);
+  record.character_bottom = collider_bottom(info);
+  record.character_size = capsule_size_of(info);
   record.character->SetListener(this);
   // (A world that holds all the bodies it can makes the character without the body that others
   // collide with.)
@@ -121,13 +166,34 @@ void World::move_character(const Record& record, float dt) {
   JPH::CharacterVirtual::ExtendedUpdateSettings update_settings;
   update_settings.mStickToFloorStepDown = JPH::Vec3(0.0f, -config::kCharacterStickToFloorDistance, 0.0f);
   update_settings.mWalkStairsStepUp = JPH::Vec3(0.0f, config::kCharacterStairStepHeight, 0.0f);
-  const JPH::ObjectLayer layer = object_layer_of(record);
-  const JPH::DefaultBroadPhaseLayerFilter broad_filter(object_vs_broad_phase_, layer);
-  const JPH::DefaultObjectLayerFilter layer_filter(object_pairs_, layer);
-  const CarrierFilter body_filter(character.GetInnerBodyID(), record.carried);
-  const JPH::ShapeFilter shape_filter;
-  character.ExtendedUpdate(dt, to_jolt(gravity_), update_settings, broad_filter, layer_filter, body_filter,
-                           shape_filter, temp_allocator_);
+  const CharacterFilters filters(object_vs_broad_phase_, object_pairs_, object_layer_of(record), record);
+  character.ExtendedUpdate(dt, to_jolt(gravity_), update_settings, filters.broad, filters.layers, filters.bodies,
+                           filters.shapes, temp_allocator_);
+}
+
+bool World::switch_character_shape(Record& record, const ShapeInfo& info, bool check) {
+  const CharacterFilters filters(object_vs_broad_phase_, object_pairs_, object_layer_of(record), record);
+  const float allowed = check ? allowed_penetration(system_) : FLT_MAX;
+  Character& character = *record.character;
+  if (!character.SetShape(info.shape, allowed, filters.broad, filters.layers, filters.bodies, filters.shapes,
+                          temp_allocator_)) {
+    return false;
+  }
+  if (!character.GetInnerBodyID().IsInvalid()) character.SetInnerBodyShape(info.shape);
+  character.set_supporting_volume(supporting_volume(info));
+  record.shape = info.shape;
+  return true;
+}
+
+bool World::resize_character(ObjectId object, float height, float radius) {
+  Record* record = find(object);
+  const CapsuleSize size{height, radius};
+  if (!can_resize(record, size)) return false;
+  const auto info = capsule_standing_on(record->character_bottom, size);
+  if (std::holds_alternative<std::string>(info)) return false;
+  if (!switch_character_shape(*record, std::get<ShapeInfo>(info), grows(record->character_size, size))) return false;
+  record->character_size = size;
+  return true;
 }
 
 void World::set_character_move(ObjectId object, Vec3 horizontal_velocity) {

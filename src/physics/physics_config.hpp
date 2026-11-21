@@ -64,6 +64,9 @@ inline constexpr float kCharacterStickToFloorDistance = 0.5f;
 inline constexpr float kCharacterStairStepHeight = 0.4f;
 // Shortest cylinder section allowed in a capsule built from flat or very round meshes.
 inline constexpr float kCharacterMinCylinderHalfHeight = 0.05f;
+// How deep a character's grown shape may sink into what is around it (standing up under a ceiling
+// is refused past that), in units of the penetration Jolt lets resting bodies keep.
+inline constexpr float kCharacterResizePenetrationSlopFactor = 1.5f;
 
 // --- Vehicles -------------------------------------------------------------------
 inline constexpr float kVehicleDefaultMass = 1200.0f;

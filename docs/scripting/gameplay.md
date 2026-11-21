@@ -270,6 +270,30 @@ def update(_dt)
 end
 ```
 
+To crouch, make its capsule shorter; to stand up, give it its height back. The feet stay where
+they are. Standing up is refused (`resize` returns false and nothing changes) while something is
+over its head, so try again on a later step. Change the size in `fixed_update`, between physics
+steps:
+
+```ruby
+STANDING = 1.8
+CROUCHING = 1.0
+RADIUS = 0.35
+
+def fixed_update(_dt)
+  wants_to_crouch = Input.action?(:crouch)
+  @crouched = true if wants_to_crouch && character.resize(height: CROUCHING, radius: RADIUS)
+  @crouched = false if stands_up?(wants_to_crouch)
+end
+
+def stands_up?(wants_to_crouch)
+  @crouched && !wants_to_crouch && character.resize(height: STANDING, radius: RADIUS)
+end
+```
+
+`resize` always makes an upright capsule, whatever collider the character had. Move the camera
+(the eye) down yourself: the object's origin does not move.
+
 ## Push things around
 
 A **dynamic** body falls, rolls and gets pushed. From a script:
