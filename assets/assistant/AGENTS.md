@@ -56,6 +56,13 @@ object at a time, as one undo step in an open editor:
 - `duplicate`, `remove` (with `confirm: true`) and `set` take `objects`, a list; `group` makes a
   parent named `object` for the `objects`, leaving them where they are.
 - `editor` `select` takes `objects`; `editor` `save` keeps the editor's changes.
+- `project` changes the rest of the game as files, each write checked as `redgem check` checks it:
+  `set_settings` merges `changes` into `game.json`, `set_texts` sets a language's `texts`,
+  `set_story` writes a dialogue, quest or item, `new_scene` makes a scene. Read first with
+  `settings`, `texts`, `story` and `scenes`.
+- `editor` `open_scene` and `save_as` take a `scene`; save before opening another one.
+- `build` `start` makes the game for a `target` from the saved files; `build` `status` with
+  `wait` says what it made, or why not.
 
 ## Tests
 

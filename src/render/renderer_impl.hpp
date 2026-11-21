@@ -58,6 +58,8 @@
 #include "render/shadow_cascades.hpp"
 #include "render/sky_harmonics.hpp"
 #include "render/temporal.hpp"
+#include "render/terrain_look.hpp"
+#include "render/terrain_textures.hpp"
 #include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
@@ -79,6 +81,11 @@ inline constexpr int kSkyReflectanceSlot = 13;
 inline constexpr int kSceneDepthSlot = 14;     // what soft particles fade into
 inline constexpr int kMorphTexelSlot = 16;     // every mesh part's shape-key deltas (morph_shapes.hpp)
 inline constexpr int kPreviousTexelSlot = 15;  // the last frame's records and bones (temporal anti-aliasing)
+// A terrain's three texture arrays (colors, surfaces, weights) take this slot and the two after it.
+inline constexpr int kTerrainTextureSlot = 17;
+inline constexpr int kTerrainSurfaceSlot = kTerrainTextureSlot + 1;
+inline constexpr int kTerrainSplatSlot = kTerrainTextureSlot + 2;
+inline constexpr int kNoTerrainYet = -2;  // a pass that told the lit shader of no terrain (kNoIndex is none)
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -95,6 +102,7 @@ struct GpuPrimitive {
   std::size_t primitive = 0;  // original MeshDesc primitive, shared by its GPU pieces
   // Where its shape keys' deltas start in the morph texels (render_math::kNoMorphs: it has none).
   float morph_first = render_math::kNoMorphs;
+  int terrain = kNoIndex;  // the terrain with ground layers it is a part of (Impl::terrains)
 };
 
 // Where a pass's shader takes what it needs of a mesh part's shape keys.
@@ -158,6 +166,16 @@ struct ObjectPass {
   int last_material = kNoMaterialYet;
   bool last_two_sided = false;
   bool mirrored = false;  // the winding the pass is drawing with: clockwise front faces when true
+  int last_terrain = kNoTerrainYet;
+};
+
+// A terrain with ground layers on the graphics card: which object and mesh it is, and its look.
+struct GpuTerrain {
+  std::string name;
+  int node = kNoIndex;
+  int mesh = kNoIndex;
+  TerrainTextures textures;
+  render_math::TerrainLook look;
 };
 
 // What of the scattered copies a quality draws (see QualityCaps): a share of them, so far.
@@ -231,6 +249,8 @@ struct Renderer::Impl {
   render_detail::WaterUniforms lit_water;
   render_detail::WaterUniforms motion_water;
   render_detail::WaterUniforms depth_water;
+  render_detail::TerrainUniforms terrain_uniforms;
+  std::vector<render_detail::GpuTerrain> terrains;  // per SceneDesc terrain
   WaterRippleSnapshot water_ripples;
   WaterRippleSnapshot previous_water_ripples;
   std::unordered_map<ObjectId, ObjectHandle> water_handles;
@@ -474,6 +494,23 @@ struct Renderer::Impl {
   void bind_textures(Material& material, const MaterialDesc& source) const;
   void release_assets();
   void release_meshes();
+
+  // --- Terrains with ground layers (renderer_terrain.cpp) ----------------------------------------
+
+  // Uploads the scene's terrains when they changed, or only their weights when those did.
+  void sync_terrains(const SceneDesc& desc);
+  void follow_terrain_weights(const SceneDesc& desc);
+  void assign_terrain_slots(const shaders::LitFeatures& features);
+  void upload_terrains(const SceneDesc& desc);
+  void sync_terrain(render_detail::GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc);
+  void mark_terrain_parts(const SceneDesc& desc);
+  void release_terrains();
+  bool has_terrains() const;
+  // Tells the lit shader of the terrain a part belongs to (kNoIndex: none) before it is drawn.
+  void use_terrain(int terrain, ObjectPass& pass);
+  void end_terrains(ObjectPass& pass);
+  void send_terrain_layers(int layers) const;
+  void send_terrain_look(const render_math::TerrainLook& look) const;
   // A scene image as a texture: from its decoded pixels when it has them.
   static Texture2D scene_picture(const SceneDesc& desc, std::size_t image);
   // Stages the next image or mesh of `desc` (see staged); returns roughly how many bytes it sent.
@@ -600,6 +637,11 @@ struct Renderer::Impl {
   static void face_by_winding(bool mirrored, ObjectPass& pass);
   // Every pass ends with front faces counter-clockwise, as the rest of the frame draws them.
   static void face_forward(ObjectPass& pass) { face_by_winding(false, pass); }
+  // What a lit pass leaves set for whatever draws after it: front faces wound as usual, no terrain.
+  void finish_lit_pass(ObjectPass& pass) {
+    face_forward(pass);
+    end_terrains(pass);
+  }
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 

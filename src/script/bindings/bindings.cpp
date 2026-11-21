@@ -24,6 +24,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_water_bindings(mrb);
   install_environment_bindings(mrb);
   install_material_bindings(mrb);
+  install_terrain_bindings(mrb);
 }
 
 void install_gameplay_bindings(mrb_state* mrb) {

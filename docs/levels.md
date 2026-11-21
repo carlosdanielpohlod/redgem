@@ -380,6 +380,123 @@ terrain's smallest Z (north, for a scene made in Blender with +Y north), its fir
 smallest X. Without these pictures the first layer covers the whole terrain. The weights of a
 spot are always scaled to add up to one. The map lies over the mesh's own X and Z bounds.
 
+The layers take the place of the terrain material's color, roughness and normal map. The vertex
+tint still multiplies their color, so a terrain painted with the old tint brush keeps its tint. A
+terrain object without `terrain_layers` is drawn exactly as before, and a scene without any
+layered terrain compiles none of the layer code into its shader. The terrain's mesh must be its
+own: when another object draws the same mesh, neither gets the layers.
+
+![Top: the vertex tint alone, two layers meeting at a hard edge, and fading by weight. Bottom: the
+same fade blended by height, a striped layer seen from above on a cube, and the same layer
+triplanar.](images/terrain-layers/blending.png)
+
+How the layers meet:
+
+- **By weight.** With `sharpness` 0, two layers fade into each other over the width where their
+  weights fade.
+- **By height.** Toward `sharpness` 1, where two layers meet, the one whose height picture plus
+  weight is higher takes the spot, so the edge follows the stones and cracks of the pictures. A
+  layer without a height picture counts as half height: the stronger weight wins with a crisp
+  edge.
+- **Repeats.** Every layer repeats every `tiling` meters, in world space. `variation` adds patches
+  `variation_size` meters across, which hide the repeats seen from far away. `stochastic` hides
+  them up close as well.
+- **Slopes.** A layer seen from above is stretched on a cliff. `triplanar` projects it from the
+  side there instead. Turn it on for rock, and leave it off for layers that only lie on gentle
+  ground.
+
+Each layer samples its two pictures once, three times with `stochastic` or `triplanar`, and nine
+times with both. Layers whose weight is nothing at a pixel cost nothing there. See
+[Ground layer cost](#ground-layer-cost) below.
+
+#### Ground layer cost
+
+Frame time at 1920 x 1080 on an RTX 4050 laptop GPU, a 200 m terrain filling most of the screen.
+This is the worst case: every layer has an even share of every pixel. Real ground has two or three
+layers at a spot, and costs about as much as the row with that many layers.
+
+| Terrain | Frame time |
+|---------|-----------:|
+| No ground layers | 2.5 ms |
+| 4 layers | 4.5 ms |
+| 8 layers | 6.4 ms |
+| 4 layers, `stochastic` | 7.5 ms |
+| 8 layers, `stochastic` | 12.8 ms |
+| 8 layers, `triplanar` | 10.6 ms |
+| 8 layers, `stochastic` and `triplanar` | 25.3 ms |
+
+Measure your own card with `redgem_field_benchmark terrain 8 stochastic triplanar` (built with
+the tests). Keep `stochastic` for the one or two layers whose repeats show, and `triplanar` for
+the layers that cover cliffs.
+
+### Painting ground layers by rules (experimental)
+
+Rules paint the weights from the shape of the ground: sand by the sea, grass above it, rock on
+steep slopes, patches of dirt. List them in the layers file, under `"rules"`:
+
+```json
+{
+  "layers": [
+    { "name": "sand", "albedo": "textures/coastal-sand/Color.jpg", "tiling": 4 },
+    { "name": "grass", "albedo": "textures/Grass004/Color.jpg", "tiling": 3, "variation": 0.3 },
+    { "name": "rock", "albedo": "textures/Rock030/Color.jpg", "tiling": 6, "triplanar": true },
+    { "name": "dirt", "albedo": "textures/Ground037/Color.jpg", "tiling": 4 }
+  ],
+  "rules": [
+    { "layer": "sand" },
+    { "layer": "grass", "height": { "min": 2, "soft": 1.5 } },
+    { "layer": "rock", "slope": { "min": 35, "soft": 10 } },
+    { "layer": "dirt", "height": { "min": 3 }, "noise": { "min": 0.65, "soft": 0.1 },
+      "noise_size": 12, "seed": 3, "strength": 0.8 }
+  ]
+}
+```
+
+The rules run in order. Each one moves every spot toward its layer by how much the spot is in its
+ranges, times its `strength`. Start with a rule without ranges, so that one layer covers
+everything first.
+
+| Key | Meaning |
+|-----|---------|
+| `layer` | The name of a layer of the file. |
+| `height` | Meters, in the terrain mesh's own space: `{ "min": 2, "max": 40, "soft": 1.5 }`. |
+| `slope` | Degrees from flat: 0 is level ground, 90 a wall. |
+| `noise` | 0 to 1, a smooth noise of patches about `noise_size` meters across (10 by default). Another `seed` gives other patches. |
+| `soft` | How wide the fade is at each end of a range, centered on the end. 0 is a hard edge. |
+| `strength` | 0 to 1 (1 by default): how far toward the layer a spot fully in range goes. |
+
+`min` and `max` may each be left out: the range is then open on that side.
+
+Paint from the command line, which writes the splat pictures beside the file:
+
+```bash
+redgem scene paint games/ilha Island        # (--scene name for a scene of scenes/)
+```
+
+Or from a script while the game runs. What a script paints is kept until the scene is loaded
+again. It is never written to the files.
+
+```ruby
+# On the player: a footstep sound that follows the ground under it.
+class Footsteps < Behaviour
+  SOUNDS = { "sand" => "step_sand", "rock" => "step_rock" }.freeze
+
+  def start
+    @ground = Scene.find("Island")
+    Terrain.paint_by_rules(@ground, [{ layer: "rock", slope: { min: 25, soft: 5 } }])
+  end
+
+  def step
+    layer = Terrain.layer_at(@ground, game_object.transform.position)  # the largest share
+    Audio.play(SOUNDS.fetch(layer, "step_grass"))
+  end
+end
+```
+
+Call `step` from the walk animation or a timer. `Terrain.weights_at(ground, point)` gives every
+layer's share, such as
+`{"sand" => 0.7, "grass" => 0.3}`. `Terrain.layers(ground)` lists the layer names.
+
 ## Editing the level in Blender
 
 ```bash

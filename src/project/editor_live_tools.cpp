@@ -7,6 +7,7 @@
 #include "core/config.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_assignments.hpp"
+#include "project/scene_command.hpp"
 #include "project/scene_diff.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
@@ -110,9 +111,12 @@ void apply_control(EditorSession& session, const std::string& action, const Json
   }
 }
 
+// The actions that put another scene in the editor: open one, or save this one as one.
+bool scene_action(const std::string& action) { return action == "open_scene" || action == "save_as"; }
+
 bool window_action(const std::string& action) {
   return action == "play" || action == "pause" || action == "resume" || action == "stop" || action == "step" ||
-         action == "capture" || action == "frame";
+         action == "capture" || action == "frame" || scene_action(action);
 }
 
 // The actions about an object: select needs one, frame takes one (else the selection).
@@ -126,13 +130,48 @@ bool misplaced_objects(const std::string& action, const Json& args) {
   return action != "select" && args.contains("objects");
 }
 
+bool misplaced_scene(const std::string& action, const Json& args) {
+  return scene_action(action) != args.contains("scene");
+}
+
+bool misplaced_discard(const std::string& action, const Json& args) {
+  return action != "open_scene" && args.contains("discard");
+}
+
+void validate_scene_words(const std::string& action, const Json& args) {
+  if (misplaced_scene(action, args)) throw std::invalid_argument("open_scene and save_as take scene, and only they do");
+  if (misplaced_discard(action, args)) throw std::invalid_argument("discard is only accepted by open_scene");
+}
+
 void validate_control(const std::string& action, const Json& args) {
+  validate_scene_words(action, args);
   if (!takes_object(action) && args.contains("object"))
     throw std::invalid_argument("object is only accepted by select and frame");
   if (selects_nothing(action, args)) throw std::invalid_argument("select needs object or objects");
   if (misplaced_objects(action, args)) throw std::invalid_argument("objects is only accepted by select");
   if (action != "capture" && args.contains("max_size"))
     throw std::invalid_argument("max_size is only accepted by capture");
+}
+
+// Whether opening another scene would drop edits nobody said to drop.
+bool drops_unsaved(EditorSession& session, const std::string& action, const Json& args) {
+  return action == "open_scene" && session.document().dirty() && !args.value("discard", false);
+}
+
+// Whether open_scene names a scene the game has: only those are opened (no path out of the game).
+bool names_no_scene(const EditorSession& session, const std::string& action, const Json& args) {
+  if (action != "open_scene") return false;
+  const auto names = scene_names(session.game_dir());
+  return std::find(names.begin(), names.end(), args["scene"].get<std::string>()) == names.end();
+}
+
+void require_scene_change(EditorSession& session, const std::string& action, const Json& args) {
+  require_editable(session, false);
+  if (names_no_scene(session, action, args))
+    throw std::invalid_argument("the game has no scene called " + args["scene"].get<std::string>() +
+                                "; project action=scenes lists them");
+  if (drops_unsaved(session, action, args))
+    throw std::invalid_argument("the open scene has unsaved edits: save first, or pass discard=true to drop them");
 }
 
 // A capture is taken whatever the editor is doing; the other window actions wait until it is free.
@@ -146,6 +185,7 @@ Json use_window(EditorSession& session, const std::string& action, const Json& a
     throw std::invalid_argument("finish the current editor gesture or dialog first");
   }
   if (action == "play") require_editable(session, false);
+  if (scene_action(action)) require_scene_change(session, action, args);
   if (args.contains("object")) {
     require_editable(session, busy);  // selecting it is a change, refused as select's is
     session.select(static_cast<ObjectId>(object(session, args)));
@@ -209,7 +249,7 @@ void validate(const EditorSession& session, const std::string& name, const Json&
   const auto tool = std::find_if(tools.begin(), tools.end(), [&](const Json& value) { return value["name"] == name; });
   if (tool == tools.end()) throw std::invalid_argument("unknown editor tool");
   validate_arguments(tool->at("inputSchema"), args);
-  require_current_scene(session, args);
+  if (name != "editor") require_current_scene(session, args);  // (the editor's scene is one to open or save as)
 }
 
 // Events of the editor's own process, with paths shown relative to its game.

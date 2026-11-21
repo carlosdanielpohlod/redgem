@@ -791,6 +791,23 @@ module Material
   def self.emission: (Symbol | String name) -> (Hash[Symbol, untyped] | nil)
 end
 
+# The ground layers of a terrain: which one is where, and its weights painted again by rules.
+%a{redgem:experimental}
+module Terrain
+  # the names of the object's ground layers, in order, or nil when it has none
+  %a{redgem:experimental}
+  def self.layers: (GameObject object) -> (Array[String] | nil)
+  # each layer's share (0 to 1) of the ground under a point of the world, seen from above; nil without layers or past the terrain's edges
+  %a{redgem:experimental}
+  def self.weights_at: (GameObject object, Vector3 | Array[Numeric] position) -> (Hash[String, Float] | nil)
+  # the layer with the largest share under a point of the world; nil without layers or past the terrain's edges
+  %a{redgem:experimental}
+  def self.layer_at: (GameObject object, Vector3 | Array[Numeric] position) -> (String | nil)
+  # paints the weights by rules (as the layers file's "rules"; nil: the file's own) and returns how many texels changed; the next frame shows them
+  %a{redgem:experimental}
+  def self.paint_by_rules: (GameObject object, ?Array[Hash[Symbol | String, untyped]] | nil rules) -> Integer
+end
+
 # The body of an object with body = "character": walks, jumps, climbs steps.
 %a{redgem:stable}
 class CharacterController

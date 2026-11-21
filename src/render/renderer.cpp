@@ -103,8 +103,11 @@ void Renderer::sync(const SceneDesc& desc) {
   impl_->upload_new_materials(desc);
   impl_->refresh_material_values(desc);
   impl_->upload_new_meshes(desc);
+  impl_->sync_terrains(desc);
   impl_->note_see_through_meshes();
 }
+
+void Renderer::follow_terrain_weights(const SceneDesc& desc) { impl_->follow_terrain_weights(desc); }
 
 void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
   const bool uploaded = is_index_of(mesh, impl_->meshes.size()) && is_index_of(mesh, desc.meshes.size());

@@ -1,6 +1,7 @@
 #include "project/scene_command.hpp"
 
 #include <algorithm>
+#include <exception>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -8,6 +9,7 @@
 #include <variant>
 
 #include "app/scene_files.hpp"
+#include "app/terrain_files.hpp"
 #include "core/command_line.hpp"
 #include "core/config.hpp"
 #include "core/translations.hpp"
@@ -18,7 +20,12 @@
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_prefab_words.hpp"
+#include "editor/prefab_instances.hpp"
 #include "project/scene_revision.hpp"
+#include "scene/ground/ground_rules.hpp"
+#include "scene/ground/terrain_layers_file.hpp"
+#include "scene/property.hpp"
 #include "scene/props.hpp"
 
 namespace redgem::tools {
@@ -33,6 +40,11 @@ constexpr const char* kAgainstOption = "--against";
 constexpr const char* kRevisionOption = "--revision";
 constexpr const char* kDiffWord = "diff";
 constexpr const char* kCompactWord = "compact";
+constexpr const char* kPaintWord = "paint";
+// The words after the object that `scene override` and `scene revert` take.
+constexpr std::size_t kPartWord = 2;
+constexpr std::size_t kFieldWord = 3;
+constexpr std::size_t kFirstOverrideWord = 3;
 // What the command takes after its name.
 ToolGrammar grammar() {
   return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption, kRevisionOption},
@@ -172,6 +184,87 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+// --- prefab placements (docs/prefabs.md#overrides) ---
+// The placement the line names; why not, as the result, when it names none.
+std::variant<int, ToolResult> named_placement(const OpenScene& scene) {
+  auto object = named_object(scene);
+  if (std::holds_alternative<ToolResult>(object)) return object;
+  if (!prefab_instances::is_placement(scene.document, std::get<int>(object)))
+    return failed(tr("project.scene.not_a_placement", {{"object", object_word(scene)}}));
+  return object;
+}
+std::string part_word(const OpenScene& scene, std::size_t word) {
+  const auto& words = scene.line.words;
+  if (word >= words.size() || words[word] == kPlacementRootWord) return {};
+  return words[word];
+}
+
+ToolResult overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  try {
+    const auto fields = prefab_instances::fields(scene.document, std::get<int>(placement));
+    return answer(fields.empty() ? std::string(tr("project.scene.no_overrides")) + "\n" : overrides_listing(fields));
+  } catch (const std::exception& problem) {
+    return failed(problem.what());
+  }
+}
+
+std::optional<prefabs::PartOverride> line_change(OpenScene& scene, int placement, std::string& error,
+                                                 std::vector<std::string>& notes) {
+  const auto path = part_word(scene, kPartWord);
+  const auto current = inherited_part(scene.document, placement, scene.game_dir, path, true, error);
+  const auto base = current ? inherited_part(scene.document, placement, scene.game_dir, path, false, error) : current;
+  if (!base) return std::nullopt;
+  const std::vector<std::string> words(scene.line.words.begin() + kFirstOverrideWord, scene.line.words.end());
+  auto change = part_change(*current, *base, words, scene.game_dir / config::kScriptsDirName, error, notes);
+  const auto overrides = prefab_instances::overrides_of(scene.document, placement);
+  const auto old = overrides.find(path);
+  if (change && old != overrides.end()) change->removed = change->removed || old->second.removed;
+  return change;
+}
+
+ToolResult override_part(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  std::string error;
+  std::vector<std::string> notes;
+  const auto change = line_change(scene, index, error, notes);
+  if (!change) return failed(error);
+  if (!prefab_instances::replace_override(scene.document, index, part_word(scene, kPartWord), *change, error))
+    return failed(error);
+  return saved_object(scene, index, notes);
+}
+
+ToolResult revert_overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  const std::string field = scene.line.words.size() > kFieldWord ? scene.line.words[kFieldWord] : "";
+  std::string error;
+  if (!prefab_instances::revert(scene.document, index, part_word(scene, kPartWord), field, error)) return failed(error);
+  return saved_object(scene, index, {});
+}
+
+ToolResult apply_overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  std::string error;
+  if (!prefab_instances::apply(scene.document, index, scene.game_dir, error)) return failed(error);
+  return saved_object(scene, index, {});
+}
+
+ToolResult unpack_placement(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  std::string error;
+  const int root = prefab_instances::unpack(scene.document, std::get<int>(placement), scene.game_dir, error);
+  if (root == kNoIndex) return failed(error);
+  return saved_object(scene, root, {});
+}
+
 // The earlier save a diff compares with: what --against names, when it is one (no --revision does).
 std::optional<std::string> earlier_save(const ToolLine& line) {
   std::optional<std::string> against = line.value(kAgainstOption);
@@ -223,6 +316,54 @@ ToolResult compact(OpenScene& scene) {
   return result;
 }
 
+// The weights the rules of a terrain's layers file paint, written beside the file: what was
+// written, or why nothing was.
+std::variant<std::string, ToolResult> painted_files(const OpenScene& scene, const TerrainLayers& layers,
+                                                    std::size_t texels) {
+  std::string error;
+  if (!write_splat_pictures(scene.game_dir, layers, error)) return failed(error);
+  std::string files = splat_picture_path(layers.name, 0);
+  if (layers.layers.size() > static_cast<std::size_t>(kLayersPerSplatPicture))
+    files += " " + splat_picture_path(layers.name, 1);
+  return tr("project.scene.painted", {{"texels", std::to_string(texels)},
+                                      {"object", object_word(scene)},
+                                      {"rules", std::to_string(layers.rules.size())},
+                                      {"files", files}});
+}
+
+// The ground layers the object names, read with their weights; why not, as the result.
+std::variant<TerrainLayers, ToolResult> layers_named_by(const OpenScene& scene, const NodeDesc& node) {
+  const auto name = get_string(node.props, props::kTerrainLayers);
+  if (!name) return failed(tr("project.scene.paint_no_layers", {{"object", object_word(scene)}}));
+  std::string error;
+  auto layers = read_terrain_files(scene.game_dir, *name, TerrainReading::Weights, error);
+  if (!layers) return failed(error);
+  if (layers->rules.empty()) return failed(tr("project.scene.paint_no_rules", {{"name", *name}}));
+  return std::move(*layers);
+}
+
+ToolResult paint_object(OpenScene& scene, int index) {
+  const SceneDesc& desc = scene.document.desc();
+  const NodeDesc& node = desc.nodes[static_cast<std::size_t>(index)];
+  if (!is_index_of(node.mesh, desc.meshes.size()))
+    return failed(tr("project.scene.paint_no_mesh", {{"object", object_word(scene)}}));
+  auto read = layers_named_by(scene, node);
+  if (auto* problem = std::get_if<ToolResult>(&read)) return *problem;
+  TerrainLayers& layers = std::get<TerrainLayers>(read);
+  const std::size_t texels = paint_ground(layers, layers.rules, desc.meshes[static_cast<std::size_t>(node.mesh)]);
+  auto written = painted_files(scene, layers, texels);
+  if (auto* problem = std::get_if<ToolResult>(&written)) return *problem;
+  return answer(std::get<std::string>(written) + "\n");
+}
+
+// Paints the object's ground layers by the rules of its layers file, and writes the weights. The
+// scene itself is not changed.
+ToolResult paint(OpenScene& scene) {
+  const auto object = named_object(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&object)) return *problem;
+  return paint_object(scene, std::get<int>(object));
+}
+
 // A line that takes as many words as it wants after those it needs (what to set).
 constexpr std::size_t kAnyMore = std::numeric_limits<std::size_t>::max();
 
@@ -237,9 +378,15 @@ constexpr Known kSubcommands[] = {
     {"get", get, kFirstAssignment, kFirstAssignment},  {"set", set, kFirstAssignment, kAnyMore},
     {"add", add, kFirstAssignment, kAnyMore},          {"remove", remove, kFirstAssignment, kFirstAssignment},
     {kCompactWord, compact, kObjectWord, kObjectWord},
+    {kPaintWord, paint, kFirstAssignment, kFirstAssignment},
+    {"overrides", overrides, kFirstAssignment, kFirstAssignment},
+    {"override", override_part, kFirstOverrideWord + 1, kAnyMore},
+    {"revert", revert_overrides, kFirstAssignment, kFieldWord + 1},
+    {"apply", apply_overrides, kFirstAssignment, kFirstAssignment},
+    {"unpack", unpack_placement, kFirstAssignment, kFirstAssignment},
 };
 
-// The options diff and compact have no use for.
+// The options diff, compact and paint have no use for.
 constexpr const char* kDiffRefuses[] = {kFromOption, kParentOption, kDepthOption};
 constexpr const char* kCompactRefuses[] = {kFromOption,  kParentOption,  kDepthOption,
                                            kLimitOption, kAgainstOption, kRevisionOption};
@@ -256,6 +403,7 @@ std::string first_refused(const ToolLine& line, const char* const (&options)[N],
 std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
   const std::string word = subcommand.word;
   if (word == kCompactWord) return first_refused(line, kCompactRefuses, "project.scene.compact_bad_option");
+  if (word == kPaintWord) return first_refused(line, kCompactRefuses, "project.scene.paint_bad_option");
   const bool diff_command = word == kDiffWord;
   if (!diff_command && names_baseline(line)) return tr("project.scene.diff_against_only");
   if (!diff_command) return {};

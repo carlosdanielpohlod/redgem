@@ -49,6 +49,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
+  if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
   warn_of_all(manifest.navigation_warnings);
@@ -108,7 +109,7 @@ std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOp
 
 std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc scene) {
   std::unique_ptr<Engine> engine(new Engine(options));
-  engine->scene_desc_ = prefabs::resolve(std::move(scene), options.game_dir);
+  engine->scene_desc_ = prefabs::resolve(std::move(scene), options.game_dir, read_prefab_limits(options.game_dir));
   engine->initialize();
   return engine;
 }
@@ -285,6 +286,7 @@ void Engine::connect_profiling() {
 
 void Engine::connect_world() {
   context_.scene = &scene_;
+  context_.scene_desc = &scene_desc_;
   context_.physics = physics_.get();
   context_.navigation = &navigation_;
   context_.water = &water_.surfaces();

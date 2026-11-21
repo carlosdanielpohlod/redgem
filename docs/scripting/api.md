@@ -24,6 +24,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. | [Experimental](stability.md) |
 | [`Environment`](#environment) | The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them. | [Experimental](stability.md) |
 | [`Material`](#material) | The glow of the scene's materials, by name, changed while the game runs: lit windows at night. | [Experimental](stability.md) |
+| [`Terrain`](#terrain) | The ground layers of a terrain: which one is where, and its weights painted again by rules. | [Experimental](stability.md) |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. | [Stable](stability.md) |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). | [Stable](stability.md) |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. | [Stable](stability.md) |
@@ -414,6 +415,17 @@ The glow of the scene's materials, by name, changed while the game runs: lit win
 - `Material.emission(Symbol | String name) -> Hash[Symbol, untyped] | nil`: what set_emission gave the materials of that name, {color:, strength:}, or nil *Experimental.*
 
 A material's name is the one it has in the scene's file (Blender's). The glow holds for every object with a material of that name, copies and prefabs spawned later and the scenes loaded after, until reset_emission. A negative strength raises an ArgumentError, an unknown color name too. Each machine keeps its own: over the network, set it on every machine. A game with no window (a dedicated server) keeps it and draws nothing.
+
+## Terrain
+
+The ground layers of a terrain: which one is where, and its weights painted again by rules. *Experimental.* See [../levels.md#painting-ground-layers-by-rules-experimental](../levels.md#painting-ground-layers-by-rules-experimental).
+
+- `Terrain.layers(GameObject object) -> Array[String] | nil`: the names of the object's ground layers, in order, or nil when it has none *Experimental.*
+- `Terrain.weights_at(GameObject object, Vector3 | Array[Numeric] position) -> Hash[String, Float] | nil`: each layer's share (0 to 1) of the ground under a point of the world, seen from above; nil without layers or past the terrain's edges *Experimental.*
+- `Terrain.layer_at(GameObject object, Vector3 | Array[Numeric] position) -> String | nil`: the layer with the largest share under a point of the world; nil without layers or past the terrain's edges *Experimental.*
+- `Terrain.paint_by_rules(GameObject object, Array[Hash[Symbol | String, untyped]] | nil rules = nil) -> Integer`: paints the weights by rules (as the layers file's "rules"; nil: the file's own) and returns how many texels changed; the next frame shows them *Experimental.*
+
+A terrain has ground layers when its object names a layers file (terrain_layers = "island": terrains/island.json). Points are in the world; heights in rules are in the terrain mesh's own space. What paint_by_rules paints is kept while the scene runs and never written to the game's files: redgem scene paint writes them. A rule naming no layer of the file raises an ArgumentError, an object without layers too. Each machine keeps its own: over the network, paint on every machine.
 
 ## CharacterController
 

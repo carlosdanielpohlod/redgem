@@ -298,6 +298,32 @@ bool revert_field(Overrides& overrides, const std::string& path, const std::stri
   return had;
 }
 
+template <typename T>
+void take_if_held(std::optional<T>& into, const std::optional<T>& change) {
+  if (change) into = change;
+}
+void merge_override(PartOverride& into, const PartOverride& change) {
+  take_if_held(into.position, change.position);
+  take_if_held(into.rotation, change.rotation);
+  take_if_held(into.scale, change.scale);
+  take_if_held(into.light, change.light);
+  take_if_held(into.camera, change.camera);
+  for (const auto& [key, value] : change.props) {
+    into.props.insert_or_assign(key, value);
+    into.unset.erase(key);
+  }
+  for (const auto& key : change.unset) {
+    into.unset.insert(key);
+    into.props.erase(key);
+  }
+  into.removed = into.removed || change.removed;
+}
+std::pair<std::string, std::string> first_step(const std::string& path) {
+  const auto cut = path.find(kPathSeparator);
+  if (cut == std::string::npos) return {path, {}};
+  return {path.substr(0, cut), path.substr(cut + 1)};
+}
+
 std::string child_path(const std::string& parent, const std::string& identity) {
   return parent.empty() ? identity : parent + kPathSeparator + identity;
 }

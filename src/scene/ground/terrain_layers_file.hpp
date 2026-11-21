@@ -12,7 +12,8 @@
 //         "roughness": "textures/sand/Roughness.jpg", "occlusion": "", "height": "textures/sand/Height.png",
 //         "tint": "#ffffff", "roughness_scale": 1, "normal_scale": 1,
 //         "tiling": 4, "sharpness": 0.5, "variation": 0.2, "stochastic": true, "triplanar": false }
-//     ]
+//     ],
+//     "rules": [ { "layer": "sand" }, ... ]   how the layers are painted (see ground_rules.hpp)
 //   }
 //
 // Every key but "layers" and each layer's "name" may be left out. Picture paths are relative to

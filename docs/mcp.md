@@ -35,6 +35,8 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `game_check` | Checks scripts, scenes and assets; does not run the game's test files. |
 | `game_shot` | Returns a PNG picture of the saved game at `at` seconds (default 1), `width` pixels wide (default 512, 16:9), optionally through another `camera`. |
 | `game_query` | Asks the playing game: `inspect` an `object`, `raycast` `from` one point `to` another, or `overlap` a sphere `at` a point with a `radius`. |
+| `project` | Reads and changes the game beyond its scenes, as files (see [The project](#the-project)): `action` `settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`, `scenes`, `new_scene` or `new_game`. |
+| `build` | Makes a standalone game from the saved files, on a thread of its own (see [Building the game](#building-the-game)): `action` `start` or `status`. |
 | `api` | Reads the API index, a `class`, or a `search`. |
 | `events` | Reads this server's log history with `since`, `limit` (default 20, maximum 32), `level`. |
 
@@ -72,7 +74,8 @@ accepts, such as `frames: must be at most 600, not 601`, so the model can correc
 Unknown or disabled tools remain JSON-RPC errors.
 
 `--read-only` exposes only `scene_list`, `scene_get`, `scene_diff`, `asset_search`,
-`template_search`, `api` and `events`; the
+`template_search`, `api`, `events` and `project` with its reading actions (`settings`, `texts`,
+`story`, `scenes`); the
 `game_*` tools execute the game's scripts and are disabled. It also
 rejects calls to disabled tools, even if the client remembers an earlier tool list. For a smaller
 surface, add an exact comma-separated allow list:
@@ -127,6 +130,60 @@ The assignments are those of `redgem scene set` (see [the command line](command-
 Objects are named as `scene_get` names them. Each answer gives a line per object it made or
 changed, with its id, so the next call can name it by `#id`.
 
+## The project
+
+`project` works on the game's files, with or without an editor:
+
+| Action | Result |
+|--------|--------|
+| `settings` | `game.json`, or only its `section` (such as `menu`), then the problems the game would have with it. |
+| `set_settings` | Merges `changes` into `game.json`: a key replaces the file's, an object merges into its object, `null` removes a key. |
+| `texts` | The texts of `locales/<language>.json` (`language` defaults to `en`) whose keys start with `prefix`, `limit` of them (default 50). |
+| `set_texts` | Sets `texts` (`{"key": "text"}`) in that language; `null` removes one. |
+| `story` | Lists the files of `kind` (`dialogue`, `quest`, `item`), or reads one by `name` (`npcs/baker`). |
+| `set_story` | Writes `content` as the whole file of `kind` and `name`. Replacing a file needs `confirm: true`. |
+| `scenes` | The names of the game's scenes (`main` is `scene.glb`). |
+| `new_scene` | Makes `scenes/<scene>.glb` with a ground, a sun and a camera. |
+| `new_game` | Makes a game from `template` (default `empty`) in a new folder `path`, next to this game's folder. |
+
+```json
+{"action": "set_settings", "changes": {"window": {"title": "Coast"}, "input": {"actions": {"jump": ["key:space", "pad:a"]}}}}
+{"action": "set_settings", "changes": {"menu": {"theme": {"colors": {"button": "#203040"}, "transition": {"kind": "fade", "seconds": 0.25}}}}}
+{"action": "set_texts", "language": "pt-BR", "texts": {"hud.coins": "Moedas {coins}/{total}"}}
+{"action": "set_story", "kind": "dialogue", "name": "npcs/baker", "content": {"start": "hi", "nodes": {"hi": {"speaker": "baker.name", "text": "baker.hi", "end": true}}}}
+```
+
+Every write is checked as `game_check` checks the game: `game.json` for its physics, input and
+menu sections (the menu theme's keys and values, and the fonts, pictures and sounds it names; see
+[Giving the menu your game's look](scripting/gameplay.md#giving-the-menu-your-games-look)), the locales, dialogues and quests for what they name of each other. A write that brings an
+error the game did not have is refused, with the errors, and the file stays as it was. The
+warnings it brings, such as texts a new language still lacks, come with the answer. An item is
+checked only through the quests that name it. The
+`changes`, `texts` and `content` objects are free-form; the checks, not the schema, judge them.
+
+## Building the game
+
+`build` makes the game a player can run, as the editor's Build menu does: `start` returns at once,
+and `status` says how it goes.
+
+```json
+{"action": "start", "target": "android", "format": "bundle"}
+{"action": "status", "wait": 25}
+```
+
+| Argument | Meaning |
+|----------|---------|
+| `target` | `linux`, `windows`, `android` or `macos` (default: this system; a Mac build only on a Mac). |
+| `format` | `apk` (default) or `bundle` (an App Bundle for Google Play), for Android. |
+| `loose` | `true` keeps the game's files in a `game/` folder instead of `game.rgpak`, to look into a build. |
+| `folder` | The folder next to the game it goes into; default `<game>-build`, or `<game>-build-<target>` for another system. |
+| `wait` | For `status`: how many seconds to wait for the build to end first (up to 25; call it again for a longer build). |
+
+`status` gives the build's step and time while it runs. Once it ended, it gives what it made (the
+executable, the app, the APK or bundle) or why not, with the last lines the build logged; these
+also reach `events`. A build works from the files on disk: save the editor's edits first. It
+replaces only what an earlier build wrote in that folder. One build runs at a time.
+
 ## Live editor
 
 Start the editor with its bridge explicitly enabled:
@@ -175,6 +232,8 @@ The `editor` tool takes these actions:
 | `play`, `pause`, `resume`, `stop` | Control the editor's game, using its normal input, audio and viewport. |
 | `step` | Advance a paused game by exactly one fixed frame, keeping it paused. |
 | `capture` | Return the last completed viewport as an MCP PNG image, without writing a file. |
+| `open_scene` | Open the game's `scene` by name. A scene with unsaved edits is refused: `save` first, or pass `discard: true` to drop them. |
+| `save_as` | Save the open scene as `scenes/<scene>.glb`, which is then the scene edited. |
 
 `capture` accepts `max_size` (default 512, range 128–1024), the longest output side. Images are
 reduced further when necessary for the reply, with the PNG as base64 text, to stay within the

@@ -259,9 +259,16 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
-- Terrain is one 100 m square with vertex tint painting and one material, no texture-layer painting,
-  no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
-  is an ordinary mesh.
+- Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
+  several terrains. A terrain re-exported from Blender is an ordinary mesh.
+- Ground layers have no editor brush yet: their weights are painted by rules (`redgem scene
+  paint`, `Terrain.paint_by_rules`) or by editing the splat pictures. Rules see the terrain mesh's
+  own heights, not its object's scale or place. The layers' textures are three texture arrays in
+  slots 17 to 19: a graphics card with fewer than 20 texture units for the fragment shader (most
+  phones) draws the terrain without them. A terrain's mesh must be its own: a mesh another object
+  also draws gets no layers. Changed layer pictures show after the scene is loaded again. Each
+  layer's pictures are sampled even where the layer is covered by others with a sharp height
+  blend.
 
 ## Tools
 
@@ -350,12 +357,15 @@ promise of how it will be closed.
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
   `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
   texture's sampler or UV set.
-- [Prefab file](docs/prefabs.md) instance overrides are set in the scene file only: the editor
-  cannot yet show, apply, revert or unpack them. Overrides do not reach materials (shared by every
+- [Prefab file](docs/prefabs.md) instance overrides are listed, reverted, applied and unpacked
+  from the command line; the editor Inspector does not show them yet. Applying cannot be undone in
+  the prefab file (only in the scene). Overrides do not reach materials (shared by every
   instance; use `tint`). Scripted prefab imports are synchronous and support rigid hierarchies
   only, and a running scene does not see a changed prefab file until reloaded. Export needs
   complete skeletons and descendant-only animation; it does not replace the original selection
-  with a reference or overwrite an existing source file.
+  with a reference or overwrite an existing source file. The editor reads `game.json`'s
+  `prefab_budget_mb` when it opens the game (reopen it after a change), and applying or unpacking
+  overrides still reads one prefab file of at most 256 MiB.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
@@ -745,11 +755,19 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
   bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials, terrain brushes and scene switching still use files or the editor UI. Native
+  materials and terrain brushes still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `build` runs in the MCP server's process, from the files on disk: an open editor's
+  unsaved edits are not in it, and its progress is not shown in the editor. A build cannot be
+  cancelled, and a server asked to quit waits for its build to end.
+- MCP's `project` tool checks a write as `redgem check` does: `game.json`'s physics, input and
+  menu sections, and what the locales, dialogues and quests name of each other. Other sections of
+  `game.json` and items no quest names are written as given. It edits files only: an open editor
+  sees a new scene once it rescans its files, and a game must be restarted to read changed
+  settings.
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.

@@ -96,9 +96,19 @@ void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
   // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
   assign_slot(shader, lit_uniforms.sky_reflections, kSkyReflectionSlot);
   assign_slot(shader, lit_uniforms.sky_reflectance, kSkyReflectanceSlot);
+  assign_terrain_slots(features);
   for (Material& material : materials) material.shader = shader;
   fallback_material.shader = shader;
   lit_features = features;
+}
+
+// A terrain's arrays are never sampled through a slot a 2D picture is bound to: given their own.
+void Renderer::Impl::assign_terrain_slots(const shaders::LitFeatures& features) {
+  terrain_uniforms = features.terrain ? find_terrain_uniforms(shader) : render_detail::TerrainUniforms{};
+  if (!features.terrain) return;
+  assign_slot(shader, terrain_uniforms.colors, kTerrainTextureSlot);
+  assign_slot(shader, terrain_uniforms.surfaces, kTerrainSurfaceSlot);
+  assign_slot(shader, terrain_uniforms.splat, kTerrainSplatSlot);
 }
 
 void Renderer::Impl::use_lit_features(const shaders::LitFeatures& features) {
