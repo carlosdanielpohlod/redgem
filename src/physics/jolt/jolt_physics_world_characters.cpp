@@ -68,10 +68,9 @@ bool stands_on_what_it_carries(const Record& record) {
 // speed of a box rising to its hand, it would rise with the box and lift it on, and fly.
 JPH::Vec3 carried_velocity(const Record& record) {
   const JPH::CharacterVirtual& character = *record.character;
-  if (!rests_on_ground(character) || stands_on_what_it_carries(record)) {
-    return JPH::Vec3(0.0f, character.GetLinearVelocity().GetY(), 0.0f);
-  }
-  const JPH::Vec3 ground_velocity = character.GetGroundVelocity();
+  if (!rests_on_ground(character)) return JPH::Vec3(0.0f, character.GetLinearVelocity().GetY(), 0.0f);
+  const JPH::Vec3 ground_velocity =
+      stands_on_what_it_carries(record) ? JPH::Vec3::sZero() : character.GetGroundVelocity();
   if (!record.pending_jump) return ground_velocity;
   return ground_velocity + JPH::Vec3(0.0f, *record.pending_jump, 0.0f);
 }

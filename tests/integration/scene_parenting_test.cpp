@@ -19,6 +19,7 @@ constexpr float kDoubled = 2.0f;
 constexpr int kFewFrames = 10;
 // A height between the middle of a courier on the ground (0.55 m up) and on a box (0.95 m).
 const std::string kOnTheBox = "0.8";
+const std::string kUnderTheGround = "0.3";  // a courier lower than this fell through the ground
 
 // A holder turned half round and twice as big, a hero beside it, a cart with nothing on it, a
 // kinematic lift, a dynamic crate resting on the ground, and a template to spawn.
@@ -182,6 +183,9 @@ TEST_CASE("a character that picks up the body it stands on stays on the ground")
   frames(*engine, kFewFrames * kFewFrames);
   CAPTURE(ruby(*engine, "Scene.find('Courier').transform.position.y"));
   CHECK(says(*engine, "Scene.find('Courier').transform.position.y < " + kOnTheBox));  // back on the ground
+  CHECK(says(*engine, "Scene.find('Courier').transform.position.y > " + kUnderTheGround));
+  CHECK(says(*engine, "Scene.find('Courier').character.grounded?"));
+  CHECK(says(*engine, "Scene.find('Box').transform.position.distance_to(Scene.find('Hand').transform.position) < 0.1"));
   CHECK(engine->scripts().error_count() == 0);
 }
 
