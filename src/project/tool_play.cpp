@@ -6,8 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
-#include "core/config.hpp"
 #include "core/translations.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_command.hpp"
@@ -37,8 +37,6 @@ std::variant<SceneDesc, std::string> scene_of(const PlayRequest& request) {
   return std::move(*scene);
 }
 
-constexpr double kStepsPerSecond = 1.0 / config::kFixedDeltaSeconds;
-
 // Whether a number of steps is one a tool plays: from `least` to kMostSteps.
 bool within_steps(double steps, long long least) {
   return std::isfinite(steps) && steps >= static_cast<double>(least) && steps <= static_cast<double>(kMostSteps);
@@ -55,10 +53,10 @@ std::optional<long long> steps_from(std::optional<double> length, double steps_p
 
 // What `--frames`, else `seconds_option`, ask for; `otherwise` seconds when neither is given.
 std::optional<long long> steps_asked(const ToolLine& line, const char* seconds_option, double otherwise,
-                                     long long least) {
+                                     double steps_per_second, long long least) {
   if (const auto frames = line.value(kFramesOption)) return steps_from(number_from(*frames), 1.0, least);
   const auto seconds = line.value(seconds_option);
-  return steps_from(seconds ? number_from(*seconds) : otherwise, kStepsPerSecond, least);
+  return steps_from(seconds ? number_from(*seconds) : otherwise, steps_per_second, least);
 }
 
 // A name no other run picks, all but surely.
@@ -105,12 +103,15 @@ std::optional<std::string> keep_camera(SceneDesc& scene, const std::string& name
   return std::nullopt;
 }
 
-std::optional<long long> frames_asked(const ToolLine& line, double otherwise) {
-  return steps_asked(line, kSecondsOption, otherwise, 1);
+std::optional<long long> frames_asked(const ToolLine& line, double otherwise, double steps_per_second) {
+  return steps_asked(line, kSecondsOption, otherwise, steps_per_second, 1);
 }
 
-std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise) {
-  return steps_asked(line, seconds_option, otherwise, 0);
+std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise,
+                                      double steps_per_second) {
+  return steps_asked(line, seconds_option, otherwise, steps_per_second, 0);
 }
+
+double steps_per_second(const std::filesystem::path& game_dir) { return read_game_settings(game_dir).tick_hz; }
 
 }  // namespace redgem::tools

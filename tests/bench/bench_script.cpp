@@ -52,9 +52,9 @@ BenchCase script_case() {
             std::shared_ptr<Engine> engine = sandbox();
             ruby(*engine, kTicker);
             ruby(*engine, spawn_code());
-            engine->frame(config::kFixedDeltaSeconds);  // their starts run once, outside the measure
+            engine->frame(config::kDefaultFixedDeltaSeconds);  // their starts run once, outside the measure
             return Sampler([engine] {
-              return microseconds_each(kFramesPerSample, [&engine] { engine->frame(config::kFixedDeltaSeconds); });
+              return microseconds_each(kFramesPerSample, [&engine] { engine->frame(config::kDefaultFixedDeltaSeconds); });
             });
           }};
 }

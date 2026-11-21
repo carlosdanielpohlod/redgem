@@ -11,7 +11,7 @@ instance for that object, and the engine calls its methods as the game runs.
 class Door < Behaviour
   def start; end                      # once, before the first update
   def update(dt); end                 # every frame; dt is seconds since the last one
-  def fixed_update(dt); end           # 60 times per second, with the physics
+  def fixed_update(dt); end           # at the game's tick (60 a second by default), with the physics
   def on_trigger_enter(other); end    # something entered this object's trigger (or it entered one)
   def on_trigger_exit(other); end
   def on_collision_enter(other); end  # this object's body touched another

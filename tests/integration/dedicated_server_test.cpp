@@ -67,7 +67,7 @@ end
 constexpr int kServedTurns = 30;
 constexpr int kOneThread = 1;
 // A room's sleeps on the fake clock wake this late: its turns cover more than a tick each.
-constexpr double kTick = config::kFixedDeltaSeconds;  // (in doubles: the clock counts in them)
+constexpr double kTick = config::kDefaultFixedDeltaSeconds;  // (in doubles: the clock counts in them)
 constexpr double kOversleep = kTick;
 // Game time comes in whole fixed steps: it trails the clock by less than one, give or take what
 // adding up its steps in floats rounds off.
@@ -173,8 +173,8 @@ struct Online {
 
   // The lobby's turn and a frame of every player, then a wait for something to reach a player.
   void round() {
-    server.tick(config::kFixedDeltaSeconds);
-    for (auto& player : players) player->frame(config::kFixedDeltaSeconds);
+    server.tick(config::kDefaultFixedDeltaSeconds);
+    for (auto& player : players) player->frame(config::kDefaultFixedDeltaSeconds);
     wait_for_sockets();
   }
 
@@ -183,7 +183,7 @@ struct Online {
   void wait_for_sockets() const {
     std::vector<net::NetworkSession*> sessions;
     for (const auto& player : players) sessions.push_back(&player->network());
-    test::wait_for_sessions(sessions, {}, config::kFixedDeltaSeconds);
+    test::wait_for_sessions(sessions, {}, config::kDefaultFixedDeltaSeconds);
   }
 
   // Whether the room with the code `room` closed (its thread let it go).
@@ -206,7 +206,7 @@ struct Online {
     while (std::chrono::steady_clock::now() < deadline) {
       round();
       if (done()) return true;
-      std::this_thread::sleep_for(std::chrono::duration<double>(config::kFixedDeltaSeconds));
+      std::this_thread::sleep_for(std::chrono::duration<double>(config::kDefaultFixedDeltaSeconds));
     }
     return false;
   }
@@ -373,7 +373,7 @@ TEST_CASE("a room that closed between two turns of the lobby holds no place: its
   // The next player's hello waits at the lobby while the old room closes, before the lobby's turn.
   Engine& next = online_game.knock();
   for (int frame = 0; frame < kFramesToSayHello; ++frame) {
-    next.frame(config::kFixedDeltaSeconds);
+    next.frame(config::kDefaultFixedDeltaSeconds);
     online_game.wait_for_sockets();
   }
   bool closed = false;
@@ -440,7 +440,7 @@ TEST_CASE("a player whose connection to a full room drops gets its place back, w
   const auto until = [&](const std::function<bool()>& done) {
     return online_game.until([&] {
       network.pump();
-      for (net::NetworkEvent& event : dropping.poll(config::kFixedDeltaSeconds)) events.push_back(std::move(event));
+      for (net::NetworkEvent& event : dropping.poll(config::kDefaultFixedDeltaSeconds)) events.push_back(std::move(event));
       return done();
     });
   };

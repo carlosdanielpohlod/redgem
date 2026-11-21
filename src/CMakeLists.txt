@@ -258,6 +258,7 @@ redgem_add_library(redgem_net
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
   net/movement_validator.cpp
+  net/placed_objects.cpp
   net/movement_rules.cpp
   net/secure/tls_basics.cpp
   net/secure/fingerprint.cpp
@@ -709,6 +710,7 @@ if(NOT ANDROID)
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
     editor/editor_session_create.cpp
+    editor/new_object_kinds.cpp
     editor/editor_session_play.cpp
     editor/editor_session_joints.cpp
     editor/scene_recovery.cpp
@@ -860,6 +862,8 @@ if(NOT ANDROID)
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp
     project/scene_assignments.cpp
+    project/component_words.cpp
+    project/scene_edits.cpp
     project/scene_command.cpp
     project/script_messages.cpp
     project/tool_play.cpp

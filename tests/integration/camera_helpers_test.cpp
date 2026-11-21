@@ -89,7 +89,7 @@ class SquarePicture final : public Presenter {
   void capture_cursor(bool) override {}
   void present(const FrameView&) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return config::kDefaultFixedDeltaSeconds; }
 };
 
 std::unique_ptr<Engine> game_on(const TempGame& game, const SceneDesc& scene, Presenter& presenter) {

@@ -60,7 +60,7 @@ std::string table_heading() {
 std::string table_line(const RoundResult& round) {
   const Totals totals = add_up(round);
   const double player_seconds = round.seconds * round.players;
-  const double frames = round.seconds / config::kFixedDeltaSeconds;
+  const double frames = round.seconds / config::kDefaultFixedDeltaSeconds;
   char line[kLineBytes];
   std::snprintf(line, sizeof(line), "| %d | %.0f | %.0f | %.1f | %.1f | %.3f | %.1f / %.1f / %.1f |", round.players,
                 totals.sent / player_seconds, totals.received / player_seconds,

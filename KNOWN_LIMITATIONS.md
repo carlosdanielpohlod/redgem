@@ -272,7 +272,6 @@ menu whose look each game sets:
 
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
-- A character that changes shape (crouching) and will not stand up under a ceiling.
 - A first-person weapon drawn with its own field of view that never goes into walls.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.
@@ -650,7 +649,8 @@ promise of how it will be closed.
   validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
   lets the host or a dedicated server refuse moves faster or further than the game's limits, but
   it checks positions only: not rotations, animations, collisions (walking through a wall within
-  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  the speed limit is believed), nor objects the host moves itself. For up to two seconds after the host places an
+  object (`Network.teleport`), its poses from away from the placed spot are not used. One top speed and one
   teleport distance hold for every object of the game, and a kicked machine is not told why. In a
   room on a relay, nothing is checked (the relay passes poses on). An object destroyed and made
   again under the same key is checked from where it was until the host makes its copy again, so a
@@ -722,9 +722,10 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   files of each kind, and says nothing when a folder had more. `api` covers the engine's classes only, not the game's own behaviours: read the game's
   scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
-  set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
-  viewport images, runtime queries and event history. Live add creates empty objects only;
-  asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
+  edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
+  selection of several objects and framing, undo/redo, save, play controls, single stepping,
+  bounded viewport images, runtime queries and event history. Model importing, prefabs,
+  materials, terrain brushes and scene switching still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
@@ -745,7 +746,8 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   cut at 8 KiB, as any tool's text.
   Classes a snippet defines or reopens are tracked by hot reload as coming from `(game_eval)`, so
   hot reloading their script files may not go cleanly afterwards: stop and play again.
-- MCP adds one object per `scene_edit` call; a row of copies takes one call each.
+- `scene_edit` sets the same words on each of several objects: a row of copies at different
+  places takes one `set` per copy after the `duplicate`.
 - Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
   and pass back than the numeric ids of older objects.
 - `game_shot` needs a display (Xvfb works on a server).

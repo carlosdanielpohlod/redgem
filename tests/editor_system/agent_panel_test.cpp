@@ -125,7 +125,7 @@ std::filesystem::path fresh_sessions_file() {
 std::unique_ptr<EditorApp> editor_keeping(const std::filesystem::path& game, const std::filesystem::path& sessions,
                                           std::vector<agent::EnvironmentVariable> agent_environment = {}) {
   EditorOptions options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   options.agent.agents_file = fake_agents_file(std::move(agent_environment));
   options.agent.sessions_file = sessions;
   options.agent.reopen_last_session = true;
@@ -206,7 +206,7 @@ TEST_CASE("a conversation started in place of one that could not be reopened has
 TEST_CASE("the transcript follows an answer as it grows, and Play an agent presses leaves the message box alone") {
   const std::filesystem::path game = copy_game();
   EditorOptions options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   options.agent.agents_file = fake_agents_file();
   auto created = EditorApp::create(game, std::move(options));
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -247,7 +247,7 @@ TEST_CASE("the Agent panel talks to an agent, which writes a file in the game af
   const std::filesystem::path game = copy_game();
   std::unique_ptr<tools::EditorBridge> bridge;
   EditorOptions options = editor_options(GpuChoice::Auto);
-  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.clock = [] { return config::kDefaultFixedDeltaSeconds; };
   options.agent = agent_hooks(bridge);
   options.agent.agents_file = fake_agents_file();
   options.agent.sessions_file = fresh_sessions_file();  // (never the user's own)

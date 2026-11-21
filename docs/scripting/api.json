@@ -60,7 +60,7 @@
             {"name": "dt", "type": "Float"}
           ],
           "returns": {"type": "void"},
-          "about": "called 60 times a second, with the physics"
+          "about": "called at the game's tick (game.json's tick_hz, 60 times a second by default), with the physics"
         },
         {
           "name": "on_trigger_enter",
@@ -245,8 +245,8 @@
           "name": "props",
           "stability": "stable",
           "params": [],
-          "returns": {"type": "Hash[String, untyped]"},
-          "about": "the object's custom properties, as a Hash"
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "the object's custom properties, as a Hash with Symbol keys"
         },
         {
           "name": "prop",
@@ -444,8 +444,8 @@
           "name": "props",
           "stability": "stable",
           "params": [],
-          "returns": {"type": "Hash[String, untyped]"},
-          "about": "its custom properties"
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "its custom properties, as a Hash with Symbol keys"
         },
         {
           "name": "joint",
@@ -1731,7 +1731,7 @@
           "static": true,
           "params": [],
           "returns": {"type": "Float"},
-          "about": "seconds of a physics step (1/60)"
+          "about": "seconds of a physics step: 1 / game.json's tick_hz (1/60 by default)"
         },
         {
           "name": "elapsed",
@@ -2339,6 +2339,16 @@
           "params": [],
           "returns": {"type": "bool"},
           "about": "whether it stands on something"
+        },
+        {
+          "name": "resize",
+          "stability": "experimental",
+          "params": [
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "radius", "type": "Numeric", "keyword": true}
+          ],
+          "returns": {"type": "bool"},
+          "about": "makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update"
         },
         {
           "name": "velocity",
@@ -5564,6 +5574,18 @@
           ],
           "returns": {"type": "Integer"},
           "about": "how many moves of a machine the host did not believe in this game"
+        },
+        {
+          "name": "teleport",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject | String"},
+            {"name": "position", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "bool"},
+          "about": "on the host (or alone): puts an object kept in step (a GameObject with a NetworkSync, or its key) there on every machine, its owner's included, with no movement violation (a respawn, a spawn point, a level's entry); false on a machine that does not host",
+          "example": "Network.teleport(hero, spawn.transform.position) if Network.host?"
         },
         {
           "name": "port",

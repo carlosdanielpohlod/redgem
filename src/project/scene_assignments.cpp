@@ -12,6 +12,7 @@
 #include "core/config.hpp"
 #include "core/translations.hpp"
 #include "project/closest_words.hpp"
+#include "project/component_words.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
 #include "editor/editor_config.hpp"
@@ -37,7 +38,8 @@ constexpr int kScaleDecimals = 3;    // enough to show the smallest scale (0.001
 constexpr double kNarrowable = 1.0;  // a number a float takes for sure, past any smallest scale
 // Every key a word may set (the props are "prop.<key>").
 constexpr const char* kKeys =
-    "position (pos), rotation (rot), scale, name, parent, script (scripts), spot_cone, prop.<key> (or <key> alone)";
+    "position (pos), rotation (rot), scale, name, parent, script (scripts), light, light_color, light_intensity, "
+    "light_range, spot_cone, camera_fov, camera_near, camera_far, prop.<key> (or <key> alone)";
 // What a line calls the scripts, the mesh and the light (see scene_text.hpp).
 constexpr const char* kScriptsKey = "scripts";
 constexpr const char* kMeshKey = "mesh";
@@ -288,9 +290,10 @@ std::string check_mesh(SceneEdit& edit, int& index, const Assignment& assignment
   return shown_as(assignment.key, shown_mesh(scene, scene.nodes[index]), assignment);
 }
 
-std::string check_light(SceneEdit& edit, int& index, const Assignment& assignment) {
-  const NodeDesc& node = edit.document.node(index);
-  return shown_as(assignment.key, node.light ? light_name(node.light->type) : "", assignment);
+// A word of the Light and Camera cards (see component_words.hpp).
+template <std::string (*Set)(SceneDocument&, int, const std::string&)>
+std::string component(SceneEdit& edit, int& index, const Assignment& assignment) {
+  return Set(edit.document, index, assignment.value);
 }
 
 bool apply_cone(LightDesc& light, const std::string& value) {
@@ -338,7 +341,13 @@ constexpr Key kSetters[] = {
     {props::kScript, set_scripts, true},
     {kScriptsKey, set_scripts, true},
     {kMeshKey, check_mesh, false},
-    {kLightKey, check_light, false},
+    {kLightKey, component<component_words::set_light_type>, false},
+    {"light_color", component<component_words::set_light_color>, false},
+    {"light_intensity", component<component_words::set_light_intensity>, false},
+    {"light_range", component<component_words::set_light_range>, false},
+    {"camera_fov", component<component_words::set_camera_fov>, false},
+    {"camera_near", component<component_words::set_camera_near>, false},
+    {"camera_far", component<component_words::set_camera_far>, false},
     {kSpotConeKey, set_spot_cone, false},
     {kInnerConeKey, reject_cone_member, false},
     {kOuterConeKey, reject_cone_member, false},

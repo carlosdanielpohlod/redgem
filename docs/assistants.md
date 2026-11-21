@@ -86,6 +86,8 @@ ran main for 30 frames (0.5 s): 1 errors, 0 warnings
 |------|-----------|
 | What is in a level | `scene_list` (50 lines unless `limit` says otherwise), then `scene_get` |
 | Move, tune, attach, copy | `scene_edit` with `assignments`, and `from` to copy an object with its mesh |
+| Place a shape, light or camera | `scene_edit` `add` with a `kind` (`cube`, `point_light`, `camera`...) |
+| Copy, group or remove several | `scene_edit` `duplicate`, `group` or `remove` with `objects` |
 | Does it play | `game_run`; `print` and `assert` read the game, e.g. `Scene.find('Coin6').transform.position` |
 | Why does it fall through the floor | `game_query` `raycast` or `inspect` (velocity, grounded) |
 | What it looks like | `game_shot` (512x288), or `editor` `capture` for the editor's view |
@@ -116,7 +118,7 @@ parameters of the methods written in Ruby).
 
 ## Repeating a headless session
 
-`redgem run` uses fixed steps of 1/60 s and a random seed of 0. Use `--seed N` to repeat another
+`redgem run` uses the game's fixed steps (1/60 s unless `game.json` sets `tick_hz`) and a random seed of 0. Use `--seed N` to repeat another
 Ruby and particle random stream, including random values read while scripts first load. A seed
 is a whole number from 0 to 2147483647. Scatter requests keep their own explicit seeds. Network
 traffic, web responses and scripts that read external clocks or files are outside this replay.

@@ -76,7 +76,7 @@ TEST_CASE("TestInput sets what the game reads on its next frame") {
   CHECK(input.is_key_down(Key::A));
   CHECK(input.mouse().x == doctest::Approx(kMouseX));
   CHECK(input.mouse().y == doctest::Approx(kMouseY));
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(*engine, "[Input.down?(:a), Input.text, TestInput.down?(:a)].inspect") == "[true, \"hi\", true]");
   ruby(*engine, "TestInput.release_all");
   CHECK_FALSE(input.is_key_down(Key::A));

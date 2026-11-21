@@ -89,7 +89,7 @@ std::string ruby(Engine& engine, const std::string& code) {
   return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
 }
 
-void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+void frame(Engine& engine) { engine.frame(config::kDefaultFixedDeltaSeconds); }
 
 // A behaviour that draws a text and a rectangle over the game every frame.
 constexpr const char* kPainter = R"(
@@ -208,7 +208,7 @@ TEST_CASE("a game shown by nobody is as big as its settings say and steps at the
   const GameSettings settings = read_game_settings(options.game_dir);
   CHECK(engine.presenter().surface_size().width == settings.window_width);
   CHECK(engine.presenter().surface_size().height == settings.window_height);
-  CHECK(engine.presenter().frame_seconds() == doctest::Approx(config::kFixedDeltaSeconds));
+  CHECK(engine.presenter().frame_seconds() == doctest::Approx(config::kDefaultFixedDeltaSeconds));
   CHECK(engine.presenter().open());
   CHECK(engine.presenter().text_width("abcd", 10) == estimated_text_width("abcd", 10));
   CHECK(ruby(engine, "UI.text_width('abcd', size: 10)") == std::to_string(estimated_text_width("abcd", 10)));

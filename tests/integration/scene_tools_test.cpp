@@ -366,7 +366,7 @@ TEST_CASE("a scene that was changed from the command line still plays") {
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
-  for (int frame = 0; frame < kFrames; ++frame) engine.frame(config::kFixedDeltaSeconds);
+  for (int frame = 0; frame < kFrames; ++frame) engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine.scripts().error_count() == 0);
   CHECK(engine.scene().find("Coin6") != kNoObject);
 }
@@ -428,4 +428,79 @@ TEST_CASE("scene diff refuses missing baselines, unrelated options and unsafe nu
         kExitUsage);
   CHECK(scene_tool({"list", game, "--against", "other.glb"}).exit_code == kExitUsage);
   CHECK(scene_tool({"list", game, "--limit", "1e300"}).exit_code != kExitSuccess);
+}
+
+TEST_CASE("set changes a light and a camera as the Inspector does, and refuses what they cannot be") {
+  GameCopy game("components");
+  const auto changed = scene_tool(
+      {"set", game.dir(), "GoalLight", "light=spot", "light_color=1,0.5,0", "light_intensity=80", "light_range=12"});
+  REQUIRE_MESSAGE(changed.exit_code == kExitSuccess, changed.err);
+  const auto& light = *node_named(load(game.scene()), "GoalLight").light;
+  CHECK(light.type == LightType::Spot);
+  CHECK(light.color.g == doctest::Approx(0.5));
+  CHECK(light.intensity == doctest::Approx(80));
+  CHECK(light.range == doctest::Approx(12));
+  REQUIRE(scene_tool({"set", game.dir(), "Camera", "camera_fov=70", "camera_near=0.2", "camera_far=500"}).exit_code ==
+          kExitSuccess);
+  const auto& camera = *node_named(load(game.scene()), "Camera").camera;
+  CHECK(radians_to_degrees(camera.fov_y_radians) == doctest::Approx(70));
+  CHECK(camera.far_plane == doctest::Approx(500));
+  CHECK(has(scene_tool({"set", game.dir(), "Camera", "camera_near=600"}).err, "less than camera_far"));
+  for (const char* bad : {"light_intensity=-1", "light_color=2,0,0", "light_color=red", "light_color=1,0,0,",
+                          "light=lamp", "camera_fov=1"}) {
+    CAPTURE(bad);
+    CHECK(scene_tool({"set", game.dir(), "GoalLight", bad}).exit_code == kExitFailure);
+  }
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "light_range=3"}).err, "has none"));
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "camera_fov=60"}).err, "has none"));
+  CHECK(scene_tool({"set", game.dir(), "Coin1", "light="}).exit_code == kExitSuccess);  // a line's word, taken back
+}
+
+namespace {
+mcp::Json edit_files(const GameCopy& game, const mcp::Json& args) {
+  return mcp::invoke(mcp::Options{game.dir(), false, {}}, "scene_edit", args);
+}
+std::string reply_text(const mcp::Json& reply) { return reply["content"][0]["text"].get<std::string>(); }
+}  // namespace
+
+TEST_CASE("scene_edit on the files adds kinds, duplicates, groups and removes several objects, then saves") {
+  GameCopy game("edits");
+  const auto box =
+      edit_files(game, {{"action", "add"}, {"object", "Box"}, {"kind", "cube"}, {"assignments", {"position=1,2,3"}}});
+  REQUIRE_MESSAGE(!box["isError"].get<bool>(), reply_text(box));
+  CHECK(has(reply_text(box), "Box pos=1,2,3"));
+  CHECK(node_named(load(game.scene()), "Box").mesh != kNoIndex);
+  const mcp::Json coins = {"Coin1", "Coin2"};
+  const auto copies = edit_files(game, {{"action", "duplicate"}, {"objects", coins}});
+  CHECK(has(reply_text(copies), "Coin1.001"));
+  CHECK(has(reply_text(copies), "Coin2.001"));
+  const auto grouped = edit_files(game, {{"action", "group"}, {"object", "Coins"}, {"objects", coins}});
+  REQUIRE_MESSAGE(!grouped["isError"].get<bool>(), reply_text(grouped));
+  const SceneDesc saved = load(game.scene());
+  CHECK(saved.nodes[node_named(saved, "Coin1").parent].name == "Coins");
+  CHECK(node_named(saved, "Coin1").local.position.z == doctest::Approx(-4));  // where it was in the world
+  const auto removed =
+      edit_files(game, {{"action", "remove"}, {"objects", {"Coin1.001", "Coin2.001"}}, {"confirm", true}});
+  CHECK(has(reply_text(removed), "Coin1.001"));
+  CHECK(load(game.scene()).find_node("Coin2.001") == kNoIndex);
+  CHECK(has(reply_text(edit_files(game, {{"action", "add"}, {"object", "Sky"}, {"kind", "sun"}})), "light=sun"));
+  CHECK(has(reply_text(edit_files(game, {{"action", "add"}, {"object", "Coin1"}})), "Coin1.001"));  // a name taken
+}
+
+TEST_CASE("a wrong scene_edit on the files throws what to change and leaves the file alone") {
+  GameCopy game("wrong_edits");
+  const auto before = fs::last_write_time(game.scene());
+  CHECK_THROWS_AS(edit_files(game, {{"action", "set"}, {"objects", {"Coin1", "Nope"}}, {"assignments", {"scale=2"}}}),
+                  std::invalid_argument);
+  CHECK_THROWS_AS(edit_files(game, {{"action", "add"}, {"object", "X"}, {"kind", "cube"}, {"from", "Coin1"}}),
+                  std::invalid_argument);
+  CHECK_THROWS_AS(
+      edit_files(game, {{"action", "group"}, {"object", "G"}, {"objects", {"Player"}}, {"parent", "Visor"}}),
+      std::invalid_argument);
+  CHECK_THROWS_AS(edit_files(game, {{"action", "duplicate"}, {"objects", {"Coin1"}}, {"parent", "Player"}}),
+                  std::invalid_argument);
+  CHECK_THROWS_AS(
+      edit_files(game, {{"action", "add"}, {"object", "Env"}, {"kind", "environment"}, {"assignments", {"bad"}}}),
+      std::invalid_argument);
+  CHECK(fs::last_write_time(game.scene()) == before);
 }

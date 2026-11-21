@@ -88,7 +88,7 @@ Json picture_result(const std::vector<std::uint8_t>& png, const std::string& tex
 int play_frames(Engine& engine, int frames) {
   int played = 0;
   while (played < frames && !engine.finished()) {
-    engine.frame(config::kFixedDeltaSeconds);
+    engine.frame(engine.fixed_delta());
     ++played;
   }
   return played;

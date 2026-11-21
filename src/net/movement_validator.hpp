@@ -73,6 +73,9 @@ class MovementValidator {
   MovementVerdict check(int peer, const std::string& key, Vec3 position);
   // How many violations machine `peer` was caught at.
   int violations(int peer) const;
+  // The host put machine `peer`'s object `key` at `position` (Network.teleport): its moves are checked
+  // from there (what its machine said before it heard is not checked at all: see PlacedObjects).
+  void place(int peer, const std::string& key, Vec3 position);
   // Machine `peer` left.
   void forget(int peer);
   // The object that goes by `key` is new on the host (its NetworkSync started, or it is gone): it

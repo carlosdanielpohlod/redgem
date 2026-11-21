@@ -148,7 +148,7 @@ TEST_CASE("a hinge set up in the editor swings within its limits when the game p
   ScriptedInputSource input;
   std::string error;
   REQUIRE_MESSAGE(session->play({input}, error), error);
-  for (int i = 0; i < kSwingFrames; ++i) session->tick(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kSwingFrames; ++i) session->tick(config::kDefaultFixedDeltaSeconds);
   const ObjectId playing = session->scene().find(name);
   REQUIRE(playing != kNoObject);
   // A unit cube a meter wide: its middle half a meter out from the hinge, turned down by the limit.

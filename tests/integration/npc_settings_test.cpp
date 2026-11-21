@@ -27,7 +27,7 @@ std::unique_ptr<Engine> sandbox() {
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   return engine;
 }
 
