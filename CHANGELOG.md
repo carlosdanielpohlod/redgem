@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
+  `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
+  fog, light and effects of the environment object, and the next frame shows them. A day that
+  turns to night needed a scene of its own for every hour.
 - **Menu and interface themes (experimental).** A game gives its menus its own look in
   game.json's `"menu": {"theme": {...}, "screens": {...}}`, or from a script with `UI.theme=`,
   `GameMenu.theme=` and `screen.theme=`. A theme sets the fonts (body and heading), sizes, colors

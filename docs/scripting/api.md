@@ -22,6 +22,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. | [Experimental](stability.md) |
 | [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. | [Experimental](stability.md) |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. | [Experimental](stability.md) |
+| [`Environment`](#environment) | The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them. | [Experimental](stability.md) |
 | [`Material`](#material) | The glow of the scene's materials, by name, changed while the game runs: lit windows at night. | [Experimental](stability.md) |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. | [Stable](stability.md) |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). | [Stable](stability.md) |
@@ -389,6 +390,17 @@ Where the scene's water is: the height of its surface, and how deep a point is u
 - `Water.under?(Vector3 point) -> bool`: whether a point is below the water surface *Experimental.*
 
 Every surface whose material has `water = true` fills the column under it down to whatever ground the level has, or to the next surface below. `height_at` gives the highest surface over a column; `depth_at` and `under?` look at the nearest surface above the point (or, with none above, the nearest below), so a point under a pool on a roof is in the lake beneath it. Heights are the calm surface: waves are not counted. The answers follow the water as the last physics step found it, and are nil (or false) outside a running game.
+
+## Environment
+
+The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them. *Experimental.* See [../levels.md#changing-the-look-while-the-game-runs](../levels.md#changing-the-look-while-the-game-runs).
+
+- `Environment[Symbol | String key] -> Float | String | bool | nil`: what the environment object says of a setting (a color as "#rrggbb"), or nil when it says nothing and the default applies *Experimental.*
+- `Environment[Symbol | String key] = Numeric | String | Symbol | Array[Numeric] | bool | nil value`: changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or "#rrggbb"; nil gives the setting back to its default *Experimental.*
+- `Environment.set(**untyped settings) -> nil`: changes several settings at once, as []= does each: all of them, or none when one is refused *Experimental.*
+- `Environment.present? -> bool`: whether the scene has an environment object (environment = true) for scripts to change *Experimental.*
+
+The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file.
 
 ## Material
 
