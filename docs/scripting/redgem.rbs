@@ -780,6 +780,9 @@ class CharacterController
   # whether it stands on something
   %a{redgem:stable}
   def grounded?: () -> bool
+  # makes it an upright capsule this tall (end to end) and wide, feet kept in place (to crouch); false and no change when that would grow into something (standing up under a ceiling) or it already has that size. Call it in fixed_update
+  %a{redgem:experimental}
+  def resize: (height: Numeric, radius: Numeric) -> bool
   # its velocity
   %a{redgem:stable}
   def velocity: () -> Vector3

@@ -272,7 +272,6 @@ menu whose look each game sets:
 
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
-- A character that changes shape (crouching) and will not stand up under a ceiling.
 - A first-person weapon drawn with its own field of view that never goes into walls.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.

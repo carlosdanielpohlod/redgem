@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Characters crouch: `character.resize(height:, radius:)`** (experimental). It makes a
+  character's collider an upright capsule of that size, with its feet where they were. Growing
+  into something is refused: standing up under a low ceiling returns false and changes nothing,
+  so a crouching player stays crouched until there is room. Call it in `fixed_update`. A
+  character's shape was fixed when it was made, so a crouch could only lower the camera.
 - **The host can put a player's object anywhere, with no movement violation.**
   `Network.teleport(object, position)` (experimental) is for a respawn, a spawn point, or a level's
   entry. It moves the object on every machine, its owner's included, and the host checks its
