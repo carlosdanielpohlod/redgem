@@ -224,7 +224,7 @@ int play_with(const SystemTestOptions& options, const RunFiles& files) {
   // Made before the engine, so they outlive it: what TestInput sets and the game reads, the
   // pictures the test asks for, and where the game is shown.
   ScriptedInputSource input;
-  FramePictures pictures(options.screenshot_dir);
+  FramePictures pictures(options.screenshot_dir, options.game_dir);
   Stage stage(options, files.settings, pictures);
   if (!options.work_dir.empty()) keep_notes_in(notes_folder_in(options.work_dir));
   auto created = Engine::create(engine_options(options, files, input, stage));

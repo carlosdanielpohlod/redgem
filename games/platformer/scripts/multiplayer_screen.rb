@@ -159,7 +159,7 @@ class MultiplayerScreen < GameMenu::Screen
     title = games.empty? ? I18n.t("multiplayer.looking") : I18n.t("multiplayer.nearby")
     UI.text(title, x: x, y: y - STATUS_ABOVE_FIELD, size: NEARBY_TITLE_SIZE, color: :gray)
     games.each_with_index do |game, index|
-      top = y + index * (height + GameMenu::BUTTON_GAP)
+      top = y + index * (height + UI.theme[:button, :gap])
       join_found(game) if UI.button("#{game[:name]} (#{game[:players]})", x: x, y: top, width: width, height: height)
     end
   end

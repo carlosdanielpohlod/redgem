@@ -61,6 +61,7 @@ void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
   context.ui_reference = settings.ui;
+  context.menu_settings = settings.menu;
 }
 
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
@@ -163,6 +164,7 @@ void Engine::open_presenter(const GameSettings& settings) {
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();
+  context_.images_dir = images_dir_;
   context_.measure_text = [this](const std::string& text, int size) {
     return presenter_->font_text_width(text, size, context_.ui_font, options_.game_dir / config::kFontsDirName);
   };
