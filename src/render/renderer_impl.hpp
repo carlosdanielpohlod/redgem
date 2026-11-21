@@ -488,6 +488,7 @@ struct Renderer::Impl {
 
   // Uploads the scene's terrains when they changed, or only their weights when those did.
   void sync_terrains(const SceneDesc& desc);
+  void follow_terrain_weights(const SceneDesc& desc);
   void assign_terrain_slots(const shaders::LitFeatures& features);
   void upload_terrains(const SceneDesc& desc);
   void sync_terrain(render_detail::GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc);

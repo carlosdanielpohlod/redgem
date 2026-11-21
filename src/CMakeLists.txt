@@ -89,7 +89,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/editor_gizmos.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/environment.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/material.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/material.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/terrain.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
 add_custom_command(
@@ -379,6 +380,8 @@ redgem_add_library(redgem_runtime
   scene/shapes/terrain.cpp
   scene/ground/splat_map.cpp
   scene/ground/terrain_layers_file.cpp
+  scene/ground/ground_survey.cpp
+  scene/ground/ground_rules.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
@@ -492,6 +495,7 @@ redgem_add_library(redgem_runtime
   script/bindings/water_bindings.cpp
   script/bindings/environment_bindings.cpp
   script/bindings/material_bindings.cpp
+  script/bindings/terrain_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
