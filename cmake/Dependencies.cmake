@@ -46,11 +46,11 @@ set(SUPPORT_FILEFORMAT_GLTF OFF CACHE BOOL "" FORCE)
 set(SUPPORT_FILEFORMAT_JPG ON CACHE BOOL "" FORCE)
 # HDRI skies (Radiance .hdr) for image based lighting.
 set(SUPPORT_FILEFORMAT_HDR ON CACHE BOOL "" FORCE)
-# On a Mac with no graphics card OpenGL can use, windows are drawn by Apple's software renderer
-# (see the script).
-set(REDGEM_RAYLIB_PATCH "")
+# Closing the audio device stops it before its lock goes (see the script). On a Mac with no graphics
+# card OpenGL can use, windows are drawn by Apple's software renderer (see that script).
+set(REDGEM_RAYLIB_PATCH PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/PatchRaylibAudioClose.cmake)
 if(APPLE)
-  set(REDGEM_RAYLIB_PATCH PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/PatchGlfwForMac.cmake)
+  list(APPEND REDGEM_RAYLIB_PATCH COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/PatchGlfwForMac.cmake)
 endif()
 FetchContent_Declare(raylib
   GIT_REPOSITORY https://github.com/raysan5/raylib.git

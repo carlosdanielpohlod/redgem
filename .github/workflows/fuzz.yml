@@ -77,7 +77,7 @@ jobs:
           path: |
             .deps/fetch/*-src
             .deps/fetch/*-subbuild
-          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/Patch*.cmake') }}
 
       # What earlier runs found (inputs reaching new code), from main's runs.
       - name: Restore the corpus

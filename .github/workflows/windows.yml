@@ -83,7 +83,7 @@ jobs:
           path: |
             .deps/fetch/*-src
             .deps/fetch/*-subbuild
-          key: fetch-windows-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: fetch-windows-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/Patch*.cmake') }}
 
       # (A warning in the engine's own code fails the build: see REDGEM_WARNINGS_AS_ERRORS.)
       - name: Configure

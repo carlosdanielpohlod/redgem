@@ -397,6 +397,18 @@ endif()
 
 # The program games ship as has none of the tools games are made with in it (no editor, no project
 # hub, no templates, no packer of phone apps, no relay), and the relay has nothing that draws.
+# The raylib built stops its audio device before the lock the device's thread takes
+# (cmake/PatchRaylibAudioClose.cmake).
+add_test(NAME audio.raylib_stops_device_before_its_lock
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/audio_closes_device_first.sh ${raylib_SOURCE_DIR}/src/raudio.c)
+# Guards the check itself: raylib as it was (the lock first, the device stopped first only in
+# InitAudioDevice) must fail it.
+add_test(NAME audio.check_catches_lock_destroyed_first
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/audio_closes_device_first.sh
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/raylib_audio_lock_first/raudio.c)
+# (Matched on its message: a script that did not run must not count as "it failed as expected".)
+set_tests_properties(audio.check_catches_lock_destroyed_first PROPERTIES
+  PASS_REGULAR_EXPRESSION "destroys the audio lock \\(line 12\\) before it stops the device \\(line 13\\)")
 add_test(NAME app.player_ships_no_tools
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_player>)
 add_test(NAME app.relay_ships_no_game

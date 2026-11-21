@@ -73,7 +73,7 @@ jobs:
           path: |
             build-android/*/_deps/*-src
             build-android/*/_deps/*-subbuild
-          key: fetch-android-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: fetch-android-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/Patch*.cmake') }}
 
       - name: Build the player for both processors
         id: build

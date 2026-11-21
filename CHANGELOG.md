@@ -32,6 +32,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **An Android game no longer aborts when it is closed while it plays sound**: closing the audio
+  device (raylib's `CloseAudioDevice`) destroyed the lock the device's playing thread takes before
+  it stopped the device, so a sound asked for in that moment locked a destroyed lock. Android
+  ends the app for that ("pthread_mutex_lock called on a destroyed mutex", seen when the system
+  closed Proving Ground on the emulator). raylib's sources are now patched when they are fetched
+  (`cmake/PatchRaylibAudioClose.cmake`) to stop the device first, and a test checks the raylib
+  built has it. The fetch caches in CI are keyed on every patch script, not only the Mac one.
 - **An Android game cut off on its first start no longer stays broken**: the app copies its game
   out of the APK on the first start, then writes a stamp so that later starts skip the copy. The
   stamp could reach the storage before the game did, so a phone switched off (or an emulator
