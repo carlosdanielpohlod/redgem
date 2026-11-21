@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **The host says why it lets a machine go.** A machine let go for too many moves the host did
+  not believe (movement validation), a flood of bytes or messages, a message that is not the
+  game's, silence, not taking what it is sent, `Network.dismiss`, or a held place that ran out is
+  named in a warning in the host's log, and the host's `Network.on_leave { |peer, why| }` gets the
+  reason (nil for a machine that left by itself, and on the other machines). A
+  load test lost a player on a dedicated server with nothing in the log to say why.
 - **`redgem-test --wait-limit <seconds>`.** A system test may wait for other programs
   (`t.wait_for`) longer than five minutes in all, up to a day: a load test whose bots play for
   five minutes and more on a dedicated server ran out of waits before the end.

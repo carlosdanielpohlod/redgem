@@ -41,6 +41,17 @@ class NetworkApprovalTest < RedGemTest::Case
     assert_nil Network.identity(NEWCOMER)
   end
 
+  def test_a_machine_the_host_let_go_leaves_with_why_and_one_that_left_with_nil
+    heard = []
+    Network.on_leave { |peer, why| heard << [peer, why] }
+    Network.on_leave { |peer| heard << [peer] } # (a handler that takes the peer alone still works)
+    Network.on_leave(&->(peer) { heard << [:lambda, peer] })
+    Network.__event(:left, NEWCOMER, "too many moves the host did not believe", nil)
+    Network.__event(:left, NEWCOMER, "", nil)
+    assert_equal [[NEWCOMER, "too many moves the host did not believe"], [NEWCOMER], [:lambda, NEWCOMER],
+                  [NEWCOMER, nil], [NEWCOMER], [:lambda, NEWCOMER]], heard
+  end
+
   def test_a_refused_join_says_why_and_a_failed_one_without_a_reason_says_nil
     reasons = []
     Network.on_fail { |reason| reasons << reason }
