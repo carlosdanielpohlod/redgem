@@ -30,7 +30,7 @@ struct SlotGame {
     REQUIRE_MESSAGE(result.ok, result.error);
     return RSTRING_PTR(mrb_obj_as_string(engine->scripts().vm().state(), result.value));
   }
-  void frame() { engine->frame(config::kFixedDeltaSeconds); }
+  void frame() { engine->frame(config::kDefaultFixedDeltaSeconds); }
 };
 struct SlotData {
   std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-slot-api-test";

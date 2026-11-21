@@ -162,7 +162,7 @@ Measured play(const Options& options) {
   StatusWatch watch(options.status_port);
   redgem::load::run_for(bots, options.seconds);
   // (Read before the watch stops: its last read may take a second in which no bot plays.)
-  const double ticks = (redgem::load::now_seconds() - start) / redgem::config::kFixedDeltaSeconds;
+  const double ticks = (redgem::load::now_seconds() - start) / redgem::config::kDefaultFixedDeltaSeconds;
   const double cpu = redgem::load::cpu_seconds(options.server_pid) - cpu_before;
   Measured measured;
   measured.statuses = watch.stop();

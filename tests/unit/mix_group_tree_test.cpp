@@ -133,7 +133,7 @@ TEST_CASE("a game's group under the voice ducks the music, and the game's groups
     auto engine = sandbox(audio);
     ruby(*engine, "Audio.ducking(volume: 0.5, attack: 0); Audio.music(:beep, volume: 1)");
     ruby(*engine, "Audio.group(:narrator, parent: :voice); Audio.play(:beep, loop: true, group: :narrator)");
-    engine->frame(config::kFixedDeltaSeconds);
+    engine->frame(config::kDefaultFixedDeltaSeconds);
     CHECK(audio.tracks().begin()->second.volume == doctest::Approx(kHalfShare));
   }
   CHECK_FALSE(audio.find_group("narrator").has_value());

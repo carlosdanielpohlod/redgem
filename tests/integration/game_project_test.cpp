@@ -179,7 +179,7 @@ TEST_CASE("every template creates a game that loads and whose scripts compile") 
     CHECK(read_game_settings(dir).studio == kNewGameStudio);
     test::LogCapture quiet;
     auto engine = play_headless(dir);
-    engine->frame(config::kFixedDeltaSeconds);
+    engine->frame(config::kDefaultFixedDeltaSeconds);
     CHECK(engine->scripts().error_count() == 0);
     std::filesystem::remove_all(dir);
   }
@@ -215,7 +215,7 @@ TEST_CASE("the platformer template is playable") {
   engine->scripted_input().set_key(Key::W, true);  // forward, through the first coin
 
   // The game opens on its title screen: nothing moves until Play is clicked.
-  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(length(engine->scene().world_transform(player).position - start) < kMinWalk);
   const RubyResult title = engine->scripts().eval("GameMenu.instance.screens[:title].heading", "title.rb");
   REQUIRE_MESSAGE(title.ok, title.error);
@@ -227,11 +227,11 @@ TEST_CASE("the platformer template is playable") {
   engine->scripted_input().move_mouse(static_cast<float>(mrb_as_float(mrb, mrb_ary_entry(play.value, 0))),
                                       static_cast<float>(mrb_as_float(mrb, mrb_ary_entry(play.value, 1))));
   engine->scripted_input().set_mouse_button(MouseButton::Left, true);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   engine->scripted_input().set_mouse_button(MouseButton::Left, false);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
 
-  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(length(engine->scene().world_transform(player).position - start) > kMinWalk);
   const RubyResult coins = engine->scripts().eval("Scene.find('Player').get_component(Player).coins", "coins.rb");
   REQUIRE(coins.ok);
@@ -462,7 +462,7 @@ TEST_CASE("the platformer template comes with the sounds its scripts play") {
     CHECK(std::filesystem::file_size(*file) > kMinToneBytes);  // a real tone, not an empty header
   }
   auto engine = play_headless(game);
-  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   std::filesystem::remove_all(game);
 }
 

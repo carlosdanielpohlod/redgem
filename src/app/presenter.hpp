@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "core/config.hpp"
 #include "core/frame_budget.hpp"
 #include "render/auto_exposure.hpp"
 #include "render/material_emission.hpp"
@@ -108,16 +109,19 @@ class Presenter {
 // are as wide as a usual letter makes them, and every frame counts as one fixed step.
 class NullPresenter final : public Presenter {
  public:
-  explicit NullPresenter(SurfaceSize size) : size_(size) {}
+  // `frame_seconds`: what every frame counts as, the game's fixed step.
+  explicit NullPresenter(SurfaceSize size, float frame_seconds = config::kDefaultFixedDeltaSeconds)
+      : size_(size), frame_seconds_(frame_seconds) {}
   SurfaceSize surface_size() const override { return size_; }
   int text_width(const std::string& text, int size) const override;
   void capture_cursor(bool) override {}
   void present(const FrameView&) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override;
+  float frame_seconds() const override { return frame_seconds_; }
 
  private:
   SurfaceSize size_;
+  float frame_seconds_;
 };
 
 }  // namespace redgem

@@ -75,6 +75,21 @@ mrb_value network_forget_movement(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// Network.__place_movement(owner, key, x, y, z): the host's game put that machine's object there
+// (Network.teleport): the host checks its moves from there. Nothing where no network runs.
+mrb_value network_place_movement(mrb_state* mrb, mrb_value) {
+  mrb_int owner = 0;
+  const char* key = nullptr;
+  mrb_int key_size = 0;
+  mrb_float x = 0.0, y = 0.0, z = 0.0;
+  mrb_get_args(mrb, "isfff", &owner, &key, &key_size, &x, &y, &z);
+  net::NetworkSession* session = context(mrb).network;
+  if (session == nullptr || !is_peer_id(owner)) return mrb_nil_value();
+  const Vec3 at{static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)};
+  session->place_object(static_cast<int>(owner), std::string(key, static_cast<std::size_t>(key_size)), at);
+  return mrb_nil_value();
+}
+
 }  // namespace
 
 void install_network_movement_bindings(RClass* network_module, mrb_state* mrb) {
@@ -84,6 +99,7 @@ void install_network_movement_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "movement_rules", network_movement_rules, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "movement_violations", network_movement_violations, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, network_module, "__forget_movement", network_forget_movement, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, network_module, "__place_movement", network_place_movement, MRB_ARGS_REQ(5));
 }
 
 }  // namespace redgem

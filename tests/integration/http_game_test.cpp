@@ -50,7 +50,7 @@ std::string ruby(Engine& engine, const std::string& code) {
 bool frames_until(Engine& game, const std::function<bool()>& done) {
   for (int frame = 0; frame < kMostFrames && !done(); ++frame) {
     game.http().wait(kAnswerLook);
-    game.frame(config::kFixedDeltaSeconds);
+    game.frame(config::kDefaultFixedDeltaSeconds);
   }
   return done();
 }

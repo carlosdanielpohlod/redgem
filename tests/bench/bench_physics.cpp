@@ -61,7 +61,7 @@ std::unique_ptr<PhysicsWorld> falling_boxes() {
 
 double step_sample() {
   const std::unique_ptr<PhysicsWorld> world = falling_boxes();
-  return microseconds_each(kStepsPerSample, [&world] { world->step(config::kFixedDeltaSeconds); });
+  return microseconds_each(kStepsPerSample, [&world] { world->step(config::kDefaultFixedDeltaSeconds); });
 }
 
 }  // namespace

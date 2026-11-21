@@ -275,7 +275,6 @@ menu whose look each game sets:
 
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
-- A character that changes shape (crouching) and will not stand up under a ceiling.
 - A first-person weapon drawn with its own field of view that never goes into walls.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.
@@ -653,7 +652,8 @@ promise of how it will be closed.
   validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
   lets the host or a dedicated server refuse moves faster or further than the game's limits, but
   it checks positions only: not rotations, animations, collisions (walking through a wall within
-  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  the speed limit is believed), nor objects the host moves itself. For up to two seconds after the host places an
+  object (`Network.teleport`), its poses from away from the placed spot are not used. One top speed and one
   teleport distance hold for every object of the game, and a kicked machine is not told why. In a
   room on a relay, nothing is checked (the relay passes poses on). An object destroyed and made
   again under the same key is checked from where it was until the host makes its copy again, so a

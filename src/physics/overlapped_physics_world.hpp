@@ -52,6 +52,7 @@ class OverlappedPhysicsWorld final : public PhysicsWorld {
   void set_carried_bodies(ObjectId character, const std::vector<ObjectId>& carried) override;
   void character_jump(ObjectId object, float speed) override;
   bool character_grounded(ObjectId object) const override;
+  bool resize_character(ObjectId object, float height, float radius) override;
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
   float vehicle_forward_speed(ObjectId object) const override;
   std::vector<WheelPose> wheel_poses(ObjectId object) const override;

@@ -61,7 +61,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, Presenter* presenter 
   return engine;
 }
 
-void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
+void frame(Engine& engine) { engine.frame(config::kDefaultFixedDeltaSeconds); }
 
 std::string ruby(Engine& engine, const std::string& code) {
   const RubyResult result = engine.scripts().eval(code, "test.rb");
@@ -279,7 +279,7 @@ class FontMeasurePresenter final : public Presenter {
   void capture_cursor(bool) override {}
   void present(const FrameView&) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return config::kDefaultFixedDeltaSeconds; }
 };
 }  // namespace
 

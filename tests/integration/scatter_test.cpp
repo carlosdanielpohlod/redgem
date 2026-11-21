@@ -69,7 +69,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene) {
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   return engine;
 }
 

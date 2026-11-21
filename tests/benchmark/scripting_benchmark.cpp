@@ -114,7 +114,7 @@ std::string spawn_code(int count, const char* behaviour) {
 // Seconds each of `frames` frames took, on average.
 double seconds_per_frame(Engine& engine, int frames) {
   const Clock::time_point start = Clock::now();
-  for (int i = 0; i < frames; ++i) engine.frame(redgem::config::kFixedDeltaSeconds);
+  for (int i = 0; i < frames; ++i) engine.frame(redgem::config::kDefaultFixedDeltaSeconds);
   return std::chrono::duration<double>(Clock::now() - start).count() / frames;
 }
 
@@ -128,7 +128,7 @@ std::string ruby_objects(Engine& engine) {
 
 int behaviours(Engine& engine) {
   if (!ruby(engine, spawn_code(kBehaviourObjects, "Ticker"))) return 1;
-  engine.frame(redgem::config::kFixedDeltaSeconds);  // their starts run once, outside the measure
+  engine.frame(redgem::config::kDefaultFixedDeltaSeconds);  // their starts run once, outside the measure
   const double seconds = seconds_per_frame(engine, kBehaviourFrames);
   std::printf("%d updating behaviours: %.1f us a frame\n", kBehaviourObjects, seconds * kMicrosecondsPerSecond);
   return 0;
@@ -136,7 +136,7 @@ int behaviours(Engine& engine) {
 
 int vectors(Engine& engine, const char* mover) {
   if (!ruby(engine, spawn_code(kMovers, mover))) return 1;
-  engine.frame(redgem::config::kFixedDeltaSeconds);
+  engine.frame(redgem::config::kDefaultFixedDeltaSeconds);
   const double seconds = seconds_per_frame(engine, kBehaviourFrames);
   std::printf("%d %s behaviours doing Vector3 math: %.1f us a frame\n", kMovers, mover,
               seconds * kMicrosecondsPerSecond);

@@ -69,7 +69,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& desc) {
 
 float settled_height(const SceneDesc& desc) {
   auto engine = engine_for(desc);
-  for (int i = 0; i < kSettleFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kSettleFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   return engine->scene().world_transform(engine->scene().find("Body")).position.y;
 }
 
@@ -96,7 +96,7 @@ TEST_CASE("kinematic bodies are left where scripts put them") {
 
 TEST_CASE("scripts ask where the water is: its height, how deep a point is, and whether it is under") {
   auto engine = engine_for(pond_with("kinematic", std::nullopt));
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(*engine, "Water.height_at(1, -2)") == "0.0");
   CHECK(ruby(*engine, "Water.height_at(20, 0).inspect") == "nil");
   CHECK(ruby(*engine, "Water.under?(Vector3.new(0, -1, 0))") == "true");
