@@ -27,9 +27,10 @@ struct CapsuleSize {
   float radius = 0.0f;
 };
 
-// The size of a collider seen as an upright capsule: a capsule's own, else its bounds'.
+// The size of a capsule collider (a character's: characters always have one, see body_config.hpp),
+// as built: its cylinder is never shorter than kCharacterMinCylinderHalfHeight.
 CapsuleSize capsule_size_of(const ShapeInfo& info);
-// The lowest point of a collider, from the object's origin.
+// The lowest point of a capsule collider, from the object's origin.
 Vec3 collider_bottom(const ShapeInfo& info);
 // An upright capsule of that size, whose lowest point sits `bottom` away from the object's origin.
 std::variant<ShapeInfo, std::string> capsule_standing_on(Vec3 bottom, CapsuleSize size);

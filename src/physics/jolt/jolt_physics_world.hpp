@@ -57,7 +57,7 @@ struct Record {
   JPH::BodyID body;
   JPH::Ref<Character> character;
   Vec3 character_bottom;       // characters: their feet, from the object's origin (a resize keeps them)
-  CapsuleSize character_size;  // characters: their collider's size now
+  CapsuleSize character_size;  // characters: their capsule's size now, as built
   JPH::Ref<JPH::VehicleConstraint> vehicle;
   std::vector<ObjectHandle> wheel_objects;  // same order as the vehicle's wheels
   JPH::RefConst<JPH::Shape> shape;

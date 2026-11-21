@@ -114,14 +114,9 @@ std::variant<ShapeInfo, std::string> with_shape(ShapeInfo info, const ShapeResul
   return info;
 }
 
-bool is_capsule(const ShapeInfo& info) { return info.capsule_radius > 0.0f; }
-
 }  // namespace
 
 CapsuleSize capsule_size_of(const ShapeInfo& info) {
-  if (!is_capsule(info)) {
-    return {info.half_extents.y / kHalf, std::max(info.half_extents.x, info.half_extents.z)};
-  }
   return {(info.capsule_half_height + info.capsule_radius) / kHalf, info.capsule_radius};
 }
 

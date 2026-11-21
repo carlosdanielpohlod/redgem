@@ -49,12 +49,3 @@ TEST_CASE("a capsule too short for its width grows upwards, never below its bott
   check_near(collider_bottom(info), kFeet);
   CHECK(capsule_size_of(info).height > kBall.height);
 }
-
-TEST_CASE("a box collider is seen as a capsule of its bounds") {
-  ShapeInfo box;
-  box.half_extents = {0.3f, 1.0f, 0.5f};
-  box.center_offset = {0.0f, 1.0f, 0.0f};
-  CHECK(capsule_size_of(box).height == doctest::Approx(2.0f));
-  CHECK(capsule_size_of(box).radius == doctest::Approx(0.5f));
-  check_near(collider_bottom(box), Vec3{0.0f, 0.0f, 0.0f});
-}

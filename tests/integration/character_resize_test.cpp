@@ -124,3 +124,10 @@ TEST_CASE("a shrinking character is never refused, even pressed against a wall")
   room.world->remove_object(kCrate);
   CHECK(room.world->resize_character(kHero, kStanding, kRadius * 2));
 }
+
+TEST_CASE("a character's ground is known for its new shape as soon as it changes") {
+  Room room;
+  REQUIRE(room.world->character_grounded(kHero));
+  REQUIRE(room.world->resize_character(kHero, kCrouching, kRadius));
+  CHECK(room.world->character_grounded(kHero));
+}

@@ -82,7 +82,11 @@ bool is_valid_capsule(CapsuleSize size) {
   return is_positive(size.height) && is_positive(size.radius) && size.height >= size.radius / kHalf;
 }
 
-bool same_size(CapsuleSize a, CapsuleSize b) { return a.height == b.height && a.radius == b.radius; }
+bool same_measure(float a, float b) { return std::fabs(a - b) <= config::kCharacterSizeTolerance; }
+
+bool same_size(CapsuleSize a, CapsuleSize b) {
+  return same_measure(a.height, b.height) && same_measure(a.radius, b.radius);
+}
 
 // Whether a resize to that size can change anything: the object is a character, the size is one a
 // capsule can have, and not the one it has.
@@ -90,9 +94,13 @@ bool can_resize(const Record* record, CapsuleSize size) {
   return is_character(record) && is_valid_capsule(size) && !same_size(record->character_size, size);
 }
 
-// Whether a character's new capsule reaches out of its old one anywhere: only then can it meet what
-// the old one did not.
-bool grows(CapsuleSize from, CapsuleSize to) { return to.height > from.height || to.radius > from.radius; }
+bool longer(float to, float from) { return to > from + config::kCharacterSizeTolerance; }
+
+// Whether a character's new capsule (on the same feet) reaches out of its old one anywhere: only
+// then can it meet what the old one did not.
+bool grows(CapsuleSize from, CapsuleSize to) {
+  return longer(to.height, from.height) || longer(to.radius, from.radius);
+}
 
 // How deep a new shape may sink into what is around it: what Jolt lets bodies rest in anyway.
 float allowed_penetration(const JPH::PhysicsSystem& system) {
@@ -122,9 +130,9 @@ JPH::Vec3 carried_velocity(const Record& record) {
 
 void World::create_character(const BodyDesc& desc, const ShapeInfo& info, Record& record) {
   // Characters stay upright: physics only drives their position.
-  record.character = new Character(character_settings(info, object_layer_of(record)),
-                                   JPH::RVec3(to_jolt(desc.world.position)), JPH::Quat::sIdentity(),
-                                   static_cast<JPH::uint64>(desc.object), &system_);
+  record.character =
+      new Character(character_settings(info, object_layer_of(record)), JPH::RVec3(to_jolt(desc.world.position)),
+                    JPH::Quat::sIdentity(), static_cast<JPH::uint64>(desc.object), &system_);
   record.character_bottom = collider_bottom(info);
   record.character_size = capsule_size_of(info);
   record.character->SetListener(this);
@@ -181,6 +189,8 @@ bool World::switch_character_shape(Record& record, const ShapeInfo& info, bool c
   }
   if (!character.GetInnerBodyID().IsInvalid()) character.SetInnerBodyShape(info.shape);
   character.set_supporting_volume(supporting_volume(info));
+  // (What it stands on is found again now: grounded? answers for the new shape before the next step.)
+  character.RefreshContacts(filters.broad, filters.layers, filters.bodies, filters.shapes, temp_allocator_);
   record.shape = info.shape;
   return true;
 }
@@ -189,10 +199,12 @@ bool World::resize_character(ObjectId object, float height, float radius) {
   Record* record = find(object);
   const CapsuleSize size{height, radius};
   if (!can_resize(record, size)) return false;
-  const auto info = capsule_standing_on(record->character_bottom, size);
-  if (std::holds_alternative<std::string>(info)) return false;
-  if (!switch_character_shape(*record, std::get<ShapeInfo>(info), grows(record->character_size, size))) return false;
-  record->character_size = size;
+  const auto made = capsule_standing_on(record->character_bottom, size);
+  if (std::holds_alternative<std::string>(made)) return false;
+  const ShapeInfo& info = std::get<ShapeInfo>(made);
+  const CapsuleSize built = capsule_size_of(info);
+  if (!switch_character_shape(*record, info, grows(record->character_size, built))) return false;
+  record->character_size = built;
   return true;
 }
 
