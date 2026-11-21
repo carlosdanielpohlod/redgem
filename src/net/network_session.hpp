@@ -15,6 +15,7 @@
 #include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
 #include "net/movement_validator.hpp"
+#include "net/placed_objects.hpp"
 #include "net/pose_baselines.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
@@ -164,6 +165,9 @@ class NetworkSession {
   // The object that goes by `key` is new on this machine, or gone (its NetworkSync started or
   // stopped): when its moves are checked, it starts where its machine next says.
   void forget_movement_of_object(const std::string& key) { movement_.forget_object(key); }
+  // The host's game put machine `owner`'s object `key` at `position` (Network.teleport): its moves
+  // are checked from there, and what its machine said before it heard is not used.
+  void place_object(int owner, const std::string& key, Vec3 position);
   // The code of the room this game is in, on a relay or a dedicated server; empty for a game
   // hosted directly.
   const std::string& room() const { return room_; }
@@ -367,7 +371,7 @@ class NetworkSession {
   // ... on the host, with movement validation: whether a message a machine sent is a pose to check.
   // (Also once turned off, while the others place an object where the host believed it.)
   bool checks_movement(const nlohmann::json& message) const {
-    return message[wire::kKind] == wire::kPose && (movement_.enabled() || !diverged_.empty());
+    return message[wire::kKind] == wire::kPose && (movement_.enabled() || !diverged_.empty() || !placed_.empty());
   }
   // A pose from the machine at `link`, checked, passed on to everyone as the host believes it.
   void relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
@@ -383,6 +387,9 @@ class NetworkSession {
   void correct(Link& link, const std::string& key, Vec3 position, bool struck_out);
   // Forgets what was checked of the moves of a machine that left.
   void forget_movement_of(int peer);
+  // A pose sent before its machine heard its object was placed: nobody hears of it, and the
+  // others are sent the object whole again once its poses count.
+  void drop_late_pose(int peer, const std::string& key);
   // How many objects of `peer` the others place where the host believes them, and where they start.
   std::size_t diverged_of(int peer) const;
   std::set<std::pair<int, std::string>>::const_iterator first_diverged_of(int peer) const {
@@ -511,6 +518,7 @@ class NetworkSession {
   // The objects (machine, key) the others place where the host believes them, not where their
   // machine does (see relay_pose).
   std::set<std::pair<int, std::string>> diverged_;
+  PlacedObjects placed_;  // placed by the host's game, until their machine says they are there
 };
 
 }  // namespace redgem::net

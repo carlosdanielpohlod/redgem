@@ -426,9 +426,21 @@ it back where it was). `teleport_distance` is the most one pose (twenty a second
 object: a longer one is never believed. `tolerance` is the share of the limits a move may go past
 and still be believed, and half a second of movement at the top speed may arrive at once, so the
 network's jitter is never a violation. The poses that were already on their way when a correction
-went out count once. Set the limits above anything the game does on purpose (a dash, a launch pad):
-to move an object further, spawn it again (an object whose NetworkSync starts on the host starts
-where its owner next says), or let the host move it (the host's own objects are never checked).
+went out count once. Set the limits above anything the game does on purpose (a dash, a launch pad).
+To move a player's object further on purpose (a respawn, a spawn point, a level's entry), the
+host's game places it:
+
+```ruby
+Network.teleport(hero, spawn.transform.position) if Network.host?   # or the key it goes by
+```
+
+Every machine has it there at once, and its owner goes on from there. The host checks its moves
+from there, so nothing counts against it. The poses its owner sent before it heard are not used
+(for two seconds at most, until one comes from within 1.5 m of the spot), with movement
+validation on or off, so nobody sees it go back. During a level change the place waits with the
+new level's objects. Only the host places: a placing message from any
+other machine is ignored, and `Network.teleport` is false on a guest. Alone, it just moves the
+object. (The host's own objects are never checked.)
 A machine's objects past 4096 that it has not moved for ten seconds are forgotten; while none are,
 the poses of its new ones are not used. In a room on a relay the relay passes poses on and checks nothing.
 

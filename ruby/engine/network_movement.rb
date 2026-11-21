@@ -10,6 +10,12 @@
 #   Network.movement_violations(peer)   # how many a machine was caught at
 #   Network.validate_movement           # no limits: off again
 #
+# The host's game moves a player's object on purpose (a respawn, a spawn point, a level's entry)
+# with Network.teleport: every machine has it there at once, its owner included, and no violation
+# counts:
+#
+#   Network.teleport(hero, spawn_point) if Network.host?
+#
 # A move too fast goes as far as was allowed (undo: true puts it back where it was instead); one
 # longer than teleport_distance is never believed. The tolerance (a share of the limits) and a
 # short burst absorb the jitter of poses arriving unevenly. It lasts until changed, across games.
@@ -30,7 +36,38 @@ module Network
       __validate_movement(max_speed.to_f, teleport_distance.to_f, tolerance.to_f, kick_after.to_i, undo)
     end
 
+    # On the host (or alone): puts `object` (a GameObject with a NetworkSync, or the key it goes
+    # by) at `position` on every machine, its owner's included, which goes on from there. The host
+    # checks its moves from there: no violation, and the poses its owner sent before it heard are
+    # not used. In a level change it waits with the level's objects. False on a machine in a game
+    # that does not host it (a guest, or one calling the host back).
+    def teleport(object, position)
+      return false if __in_game? && !host?
+
+      sync = placed_sync(object)
+      at = Vector3[*position.to_a]
+      sync.__placed(at)
+      tell_placed(sync, at) if online?
+      true
+    end
+
     private
+
+    def placed_sync(object)
+      sync = object.is_a?(String) ? @synced[object] : object&.get_component(NetworkSync)
+      sync || raise(ArgumentError, "Network.teleport: #{object.inspect} has no NetworkSync that started")
+    end
+
+    # (The host's own objects are never checked: nothing to tell its validation of them.)
+    def tell_placed(sync, at)
+      __place_movement(sync.owner, sync.key, at.x, at.y, at.z) unless sync.owner == id
+      __deliver(PLACE, [sync.key, at.to_a], :all)
+    end
+
+    # The host put an object of the game somewhere: it is there, whoever's it is.
+    def receive_place(data, from)
+      @synced[data[0]]&.__placed(Vector3[*data[1]]) if host_correction?(data, from)
+    end
 
     # Only the host corrects, and only this machine's own objects move for it.
     def receive_correction(data, from)

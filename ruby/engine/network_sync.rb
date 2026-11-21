@@ -170,6 +170,13 @@ class NetworkSync < Behaviour
     transform.position = Vector3[*position] if mine?
   end
 
+  # The host put the object there (Network.teleport): it is there at once. Its owner goes on from
+  # there; the others watch it from there, with nothing of where it was before.
+  def __placed(position)
+    transform.position = position
+    watch_afresh unless mine?
+  end
+
   private
 
   def watch(dt)

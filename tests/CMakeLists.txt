@@ -182,6 +182,7 @@ add_executable(redgem_tests
   unit/resume_token_test.cpp
   unit/byte_allowance_test.cpp
   unit/movement_validator_test.cpp
+  unit/placed_objects_test.cpp
   unit/movement_rules_test.cpp
   unit/relay_program_test.cpp
   unit/stun_message_test.cpp
@@ -216,7 +217,9 @@ add_executable(redgem_tests
   unit/agent_files_test.cpp
   unit/markdown_blocks_test.cpp
   unit/session_history_test.cpp
+  unit/capsule_shape_test.cpp
   integration/physics_world_test.cpp
+  integration/character_resize_test.cpp
   integration/threaded_physics_test.cpp
   integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
