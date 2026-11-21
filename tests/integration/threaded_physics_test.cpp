@@ -20,7 +20,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kDt = config::kFixedDeltaSeconds;
+constexpr float kDt = config::kDefaultFixedDeltaSeconds;
 constexpr int kSteps = 240;
 constexpr int kPileSide = 6;  // a pile of kPileSide³ boxes: islands enough for a pool to share
 constexpr float kBoxHalf = 0.5f;

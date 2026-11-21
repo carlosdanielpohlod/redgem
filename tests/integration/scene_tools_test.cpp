@@ -366,7 +366,7 @@ TEST_CASE("a scene that was changed from the command line still plays") {
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
-  for (int frame = 0; frame < kFrames; ++frame) engine.frame(config::kFixedDeltaSeconds);
+  for (int frame = 0; frame < kFrames; ++frame) engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(engine.scripts().error_count() == 0);
   CHECK(engine.scene().find("Coin6") != kNoObject);
 }

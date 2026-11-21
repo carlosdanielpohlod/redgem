@@ -57,15 +57,15 @@ TEST_CASE("profile overlay draws above the game and disappears when disabled") {
   auto& engine = *std::get<std::unique_ptr<Engine>>(created);
   ruby(engine, "Game.on_loading { UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :white) }");
   ruby(engine, "Debug.stats_visible = true; Game.load_scene_async('level2')");
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   reader.wait_started();
-  engine.frame(config::kFixedDeltaSeconds);  // collect a completion interval before capturing FPS
+  engine.frame(config::kDefaultFixedDeltaSeconds);  // collect a completion interval before capturing FPS
   capture = "enabled.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(pixels.inside.r < pixels.outside.r);
   ruby(engine, "Debug.stats_visible = false");
   capture = "disabled.png";
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK_FALSE(engine.script_context().stats_visible);
   CHECK(pixels.inside.r == pixels.outside.r);
 }

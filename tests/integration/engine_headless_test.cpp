@@ -58,7 +58,7 @@ std::unique_ptr<Engine> sandbox(AudioSystem* audio = nullptr) {
 }
 
 void frames(Engine& engine, int count) {
-  for (int i = 0; i < count; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < count; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
 }
 
 std::string ruby(Engine& engine, const std::string& code) {
@@ -414,11 +414,11 @@ TEST_CASE("an engine told to step fixedly plays the same game whatever time pass
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   for (int i = 0; i < kOneSecondOfFrames; ++i) engine.frame(kStall);
-  CHECK(engine.script_context().time.elapsed == doctest::Approx(kOneSecondOfFrames * config::kFixedDeltaSeconds));
+  CHECK(engine.script_context().time.elapsed == doctest::Approx(kOneSecondOfFrames * config::kDefaultFixedDeltaSeconds));
 }
 
 TEST_CASE("only fixed_step selects fixed stepping: without it the game follows the time it is given") {
-  constexpr float kHalfStep = config::kFixedDeltaSeconds / 2.0f;
+  constexpr float kHalfStep = config::kDefaultFixedDeltaSeconds / 2.0f;
   constexpr int kFrames = 20;
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");  // (no input, no presenter, no audio: none of them decides)
@@ -485,7 +485,7 @@ TEST_CASE("the input a program hands the engine is what the game reads") {
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   input.set_key(Key::A, true);
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(engine, "Input.down?(:a)") == "true");
 }
 
@@ -768,11 +768,11 @@ TEST_CASE("the scene's animations play: bones move over time and loop") {
   const ObjectId upper = engine.scene().find("Upper");
   REQUIRE(upper != kNoObject);
   const Quat rest = engine.scene().at(upper).local.rotation;
-  for (int i = 0; i < kHalfSecondFrames; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kHalfSecondFrames; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
   const Quat bent = engine.scene().at(upper).local.rotation;
   CHECK(std::fabs(bent.x - rest.x) > kMinTurn);
   // The clip lasts one second: half a second later it starts over.
-  for (int i = 0; i < kHalfSecondFrames + 1; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kHalfSecondFrames + 1; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
   CHECK(std::fabs(engine.scene().at(upper).local.rotation.x - rest.x) < kMinTurn);
   std::filesystem::remove_all(game);
 }

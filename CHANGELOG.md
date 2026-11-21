@@ -25,6 +25,22 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `scene_edit` change lights and cameras: `light=spot`, `light_color=#ffcc88`, `light_intensity`,
   `light_range`, `camera_fov`, `camera_near` and `camera_far`. The editor tool's `select` takes
   `objects`. An agent could place only empty objects live and edit one object a call.
+- **A game's tick rate.** `game.json`'s `"tick_hz"` (30 to 128, 60 by default) sets how many
+  fixed steps the game takes a second: the physics, `fixed_update` and `Time.fixed_delta` follow
+  it, and so do the tools that play a step a frame (`redgem run`, `redgem shot`, `redgem-test`,
+  the editor's Step, the MCP game tools). A game without it plays as before. `redgem check`
+  refuses a number out of bounds. A competitive shooter needs a 64 or 128 Hz step; RedGem had a
+  fixed 60.
+- **Characters crouch: `character.resize(height:, radius:)`** (experimental). It makes a
+  character's collider an upright capsule of that size, with its feet where they were. Growing
+  into something is refused: standing up under a low ceiling returns false and changes nothing,
+  so a crouching player stays crouched until there is room. Call it in `fixed_update`. A
+  character's shape was fixed when it was made, so a crouch could only lower the camera.
+- **The host can put a player's object anywhere, with no movement violation.**
+  `Network.teleport(object, position)` (experimental) is for a respawn, a spawn point, or a level's
+  entry. It moves the object on every machine, its owner's included, and the host checks its
+  moves from there. The owner's poses from before it heard are not used.
+
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
@@ -68,6 +84,8 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **The API reference says `GameObject#props` and `Behaviour#props` have Symbol keys**, which is
+  what they return (`props[:damage]`). It said String keys, and `props["damage"]` is nil.
 - **A character that picks up the body it stands on stays on the ground.** A courier standing on
   a parcel and taking it in hand (made kinematic, put under its hand) took the parcel's rise to the
   hand as its ground's, rose with it, lifted the parcel on, and flew 60 to 90 m up. A body a

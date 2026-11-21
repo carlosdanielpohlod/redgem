@@ -61,7 +61,7 @@ class HudPresenter final : public Presenter {
   void capture_cursor(bool) override {}
   void present(const FrameView& view) override { seen = view.hud; }
   bool open() const override { return true; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return config::kDefaultFixedDeltaSeconds; }
   std::vector<HudItem> seen;
 };
 

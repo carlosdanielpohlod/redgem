@@ -47,7 +47,7 @@ struct World {
 
   void step() {
     bodies::push_poses(scene, *physics);
-    physics->step(config::kFixedDeltaSeconds);
+    physics->step(config::kDefaultFixedDeltaSeconds);
     bodies::pull_poses(scene, *physics);
   }
 };

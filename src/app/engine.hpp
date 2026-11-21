@@ -175,6 +175,9 @@ class Engine {
   bool audio_open() const;  // whether audio() has something to sound through
   // Who shows the game: the presenter of its options, or the nobody it made for itself.
   Presenter& presenter() { return *presenter_; }
+  // The seconds of one fixed step: 1 / game.json's "tick_hz" (Time.fixed_delta). A tool that plays
+  // the game a step a frame hands each frame this.
+  float fixed_delta() const { return clock_.fixed_delta(); }
   AnimationPlayer& animations() { return animations_; }
   net::NetworkSession& network() { return network_; }
   // The game's web requests (HTTP in Ruby).

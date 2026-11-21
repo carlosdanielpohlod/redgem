@@ -9,7 +9,7 @@ using namespace redgem;
 
 namespace {
 
-constexpr float kDt = config::kFixedDeltaSeconds;
+constexpr float kDt = config::kDefaultFixedDeltaSeconds;
 constexpr int kSettleSteps = 120;
 constexpr int kDriveSteps = 180;
 constexpr float kMinCruiseSpeed = 3.0f;

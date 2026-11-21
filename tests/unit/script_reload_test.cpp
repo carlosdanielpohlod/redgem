@@ -82,7 +82,7 @@ struct ReloadGame {
 void start(EditorSession& session, ScriptedInputSource& input) {
   std::string error;
   REQUIRE_MESSAGE(session.play({input}, error), error);
-  for (int i = 0; i < 3; ++i) session.tick(config::kFixedDeltaSeconds);
+  for (int i = 0; i < 3; ++i) session.tick(config::kDefaultFixedDeltaSeconds);
 }
 }  // namespace
 TEST_CASE(
@@ -158,7 +158,7 @@ TEST_CASE(
   checked(host,
           "raise unless $actor.object_id == $id && Mover == $klass && $actor.steps == $old_steps && $starts == 1; "
           "raise if $actor.respond_to?(:obsolete)");
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $old_steps + 5 && $fixed > 0 && $starts == 1");
   CHECK(settled_reload(host) == 0);
   session->stop();
@@ -179,7 +179,7 @@ TEST_CASE("script reload: failed changed scripts retain last code and report onc
   CHECK(host.reload_scripts(true) == 0);
   CHECK(host.error_count() == errors + 2);
   checked(host, "$old_steps = $actor.steps");
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $old_steps + 1");
   std::filesystem::remove(game.dir / "scripts/mover.rb");
   CHECK(settled_reload(host) == 0);
@@ -204,7 +204,7 @@ TEST_CASE("script reload: ordinary game engines never watch or replace script so
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   auto& engine = *std::get<std::unique_ptr<Engine>>(created);
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   game.write(kChanged);
   CHECK(engine.scripts().reload_scripts(true) == 0);
   checked(engine.scripts(), "raise unless Mover::STEP == 1");
@@ -248,11 +248,11 @@ TEST_CASE("script reload: a corrected callback resumes its disabled instance wit
   game.write("class Mover < Behaviour; def update(_dt); raise 'broken'; end; end");
   REQUIRE(settled_reload(host) == 1);
   const int errors = host.error_count();
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   CHECK(host.error_count() == errors + 1);
   game.write(kChanged);
   REQUIRE(settled_reload(host) == 1);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $before + 5 && $starts == 1 && $fixed > 0");
   CHECK(host.error_count() == errors + 1);
   session->stop();
@@ -302,7 +302,7 @@ TEST_CASE("script reload: failed starts stay disabled after replacing code") {
   REQUIRE(errors > 0);
   game.write("class Mover < Behaviour; def update(_dt); $bad_update = true; end; end");
   REQUIRE(settled_reload(host) == 1);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   checked(host, "raise if $bad_update");
   CHECK(host.error_count() == errors);
 }
@@ -319,7 +319,7 @@ TEST_CASE("script reload: manual retry leaves successful unchanged constants and
   checked(host, "Mover::SPAWNED << 1; $constant_id = Mover::SPAWNED.object_id");
   const auto errors = host.error_count();
   REQUIRE(host.reload_scripts(true) == 0);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   CHECK(host.error_count() == errors);
   checked(host, "raise unless Mover::SPAWNED == [1] && Mover::SPAWNED.object_id == $constant_id");
 }
@@ -573,9 +573,9 @@ TEST_CASE("script reload: changing a base retries a disabled subclass only once"
   REQUIRE(errors > 0);
   game.write(kChanged);
   REQUIRE(settled_reload(host) == 1);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   CHECK(host.error_count() == errors + 1);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   CHECK(host.error_count() == errors + 1);
 }
 TEST_CASE("script reload: literal heredocs are accepted but interpolated setup is refused") {
@@ -658,7 +658,7 @@ TEST_CASE("script reload: fixing an inherited update resumes instances of the su
   REQUIRE(errors > 0);
   game.write(kChanged);
   REQUIRE(settled_reload(host) == 1);
-  session->tick(config::kFixedDeltaSeconds);
+  session->tick(config::kDefaultFixedDeltaSeconds);
   CHECK(host.error_count() == errors);
   checked(host, "raise unless Scene.find('Child').get_component(Child).steps > 0");
 }

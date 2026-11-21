@@ -25,6 +25,7 @@ void MovementValidator::forgive(float seconds, float most_seconds) {
 }
 
 MovementVerdict MovementValidator::check(int peer, const std::string& key, Vec3 position) {
+  if (!enabled()) return {true, position, false, false};  // (nothing to hold it to, nothing to follow)
   const Source source{peer, key};
   if (!can_track(source)) return {false, position, false, true};
   Track& track = track_of(source, position);
@@ -37,6 +38,15 @@ MovementVerdict MovementValidator::check(int peer, const std::string& key, Vec3 
 int MovementValidator::violations(int peer) const {
   const auto found = violations_.find(peer);
   return found != violations_.end() ? found->second : 0;
+}
+
+void MovementValidator::place(int peer, const std::string& key, Vec3 position) {
+  const Source source{peer, key};
+  if (!enabled() || !can_track(source)) return;
+  Track& track = track_of(source, position);
+  track.accepted = position;
+  track.budget = burst();
+  track.checked_at = clock_;
 }
 
 void MovementValidator::forget(int peer) {

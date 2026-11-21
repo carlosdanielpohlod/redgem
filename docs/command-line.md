@@ -160,7 +160,8 @@ ran main for 180 frames (3 s): 1 errors, 0 warnings
 ```
 
 It plays the game with no window and no sound for a while (5 seconds unless `--seconds N` or
-`--frames N` says otherwise), each frame one fixed step of 1/60 s with nothing pressed, so the same
+`--frames N` says otherwise), each frame one fixed step of the game (1/60 s, unless its `game.json` sets a
+`tick_hz`: see [Tick rate](scripting/gameplay.md#tick-rate)) with nothing pressed, so the same
 run gives the same answer every time. It says each warning and error once (with how many times it
 came), led by the place in the game's scripts it points at, then one line of summary, and ends
 with an error when a script failed. `--scene level2` starts on another scene. What the game saves

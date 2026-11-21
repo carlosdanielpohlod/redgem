@@ -67,13 +67,13 @@ TEST_CASE("async loading draws a live loading screen in the player's window") {
   ruby(engine,
        "Game.on_loading { |dt| UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :ruby); "
        "UI.text('Loading level2...', x: 32, y: 80, size: 32) }; Game.load_scene_async('level2')");
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   reader.wait_started();
   std::vector<double> milliseconds;
   capture = "reading.png";
   for (int i = 0; i < kFramesWhileBlocked; ++i) {
     const auto start = std::chrono::steady_clock::now();
-    engine.frame(config::kFixedDeltaSeconds);
+    engine.frame(config::kDefaultFixedDeltaSeconds);
     milliseconds.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     capture = nullptr;
   }
@@ -86,14 +86,14 @@ TEST_CASE("async loading draws a live loading screen in the player's window") {
   for (int i = 0; i < kMostRealActivationFrames && engine.scene_name() != "level2"; ++i) {
     REQUIRE(engine.wait_for_scene_read(test::kSceneReadPatience));
     const auto frame_start = std::chrono::steady_clock::now();
-    engine.frame(config::kFixedDeltaSeconds);
+    engine.frame(config::kDefaultFixedDeltaSeconds);
     activation_frame =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frame_start).count();
   }
   REQUIRE(engine.scene_name() == "level2");
   capture = "activated.png";
   const auto start = std::chrono::steady_clock::now();
-  engine.frame(config::kFixedDeltaSeconds);
+  engine.frame(config::kDefaultFixedDeltaSeconds);
   const auto activation = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
   CHECK_FALSE(seen.r > kRedDominance * seen.g);
   std::ofstream timings(picture("frame-times.txt"));
