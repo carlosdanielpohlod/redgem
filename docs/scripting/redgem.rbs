@@ -1930,6 +1930,9 @@ module Network
   # holds a dropped player's place and id that long, up to 300 (0 turns it off)
   %a{redgem:experimental}
   def self.reconnect_window=: (Numeric seconds) -> Numeric
+  # poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)
+  %a{redgem:experimental}
+  def self.send_hz: () -> Integer
   # whether this machine hosts
   %a{redgem:stable}
   def self.host?: () -> bool
@@ -2078,6 +2081,12 @@ class NetworkSync < Behaviour
   # sets its owner and key
   %a{redgem:stable}
   def assign: (owner: Integer, ?key: String) -> void
+  # poses a second its owner sends: its send_hz setting, else Network.send_hz
+  %a{redgem:experimental}
+  def send_hz: () -> Float
+  # seconds between two of its poses (1 / send_hz)
+  %a{redgem:experimental}
+  def send_interval: () -> Float
 end
 
 # A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).

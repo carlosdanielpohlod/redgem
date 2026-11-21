@@ -434,7 +434,10 @@ int poses_heard_in_a_second(const std::string& settings) {
   for (Engine* machine : {host, guest}) {
     ruby(*machine, "$platform = Scene.find('Platform'); $sync = $platform.add_component(NetworkSync" + settings + ")");
   }
-  ruby(*guest, "$heard = 0; def $sync.__receive(*pose) = ($heard += 1; super)");
+  ruby(*guest,
+       "$heard = 0; class << $sync; alias_method :__counted_receive, :__receive; "
+       "def __receive(*pose); $heard += 1; __counted_receive(*pose); end; end");
+  lan.round();
   for (int round = 0; round < kOneSecondRounds; ++round) {
     ruby(*host, "$platform.transform.position = Vector3.new(" + std::to_string(round * kNudge) + ", 1, 0)");
     lan.round();

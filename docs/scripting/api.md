@@ -934,6 +934,7 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.reconnecting? -> bool`: whether this machine's connection dropped and it is getting back in *Experimental.*
 - `Network.reconnect_window -> Float`: seconds the game hosted here holds a dropped player's place (0: none) *Experimental.*
 - `Network.reconnect_window = Numeric seconds`: holds a dropped player's place and id that long, up to 300 (0 turns it off) *Experimental.*
+- `Network.send_hz -> Integer`: poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default) *Experimental.*
 - `Network.host? -> bool`: whether this machine hosts
 - `Network.server? -> bool`: whether this machine is a dedicated server
 - `Network.id -> Integer`: this machine's peer id
@@ -990,6 +991,8 @@ A behaviour: the same object in the same place on every machine. See [multiplaye
 - `owner = Integer peer`: gives it to a peer
 - `key -> String`: the name it is known by on every machine
 - `assign(owner: Integer, key: String = self.key) -> void`: sets its owner and key
+- `send_hz -> Float`: poses a second its owner sends: its send_hz setting, else Network.send_hz *Experimental.*
+- `send_interval -> Float`: seconds between two of its poses (1 / send_hz) *Experimental.*
 
 ## Interactable
 
