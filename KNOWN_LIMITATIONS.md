@@ -263,9 +263,7 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, a multi-level
-multiplayer template, the packed Android app on the emulator, and the test cases still on the
-real clock.
+The 1.0 blocker still open (see the 1.0 cut plan): a quest journal and markers.
 
 ### Gameplay API
 
@@ -279,13 +277,15 @@ real clock.
 
 ### Shipping
 
-- The packed Android app runs on a phone or emulator: not yet confirmed; the emulator crashes on
-  this host. A packed game (Proving Ground, 0.6.1) unpacked, started and showed its title screen on
-  the emulator with SwiftShader graphics, then the emulator itself crashed: with the computer's
-  graphics card, in the emulator's own memory allocator (tcmalloc) as the computer's C library
-  (glibc 2.39) makes room for a new thread's storage; with SwiftShader, in its compiled drawing
-  code. Emulators 37.1.11 and 37.3.10, cold boots and wiped data alike. The continuous
-  integration only builds the player.
+- The packed Android app played on the emulator (see Platforms: not yet on a phone): a packed game
+  (Proving Ground, 0.6.1) unpacked, showed its title screen and played a level with the
+  computer's graphics card. On a computer whose C library is glibc 2.39 (Ubuntu 24.04) the
+  emulator itself crashes as soon as a game draws (emulators 37.1.11 and 37.3.10): with the
+  graphics card, its bundled memory allocator (`emulator/lib64/libtcmalloc_minimal.so.4`) calls
+  itself without end while glibc makes room for a new thread's storage, an emulator bug, not the
+  engine's; the run above swapped in tools/android/emulator_tcmalloc_stand_in.c (how, in it).
+  With SwiftShader graphics it crashed in SwiftShader's compiled drawing code, and has not been
+  tried with the stand-in. The continuous integration only builds the player.
 
 ### Engineering
 
