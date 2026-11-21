@@ -1,0 +1,18 @@
+{
+  "title": "beacon.title",
+  "description": "beacon.description",
+  "start": "find",
+  "stages": {
+    "find": {
+      "text": "beacon.find",
+      "objectives": [{ "go_to": "Beacon", "radius": 3, "text": "beacon.go_to" }],
+      "next": "report"
+    },
+    "report": {
+      "text": "beacon.report",
+      "objectives": [{ "talk_to": "Guide", "dialogue": "guide", "node": "report", "text": "beacon.talk" }],
+      "next": "done"
+    },
+    "done": { "text": "beacon.done", "end": true }
+  }
+}

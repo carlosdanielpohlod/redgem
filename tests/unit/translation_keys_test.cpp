@@ -32,6 +32,8 @@ const std::regex kCppKey(R"re("([a-z]+(\.[a-z0-9_]+){2,})")re");
 const std::regex kRubyKey(R"re(I18n\.t\("([^"]+)")re");
 // A key the engine's Ruby keeps in a constant: a frozen dotted name (not a prefix ending in "_").
 const std::regex kRubyConstantKey(R"re("([a-z]+(\.[a-z0-9_]*[a-z0-9]){2,})"\.freeze)re");
+// A key a script gives an Interactable as its prompt (see docs/scripting/interaction.md).
+const std::regex kPromptKey(R"re(prompt:\s*"([^"]+)")re");
 // A key a dialogue file shows: a speaker's name, a line or a choice.
 const std::regex kDialogueKey(R"re("(?:speaker|text)"\s*:\s*"([^"]+)")re");
 
@@ -162,6 +164,7 @@ TEST_CASE("every key a game or a template shows has a text in English, and every
   for (const fs::path& game : games()) {
     const fs::path locales = game / "locales";
     Keys used = keys_in_code(game / "scripts", kRubyKey, ".rb");
+    used.merge(keys_in_code(game / "scripts", kPromptKey, ".rb"));
     used.merge(keys_in_code(game / "dialogues", kDialogueKey, ".json"));
     used.merge(quest_keys(game));
     const Keys own = fs::is_directory(locales) ? keys_of(locales / kEnglishFile) : Keys();
