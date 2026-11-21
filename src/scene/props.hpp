@@ -46,6 +46,10 @@ inline constexpr const char* kCastShadow = "cast_shadow";
 // Whether wind sways an object's foliage (its textured see-through materials). Not said, it does
 // unless a skeleton moves the object (a character's hair follows its head, not the wind).
 inline constexpr const char* kSway = "sway";
+// True draws an object, and everything under it, as the view model: a first-person weapon or
+// hands, drawn over the world (it never goes into a wall), with the view model's field of view,
+// a light of its own, and no shadow on the world.
+inline constexpr const char* kViewModel = "view_model";
 
 // --- The properties of a material (glTF material extras) --------------------------
 // How a blended material shows what is behind it: mixed with it, sorted farthest first (the

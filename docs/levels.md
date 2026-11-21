@@ -411,6 +411,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
 | `cast_shadow` | `false` / `true`                            | `false` keeps the object out of the shadows (a sky dome); `true` on a point or spot light makes it cast shadows (off unless said) |
+| `view_model` | `false` / `true`                            | `true` draws the object and what is under it as the view model: a first-person weapon drawn over the world, never into a wall (see "A first-person weapon" in [gameplay.md](scripting/gameplay.md)) |
 | `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves (see "See-through materials and wind") |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |

@@ -33,7 +33,19 @@ bool same(const RecordSource& a, const RecordSource& b) {
          a.first_morph == b.first_morph && a.sway == b.sway && a.record == b.record;
 }
 
+// Whether an object is drawn as the view model: it, or an object it is under, says so.
+bool in_view_model(const Scene& scene, const GameObject& object) {
+  for (ObjectId id = object.id; id != kNoObject; id = scene.at(id).parent) {
+    if (scene.at(id).view_model) return true;
+  }
+  return false;
+}
+
 }  // namespace
+
+bool Renderer::Impl::drawn_apart(const Scene& scene, const GameObject& object) const {
+  return view_models_apart && in_view_model(scene, object);
+}
 
 void Renderer::Impl::write_frame_texels(const Scene& scene) {
   lay_out_scattered(scene.scattered());
@@ -65,6 +77,7 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const bool mirrored = !pose && mirrors(worlds[slot]);
   sights[slot] = ObjectSight{write_record(slot, look), seen,    object.mesh, object.visible_from, object.visible_to,
                              object.cast_shadow,       mirrored};
+  sights[slot].view_model = drawn_apart(scene, object);
   return next;
 }
 

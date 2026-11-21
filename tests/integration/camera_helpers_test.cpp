@@ -3,12 +3,15 @@
 
 #include <doctest/doctest.h>
 
+#include <cmath>
 #include <memory>
 #include <string>
 
 #include "app/presenter.hpp"
 #include "input/devices.hpp"
 #include "physics_game.hpp"
+#include "scene/props.hpp"
+#include "scene/scene_config.hpp"
 
 using namespace redgem;
 using namespace redgem::test::physics_game;
@@ -483,4 +486,35 @@ TEST_CASE("the camera helpers refuse what would break the picture") {
   CHECK(fails(*engine, "Camera.orbit(Scene.find('Hero')).turn(Float::NAN, 0)"));
   CHECK(fails(*engine, "Camera.shake(-0.1)"));
   CHECK(fails(*engine, "Camera.__shake_by(Scene.find('Hero'), Vector3.zero, Vector3.zero)"));  // not a camera
+}
+
+TEST_CASE("the view model: its property, its own field of view, and where its sockets show in the world") {
+  constexpr float kWorldFov = 45.0f;
+  constexpr float kWeaponFov = 70.0f;
+  NodeDesc weapon;
+  weapon.name = "Weapon";
+  weapon.props[props::kViewModel] = true;
+  NodeDesc lamp;
+  lamp.name = "Lamp";
+  const TempGame game(kGame);
+  auto engine = engine_for(game, hero_scene({weapon, lamp}));
+  CHECK(ruby(*engine, "Scene.find('Weapon').view_model?") == "true");
+  CHECK(ruby(*engine, "Scene.find('Lamp').view_model?") == "false");
+  ruby(*engine, "Scene.find('Lamp').view_model = true");
+  CHECK(engine->scene().at(engine->scene().find("Lamp")).view_model);
+
+  CHECK(number(*engine, "Camera.view_model_fov") == doctest::Approx(config::kDefaultViewModelFovYDegrees));
+  ruby(*engine, "Camera.fov = 45; Camera.view_model_fov = 70");
+  const CameraDesc& lens = *engine->scene().at(engine->scene().main_camera()).camera;
+  CHECK(radians_to_degrees(lens.view_model_fov_y_radians) == doctest::Approx(kWeaponFov));
+  CHECK(radians_to_degrees(lens.fov_y_radians) == doctest::Approx(kWorldFov));
+  CHECK(error_of(*engine, "Camera.view_model_fov = 5").find("must be from 10 to 150") != std::string::npos);
+
+  // The camera sits at the origin looking down -z. A point on its axis shows where it is; one
+  // aside is drawn wider by the view model's 70 degrees than the world's 45 would draw it.
+  CHECK(ruby(*engine, "Camera.from_view_model(Vector3.new(0, 0, -2)).to_s") == "(0.000, 0.000, -2.000)");
+  const float widening = std::tan(degrees_to_radians(kWorldFov) / 2) / std::tan(degrees_to_radians(kWeaponFov) / 2);
+  CHECK(number(*engine, "Camera.from_view_model(Vector3.new(0.3, -0.2, -1)).x") == doctest::Approx(0.3f * widening));
+  CHECK(number(*engine, "Camera.from_view_model(Vector3.new(0.3, -0.2, -1)).y") == doctest::Approx(-0.2f * widening));
+  CHECK(error_of(*engine, "Camera.from_view_model(5)").find("must be a Vector3") != std::string::npos);
 }
