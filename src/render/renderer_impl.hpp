@@ -58,6 +58,8 @@
 #include "render/shadow_cascades.hpp"
 #include "render/sky_harmonics.hpp"
 #include "render/temporal.hpp"
+#include "render/terrain_look.hpp"
+#include "render/terrain_textures.hpp"
 #include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
@@ -79,6 +81,11 @@ inline constexpr int kSkyReflectanceSlot = 13;
 inline constexpr int kSceneDepthSlot = 14;     // what soft particles fade into
 inline constexpr int kMorphTexelSlot = 16;     // every mesh part's shape-key deltas (morph_shapes.hpp)
 inline constexpr int kPreviousTexelSlot = 15;  // the last frame's records and bones (temporal anti-aliasing)
+// A terrain's three texture arrays (colors, surfaces, weights) take this slot and the two after it.
+inline constexpr int kTerrainTextureSlot = 17;
+inline constexpr int kTerrainSurfaceSlot = kTerrainTextureSlot + 1;
+inline constexpr int kTerrainSplatSlot = kTerrainTextureSlot + 2;
+inline constexpr int kNoTerrainYet = -2;  // a pass that told the lit shader of no terrain (kNoIndex is none)
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -95,6 +102,7 @@ struct GpuPrimitive {
   std::size_t primitive = 0;  // original MeshDesc primitive, shared by its GPU pieces
   // Where its shape keys' deltas start in the morph texels (render_math::kNoMorphs: it has none).
   float morph_first = render_math::kNoMorphs;
+  int terrain = kNoIndex;  // the terrain with ground layers it is a part of (Impl::terrains)
 };
 
 // Where a pass's shader takes what it needs of a mesh part's shape keys.
@@ -113,7 +121,16 @@ struct ObjectSight {
   float visible_from = 0.0f;
   float visible_to = 0.0f;
   bool cast_shadow = true;
-  bool mirrored = false;  // its placement mirrors it (see `mirrors` in scene/transform.hpp)
+  bool mirrored = false;    // its placement mirrors it (see `mirrors` in scene/transform.hpp)
+  bool view_model = false;  // drawn in the view model's pass alone (see renderer_view_model.cpp)
+};
+
+// The sun and the sky's light a frame is lit with, as the lit shader takes them: what the view
+// model is lit with too.
+struct FrameSun {
+  Vector3 direction{};
+  Vector3 color{};
+  float ambient = 0.0f;
 };
 
 // Whether what casts a shadow or not (`cast_shadow`) is drawn in a pass: the shadow map's pass
@@ -149,6 +166,16 @@ struct ObjectPass {
   int last_material = kNoMaterialYet;
   bool last_two_sided = false;
   bool mirrored = false;  // the winding the pass is drawing with: clockwise front faces when true
+  int last_terrain = kNoTerrainYet;
+};
+
+// A terrain with ground layers on the graphics card: which object and mesh it is, and its look.
+struct GpuTerrain {
+  std::string name;
+  int node = kNoIndex;
+  int mesh = kNoIndex;
+  TerrainTextures textures;
+  render_math::TerrainLook look;
 };
 
 // What of the scattered copies a quality draws (see QualityCaps): a share of them, so far.
@@ -203,6 +230,9 @@ struct PreviousTexels {
 inline float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
 // Draws `source` over the whole current target (render textures are stored upside down).
 void draw_full(const RenderTexture2D& source, int width, int height);
+// Covered (see the motion target): a surface's alpha added to what is covered already, on the
+// alpha channel alone.
+void blend_cover();
 
 }  // namespace render_detail
 
@@ -219,6 +249,8 @@ struct Renderer::Impl {
   render_detail::WaterUniforms lit_water;
   render_detail::WaterUniforms motion_water;
   render_detail::WaterUniforms depth_water;
+  render_detail::TerrainUniforms terrain_uniforms;
+  std::vector<render_detail::GpuTerrain> terrains;  // per SceneDesc terrain
   WaterRippleSnapshot water_ripples;
   WaterRippleSnapshot previous_water_ripples;
   std::unordered_map<ObjectId, ObjectHandle> water_handles;
@@ -319,6 +351,9 @@ struct Renderer::Impl {
   std::unordered_map<std::string, Texture2D> ui_images;  // by name; missing files keep a cached checkerboard
   // What the game asked for.
   bool show_prefabs = false;
+  // Whether view model objects are drawn apart, over the world (Renderer::draw_view_models_apart):
+  // in a game, not in the editor, where they are where they stand.
+  bool view_models_apart = true;
   std::uint64_t scene_uploads = 0;           // scenes uploaded so far: what a frame was drawn of
   float motion_blur = 0.0f;                  // 0..1 (Camera.motion_blur)
   float backdrop_blur = 0.0f;                // 0..1 (Camera.backdrop_blur)
@@ -357,6 +392,8 @@ struct Renderer::Impl {
   float foliage_translucency = 0.0f;  // of the environment
   bool glow_gathered = false;         // this frame's glowing particles wait in `glow`
   Vector3 sun_travel{};               // direction the sun's light travels
+  render_detail::FrameSun frame_sun;  // the frame's sun and sky light
+  float view_model_fov = 0.0f;        // degrees: the view model's field of view this frame
   std::array<Matrix, render_math::kMaxShadowCascades> light_matrices{};  // into each cascade's view
   // The frame's point and spot lights as the lit shader takes them (those casting shadows first),
   // and the shadows they cast.
@@ -446,6 +483,22 @@ struct Renderer::Impl {
   void bind_textures(Material& material, const MaterialDesc& source) const;
   void release_assets();
   void release_meshes();
+
+  // --- Terrains with ground layers (renderer_terrain.cpp) ----------------------------------------
+
+  // Uploads the scene's terrains when they changed, or only their weights when those did.
+  void sync_terrains(const SceneDesc& desc);
+  void assign_terrain_slots(const shaders::LitFeatures& features);
+  void upload_terrains(const SceneDesc& desc);
+  void sync_terrain(render_detail::GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc);
+  void mark_terrain_parts(const SceneDesc& desc);
+  void release_terrains();
+  bool has_terrains() const;
+  // Tells the lit shader of the terrain a part belongs to (kNoIndex: none) before it is drawn.
+  void use_terrain(int terrain, ObjectPass& pass);
+  void end_terrains(ObjectPass& pass);
+  void send_terrain_layers(int layers) const;
+  void send_terrain_look(const render_math::TerrainLook& look) const;
   // A scene image as a texture: from its decoded pixels when it has them.
   static Texture2D scene_picture(const SceneDesc& desc, std::size_t image);
   // Stages the next image or mesh of `desc` (see staged); returns roughly how many bytes it sent.
@@ -572,6 +625,11 @@ struct Renderer::Impl {
   static void face_by_winding(bool mirrored, ObjectPass& pass);
   // Every pass ends with front faces counter-clockwise, as the rest of the frame draws them.
   static void face_forward(ObjectPass& pass) { face_by_winding(false, pass); }
+  // What a lit pass leaves set for whatever draws after it: front faces wound as usual, no terrain.
+  void finish_lit_pass(ObjectPass& pass) {
+    face_forward(pass);
+    end_terrains(pass);
+  }
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 
@@ -636,6 +694,25 @@ struct Renderer::Impl {
   // The light lit particles take: the sun, the sky and the nearest point lights.
   void send_particle_lights(Vector3 sun_direction, Vector3 sun_color, const Environment& env,
                             const render_math::PointLightUniforms& points);
+
+  // --- The view model (renderer_view_model.cpp) ---------------------------------------------------
+
+  // A first-person weapon or hands: drawn after the world, its depths in front of all of it (it
+  // never goes into a wall), with a field of view of its own, the sun unshadowed and a fill light
+  // of its own.
+  void draw_view_model(const Camera3D& camera);
+  // Whether an object is drawn as the view model this frame: it or an object it is under says so,
+  // and the view draws view models apart.
+  bool drawn_apart(const Scene& scene, const GameObject& object) const;
+  // The projection it is drawn with: its field of view, jittered as the world's is.
+  Matrix view_model_projection() const;
+  void light_view_model(Vec3 viewer);
+  // Its objects and their see-through parts; returns where their record numbers start in `slots`.
+  std::size_t draw_view_model_objects(Vec3 viewer);
+  void gather_view_model(bool mirrored, Vec3 viewer);
+  // Where it covers the picture, into the motion target's alpha: the frames before count for less
+  // there (its motion is not the world's).
+  void mark_view_model_cover(std::size_t first, Vec3 viewer);
 
   // --- Temporal anti-aliasing (renderer_temporal.cpp) -------------------------------------------
 

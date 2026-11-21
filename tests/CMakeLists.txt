@@ -29,6 +29,7 @@ unit/temp_dirs_test.cpp
   unit/dialogue_file_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
+  unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
@@ -51,6 +52,7 @@ unit/temp_dirs_test.cpp
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
   unit/mcp_test.cpp
+  unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
@@ -305,6 +307,7 @@ unit/temp_dirs_test.cpp
   integration/game_project_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
+  integration/project_tools_test.cpp
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/menu_checks_test.cpp
@@ -714,6 +717,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/mirrored_render_test.cpp
+               render_system/view_model_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/ktx2_render_test.cpp
@@ -831,7 +835,8 @@ add_executable(redgem_field_benchmark
   benchmark/field_benchmark.cpp
   benchmark/field_scene.cpp
   benchmark/field_placements.cpp
-  benchmark/field_textures.cpp)
+  benchmark/field_textures.cpp
+  benchmark/terrain_scene.cpp)
 target_link_libraries(redgem_field_benchmark PRIVATE redgem_runtime)
 target_include_directories(redgem_field_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

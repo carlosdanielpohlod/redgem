@@ -23,6 +23,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   document. Apply writes them into the file for every placement; unpack turns the placement into
   plain objects. See [prefab overrides](docs/prefabs.md#revert-apply-and-unpack).
 
+- **Agents change the whole game, not only its scenes.** MCP's new `project` tool reads and
+  writes `game.json` (`set_settings` merges changes, input and the menu theme included), the locales' texts, and the
+  dialogues, quests and items, and lists and makes scenes and new games from a template. Each
+  write is checked as `redgem check` checks the game, and refused, the file kept, when it brings a
+  new problem. `--read-only` keeps its reading actions. The editor tool gains `open_scene` (with
+  `discard: true` to drop unsaved edits) and `save_as`.
 - **A prefab instance can change the parts it inherits.** A placement's `prefab_overrides`
   property records, per inherited part, its position, rotation or scale, properties set or
   dropped, its light or camera, or that the part is removed. A child added under the placement
@@ -36,6 +42,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   `terrains/island.splat0.png` (and `.splat1.png` past four layers). The map has its own resolution,
   1024 texels across by default, whatever the mesh's vertices. A dedicated server reads the weights
   alone.
+- **Ground layers are drawn, blended (experimental).** Layers meet by weight or, with `sharpness`,
+  by height: sand fills the cracks between rocks. Each layer has its own `tiling`, large patches of
+  `variation`, and can break up its repeats (`stochastic`) or project along three axes on cliffs
+  (`triplanar`). A scene without a layered terrain draws as before, with no extra cost.
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that
@@ -85,6 +95,15 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
+- **A first-person weapon: the view model** (experimental). `view_model = true` on an object
+  (in the Inspector, or `weapon.view_model = true`) draws it, and everything under it, after the
+  world, in front of all of it: pressed against a wall, the weapon no longer goes into it. It has a
+  field of view of its own (`Camera.view_model_fov`, 50 degrees unless set), apart from
+  `Camera.fov`. It is lit by the sun without the world's shadows and by a fill light from the eye,
+  so it reads indoors; it casts no shadow on the world, and no frustum culls it. A muzzle socket
+  is an object under the weapon: a flash mesh there is drawn with it, and
+  `Camera.from_view_model(point)` says where the socket shows in the world, where particles and
+  tracers start. The editor's own view draws the weapon where it stands.
 - **Recorded videos have the game's sound.** `redgem <game> --record out.mp4` now puts the game's
   mix in the video as AAC. It is mixed by the engine's own mixer, not taken from the sound card,
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried

@@ -21,11 +21,11 @@ using render_math::to_raylib;
 // A switch of the lit shader: on for a material that has that texture.
 float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 
-// Whether a view draws an object: one the frame has a record of, that casts a shadow when the
-// pass is the shadow map's, in the view, big enough in it, and at the distance its level of
-// detail is for.
+// Whether a view of the world draws an object: one the frame has a record of, not the view
+// model's (drawn apart), that casts a shadow when the pass is the shadow map's, in the view, big
+// enough in it, and at the distance its level of detail is for.
 bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pass) {
-  return sight.drawn && casts_into(sight.cast_shadow, depth_pass) &&
+  return sight.drawn && !sight.view_model && casts_into(sight.cast_shadow, depth_pass) &&
          render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 
@@ -149,7 +149,7 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects = object_pass(depth_pass, view);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
-  face_forward(objects);
+  finish_lit_pass(objects);
   if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
@@ -196,6 +196,7 @@ void Renderer::Impl::face_by_winding(bool mirrored, ObjectPass& pass) {
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {
   if (omits_water(factors_of(primitive.material), pass.alpha)) return;
   use_material(primitive.material, pass);
+  use_terrain(primitive.terrain, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
   send_part(primitive, pass);

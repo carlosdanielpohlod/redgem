@@ -553,7 +553,11 @@ redgem_add_library(redgem_runtime
   render/renderer_environment.cpp
   render/renderer_objects.cpp
   render/renderer_see_through.cpp
+  render/renderer_terrain.cpp
+  render/terrain_textures.cpp
+  render/terrain_look.cpp
   render/renderer_water.cpp
+  render/renderer_view_model.cpp
   render/water_ripple_packet.cpp
   render/underwater.cpp
   render/renderer_water_ripples.cpp
@@ -876,6 +880,8 @@ if(NOT ANDROID)
     project/scene_assignments.cpp
     project/component_words.cpp
     project/scene_edits.cpp
+    project/project_json_files.cpp
+    project/mcp_project_tools.cpp
     project/scene_command.cpp
     project/scene_prefab_words.cpp
     project/script_messages.cpp

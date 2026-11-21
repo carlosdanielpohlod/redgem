@@ -99,6 +99,21 @@ struct LitUniforms {
   int sky_reflectance = kNoLocation;
 };
 
+// Where the lit shader takes what it is told of a terrain's ground layers (see shaders/lit_terrain.hpp).
+struct TerrainUniforms {
+  int layers = kNoLocation;
+  int area = kNoLocation;
+  int tiling = kNoLocation;
+  int sharpness = kNoLocation;
+  int variation = kNoLocation;
+  int stochastic = kNoLocation;
+  int triplanar = kNoLocation;
+  int variation_scale = kNoLocation;
+  int colors = kNoLocation;
+  int surfaces = kNoLocation;
+  int splat = kNoLocation;
+};
+
 // Where the shadow map's depth shader takes its values.
 struct DepthUniforms {
   int alpha_cutoff = kNoLocation;
@@ -177,6 +192,7 @@ Shader compile_shader(const char* vertex, const char* fragment, const char* name
 
 // The lit one also tells raylib where the uniforms it sets by itself are (its texture maps).
 LitUniforms find_lit_uniforms(Shader& lit);
+TerrainUniforms find_terrain_uniforms(const Shader& lit);
 DepthUniforms find_depth_uniforms(const Shader& depth);
 MotionUniforms find_motion_uniforms(const Shader& motion);
 TemporalUniforms find_temporal_uniforms(const Shader& temporal);
