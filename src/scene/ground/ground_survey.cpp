@@ -9,6 +9,9 @@ namespace {
 
 constexpr float kSmallestSpan = 1.0f;  // meters: what a flat side of the mesh is spread over
 constexpr float kFlatArea = 1e-12f;    // a triangle seen from above with less area has none
+// How far outside a triangle a point may be and still count as on it: a point on an edge two
+// triangles share belongs to both, whatever the rounding.
+constexpr float kEdgeTolerance = -1e-5f;
 constexpr std::size_t kXyz = 3;
 constexpr std::size_t kCorners = 3;
 // A triangle's corners, in order.
@@ -44,7 +47,7 @@ Shares shares_at(const Triangle& triangle, float x, float z) {
   shares.of[kB] = ((x - a.x) * (c.z - a.z) - (c.x - a.x) * (z - a.z)) / area;
   shares.of[kC] = ((b.x - a.x) * (z - a.z) - (x - a.x) * (b.z - a.z)) / area;
   shares.of[kA] = 1.0f - shares.of[kB] - shares.of[kC];
-  shares.inside = std::all_of(shares.of.begin(), shares.of.end(), [](float share) { return share >= 0.0f; });
+  shares.inside = std::all_of(shares.of.begin(), shares.of.end(), [](float share) { return share >= kEdgeTolerance; });
   return shares;
 }
 

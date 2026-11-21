@@ -2436,7 +2436,7 @@
           "example": "Terrain.paint_by_rules(ground, [{layer: \"rock\", slope: {min: 30, soft: 8}}])"
         }
       ],
-      "guide": "../levels.md#painting-ground-layers-by-rules",
+      "guide": "../levels.md#painting-ground-layers-by-rules-experimental",
       "notes": "A terrain has ground layers when its object names a layers file (terrain_layers = \"island\": terrains/island.json). Points are in the world; heights in rules are in the terrain mesh's own space. What paint_by_rules paints is kept while the scene runs and never written to the game's files: redgem scene paint writes them. A rule naming no layer of the file raises an ArgumentError, an object without layers too. Each machine keeps its own: over the network, paint on every machine."
     },
     {

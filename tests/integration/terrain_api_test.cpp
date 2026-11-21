@@ -110,3 +110,17 @@ TEST_CASE("Terrain.paint_by_rules refuses wrong rules, and an object without lay
         std::string::npos);
   CHECK(ruby(*engine, at("Terrain.layer_at", 0, 0)) == "sand");  // nothing painted
 }
+
+TEST_CASE("Terrain.paint_by_rules takes a seed from the script, and another seed paints other patches") {
+  const TempGame game(kGame);
+  auto engine = engine_for(game, island());
+  const std::string ground = "g = Scene.find('Island'); ";
+  const std::string noise = "noise: {min: 0.5}, noise_size: 3";
+  ruby(*engine, ground + "Terrain.paint_by_rules(g, [{layer: 'grass', " + noise + ", seed: 1}])");
+  const std::string first =
+      ruby(*engine, "(-9..9).map { |x| Terrain.layer_at(Scene.find('Island'), [100 + x, 0, 0]) }.join(',')");
+  ruby(*engine, ground + "Terrain.paint_by_rules(g, [{layer: 'sand'}, {layer: 'grass', " + noise + ", seed: 7}])");
+  const std::string second =
+      ruby(*engine, "(-9..9).map { |x| Terrain.layer_at(Scene.find('Island'), [100 + x, 0, 0]) }.join(',')");
+  CHECK(first != second);
+}

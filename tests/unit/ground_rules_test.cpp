@@ -75,6 +75,7 @@ TEST_CASE("a hard range takes what is inside it whole and nothing outside") {
   const SoftRange range{1.0f, 3.0f, 0.0f};
   CHECK(range_share(range, 2.0f) == 1.0f);
   CHECK(range_share(range, 1.0f) == 1.0f);
+  CHECK(range_share(range, 3.0f) == 1.0f);  // closed at both ends
   CHECK(range_share(range, 0.5f) == 0.0f);
   CHECK(range_share(range, 3.5f) == 0.0f);
 }
@@ -218,4 +219,26 @@ TEST_CASE("a noise rule paints patches, not everything or nothing") {
   }
   CHECK(rock > kSplatSize * kSplatSize / 10);
   CHECK(rock < kSplatSize * kSplatSize * 9 / 10);
+}
+
+TEST_CASE("a rule's seed is any whole number, as a script's signed Integer arrives") {
+  CHECK(rules_from(R"([{"layer": "sand", "seed": 3}])")[0].seed == 3U);
+  CHECK(rules_from(R"([{"layer": "sand", "seed": -1}])")[0].seed == 0xffffffffU);
+  CHECK(rules_from(R"([{"layer": "sand", "seed": "three"}])")[0].seed == 0U);
+}
+
+TEST_CASE("neighbouring seeds paint unrelated patches") {
+  int same = 0;
+  for (int i = 0; i < 100; ++i) {
+    const float x = static_cast<float>(i) * 1.7f;
+    const bool a = ground_noise(x, 0.0f, kDefaultNoiseSize, 3) > 0.5f;
+    const bool b = ground_noise(x, 0.0f, kDefaultNoiseSize, 4) > 0.5f;
+    same += a == b ? 1 : 0;
+  }
+  CHECK(same < 85);
+}
+
+TEST_CASE("every texel of a grid terrain is covered, those on its diagonals too") {
+  const std::vector<GroundPoint> points = survey_ground(flat_ground(), kGrid.cells * 2);
+  CHECK(std::all_of(points.begin(), points.end(), [](const GroundPoint& p) { return p.covered; }));
 }

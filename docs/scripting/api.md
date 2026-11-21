@@ -417,7 +417,7 @@ A material's name is the one it has in the scene's file (Blender's). The glow ho
 
 ## Terrain
 
-The ground layers of a terrain: which one is where, and its weights painted again by rules. *Experimental.* See [../levels.md#painting-ground-layers-by-rules](../levels.md#painting-ground-layers-by-rules).
+The ground layers of a terrain: which one is where, and its weights painted again by rules. *Experimental.* See [../levels.md#painting-ground-layers-by-rules-experimental](../levels.md#painting-ground-layers-by-rules-experimental).
 
 - `Terrain.layers(GameObject object) -> Array[String] | nil`: the names of the object's ground layers, in order, or nil when it has none *Experimental.*
 - `Terrain.weights_at(GameObject object, Vector3 | Array[Numeric] position) -> Hash[String, Float] | nil`: each layer's share (0 to 1) of the ground under a point of the world, seen from above; nil without layers or past the terrain's edges *Experimental.*

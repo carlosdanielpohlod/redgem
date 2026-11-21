@@ -26,9 +26,10 @@ SceneDesc& scene_desc(mrb_state* mrb) { return required(mrb, context(mrb).scene_
 // The ground layers of the object of the scene's file that `object` is (or copies); null when
 // it has none.
 TerrainLayers* layers_of(mrb_state* mrb, const GameObject& object) {
-  const ObjectId node = object.copy_of != kNoObject ? object.copy_of : object.id;
+  // (An object of the loaded scene has its node's index for its id, see Scene.)
+  const auto node = static_cast<int>(object.copy_of != kNoObject ? object.copy_of : object.id);
   for (TerrainLayers& layers : scene_desc(mrb).terrains) {
-    if (static_cast<ObjectId>(layers.node) == node) return &layers;
+    if (layers.node == node) return &layers;
   }
   return nullptr;
 }
@@ -90,8 +91,8 @@ mrb_value terrain_paint(mrb_state* mrb, mrb_value) {
   const GameObject& terrain = alive_object(mrb, object);
   TerrainLayers* layers = layers_of(mrb, terrain);
   const MeshDesc* mesh = mesh_of(mrb, terrain);
-  if (layers == nullptr || mesh == nullptr)
-    mrb_raise(mrb, E_ARGUMENT_ERROR, "Terrain.paint_by_rules: the object has no ground layers");
+  if (layers == nullptr) mrb_raise(mrb, E_ARGUMENT_ERROR, "Terrain.paint_by_rules: the object has no ground layers");
+  if (mesh == nullptr) mrb_raise(mrb, E_ARGUMENT_ERROR, "Terrain.paint_by_rules: the object has no mesh to paint over");
   const std::vector<GroundRule> rules = rules_of(mrb, given, *layers);
   const std::size_t changed = paused(mrb, [&] { return paint_ground(*layers, rules, *mesh); });
   return mrb_int_value(mrb, static_cast<mrb_int>(changed));

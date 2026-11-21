@@ -23,6 +23,7 @@ constexpr float kOctaveScale = 2.0f;
 constexpr std::uint32_t kPrimeX = 0x8da6b343U;
 constexpr std::uint32_t kPrimeZ = 0xd8163841U;
 constexpr std::uint32_t kPrimeSeed = 0xcb1ab31fU;
+constexpr std::uint32_t kPrimeOctave = 0x9e3779b1U;  // each octave its own lattice, whatever the seed
 constexpr std::uint32_t kMixShift = 15;
 constexpr std::uint32_t kMixFactor = 0x2c1b3c6dU;
 constexpr float kLargestHash = 4294967295.0f;
@@ -38,6 +39,13 @@ float smooth(float t) { return t * t * (kSmoothA - kSmoothB * t); }
 float rise(float low, float high, float value) {
   if (high <= low) return value >= low ? 1.0f : 0.0f;
   return smooth(std::clamp((value - low) / (high - low), 0.0f, 1.0f));
+}
+
+// From 1 below `low` to 0 above `high`, smoothly; a hard edge keeps `low` itself (ranges are
+// closed at both ends).
+float fall(float low, float high, float value) {
+  if (high <= low) return value <= low ? 1.0f : 0.0f;
+  return 1.0f - smooth(std::clamp((value - low) / (high - low), 0.0f, 1.0f));
 }
 
 float lattice(int x, int z, std::uint32_t seed) {
@@ -98,9 +106,11 @@ std::string read_ranges(const json& rule, GroundRule& into) {
   return {};
 }
 
+// Any whole number, wrapped to 32 bits (a script's Integer arrives signed).
 std::uint32_t seed_of(const json& rule) {
   const auto found = rule.find("seed");
-  return found != rule.end() && found->is_number_unsigned() ? found->get<std::uint32_t>() : 0U;
+  if (found == rule.end() || !found->is_number_integer()) return 0U;
+  return static_cast<std::uint32_t>(found->get<std::int64_t>());
 }
 
 int layer_of(const json& rule, const TerrainLayers& layers) {
@@ -165,7 +175,7 @@ std::size_t paint_row(SplatMap& splat, const std::vector<GroundRule>& rules, con
 
 float range_share(const SoftRange& range, float value) {
   const float half = range.soft * kHalf;
-  return rise(range.min - half, range.min + half, value) * (1.0f - rise(range.max - half, range.max + half, value));
+  return rise(range.min - half, range.min + half, value) * fall(range.max - half, range.max + half, value);
 }
 
 float ground_noise(float x, float z, float size, std::uint32_t seed) {
@@ -174,7 +184,7 @@ float ground_noise(float x, float z, float size, std::uint32_t seed) {
   float shares = 0.0f;
   float scale = 1.0f / std::max(size, kMinNoiseSize);
   for (int octave = 0; octave < kNoiseOctaves; ++octave) {
-    total += value_noise(x * scale, z * scale, seed + static_cast<std::uint32_t>(octave)) * share;
+    total += value_noise(x * scale, z * scale, seed ^ (static_cast<std::uint32_t>(octave) * kPrimeOctave)) * share;
     shares += share;
     share *= kOctaveShare;
     scale *= kOctaveScale;
