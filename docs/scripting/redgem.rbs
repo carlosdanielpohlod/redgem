@@ -754,6 +754,23 @@ module Water
   def self.under?: (Vector3 point) -> bool
 end
 
+# The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them.
+%a{redgem:experimental}
+module Environment
+  # what the environment object says of a setting (a color as "#rrggbb"), or nil when it says nothing and the default applies
+  %a{redgem:experimental}
+  def self.[]: (Symbol | String key) -> (Float | String | bool | nil)
+  # changes a setting from the next frame drawn: a color takes a name, [r, g, b] from 0 to 255 or "#rrggbb"; nil gives the setting back to its default
+  %a{redgem:experimental}
+  def self.[]=: (Symbol | String key, Numeric | String | Symbol | Array[Numeric] | bool | nil value) -> (Numeric | String | Symbol | Array[Numeric] | bool | nil)
+  # changes several settings at once, as []= does each
+  %a{redgem:experimental}
+  def self.set: (**untyped settings) -> nil
+  # whether the scene has an environment object (environment = true) for scripts to change
+  %a{redgem:experimental}
+  def self.present?: () -> bool
+end
+
 # The body of an object with body = "character": walks, jumps, climbs steps.
 %a{redgem:stable}
 class CharacterController

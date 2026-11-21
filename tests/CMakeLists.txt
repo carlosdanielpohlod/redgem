@@ -221,6 +221,7 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
   integration/navigation_api_test.cpp
+  integration/environment_api_test.cpp
   integration/navigation_crowd_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp

@@ -194,6 +194,9 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
+- `Environment` changes the scene's look on one machine only: a game played together changes it
+  on every machine. A new `sky_image` is read from disk the first time it is shown, which can take
+  a frame or two.
 - `Camera.cut_to` fades through black only: there is no crossfade (the renderer draws one camera
   a frame) and no wipe. The black covers the world, never the UI.
 - The choice of camera (`Camera.main =`) belongs to the scene: a scene loaded anew is seen

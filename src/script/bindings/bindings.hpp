@@ -24,6 +24,7 @@ void install_joint_bindings(mrb_state* mrb);
 void install_light_bindings(mrb_state* mrb);
 void install_navigation_bindings(mrb_state* mrb);
 void install_water_bindings(mrb_state* mrb);
+void install_environment_bindings(mrb_state* mrb);
 void install_runtime_bindings(mrb_state* mrb);
 void install_profile_bindings(mrb_state* mrb);
 void install_debug_draw_bindings(mrb_state* mrb);
