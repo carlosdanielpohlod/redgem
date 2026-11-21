@@ -7,8 +7,8 @@
 //   FAKE_AGENT_NO_LOAD=1   it says it cannot reopen past conversations (no loadSession)
 // Each prompt is kept in fake-agent-history-<session>.txt in the session's folder: session/load of a
 // session replays them, each with the answer it got.
-#include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -29,6 +29,7 @@ constexpr int kReadRequest = 102;
 constexpr const char* kSessionPrefix = "fake-session-";
 // The id of the session open now: a new one each session/new, so that a test tells them apart.
 std::string current_session = "fake-session";
+int last_session_number = 0;  // of this program's session/new calls
 constexpr const char* kNotesFile = "notes.txt";
 constexpr const char* kLoginVariable = "FAKE_AGENT_LOGIN";
 constexpr const char* kCrashPrompt = "crash";
@@ -121,6 +122,14 @@ std::string history_file(const Session& session, const std::string& id) {
   return session.folder + kHistoryFile + id + kHistoryExtension;
 }
 
+// The next session number not taken, by this program or by a history in the session's folder.
+std::string new_session_id(const Session& session) {
+  std::string id;
+  do id = kSessionPrefix + std::to_string(++last_session_number);
+  while (std::filesystem::exists(history_file(session, id)));
+  return id;
+}
+
 void keep_prompt(const Session& session, const std::string& text) {
   std::ofstream(history_file(session, current_session), std::ios::app) << text << '\n';
 }
@@ -172,7 +181,7 @@ void open_session(const Json& id, const Json& params, Session& session) {
   session.folder = params.value("cwd", std::string());
   const Json servers = params.value("mcpServers", Json::array());
   session.tools = servers.empty() ? "none" : servers[0].value("name", std::string());
-  current_session = kSessionPrefix + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+  current_session = new_session_id(session);
   answer(id, {{"sessionId", current_session}});
 }
 

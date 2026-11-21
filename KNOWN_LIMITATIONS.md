@@ -283,16 +283,16 @@ real clock.
 
 ### Engineering
 
-- Some test cases still sleep or measure the real clock, a source of rare timing failures: those
-  that check that some work ends within seconds (a flood of messages, many numbers to parse, a
-  large physics world taken apart, games whose web requests are answered as they end). The network tests count
-  rounds and wait on their sockets (`tests/socket_rounds.hpp`), but for a relay's wait woken by a
-  call from another thread, a flood paced to real time for the system's own TCP timers, the join
-  times the encrypted tests print, and a dedicated server's rooms, which play on threads of their
-  own on the real clock. Async scene loading, HTTP, the editor bridge and the agent connection
-  wait for the other thread, not for a time; an agent's stray child process and the bridge backing
-  off from a silent editor are still timed. The scripts' budget and the editor's build timer run
-  on a test's clock (`tests/fake_clock.hpp`).
+- A few test cases still need the real clock, so a very slow computer can fail them. Some check
+  that work ends in time: a flood of messages, many numbers to parse, a large physics world taken
+  apart, twenty games whose web requests end at once, an agent's stray child process, and the
+  bridge giving up on a silent editor. Some need real time to pass: a flood paced for the system's
+  own TCP timers, a relay's wait woken by a call from another thread, a web request cancelled while
+  it waits, the scripts' watchdog sleeping while no script runs, and a dedicated server's rooms,
+  which play on threads of their own on the real clock. The rest only print times (the encrypted
+  joins, navigation baking, async scene frames) or check a lower bound that cannot fail early (a
+  save key's bounded wait). Every other test counts rounds or frames, waits for the other thread or
+  socket, or runs on a test's clock (`tests/fake_clock.hpp`, `tests/socket_rounds.hpp`).
 
 ### Documentation
 
