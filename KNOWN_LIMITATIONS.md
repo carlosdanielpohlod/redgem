@@ -262,15 +262,16 @@ the same pull request.
 
 ## Before 1.0
 
-The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, editor support
-for NPCs, dialogue and quests, a multi-level multiplayer template, the packed Android app on
-the emulator, and the test cases still on the real clock.
+The 1.0 blockers still open (see the 1.0 cut plan): a quest journal and markers, a multi-level
+multiplayer template, the packed Android app on the emulator, and the test cases still on the
+real clock.
 
 ### Gameplay API
 
 - [Quests](docs/scripting/quests.md) have no journal in `GameMenu`, world markers or an
   on-screen objective pointer. Games can build those views from `Quests.active`.
-- There is no panel that runs a dialogue or a quest without Play.
+- The editor's [Story panel](docs/editor.md#story-panel) runs dialogues and quests without the
+  scene: `check` objectives never pass, `talk_to` objectives have no speaker, and voices are silent.
 - [NPC gizmos](docs/editor.md#npc-gizmos) show, while editing, only the parts an object's
   properties name (a part a script adds shows once the game runs), and while the game runs they
   show no texts (prompts, plans).

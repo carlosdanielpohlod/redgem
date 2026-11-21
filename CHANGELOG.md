@@ -40,6 +40,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   parts the scripts gave them. **View > NPC gizmos** turns them off.
 - **File > Check Game** in the editor: what `redgem check` finds goes to the Console, each error
   and warning a line, then the summary. An error at a script's line links to it.
+- **Story panel** in the editor: steps through a dialogue's lines and choices, and moves a quest from
+  stage to stage, without Play. It shows each choice's conditions and effects and whether they
+  hold, on scratch GameVariables that Play never sees.
 
 ## [0.6.1] - 2026-11-15
 
