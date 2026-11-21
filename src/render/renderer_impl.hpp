@@ -473,7 +473,8 @@ struct Renderer::Impl {
   void sync_terrains(const SceneDesc& desc);
   void assign_terrain_slots(const shaders::LitFeatures& features);
   void upload_terrains(const SceneDesc& desc);
-  void mark_terrain_parts();
+  void sync_terrain(render_detail::GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc);
+  void mark_terrain_parts(const SceneDesc& desc);
   void release_terrains();
   bool has_terrains() const;
   // Tells the lit shader of the terrain a part belongs to (kNoIndex: none) before it is drawn.

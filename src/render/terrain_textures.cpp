@@ -3,6 +3,7 @@
 #include <rlgl.h>
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 #include "scene/ground/splat_map.hpp"
@@ -22,16 +23,33 @@ constexpr GLenum kMaxAnisotropy = 0x84FE;
 constexpr GLenum kLargestAnisotropy = 0x84FF;
 constexpr GLfloat kWantedAnisotropy = 8.0f;
 
-void forget_gl_errors() {
-  while (glGetError() != GL_NO_ERROR) {
-  }
+constexpr const char* kAnisotropyExtension = "GL_EXT_texture_filter_anisotropic";
+constexpr const char* kCoreAnisotropyExtension = "GL_ARB_texture_filter_anisotropic";
+
+bool named_anisotropy(const char* name) {
+  return name != nullptr &&
+         (std::strcmp(name, kAnisotropyExtension) == 0 || std::strcmp(name, kCoreAnisotropyExtension) == 0);
+}
+
+// Whether the card filters anisotropically (asked once: the answer never changes).
+bool has_anisotropy() {
+  static const bool found = [] {
+    GLint count = 0;
+    glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+    for (GLint i = 0; i < count; ++i) {
+      if (named_anisotropy(reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, static_cast<GLuint>(i)))))
+        return true;
+    }
+    return false;
+  }();
+  return found;
 }
 
 void sharpen_at_low_angles() {
+  if (!has_anisotropy()) return;
   GLfloat largest = 0.0f;
   glGetFloatv(kLargestAnisotropy, &largest);
   if (largest > 1.0f) glTexParameterf(GL_TEXTURE_2D_ARRAY, kMaxAnisotropy, std::min(largest, kWantedAnisotropy));
-  forget_gl_errors();
 }
 
 // How the bound array is sampled: pictures repeat, with smaller copies; weights stop at the edge.
@@ -67,7 +85,20 @@ std::vector<std::uint8_t> splat_layers(const SplatMap& splat) {
   return pixels;
 }
 
-bool has_what_is_drawn(const TerrainLayers& layers) { return !layers.pictures.empty() && well_formed(layers.splat); }
+constexpr std::size_t kChannels = 4;  // RGBA
+
+// Whether an array of the pictures' side and layers holds exactly their bytes.
+bool whole(const std::vector<std::uint8_t>& pixels, const TerrainPictures& pictures) {
+  const auto side = static_cast<std::size_t>(std::max(pictures.side, 0));
+  return pixels.size() == side * side * kChannels * static_cast<std::size_t>(pictures.layers);
+}
+
+bool has_what_is_drawn(const TerrainLayers& layers) {
+  const TerrainPictures& pictures = layers.pictures;
+  const bool pictures_whole =
+      !pictures.empty() && pictures.side > 0 && whole(pictures.color, pictures) && whole(pictures.surface, pictures);
+  return pictures_whole && well_formed(layers.splat);
+}
 
 }  // namespace
 
@@ -78,6 +109,7 @@ TerrainTextures upload_terrain_textures(const TerrainLayers& layers) {
   textures.colors = texture_array(pictures.side, pictures.layers, pictures.color.data(), true);
   textures.surfaces = texture_array(pictures.side, pictures.layers, pictures.surface.data(), true);
   textures.splat = texture_array(layers.splat.size, kSplatPictures, splat_layers(layers.splat).data(), false);
+  textures.layers = pictures.layers;
   textures.splat_size = layers.splat.size;
   textures.splat_version = layers.splat.version;
   return textures;
@@ -104,6 +136,15 @@ void release(TerrainTextures& textures) {
     if (*texture != 0) glDeleteTextures(1, texture);
   }
   textures = {};
+}
+
+bool has_texture_units(int units) {
+  static const GLint available = [] {
+    GLint found = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &found);
+    return found;
+  }();
+  return available >= units;
 }
 
 void bind_terrain_textures(const TerrainTextures& textures, int first_slot) {

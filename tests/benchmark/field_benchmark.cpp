@@ -13,6 +13,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -45,9 +46,15 @@ bool asks_for(const std::vector<std::string>& args, const char* option) {
   return std::find(args.begin(), args.end(), option) != args.end();
 }
 
+// A count of layers (0 to 8); a word that is no number (an option) asks for all of them.
+int layer_count(const std::string& arg) {
+  const bool number = !arg.empty() && std::all_of(arg.begin(), arg.end(), [](char c) { return std::isdigit(c) != 0; });
+  return number ? std::clamp(std::stoi(arg), 0, kMaxTerrainLayers) : kMaxTerrainLayers;
+}
+
 benchmark::TerrainOptions terrain_options(const std::vector<std::string>& args) {
   benchmark::TerrainOptions options;
-  options.layers = args.size() > 1 ? std::clamp(std::stoi(args[1]), 0, kMaxTerrainLayers) : kMaxTerrainLayers;
+  options.layers = args.size() > 1 ? layer_count(args[1]) : kMaxTerrainLayers;
   options.stochastic = asks_for(args, "stochastic");
   options.triplanar = asks_for(args, "triplanar");
   return options;

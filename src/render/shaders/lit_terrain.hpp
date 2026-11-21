@@ -52,7 +52,7 @@ const float GROUND_TRIPLANAR_POWER = 4.0;    // how quickly projections hand ove
 const float GROUND_HEX_SCALE = 3.4641016;    // 2 sqrt(3): hexagons about a repeat across
 const float GROUND_HEX_CONTRAST = 6.0;       // how sharply the three shifted samples hand over
 const float GROUND_VARIATION_DARKEST = 0.6;  // a full-strength patch, from this much of the color ...
-const float GROUND_VARIATION_HUE = 0.08;     // ... and shifted in hue by about this much
+const float GROUND_VARIATION_HUE = 0.16;     // ... and each channel shifted by up to half this
 const int GROUND_FIRST_PICTURE_LAYERS = 4;   // the splat's first picture holds the first four
 const vec3 GROUND_LIGHT_OCTAVES = vec3(0.65, 0.35, 2.7);  // the patches' two octaves: shares, and the second's scale
 const float GROUND_LAYER_OFFSET = 17.0;      // meters each layer's patches are moved by, so layers differ
@@ -102,7 +102,7 @@ void groundHexCorners(vec2 uv, out vec3 weights, out vec2 c1, out vec2 c2, out v
 }
 
 // A layer's pictures with its repeats broken up: three randomly shifted samples, mixed by how near
-// the pixel is to each of its hexagon's corners (and, sharper, by which is brighter).
+// the pixel is to each of its hexagon's corners, sharpened so that one sample wins most of the way.
 void groundStochastic(int layer, vec2 uv, vec2 dx, vec2 dy, out vec4 color, out vec4 surface) {
   vec3 near;
   vec2 c1, c2, c3;
@@ -156,7 +156,8 @@ GroundSample groundTriplanar(int layer, vec3 n, vec3 dpx, vec3 dpy) {
   return GroundSample(cx * facing.x + cy * facing.y + cz * facing.z, bent, surface.zw);
 }
 
-// Large patches of a layer a little darker and shifted in hue, by how much it varies.
+// Large patches of a layer darker or lighter (60% to 140% of its color) and shifted in hue, by
+// how much it varies.
 vec3 groundVaried(int layer, vec3 color) {
   float amount = terrainVariation[layer];
   if (amount <= 0.0) return color;
@@ -165,7 +166,7 @@ vec3 groundVaried(int layer, vec3 color) {
   vec3 hue = vec3(groundNoise(at + GROUND_HUE_OFFSETS.x), groundNoise(at + GROUND_HUE_OFFSETS.y),
                   groundNoise(at + GROUND_HUE_OFFSETS.z)) - HALF;
   vec3 varied = color * mix(GROUND_VARIATION_DARKEST, 1.0 + (1.0 - GROUND_VARIATION_DARKEST), light);
-  return mix(color, varied * (1.0 + hue * GROUND_VARIATION_HUE * NORMAL_MAP_RANGE), amount);
+  return mix(color, varied * (1.0 + hue * GROUND_VARIATION_HUE), amount);
 }
 
 GroundSample groundLayer(int layer, vec3 n, vec3 dpx, vec3 dpy) {
@@ -180,8 +181,13 @@ void groundWeights(out float weights[MAX_TERRAIN_LAYERS]) {
   vec2 uv = (fragLocal.xz - terrainArea.xy) * terrainArea.zw;
   vec4 first = texture(terrainSplat, vec3(uv, 0.0));
   vec4 second = terrainLayers > GROUND_FIRST_PICTURE_LAYERS ? texture(terrainSplat, vec3(uv, 1.0)) : vec4(0.0);
-  for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
+  float drawn = 0.0;
+  for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) {
     weights[i] = i < GROUND_FIRST_PICTURE_LAYERS ? first[i] : second[i - GROUND_FIRST_PICTURE_LAYERS];
+    if (i < terrainLayers) drawn += weights[i];
+  }
+  // Weights only on layers the terrain has no pictures for: the first layer covers the spot.
+  if (drawn < GROUND_WEIGHT_FLOOR) weights[0] = 1.0;
 }
 
 // The ground here: the layers' samples mixed by their weights, bent toward the height-based mix

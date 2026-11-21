@@ -14,6 +14,7 @@ struct TerrainTextures {
   unsigned int colors = 0;    // RGBA8 array: color and height
   unsigned int surfaces = 0;  // RGBA8 array: normal X and Y, roughness, occlusion
   unsigned int splat = 0;     // RGBA8 array of kSplatPictures layers: the weights
+  int layers = 0;             // pictures in each of the first two arrays
   int splat_size = 0;
   std::uint64_t splat_version = 0;  // of the weights it holds
 
@@ -28,6 +29,9 @@ TerrainTextures upload_terrain_textures(const TerrainLayers& layers);
 void update_terrain_splat(TerrainTextures& textures, const SplatMap& splat);
 
 void release(TerrainTextures& textures);
+
+// Whether the fragment shader can sample `units` texture units (0 to units - 1) on this card.
+bool has_texture_units(int units);
 
 // Binds the three arrays to `first_slot` and the two slots after it.
 void bind_terrain_textures(const TerrainTextures& textures, int first_slot);

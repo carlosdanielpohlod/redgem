@@ -39,31 +39,55 @@ int mesh_of(const SceneDesc& desc, int node) {
   return is_index_of(node, desc.nodes.size()) ? desc.nodes[static_cast<std::size_t>(node)].mesh : kNoIndex;
 }
 
+// Whether no other object draws the terrain's mesh: the layers go with the mesh's parts, so a mesh
+// shared with a crate or a copy of the terrain would draw them on those too.
+bool own_mesh(const SceneDesc& desc, int mesh) {
+  const auto users =
+      std::count_if(desc.nodes.begin(), desc.nodes.end(), [mesh](const NodeDesc& node) { return node.mesh == mesh; });
+  return users == 1;
+}
+
+// The look of a terrain's layers over its mesh, of no more layers than its pictures on the card.
+render_math::TerrainLook look_of(const TerrainLayers& layers, const SceneDesc& desc, const GpuTerrain& terrain) {
+  if (!is_index_of(terrain.mesh, desc.meshes.size())) return {};
+  render_math::TerrainLook look =
+      render_math::terrain_look(layers, desc.meshes[static_cast<std::size_t>(terrain.mesh)].bounds);
+  look.layers = std::min(look.layers, terrain.textures.layers);
+  return look;
+}
+
 }  // namespace
 
 void Renderer::Impl::sync_terrains(const SceneDesc& desc) {
   if (!same_terrains(terrains, desc)) return upload_terrains(desc);
-  for (std::size_t i = 0; i < terrains.size(); ++i) update_terrain_splat(terrains[i].textures, desc.terrains[i].splat);
-  mark_terrain_parts();  // (parts uploaded since are marked too)
+  for (std::size_t i = 0; i < terrains.size(); ++i) sync_terrain(terrains[i], desc.terrains[i], desc);
+  mark_terrain_parts(desc);  // (parts uploaded since are marked too)
+}
+
+// A terrain already on the card follows its layers: new weights, settings and mesh. Its pictures
+// are sent once (they are freed after), or again only while none could be sent.
+void Renderer::Impl::sync_terrain(GpuTerrain& terrain, const TerrainLayers& layers, const SceneDesc& desc) {
+  if (!terrain.textures.loaded()) terrain.textures = upload_terrain_textures(layers);
+  update_terrain_splat(terrain.textures, layers.splat);
+  terrain.mesh = mesh_of(desc, layers.node);
+  terrain.look = look_of(layers, desc, terrain);
 }
 
 void Renderer::Impl::upload_terrains(const SceneDesc& desc) {
   release_terrains();
   for (const TerrainLayers& layers : desc.terrains) {
-    const int mesh = mesh_of(desc, layers.node);
-    GpuTerrain terrain{layers.name, layers.node, mesh, upload_terrain_textures(layers), {}};
-    if (is_index_of(mesh, desc.meshes.size()))
-      terrain.look = render_math::terrain_look(layers, desc.meshes[static_cast<std::size_t>(mesh)].bounds);
+    GpuTerrain terrain{layers.name, layers.node, mesh_of(desc, layers.node), upload_terrain_textures(layers), {}};
+    terrain.look = look_of(layers, desc, terrain);
     terrains.push_back(terrain);
   }
-  mark_terrain_parts();
+  mark_terrain_parts(desc);
 }
 
 // Each part of a terrain's mesh knows its terrain, so that drawing it tells the lit shader.
-void Renderer::Impl::mark_terrain_parts() {
+void Renderer::Impl::mark_terrain_parts(const SceneDesc& desc) {
   for (auto& parts : meshes) mark_parts(parts, kNoIndex);
   for (std::size_t i = 0; i < terrains.size(); ++i) {
-    if (drawn_terrain(terrains[i], meshes.size()))
+    if (drawn_terrain(terrains[i], meshes.size()) && own_mesh(desc, terrains[i].mesh))
       mark_parts(meshes[static_cast<std::size_t>(terrains[i].mesh)], static_cast<int>(i));
   }
 }
@@ -73,8 +97,12 @@ void Renderer::Impl::release_terrains() {
   terrains.clear();
 }
 
+// Whether the lit shader needs the layers: a terrain has them on the card, and the card has the
+// texture units they are bound to (most phones have 16: their terrains are drawn plain).
 bool Renderer::Impl::has_terrains() const {
-  return std::any_of(terrains.begin(), terrains.end(), [](const GpuTerrain& t) { return t.textures.loaded(); });
+  const bool any =
+      std::any_of(terrains.begin(), terrains.end(), [](const GpuTerrain& t) { return t.textures.loaded(); });
+  return any && has_texture_units(kTerrainSplatSlot + 1);
 }
 
 void Renderer::Impl::use_terrain(int terrain, ObjectPass& pass) {

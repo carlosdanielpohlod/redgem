@@ -383,7 +383,8 @@ spot are always scaled to add up to one. The map lies over the mesh's own X and 
 The layers take the place of the terrain material's color, roughness and normal map. The vertex
 tint still multiplies their color, so a terrain painted with the old tint brush keeps its tint. A
 terrain object without `terrain_layers` is drawn exactly as before, and a scene without any
-layered terrain compiles none of the layer code into its shader.
+layered terrain compiles none of the layer code into its shader. The terrain's mesh must be its
+own: when another object draws the same mesh, neither gets the layers.
 
 ![Top: the vertex tint alone, two layers meeting at a hard edge, and fading by weight. Bottom: the
 same fade blended by height, a striped layer seen from above on a cube, and the same layer

@@ -333,3 +333,14 @@ TEST_CASE("a triplanar layer runs down the sides of steep ground instead of stre
   const int triplanar = cube_turns(true, "terrain_layers_triplanar");
   CHECK(triplanar > from_above + kStripeRows / kTwoLayers);
 }
+
+TEST_CASE("a terrain whose mesh another object also draws gets no layers") {
+  SceneDesc desc = layered_terrain(layers_of({kRed}));
+  NodeDesc copy = terrain_node();
+  copy.name = "Copy";
+  copy.local.position = Vec3{0.0f, 0.0f, -kGrid.size};
+  desc.nodes.push_back(copy);
+  RenderStage stage;
+  stage.upload(desc);
+  CHECK_FALSE(reddish(stage.draw(Scene::from_desc(desc), "terrain_layers_shared_mesh").at(kCenter, kGroundRow)));
+}
