@@ -17,6 +17,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
+  strength: 4.0)` lights every material of that name, in every object, spawned copies and later
+  scenes too, until `Material.reset_emission`. A village's windows could not light up at night.
 - **Recorded videos have the game's sound.** `redgem <game> --record out.mp4` now puts the game's
   mix in the video as AAC. It is mixed by the engine's own mixer, not taken from the sound card,
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
