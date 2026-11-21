@@ -1841,9 +1841,9 @@ module Network
   # someone arrived: |peer|
   %a{redgem:stable}
   def self.on_join: () { (Integer) -> void } -> void
-  # someone left: |peer|
+  # someone left: |peer, why| (why: the host let it go, or nil)
   %a{redgem:stable}
-  def self.on_leave: () { (Integer) -> void } -> void
+  def self.on_leave: () { (Integer, String | nil) -> void } -> void
   # a join did not work out: |reason|
   %a{redgem:stable}
   def self.on_fail: () { (String | nil) -> void } -> void

@@ -177,7 +177,7 @@ module Network
     def on_fail(&block) = listen(:failed, block)              # |reason| the join did not work out (reason may be nil)
     def on_disconnect(&block) = listen(:disconnected, block)  # the game is gone
     def on_join(&block) = listen(:joined, block)              # |peer| someone arrived
-    def on_leave(&block) = listen(:left, block)               # |peer| someone left
+    def on_leave(&block) = listen(:left, block)               # |peer, why| someone left (why the host let it go)
     def on_reconnecting(&block) = listen(:reconnecting, block) # |peer| a connection dropped: the place is held
     def on_reconnected(&block) = listen(:reconnected, block)   # |peer| it is back in its place, with its id
     def on_lost(&block) = listen(:lost, block)                 # |reason| this machine could not get back in
@@ -221,8 +221,9 @@ module Network
     # hear of it (a failed join's with its reason, when there is one).
     def happened(kind, peer, name)
       REACTIONS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
-      told = told_about(kind, peer, name)
-      (@listeners[kind] || []).dup.each { |block| block.call(told) }
+      told = [told_about(kind, peer, name)]
+      told << (name.to_s.empty? ? nil : name) if kind == :left # (why the host let it go)
+      (@listeners[kind] || []).dup.each { |block| block.call(*told) }
       AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
     end
 

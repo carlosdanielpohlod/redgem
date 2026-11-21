@@ -883,7 +883,7 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.on_connect { () -> void } -> void`: this machine is in the game
 - `Network.on_disconnect { () -> void } -> void`: the game is gone
 - `Network.on_join { (Integer) -> void } -> void`: someone arrived: |peer|
-- `Network.on_leave { (Integer) -> void } -> void`: someone left: |peer|
+- `Network.on_leave { (Integer, String | nil) -> void } -> void`: someone left: |peer, why| (why: the host let it go, or nil)
 - `Network.on_fail { (String | nil) -> void } -> void`: a join did not work out: |reason|
 - `Network.on_reconnecting { (Integer) -> void } -> void`: a connection dropped and its place is held: |peer| *Experimental.*
 - `Network.on_reconnected { (Integer) -> void } -> void`: a dropped machine is back in its place: |peer| *Experimental.*

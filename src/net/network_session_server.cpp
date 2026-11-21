@@ -52,16 +52,16 @@ void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
   if (!relaying()) return;
   link.allowance.refill(seconds);
   link.messages.refill(seconds);
-  if (!link.allowance.charge(bytes)) link.connection.close();  // no game talks this much: a flood
+  if (!link.allowance.charge(bytes)) kick(link, "it sent more bytes than a game does (a flood)");
   if (!serving()) return;
   link.idle_for += seconds;
-  if (link.idle_for > kServedIdleSeconds) link.connection.close();
+  if (link.idle_for > kServedIdleSeconds) kick(link, "it said nothing to the game for too long");
 }
 
 bool NetworkSession::police_message(Link& link) {
   if (!relaying()) return true;
   if (link.messages.charge(1)) return true;
-  link.connection.close();
+  kick(link, "it sent more messages than a game does (a flood)");
   return false;
 }
 

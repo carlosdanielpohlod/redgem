@@ -5664,10 +5664,10 @@
           "stability": "stable",
           "static": true,
           "params": [
-            {"name": "block", "type": "^(Integer) -> void", "block": true}
+            {"name": "block", "type": "^(Integer, String | nil) -> void", "block": true}
           ],
           "returns": {"type": "void"},
-          "about": "someone left: |peer|"
+          "about": "someone left: |peer, why| (why: the host let it go, or nil)"
         },
         {
           "name": "on_fail",

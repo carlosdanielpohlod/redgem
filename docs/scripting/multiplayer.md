@@ -32,7 +32,7 @@ Network.join("192.168.0.12")           # on the others: the host's address
 Network.on_connect { start_round }     # this machine is in the game
 Network.on_fail { |reason| show("Could not join: #{reason}") }  # reason: nil, the host's, or a timeout
 Network.on_join { |peer| ... }         # someone else arrived
-Network.on_leave { |peer| ... }        # someone else left
+Network.on_leave { |peer, why| ... }   # someone else left (why: the host let it go, or nil)
 Network.on_disconnect { ... }          # the game is gone: the host left or the connection dropped
 ```
 
@@ -398,7 +398,9 @@ machine that hosts, or a dedicated server's room) can refuse to believe it: it c
 of the others' objects against how fast and how far one may move, and everyone, the host's own
 scripts included, sees an object that went past that where the host believes it is. Its owner is
 told and puts it back there (`Network::CORRECT`), and the violation is counted against its
-machine, which is let go after `kick_after` of them. It is off unless the game turns it on, in
+machine, which is let go after `kick_after` of them. The host writes a warning to its log when it
+lets a machine go (for this, for a flood, or for silence on a server), and its `on_leave` handlers
+get why as a second argument. It is off unless the game turns it on, in
 game.json:
 
 ```json
