@@ -43,6 +43,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Fixed
 
+- **A character that picks up the body it stands on stays on the ground.** A courier standing on
+  a parcel and taking it in hand (made kinematic, put under its hand) took the parcel's rise to the
+  hand as its ground's, rose with it, lifted the parcel on, and flew 60 to 90 m up. A body a
+  character carries is no longer its ground.
 - **The relay approval test of a reused id no longer fails on a slow machine**: it counted on the
   relay hearing a goodbye and a newcomer's hello in one poll, but a Mac can hand the relay the
   newcomer before its hello. The relay then rightly tells the room of the leave first, and may give

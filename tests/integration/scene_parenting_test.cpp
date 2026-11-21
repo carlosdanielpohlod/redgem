@@ -17,6 +17,8 @@ constexpr const char* kGame = R"({"title": "Parents"})";
 constexpr float kHalfTurn = 180.0f;
 constexpr float kDoubled = 2.0f;
 constexpr int kFewFrames = 10;
+// A height between the middle of a courier on the ground (0.55 m up) and on a box (0.95 m).
+const std::string kOnTheBox = "0.8";
 
 // A holder turned half round and twice as big, a hero beside it, a cart with nothing on it, a
 // kinematic lift, a dynamic crate resting on the ground, and a template to spawn.
@@ -155,6 +157,32 @@ TEST_CASE("a character is not pushed by the kinematic body it carries") {
   frames(*engine, kFewFrames);
   CHECK(says(*engine, "(Scene.find('Courier').transform.position.flat - Vector3.new(0, 0, -20)).length < 0.1"));
   CHECK(says(*engine, "(Scene.find('Box').transform.position.flat - Vector3.new(0, 0, -20.6)).length < 0.1"));
+}
+
+// A courier standing on a loose box, with an empty hand.
+SceneDesc courier_on_box() {
+  NodeDesc hero = node("Courier", {0, 1.6f, 20}, {1, 1, 1}, {{"body", std::string("character")}});
+  hero.children = {3};
+  NodeDesc hand = node("Hand", {0, 0.2f, -0.6f}, {1, 1, 1}, {});
+  hand.parent = 2;  // (after the camera and the ground)
+  return scene_with({hero, hand, node("Box", {0, 0.2f, 20}, {1, 0.4f, 1}, moving("dynamic"))});
+}
+
+TEST_CASE("a character that picks up the body it stands on stays on the ground") {
+  // The box it stood on, made kinematic and put in its hand, was still its ground for a step: the
+  // character took the box's jump up to the hand as its own, rose, lifted the box with it, and
+  // flew on (a courier picking up the parcel under its feet went 90 m up).
+  TempGame game(kGame);
+  auto engine = engine_for(game, courier_on_box());
+  frames(*engine, kFewFrames * kFewFrames);
+  CHECK(says(*engine, "Scene.find('Courier').transform.position.y > " + kOnTheBox));
+  ruby(*engine,
+       "box = Scene.find('Box'); box.rigidbody.kinematic = true; box.parent = Scene.find('Hand'); "
+       "box.transform.position = Scene.find('Hand').transform.position");
+  frames(*engine, kFewFrames * kFewFrames);
+  CAPTURE(ruby(*engine, "Scene.find('Courier').transform.position.y"));
+  CHECK(says(*engine, "Scene.find('Courier').transform.position.y < " + kOnTheBox));  // back on the ground
+  CHECK(engine->scripts().error_count() == 0);
 }
 
 TEST_CASE("a wheel stays on its vehicle") {

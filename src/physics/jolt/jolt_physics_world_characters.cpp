@@ -56,11 +56,21 @@ class CarrierFilter final : public JPH::BodyFilter {
   const std::vector<JPH::BodyID>& carried_;
 };
 
+// Whether a character stands on a body it carries: the box it picked up from under its feet is
+// still its ground until its next move, which passes through the box.
+bool stands_on_what_it_carries(const Record& record) {
+  const JPH::BodyID ground = record.character->GetGroundBodyID();
+  return std::find(record.carried.begin(), record.carried.end(), ground) != record.carried.end();
+}
+
 // The speed a character carries into a step, before gravity and its own move: the ground's
-// (plus a jump) while it stands on it, else its own fall.
+// (plus a jump) while it stands on it, else its own fall. What it carries is no ground: taking the
+// speed of a box rising to its hand, it would rise with the box and lift it on, and fly.
 JPH::Vec3 carried_velocity(const Record& record) {
   const JPH::CharacterVirtual& character = *record.character;
-  if (!rests_on_ground(character)) return JPH::Vec3(0.0f, character.GetLinearVelocity().GetY(), 0.0f);
+  if (!rests_on_ground(character) || stands_on_what_it_carries(record)) {
+    return JPH::Vec3(0.0f, character.GetLinearVelocity().GetY(), 0.0f);
+  }
   const JPH::Vec3 ground_velocity = character.GetGroundVelocity();
   if (!record.pending_jump) return ground_velocity;
   return ground_velocity + JPH::Vec3(0.0f, *record.pending_jump, 0.0f);
