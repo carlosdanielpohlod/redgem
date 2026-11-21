@@ -26,10 +26,10 @@ ToolGrammar grammar() {
 constexpr double kDefaultSeconds = 5.0;
 constexpr int kSecondsDecimals = 2;
 
-std::string summary(const std::string& scene, const RunOutcome& played, const MessageCollector& messages) {
-  const double seconds = static_cast<double>(played.frames) * config::kFixedDeltaSeconds;
+std::string summary(const PlayRequest& request, const RunOutcome& played, const MessageCollector& messages) {
+  const double seconds = static_cast<double>(played.frames) / steps_per_second(request.game_dir);
   const std::size_t errors = messages.errors() + (played.problem.empty() ? 0 : 1);
-  return tr("project.run.summary", {{"scene", scene},
+  return tr("project.run.summary", {{"scene", request.scene},
                                     {"frames", std::to_string(played.frames)},
                                     {"seconds", number_text(seconds, kSecondsDecimals)},
                                     {"errors", std::to_string(errors)},
@@ -49,7 +49,7 @@ ToolResult run_game(const PlayRequest& request, const RunPlan& plan, long long f
   const RunOutcome played = play_run(*std::get<std::unique_ptr<Engine>>(created), plan, frames);
   ToolResult result;
   result.err = played.problem;
-  result.out = messages.lines() + played.output + summary(request.scene, played, messages) + "\n";
+  result.out = messages.lines() + played.output + summary(request, played, messages) + "\n";
   result.exit_code = went_wrong(played, messages) ? kExitFailure : kExitSuccess;
   return result;
 }
@@ -75,7 +75,7 @@ ToolResult run_run_command(const std::vector<std::string>& args) {
   if (!line) return usage_failure(error);
   if (line->has(command_line::kHelpOption)) return ToolResult{kExitSuccess, tr("project.run.usage"), {}};
   if (line->words.size() != 1) return usage_failure(tr("project.tools.needs_game"));
-  const auto frames = frames_asked(*line, kDefaultSeconds);
+  const auto frames = frames_asked(*line, kDefaultSeconds, steps_per_second(line->words.front()));
   if (!frames) return usage_failure(tr("project.run.needs_length"));
   return run_asked(*line, *frames);
 }

@@ -43,7 +43,7 @@ constexpr float kWhereTheGuestLeftIt = 2.9f;  // meters along x, give or take
 constexpr int kQuarterSecondRounds = 15;      // frames
 constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
 constexpr float kShownBehind = 0.25f;         // seconds a watched swordsman is shown behind his owner
-constexpr float kFewFrames = 4.0f * config::kFixedDeltaSeconds;  // what a pose takes on its way, and more
+constexpr float kFewFrames = 4.0f * config::kDefaultFixedDeltaSeconds;  // what a pose takes on its way, and more
 constexpr float kSomeMix = 0.05f;
 constexpr float kTeleportDistance = 5.0f;  // meters the host believes a pose moves an object at most
 constexpr int kPastAWholePose = 180;       // frames: three seconds, past the two between whole poses  // meters of the
@@ -85,7 +85,7 @@ struct Lan {
   // The real time as the machines' networks read it (set before they start). Unless a test says
   // otherwise, a round's frame of it: the seconds the network counts (a join that gets no answer,
   // a place held for a machine that dropped) are the rounds', however fast the computer plays them.
-  Stopwatch::Reading network_time = [this] { return rounds_played * static_cast<double>(config::kFixedDeltaSeconds); };
+  Stopwatch::Reading network_time = [this] { return rounds_played * static_cast<double>(config::kDefaultFixedDeltaSeconds); };
   long rounds_played = 0;
 
   Lan() { std::filesystem::remove_all(dir); }
@@ -131,9 +131,9 @@ struct Lan {
   void rounds_without(const Engine* stalled, int count) {
     for (int i = 0; i < count; ++i) {
       ++rounds_played;
-      if (relay) relay->poll(config::kFixedDeltaSeconds);
+      if (relay) relay->poll(config::kDefaultFixedDeltaSeconds);
       for (auto& machine : machines) {
-        if (machine.get() != stalled) machine->frame(config::kFixedDeltaSeconds);
+        if (machine.get() != stalled) machine->frame(config::kDefaultFixedDeltaSeconds);
       }
       wait_for_sockets(stalled);
     }
@@ -299,9 +299,9 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   const std::string talk = std::to_string(kMessagesPerFrame) + ".times { Network.emit(:t) }";
   const auto guest_frame = [&] {
-    clock += config::kFixedDeltaSeconds;
+    clock += config::kDefaultFixedDeltaSeconds;
     ruby(*guest, talk);
-    guest->frame(config::kFixedDeltaSeconds);
+    guest->frame(config::kDefaultFixedDeltaSeconds);
   };
   for (int i = 0; i < kStallFrames; ++i) guest_frame();
   // Both play on until the host heard all that was sent while it stood still (how fast that comes
@@ -310,7 +310,7 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   const auto both_frame = [&] {
     guest_frame();
     pace.wait_for(clock);
-    host->frame(config::kFixedDeltaSeconds);
+    host->frame(config::kDefaultFixedDeltaSeconds);
   };
   const auto heard_the_stall = [&] { return std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame; };
   for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) both_frame();

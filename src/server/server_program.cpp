@@ -61,7 +61,7 @@ int run_server(const ServerSettings& settings) {
 
 void serve_until(GameServer& server, const std::function<bool()>& stop, const std::function<bool()>& status_asked) {
   Clock& clock = server.clock();
-  TickPacer pacer(config::kFixedDeltaSeconds, clock.now());
+  TickPacer pacer(config::kDefaultFixedDeltaSeconds, clock.now());
   Census census;
   while (!stop()) {
     clock.sleep(pacer.until_next(clock.now()));

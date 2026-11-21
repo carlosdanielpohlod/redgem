@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **A game's tick rate.** `game.json`'s `"tick_hz"` (30 to 128, 60 by default) sets how many
+  fixed steps the game takes a second: the physics, `fixed_update` and `Time.fixed_delta` follow
+  it, and so do the tools that play a step a frame (`redgem run`, `redgem shot`, `redgem-test`,
+  the editor's Step, the MCP game tools). A game without it plays as before. `redgem check`
+  refuses a number out of bounds. A competitive shooter needs a 64 or 128 Hz step; RedGem had a
+  fixed 60.
 - **Characters crouch: `character.resize(height:, radius:)`** (experimental). It makes a
   character's collider an upright capsule of that size, with its feet where they were. Growing
   into something is refused: standing up under a low ceiling returns false and changes nothing,

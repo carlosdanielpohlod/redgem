@@ -22,7 +22,7 @@ class WaterPresenter final : public Presenter {
   int text_width(const std::string&, int) const override { return 0; }
   void capture_cursor(bool) override {}
   bool open() const override { return true; }
-  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  float frame_seconds() const override { return config::kDefaultFixedDeltaSeconds; }
   void present(const FrameView& view) override {
     REQUIRE(view.water_ripples != nullptr);
     snapshot = *view.water_ripples;
@@ -71,7 +71,7 @@ std::unique_ptr<Engine> water_engine(const SceneDesc& desc, WaterPresenter& pres
 
 void impact_frames(Engine& engine) {
   engine.physics().set_velocity(engine.scene().find("Body"), {0.0f, kImpactVelocity, 0.0f});
-  for (int i = 0; i < kImpactFrames; ++i) engine.frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kImpactFrames; ++i) engine.frame(config::kDefaultFixedDeltaSeconds);
 }
 
 }  // namespace
@@ -87,7 +87,7 @@ TEST_CASE("physics automatically creates water waves and hands simulation snapsh
   CHECK(presenter.snapshot.ripples[0].age > 0.0f);
   const auto paused = presenter.snapshot;
   engine->script_context().time.scale = 0.0f;
-  for (int i = 0; i < kPausedFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  for (int i = 0; i < kPausedFrames; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(presenter.snapshot.time == paused.time);
   CHECK(presenter.snapshot.ripples[0].age == paused.ripples[0].age);
   engine->present();
@@ -109,18 +109,18 @@ TEST_CASE("water triggers and script teleports do not masquerade as physical imp
   SceneDesc desc = runtime_pond();
   desc.nodes[1].props["trigger"] = true;
   auto trigger_engine = water_engine(desc, presenter);
-  trigger_engine->frame(config::kFixedDeltaSeconds);
+  trigger_engine->frame(config::kDefaultFixedDeltaSeconds);
   trigger_engine->scene().set_world_position(1, kBodyExit);
-  trigger_engine->frame(config::kFixedDeltaSeconds);
+  trigger_engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(presenter.snapshot.count == 0);
   trigger_engine.reset();
   desc = runtime_pond();
   auto engine = water_engine(desc, presenter);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   const auto result =
       engine->scripts().eval("Scene.find('Body').transform.position = Vector3.new(0, -2, 0)", "water_test.rb");
   REQUIRE_MESSAGE(result.ok, result.error);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(presenter.snapshot.count == 0);
 }
 
@@ -132,7 +132,7 @@ TEST_CASE("scripted kinematic bodies entering water generate waves instead of be
   const auto result =
       engine->scripts().eval("Scene.find('Body').transform.position = Vector3.new(0, -2, 0)", "water_test.rb");
   REQUIRE_MESSAGE(result.ok, result.error);
-  engine->frame(config::kFixedDeltaSeconds);
+  engine->frame(config::kDefaultFixedDeltaSeconds);
   REQUIRE(presenter.snapshot.count == 1);
   CHECK(presenter.snapshot.ripples[0].surface == engine->scene().handle(0));
 }

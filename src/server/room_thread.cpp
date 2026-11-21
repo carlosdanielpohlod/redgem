@@ -39,7 +39,7 @@ void RoomThread::stop() {
 
 void RoomThread::run() {
   Clock& clock = *start_.clock;
-  TickPacer pacer(config::kFixedDeltaSeconds, clock.now());
+  TickPacer pacer(config::kDefaultFixedDeltaSeconds, clock.now());
   while (wait_for_turn(pacer.until_next(clock.now()))) {
     take_new_rooms();
     play_turn(pacer.take_turn(clock.now()));

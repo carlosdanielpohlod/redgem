@@ -193,6 +193,7 @@ std::vector<std::string> script_files(const fs::path& scripts_dir) {
 void check_game_file(const fs::path& game_dir, CheckReport& report) {
   const GameManifest manifest = read_game_manifest(game_dir);
   if (!manifest.max_bodies_error.empty()) report.errors.push_back(manifest.max_bodies_error);
+  if (!manifest.tick_hz_error.empty()) report.errors.push_back(manifest.tick_hz_error);
   for (const std::string& warning : manifest.physics_warnings) report.warnings.push_back(warning);
 }
 

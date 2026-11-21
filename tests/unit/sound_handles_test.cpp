@@ -23,8 +23,8 @@ constexpr float kRaisedSoundPitch = 1.5f;
 constexpr float kMusicVolume = 0.7f;  // Audio.music's own default
 constexpr float kFadeSeconds = 0.5f;
 // Frames that see a fade of kFadeSeconds through, at the engine's fixed step, and one more.
-constexpr int kFramesPastFade = static_cast<int>(kFadeSeconds / config::kFixedDeltaSeconds) + 2;
-constexpr int kFramesPastRelease = static_cast<int>(kDefaultDuckRelease / config::kFixedDeltaSeconds) + 2;
+constexpr int kFramesPastFade = static_cast<int>(kFadeSeconds / config::kDefaultFixedDeltaSeconds) + 2;
+constexpr int kFramesPastRelease = static_cast<int>(kDefaultDuckRelease / config::kDefaultFixedDeltaSeconds) + 2;
 
 // A sound driver that keeps what it was asked to play (every name is there).
 class HandleTestDriver final : public SoundDriver {
@@ -66,7 +66,7 @@ std::string ruby(Engine& engine, const std::string& code) {
 }
 
 void frames(Engine& engine, int count) {
-  for (int frame = 0; frame < count; ++frame) engine.frame(config::kFixedDeltaSeconds);
+  for (int frame = 0; frame < count; ++frame) engine.frame(config::kDefaultFixedDeltaSeconds);
 }
 
 }  // namespace
