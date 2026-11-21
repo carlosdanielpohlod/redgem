@@ -247,6 +247,7 @@ class EditorSession {
                   const std::vector<Transform>& locals);
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
+  prefabs::Limits prefab_limits_;  // game.json's budgets, read as the game opens
   CollisionLayers collision_layers_;
   std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;
