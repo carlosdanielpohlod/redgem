@@ -32,9 +32,9 @@ bool GameServer::start(std::string& error) {
 }
 
 void GameServer::read_tick() {
-  const GameSettings game = read_game_settings(settings_.game_dir);
+  const GameManifest game = read_game_manifest(settings_.game_dir);
   if (!game.tick_hz_error.empty()) log::warning(game.tick_hz_error);
-  tick_hz_ = game.tick_hz;
+  tick_hz_ = game.settings.tick_hz;
 }
 
 bool GameServer::take_identity(std::string& error) {
