@@ -245,8 +245,8 @@
           "name": "props",
           "stability": "stable",
           "params": [],
-          "returns": {"type": "Hash[String, untyped]"},
-          "about": "the object's custom properties, as a Hash"
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "the object's custom properties, as a Hash with Symbol keys"
         },
         {
           "name": "prop",
@@ -444,8 +444,8 @@
           "name": "props",
           "stability": "stable",
           "params": [],
-          "returns": {"type": "Hash[String, untyped]"},
-          "about": "its custom properties"
+          "returns": {"type": "Hash[Symbol, untyped]"},
+          "about": "its custom properties, as a Hash with Symbol keys"
         },
         {
           "name": "joint",
