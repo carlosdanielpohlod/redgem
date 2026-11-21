@@ -5,6 +5,7 @@
 // run ends, and each unique_temp_dir is a folder made for one test alone, removed when it ends.
 
 #include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <random>
@@ -12,11 +13,17 @@
 #include <string>
 #include <utility>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace redgem::test {
 
 // Set to anything, it keeps every test folder after the run, to look into.
 inline constexpr const char* kKeepTestDirsVariable = "REDGEM_KEEP_TEST_DIRS";
-// The run's own folder among the temporary files: redgem-tests-<random>-<count>.
+// The run's own folder among the temporary files: redgem-tests-<process id>-<random>-<count>.
 inline constexpr const char* kRunFolderName = "redgem-tests";
 // How many names a new folder tries before giving up (a name is only taken when nobody has it).
 inline constexpr int kFreshDirTries = 64;
@@ -24,6 +31,14 @@ inline constexpr int kFreshDirTries = 64;
 inline bool keep_test_dirs() {
   const char* value = std::getenv(kKeepTestDirsVariable);
   return value != nullptr && *value != '\0';
+}
+
+inline long process_id() {
+#ifdef _WIN32
+  return static_cast<long>(_getpid());
+#else
+  return static_cast<long>(getpid());
+#endif
 }
 
 // A part of a folder's name nobody else picks: random, and counted within this process.
@@ -34,11 +49,14 @@ inline std::string fresh_suffix() {
 }
 
 // A new folder `<name>-<suffix>` in `parent`, made by this call: a folder already there is never taken.
+// Only its owner may write in it (the engine refuses some folders other users can write in).
 inline std::filesystem::path make_fresh_dir(const std::filesystem::path& parent, const std::string& name) {
   std::filesystem::create_directories(parent);
   for (int tries = 0; tries < kFreshDirTries; ++tries) {
     std::filesystem::path dir = parent / (name + "-" + fresh_suffix());
-    if (std::filesystem::create_directory(dir)) return dir;
+    if (!std::filesystem::create_directory(dir)) continue;
+    std::filesystem::permissions(dir, std::filesystem::perms::owner_all);
+    return dir;
   }
   throw std::runtime_error("no fresh test folder could be made in " + parent.string());
 }
@@ -73,10 +91,19 @@ class TempDir {
   std::filesystem::path path_;
 };
 
-// This run's own folder among the temporary files, made on first use and removed when the run ends.
-// A test's fixed folder name goes in it, never straight in the temporary files.
+// The run's folder, said on the error output when it is kept, so the run's files can be found.
+inline std::filesystem::path make_run_folder() {
+  const std::string name = std::string(kRunFolderName) + "-" + std::to_string(process_id());
+  std::filesystem::path folder = make_fresh_dir(std::filesystem::temp_directory_path(), name);
+  if (keep_test_dirs()) std::fprintf(stderr, "test folders kept in %s\n", folder.string().c_str());
+  return folder;
+}
+
+// This run's own folder among the temporary files, made on first use and removed when the run ends
+// (a run that crashes leaves it: its name has the run's process id). A test's fixed folder name
+// goes in it, never straight in the temporary files.
 inline const std::filesystem::path& temp_root() {
-  static const TempDir root(make_fresh_dir(std::filesystem::temp_directory_path(), kRunFolderName));
+  static const TempDir root(make_run_folder());
   return root.path();
 }
 

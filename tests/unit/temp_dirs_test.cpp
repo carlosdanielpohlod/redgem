@@ -40,7 +40,7 @@ struct KeptDirsSetting {
 TEST_CASE("the run works in a folder of its own among the temporary files, never in them straight") {
   const std::filesystem::path& root = test::temp_root();
   CHECK(std::filesystem::is_directory(root));
-  CHECK(root.parent_path() == std::filesystem::temp_directory_path());
+  CHECK(std::filesystem::equivalent(root.parent_path(), std::filesystem::temp_directory_path()));
   CHECK(root.filename().string().rfind(test::kRunFolderName, 0) == 0);
   CHECK(&test::temp_root() == &root);
 }

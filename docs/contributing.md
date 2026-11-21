@@ -86,12 +86,12 @@ run left. The first run is a ctest fixture of the second (`redgem-test --work <d
 Test fixtures are regenerated with
 `tools/blender/run.sh build_test_fixtures.py tests/fixtures`.
 
-A C++ test never writes straight into the system's temporary folder: runs side by side (two
+A doctest test never writes straight into the system's temporary folder: runs side by side (two
 worktrees, two CI jobs, `ctest -j`) would share its files. `tests/temp_dirs.hpp` gives each run a
-folder of its own, `redgem::test::temp_root()` (`redgem-tests-<random>` among the temporary files,
-removed when the run ends), and `redgem::test::unique_temp_dir("name")` gives one test a fresh
+folder of its own, `redgem::test::temp_root()` (`redgem-tests-<process id>-<random>` among the
+temporary files, removed when the run ends; a run that crashes leaves it), and `redgem::test::unique_temp_dir("name")` gives one test a fresh
 folder in it, removed when the returned `TempDir` goes. Set `REDGEM_KEEP_TEST_DIRS=1` to keep them
-and look into them after the run.
+and look into them after the run: the run says where its folder is.
 
 ## Continuous integration
 
