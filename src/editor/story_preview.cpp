@@ -91,10 +91,11 @@ std::vector<PreviewVariable> variables_from(const nlohmann::json& json) {
 
 // A method of EditorPreview called with these texts (the module's own error when it is not there).
 RubyResult called(RubyVm& vm, const std::string& method, const std::vector<std::string>& args) {
-  const RubyResult module = vm.eval(kPreviewModule, kWhere);
+  RubyResult module = vm.eval(kPreviewModule, kWhere);
   if (!module.ok) return module;
   return vm.call_with(module.value, method.c_str(), [&args](mrb_state* mrb) {
     std::vector<mrb_value> values;
+    values.reserve(args.size());
     for (const std::string& arg : args) values.push_back(mrb_str_new(mrb, arg.data(), arg.size()));
     return values;
   });

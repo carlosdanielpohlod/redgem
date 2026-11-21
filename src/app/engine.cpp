@@ -279,16 +279,24 @@ void Engine::connect_world() {
   context_.bake_navigation = [this] { bake_navigation(); };
 }
 
-void Engine::fill_context(const GameSettings& settings) {
-  connect_saves();
-  connect_effects();
+void Engine::connect_network() {
   context_.network = &network_;
   context_.discovery = &discovery_;
   context_.http = &http_;
-  describe_game(context_, settings);
+}
+
+void Engine::connect_audio() {
   context_.audio = &audio();
   audio().set_occlusion_query(
       [this](Vec3 from, Vec3 to) { return walls_between(physics_.get(), step_in_flight_, from, to); });
+}
+
+void Engine::fill_context(const GameSettings& settings) {
+  connect_saves();
+  connect_effects();
+  connect_network();
+  describe_game(context_, settings);
+  connect_audio();
   connect_world();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;

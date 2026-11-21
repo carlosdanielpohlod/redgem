@@ -6,7 +6,7 @@
 namespace redgem {
 namespace {
 
-constexpr float kFastestShare = 0.5f;           // of the speed of sound, either way
+constexpr float kFastestShare = 0.5f;             // of the speed of sound, either way
 constexpr float kNearestDopplerDistance = 0.01f;  // m: nearer, the line between them has no direction
 
 float bounded_speed(float speed) {

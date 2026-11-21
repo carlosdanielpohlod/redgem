@@ -142,15 +142,20 @@ std::vector<HttpResult> HttpClient::poll() {
   std::vector<std::shared_ptr<Job>> still_out;
   for (auto& job : jobs_) {
     if (job->finished()) {
-      ++collected_;
-      results.push_back({job->id, std::move(job->response)});
-      job->thread.join();  // (its work is over: it is ending, in a moment)
+      collect(*job, results);
     } else {
       still_out.push_back(std::move(job));
     }
   }
   jobs_.swap(still_out);
   return results;
+}
+
+// A finished job's answer.
+void HttpClient::collect(Job& job, std::vector<HttpResult>& results) {
+  ++collected_;
+  results.push_back({job.id, std::move(job.response)});
+  job.thread.join();  // (its work is over: it is ending, in a moment)
 }
 
 }  // namespace redgem::net

@@ -59,6 +59,7 @@ class HttpClient {
   struct Ends;
 
   void launch(int id, HttpRequest request, Url url);
+  void collect(Job& job, std::vector<HttpResult>& results);
 
   std::shared_ptr<const TrustStore> trust_;
   std::shared_ptr<const Clock> clock_;
