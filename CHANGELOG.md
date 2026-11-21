@@ -75,7 +75,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   load test lost a player on a dedicated server with nothing in the log to say why.
 - **`redgem-test --wait-limit <seconds>`.** A system test may wait for other programs
   (`t.wait_for`) longer than five minutes in all, up to a day: a load test whose bots play for
-  five minutes and more on a dedicated server ran out of waits before the end.
+  five minutes and more on a dedicated server ran out of waits before the end. The limit is in
+  real seconds, measured by the clock: frames that run slow on a busy machine count for the time
+  they take.
 - **A quest journal and objective markers.** The pause menu of a game with quest files has a
   Journal page: the quests under way, each with the text of its stage and its objectives (a filled
   box once done), then the quests completed. Its lines scroll and take the focus, so the keyboard,
