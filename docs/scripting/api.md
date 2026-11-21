@@ -23,6 +23,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`NavAgent`](#navagent) | A behaviour: a character that walks where it is sent along Navigation.path, steering clear of other agents and of moving bodies, and finding another way when something stands in its way. | [Experimental](stability.md) |
 | [`Water`](#water) | Where the scene's water is: the height of its surface, and how deep a point is under it. | [Experimental](stability.md) |
 | [`Environment`](#environment) | The scene's look while the game runs: sky, fog, light and effects, as its environment object describes them. | [Experimental](stability.md) |
+| [`Material`](#material) | The glow of the scene's materials, by name, changed while the game runs: lit windows at night. | [Experimental](stability.md) |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. | [Stable](stability.md) |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). | [Stable](stability.md) |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. | [Stable](stability.md) |
@@ -398,6 +399,15 @@ The scene's look while the game runs: sky, fog, light and effects, as its enviro
 - `Environment.present? -> bool`: whether the scene has an environment object (environment = true) for scripts to change *Experimental.*
 
 The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file.
+## Material
+
+The glow of the scene's materials, by name, changed while the game runs: lit windows at night. *Experimental.* See [../levels.md#glowing-materials-from-scripts](../levels.md#glowing-materials-from-scripts).
+
+- `Material.set_emission(Symbol | String name, Symbol | Array[Numeric] color, strength: Numeric = 1.0) -> nil`: every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength (0 to 1000), over what the scene's file says *Experimental.*
+- `Material.reset_emission(Symbol | String name) -> nil`: the materials of that name glow as the scene's file says again *Experimental.*
+- `Material.emission(Symbol | String name) -> Hash[Symbol, untyped] | nil`: what set_emission gave the materials of that name, {color:, strength:}, or nil *Experimental.*
+
+A material's name is the one it has in the scene's file (Blender's). The glow holds for every object with a material of that name, copies and prefabs spawned later and the scenes loaded after, until reset_emission. A negative strength raises an ArgumentError, an unknown color name too. Each machine keeps its own: over the network, set it on every machine. A game with no window (a dedicated server) keeps it and draws nothing.
 
 ## CharacterController
 

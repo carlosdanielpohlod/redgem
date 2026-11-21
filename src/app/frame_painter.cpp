@@ -25,6 +25,7 @@ void FramePainter::follow_game(const FrameView& view) {
   }
   renderer_.set_motion_blur(view.motion_blur);
   renderer_.set_auto_exposure(view.auto_exposure);
+  if (view.material_emission != nullptr) renderer_.set_material_emission(*view.material_emission);
 }
 
 void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {

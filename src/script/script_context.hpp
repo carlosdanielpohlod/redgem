@@ -14,6 +14,7 @@
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
 #include "render/auto_exposure.hpp"
+#include "render/material_emission.hpp"
 #include "render/display_settings.hpp"
 #include "render/hud.hpp"
 #include "render/ui_scale.hpp"
@@ -118,6 +119,8 @@ struct ScriptContext {
   float motion_blur = 0.0f;
   // Camera.auto_exposure and the others: what the game changes of the scene's auto exposure.
   AutoExposureOverrides auto_exposure;
+  // Material.set_emission: the glow of the materials of each name, over what the scene's file says.
+  EmissionOverrides material_emission;
   // How the player chose the game to be shown and heard (Settings): what is in use now.
   DisplaySettings display;
   // What puts a change of `display` into effect (the window, the renderer's quality, the volume),

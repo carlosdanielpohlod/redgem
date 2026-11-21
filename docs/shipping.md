@@ -270,6 +270,9 @@ REDGEM_KEYSTORE_PASSWORD='...' ./build/src/redgem build my_game dist/android --t
 redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 --record-scale 1920x1080 --record-seconds 20
 ```
 
+Options: `--record-fps`, `--record-size`, `--record-scale`, `--record-seconds` and
+`--record-audio on|off`.
+
 - Each frame moves the game on by exactly 1/`--record-fps` seconds (30 unless given), however
   long it takes to draw. A scene too heavy to play smoothly still comes out smooth in the video,
   and so do the wind, film grain and everything else that moves with time.
@@ -281,6 +284,16 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
   keeps running in the window), or when the game quits.
 - Frames are read back from the graphics card a few frames late, so drawing never waits for it.
   They are encoded as H.264 (`-crf 16`, preset `medium`, `yuv420p`), which plays everywhere.
+- The video has the game's sound, unless you give `--record-audio off`. It is not taken from the
+  sound card. The engine's own mixer mixes it in step with the frames: each frame gets exactly
+  48000/`--record-fps` samples (the fraction carries over to the next frame), so the sound never
+  drifts from the pictures. You get everything a player hears: positional sounds, music, group
+  effects, ducking, Doppler and occlusion. Nothing is heard while the game records. The sound is
+  encoded as AAC (192 kb/s). The pictures and the sound are first written next to the video
+  (`trailer.pictures.mp4` and `trailer.sound.f32`). When the recording ends, they are put together
+  into `trailer.mp4` and deleted. If that step fails, the video is kept without sound, with a
+  warning.
+- After `Game.stop_recording`, a recording with sound leaves the game silent for the rest of the run.
 
 ## Notes
 

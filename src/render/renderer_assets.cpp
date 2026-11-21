@@ -233,7 +233,8 @@ void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
     materials[i].maps[MATERIAL_MAP_ALBEDO].color = to_raylib(desc.materials[i].base_color);
     bind_textures(materials[i], desc.materials[i]);
   }
-  material_factors = desc.materials;
+  loaded_factors = desc.materials;
+  material_factors = with_emission(loaded_factors, emission_overrides);
   skins = desc.skins;
 }
 
@@ -269,6 +270,7 @@ void Renderer::Impl::release_assets() {
   for (Material& material : materials) MemFree(material.maps);
   materials.clear();
   material_factors.clear();
+  loaded_factors.clear();
 }
 
 void Renderer::Impl::release_meshes() {

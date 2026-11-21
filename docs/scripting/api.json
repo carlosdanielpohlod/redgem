@@ -2319,6 +2319,49 @@
       "notes": "The settings are the environment object's properties (see Levels): `sky_image`, `sky_intensity`, `ambient`, `fog_color`, `fog_density`, `exposure`, `bloom`, `auto_exposure` and the rest. A new `sky_image` loads that picture, which takes a moment; a number or a color costs nothing. An unknown setting, or a value of the wrong kind, raises an ArgumentError (a String where a number goes: a TypeError). A scene without an environment object reads nil and refuses changes with a RuntimeError. Each machine keeps its own look: over the network, change it on every machine. A scene loaded anew starts from its own file."
     },
     {
+      "name": "Material",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The glow of the scene's materials, by name, changed while the game runs: lit windows at night.",
+      "methods": [
+        {
+          "name": "set_emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"},
+            {"name": "color", "type": "Symbol | Array[Numeric]"},
+            {"name": "strength", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "every material of that name glows with that color (a name, or [r, g, b] from 0 to 255) times strength (0 to 1000), over what the scene's file says",
+          "example": "Material.set_emission(\"window_glass\", [255, 190, 120], strength: 4.0)"
+        },
+        {
+          "name": "reset_emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "nil"},
+          "about": "the materials of that name glow as the scene's file says again"
+        },
+        {
+          "name": "emission",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "name", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
+          "about": "what set_emission gave the materials of that name, {color:, strength:}, or nil"
+        }
+      ],
+      "guide": "../levels.md#glowing-materials-from-scripts",
+      "notes": "A material's name is the one it has in the scene's file (Blender's). The glow holds for every object with a material of that name, copies and prefabs spawned later and the scenes loaded after, until reset_emission. A negative strength raises an ArgumentError, an unknown color name too. Each machine keeps its own: over the network, set it on every machine. A game with no window (a dedicated server) keeps it and draws nothing."
+    },
+    {
       "name": "CharacterController",
       "stability": "stable",
       "kind": "class",

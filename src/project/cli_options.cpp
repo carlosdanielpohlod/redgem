@@ -31,6 +31,7 @@ constexpr const char* kRecordFpsOption = "--record-fps";
 constexpr const char* kRecordSizeOption = "--record-size";
 constexpr const char* kRecordScaleOption = "--record-scale";
 constexpr const char* kRecordSecondsOption = "--record-seconds";
+constexpr const char* kRecordAudioOption = "--record-audio";
 
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
@@ -139,6 +140,15 @@ void read_record_seconds(Reading& reading) {
   reading.result.options.record.seconds = seconds;
 }
 
+void read_record_audio(Reading& reading) {
+  const auto sound = record_sound_from(value(reading).value_or(""));
+  if (!sound) {
+    fail(reading, tr("project.cli.record_audio_needs_switch"));
+    return;
+  }
+  reading.result.options.record.sound = *sound;
+}
+
 constexpr Option kOptions[] = {
     {command_line::kHelpOption, read_help},
     {command_line::kShortHelpOption, read_help},
@@ -158,6 +168,7 @@ constexpr Option kOptions[] = {
     {kRecordSizeOption, read_record_size},
     {kRecordScaleOption, read_record_scale},
     {kRecordSecondsOption, read_record_seconds},
+    {kRecordAudioOption, read_record_audio},
 };
 
 }  // namespace
