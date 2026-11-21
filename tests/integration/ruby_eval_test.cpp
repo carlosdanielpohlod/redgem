@@ -2,6 +2,8 @@
 // as the code it tests is; tests/ships_no_ruby_eval.sh checks that release programs have none of it.
 #include <doctest/doctest.h>
 
+#include <mruby.h>
+
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -27,12 +29,19 @@ using mcp::Json;
 namespace fs = std::filesystem;
 
 namespace {
+// The editor's frame while a call waits: the bridge ticks each time the call is not over yet.
+constexpr std::chrono::milliseconds kTickEvery{1};
 constexpr const char* kToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 constexpr std::chrono::milliseconds kShortBudget{50};
 // Far longer than kMostEvalBudget: an evaluation must not run on it.
 constexpr std::chrono::milliseconds kLongBudget{60 * 1000};
-// What an evaluation that is stopped may take at most, with the budget's grace to unwind.
-constexpr std::chrono::seconds kStoppedWithin{4};
+// (What budget_ms reads; the test that defines it sets it.)
+RubyVm* budgeted_vm = nullptr;
+
+// budget_ms: the budget the call that asks runs on, in milliseconds.
+mrb_value budget_ms(mrb_state*, mrb_value) {
+  return mrb_fixnum_value(static_cast<mrb_int>(budgeted_vm->budget().count()));
+}
 // More than a tool's text is cut to (8 KiB) with its notice.
 constexpr std::size_t kMostAnswerBytes = 8400;
 
@@ -69,12 +78,11 @@ Json over_bridge(Game& game, const RubyEvalGate* gate, const Json& args) {
   EditorBridge server(game.path, game.root / "private");
   const mcp::Options options{game.path, false, {}, server.connection_file()};
   auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, kRubyEvalTool, args); });
-  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+  while (future.wait_for(kTickEvery) != std::future_status::ready) {
     server.tick([&](const std::string& tool, const Json& values) {
       if (is_ruby_eval_tool(tool)) return answer_ruby_eval(gate, *game.session, values);
       return invoke_editor(*game.session, tool, values);
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return future.get();
 }
@@ -107,7 +115,10 @@ TEST_CASE("an evaluation that raises reports the exception with its backtrace") 
 
 TEST_CASE("an evaluation that never returns is stopped by the script budget, which is given back") {
   RubyVm vm;
+  budgeted_vm = &vm;
+  mrb_define_method(vm.state(), vm.state()->kernel_module, "budget_ms", budget_ms, MRB_ARGS_NONE());
   vm.set_budget(kShortBudget);
+  CHECK(evaluate_ruby(vm, "budget_ms").text == std::to_string(kShortBudget.count()));  // its own, short enough
   const EvalReply stopped = evaluate_ruby(vm, "loop {}");
   CHECK_FALSE(stopped.ok);
   CHECK(says(stopped.text, "ScriptTimeout"));
@@ -115,12 +126,12 @@ TEST_CASE("an evaluation that never returns is stopped by the script budget, whi
   // Without a budget, or with one longer than the bridge waits, it runs on kMostEvalBudget.
   for (const auto own : {std::chrono::milliseconds(0), kLongBudget}) {
     vm.set_budget(own);
-    const auto started = std::chrono::steady_clock::now();
+    CHECK(evaluate_ruby(vm, "budget_ms").text == std::to_string(kMostEvalBudget.count()));
     CHECK(says(evaluate_ruby(vm, "loop {}").text, "ScriptTimeout"));
-    CHECK(std::chrono::steady_clock::now() - started < kStoppedWithin);
     CHECK(vm.budget() == own);
   }
   vm.set_budget(std::chrono::milliseconds(0));
+  budgeted_vm = nullptr;
 }
 
 TEST_CASE("an evaluation's answer stops at the tools' size limit") {

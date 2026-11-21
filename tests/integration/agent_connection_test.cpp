@@ -17,8 +17,10 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr auto kPatience = std::chrono::seconds(20);  // how long the agent gets for what is waited for
-constexpr auto kPollEvery = std::chrono::milliseconds(5);
+// A poll waits this long for the agent at most before the next; there are that many polls at most
+// (a bound for an agent that never answers, never a measure).
+constexpr float kPollLook = 0.005f;
+constexpr int kMostPolls = 4000;
 
 fs::path game_folder() {
   const fs::path folder = fs::temp_directory_path() / "redgem_agent_connection_test";
@@ -35,11 +37,10 @@ ProgramCall fake_agent(std::vector<EnvironmentVariable> environment = {}) {
 
 // Polls the connection, as the editor's frames do, until `done` (false when it never was).
 bool poll_until(AgentConnection& connection, const std::function<bool()>& done) {
-  const auto give_up = std::chrono::steady_clock::now() + kPatience;
-  while (std::chrono::steady_clock::now() < give_up) {
+  for (int poll = 0; poll < kMostPolls; ++poll) {
     connection.poll();
     if (done()) return true;
-    std::this_thread::sleep_for(kPollEvery);
+    connection.wait(kPollLook);
   }
   return false;
 }
@@ -85,6 +86,16 @@ TEST_CASE("a whole turn with an agent program: answer, plan, question, and a fil
   REQUIRE(tool->tool.content.size() == 1);
   CHECK(tool->tool.content[0].change.has_value());
   CHECK(last_of(client.transcript(), EntryKind::Agent)->text.find("Wrote notes.txt.") != std::string::npos);
+  fs::remove_all(folder);
+}
+
+TEST_CASE("a wait for the agent ends once a poll has something to take in, and only then") {
+  constexpr float kLongWait = 20.0f;  // (a bound for an agent that never answers)
+  const fs::path folder = game_folder();
+  AgentConnection connection(fake_agent(), setup_in(folder));
+  REQUIRE(connection.wait(kLongWait));  // its answer to initialize
+  REQUIRE(poll_until(connection, [&] { return connection.client().state() == AgentState::Ready; }));
+  CHECK_FALSE(connection.wait(0.0f));  // all of it taken: nothing waits
   fs::remove_all(folder);
 }
 

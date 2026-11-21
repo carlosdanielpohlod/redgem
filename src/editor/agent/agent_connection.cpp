@@ -1,9 +1,12 @@
 #include "editor/agent/agent_connection.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <utility>
 
+#include "core/wait_length.hpp"
 #include "core/engine_thread.hpp"
 #include "core/translations.hpp"
 
@@ -56,6 +59,11 @@ void AgentConnection::poll() {
   for (const Json& message : messages) client_.receive(message);
   if (!ended || std::exchange(end_reported_, true)) return;
   client_.fail(why_it_ended());
+}
+
+bool AgentConnection::wait(float seconds) {
+  std::unique_lock<std::mutex> guard(lock_);
+  return news_.wait_for(guard, wait_length(seconds), [this] { return news_waiting(); });
 }
 
 bool AgentConnection::take_inbox(std::deque<Json>& messages, bool& ended) {
@@ -115,6 +123,7 @@ void AgentConnection::finish_reading(bool overflowed) {
   errors_ended_signal_.wait_for(guard, kErrorsGrace, [this] { return errors_ended_; });
   output_ended_ = true;
   unreadable_ = overflowed;
+  news_.notify_all();
 }
 
 void AgentConnection::take_line(const std::string& line) {
@@ -123,8 +132,11 @@ void AgentConnection::take_line(const std::string& line) {
   if (!message) return keep_error_line(line);
   // (Files are read and written here, off the editor's thread: a big one does not hold up a frame.)
   if (answer_files(*message)) return;
-  const std::lock_guard<std::mutex> guard(lock_);
-  inbox_.push_back(std::move(*message));
+  {
+    const std::lock_guard<std::mutex> guard(lock_);
+    inbox_.push_back(std::move(*message));
+  }
+  news_.notify_all();
 }
 
 bool AgentConnection::answer_files(const Json& message) {

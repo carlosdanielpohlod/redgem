@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -11,6 +13,10 @@
 #include "net/socket/socket.hpp"
 
 namespace redgem::test {
+
+// The most a test waits for the server's thread to hear something: a bound for a client that never
+// came, never a measure (how long a request takes is the computer's).
+inline constexpr float kTestServerPatience = 10.0f;
 
 // A web server on this machine for the tests of HTTP, on a thread of its own: plain, or TLS with a
 // certificate made for the test, which nothing trusts but the clients the test hands it to
@@ -42,12 +48,17 @@ class HttpTestServer {
   int requests() const { return requests_.load(); }
   // Whether a client hung up while it was being kept waiting (it gave its request up).
   bool saw_hang_up() const { return hang_ups_.load() > 0; }
+  // Sleeps until it read `count` requests whole, kTestServerPatience at most: whether it did.
+  bool wait_for_requests(int count) const;
+  // Sleeps until a client it kept waiting hung up, kTestServerPatience at most: whether one did.
+  bool wait_for_hang_up() const;
 
  private:
   struct Tls;  // the server's certificate and key
 
   void serve();
   void serve_one(net::Socket socket);
+  void note_hang_up();
   // What the request numbered `index` (from 0) is answered with.
   std::string answer_to(int index) const;
   bool stopping() const { return stop_.load(); }
@@ -65,6 +76,7 @@ class HttpTestServer {
   std::atomic<int> requests_{0};
   std::atomic<int> hang_ups_{0};
   mutable std::mutex mutex_;
+  mutable std::condition_variable heard_;  // told when requests_ or hang_ups_ grows (under mutex_)
   std::string last_request_;
   std::thread thread_;
 };

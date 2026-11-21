@@ -1,17 +1,34 @@
 #include "net/http/http_client.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <condition_variable>
 #include <mutex>
 #include <optional>
 #include <system_error>
 #include <thread>
 
+#include "core/wait_length.hpp"
 #include "core/engine_thread.hpp"
 #include "core/log.hpp"
 #include "net/http/http_exchange.hpp"
 #include "net/http/http_stream.hpp"
 
 namespace redgem::net {
+
+struct HttpClient::Ends {
+  std::mutex mutex;
+  std::condition_variable one_ended;
+  int count = 0;  // (under mutex)
+
+  void add_one() {
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      ++count;
+    }
+    one_ended.notify_all();
+  }
+};
 
 struct HttpClient::Job {
   using Deadline = std::chrono::steady_clock::time_point;
@@ -24,11 +41,12 @@ struct HttpClient::Job {
   // Carries the request out on a thread of its own, which holds the job too (throws
   // std::system_error when the system has no thread left).
   static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url, const HttpClient& client) {
-    job->thread = std::thread(
-        [job, request = std::move(request), url = std::move(url), trust = client.trust_, clock = client.clock_] {
-          run_engine_thread([&] { job->response = exchange(request, url, trust, job->cancel, *clock); });
-          job->finish();
-        });
+    job->thread = std::thread([job, request = std::move(request), url = std::move(url), trust = client.trust_,
+                               clock = client.clock_, ends = client.ends_] {
+      run_engine_thread([&] { job->response = exchange(request, url, trust, job->cancel, *clock); });
+      job->finish();
+      ends->add_one();
+    });
   }
 
   // The thread's last word: its work is over, and joining it takes a moment (what it holds is let go).
@@ -69,7 +87,9 @@ std::shared_ptr<const Clock> shared_steady_clock() { return {std::shared_ptr<con
 }  // namespace
 
 HttpClient::HttpClient(std::shared_ptr<const TrustStore> trust, std::shared_ptr<const Clock> clock)
-    : trust_(std::move(trust)), clock_(clock ? std::move(clock) : shared_steady_clock()) {}
+    : trust_(std::move(trust)),
+      clock_(clock ? std::move(clock) : shared_steady_clock()),
+      ends_(std::make_shared<Ends>()) {}
 
 HttpClient::~HttpClient() {
   // Every request is given up first: their threads end together, not one after the other.
@@ -100,6 +120,12 @@ int HttpClient::start(HttpRequest request, std::string& error) {
   return id;
 }
 
+bool HttpClient::wait(float seconds) const {
+  if (!refused_.empty()) return true;
+  std::unique_lock<std::mutex> lock(ends_->mutex);
+  return ends_->one_ended.wait_for(lock, wait_length(seconds), [this] { return ends_->count > collected_; });
+}
+
 void HttpClient::launch(int id, HttpRequest request, Url url) {
   auto job = std::make_shared<Job>();
   job->id = id;
@@ -118,6 +144,7 @@ std::vector<HttpResult> HttpClient::poll() {
   std::vector<std::shared_ptr<Job>> still_out;
   for (auto& job : jobs_) {
     if (job->finished()) {
+      ++collected_;
       results.push_back({job->id, std::move(job->response)});
       job->thread.join();  // (its work is over: it is ending, in a moment)
     } else {

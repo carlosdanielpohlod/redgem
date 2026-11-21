@@ -177,6 +177,8 @@ class Engine {
   Presenter& presenter() { return *presenter_; }
   AnimationPlayer& animations() { return animations_; }
   net::NetworkSession& network() { return network_; }
+  // The game's web requests (HTTP in Ruby).
+  net::HttpClient& http() { return http_; }
   // Starts the behaviours that did not start yet, unless the world is frozen (a level loading, or
   // the machines of a network game waiting for each other to have the next one).
   void start_scripts();

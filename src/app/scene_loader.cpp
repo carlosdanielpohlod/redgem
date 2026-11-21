@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "app/scene_files.hpp"
+#include "core/wait_length.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
@@ -15,13 +16,6 @@
 namespace redgem {
 namespace {
 
-constexpr float kLongestReadWait = 3600.0f;  // seconds a wait for a read lasts at most
-
-// A wait's length as a condition variable takes it: never negative, never more than the longest.
-std::chrono::milliseconds wait_length(float seconds) {
-  const float bounded = std::isnan(seconds) ? 0.0f : std::clamp(seconds, 0.0f, kLongestReadWait);
-  return std::chrono::milliseconds(static_cast<long long>(bounded * std::milli::den));
-}
 constexpr std::size_t kMaxReadMessages = 128;  // plus one notice when further messages are dropped
 constexpr std::size_t kMaxReadMessageBytes = 2048;
 

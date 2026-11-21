@@ -31,8 +31,10 @@ namespace {
 
 constexpr int kWarmupFrames = 10;
 constexpr int kPictureFrames = 3;
-constexpr auto kPatience = std::chrono::seconds(20);  // how long the agent gets for each step
-constexpr auto kFramePause = std::chrono::milliseconds(5);
+// A frame waits this long for the agent at most before the next; there are that many frames at most
+// for each step (a bound for an agent that never answers, never a measure).
+constexpr float kFrameLook = 0.005f;
+constexpr int kMostFrames = 4000;
 
 std::filesystem::path copy_game() {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_editor_agent";
@@ -55,11 +57,10 @@ void run(EditorApp& app, int frames) {
 
 // Frames until `done`, as the editor runs while the agent works (false when it never was).
 bool run_until(EditorApp& app, const std::function<bool()>& done) {
-  const auto give_up = std::chrono::steady_clock::now() + kPatience;
-  while (std::chrono::steady_clock::now() < give_up) {
+  for (int frame = 0; frame < kMostFrames; ++frame) {
     app.frame();
     if (done()) return true;
-    std::this_thread::sleep_for(kFramePause);
+    if (agent::AgentConnection* connection = app.agent_panel().connection()) connection->wait(kFrameLook);
   }
   return false;
 }

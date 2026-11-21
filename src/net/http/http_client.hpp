@@ -48,10 +48,15 @@ class HttpClient {
   std::vector<HttpResult> poll();
   // Requests sent whose answers were not collected yet.
   std::size_t in_flight() const { return jobs_.size(); }
+  // Sleeps until an answer waits for the next poll, `seconds` at most: for a program with nothing
+  // else to do meanwhile (a game's frame never waits). Whether one does.
+  bool wait(float seconds) const;
 
  private:
   // A request's own, shared with the thread that carries it out.
   struct Job;
+  // How many requests have ended, told by their threads (which may outlive the client).
+  struct Ends;
 
   void launch(int id, HttpRequest request, Url url);
 
@@ -59,6 +64,8 @@ class HttpClient {
   std::shared_ptr<const Clock> clock_;
   std::vector<std::shared_ptr<Job>> jobs_;
   std::vector<HttpResult> refused_;  // answered at once: for the next poll
+  std::shared_ptr<Ends> ends_;
+  int collected_ = 0;  // answers of requests that went out, collected by poll
   int next_id_ = 1;
 };
 

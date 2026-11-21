@@ -25,6 +25,8 @@ using namespace redgem::tools;
 using mcp::Json;
 namespace fs = std::filesystem;
 namespace {
+// The editor's frame while a call waits: the bridge ticks each time the call is not over yet.
+constexpr std::chrono::milliseconds kTickEvery{1};
 class Game {
  public:
   Game() {
@@ -60,12 +62,11 @@ Json exchange(Game& game, EditorBridge& server, const std::string& name, const J
   const mcp::Options options{root, false, {}, file};
   auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, name, args); });
   const auto main = std::this_thread::get_id();
-  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+  while (future.wait_for(kTickEvery) != std::future_status::ready) {
     server.tick([&](const std::string& tool, const Json& values) {
       CHECK(std::this_thread::get_id() == main);
       return invoke_editor(*game.session, tool, values);
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return future.get();
 }
@@ -457,10 +458,9 @@ namespace {
 Json exchange_with(Game& game, EditorBridge& server, const mcp::Options& options, const std::string& name,
                    const Json& args) {
   auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, name, args); });
-  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+  while (future.wait_for(kTickEvery) != std::future_status::ready) {
     server.tick(
         [&](const std::string& tool, const Json& values) { return invoke_editor(*game.session, tool, values); });
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return future.get();
 }
