@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Prefab overrides can be reverted, applied to the prefab file, or unpacked.**
+  `redgem scene overrides`, `override`, `revert`, `apply` and `unpack` list and change a prefab
+  placement's overrides from the command line, each change one undo step in the editor's
+  document. Apply writes them into the file for every placement; unpack turns the placement into
+  plain objects. See [prefab overrides](docs/prefabs.md#revert-apply-and-unpack).
+
 - **Agents change the whole game, not only its scenes.** MCP's new `project` tool reads and
   writes `game.json` (`set_settings` merges changes, input and the menu theme included), the locales' texts, and the
   dialogues, quests and items, and lists and makes scenes and new games from a template. Each

@@ -721,6 +721,7 @@ if(NOT ANDROID)
     editor/picking.cpp
     editor/editor_session_prefabs.cpp
     editor/prefab_preview.cpp
+    editor/prefab_instances.cpp
     editor/prefab_files.cpp
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
@@ -882,6 +883,7 @@ if(NOT ANDROID)
     project/project_json_files.cpp
     project/mcp_project_tools.cpp
     project/scene_command.cpp
+    project/scene_prefab_words.cpp
     project/script_messages.cpp
     project/tool_play.cpp
     project/run_command.cpp

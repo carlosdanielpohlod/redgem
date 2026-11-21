@@ -63,6 +63,12 @@ void write_overrides(PropertyMap& placement, const Overrides& overrides);
 std::string overrides_text(const Overrides& overrides);
 Overrides parse_overrides(const std::string& text);
 
+// Adds `change` to `into`: the fields it holds replace those of `into`; a property it sets is no
+// longer unset and one it unsets is no longer set.
+void merge_override(PartOverride& into, const PartOverride& change);
+// Splits a part path at its first separator: {"load", "lid/handle"}; {"lid", ""} when it has none.
+std::pair<std::string, std::string> first_step(const std::string& path);
+
 // The part with its overrides applied.
 void apply_override(NodeDesc& part, const PartOverride& change);
 

@@ -1,6 +1,7 @@
 #include "project/scene_command.hpp"
 
 #include <algorithm>
+#include <exception>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -18,6 +19,8 @@
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_prefab_words.hpp"
+#include "editor/prefab_instances.hpp"
 #include "project/scene_revision.hpp"
 #include "scene/props.hpp"
 
@@ -33,6 +36,10 @@ constexpr const char* kAgainstOption = "--against";
 constexpr const char* kRevisionOption = "--revision";
 constexpr const char* kDiffWord = "diff";
 constexpr const char* kCompactWord = "compact";
+// The words after the object that `scene override` and `scene revert` take.
+constexpr std::size_t kPartWord = 2;
+constexpr std::size_t kFieldWord = 3;
+constexpr std::size_t kFirstOverrideWord = 3;
 // What the command takes after its name.
 ToolGrammar grammar() {
   return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption, kRevisionOption},
@@ -172,6 +179,87 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+// --- prefab placements (docs/prefabs.md#overrides) ---
+// The placement the line names; why not, as the result, when it names none.
+std::variant<int, ToolResult> named_placement(const OpenScene& scene) {
+  auto object = named_object(scene);
+  if (std::holds_alternative<ToolResult>(object)) return object;
+  if (!prefab_instances::is_placement(scene.document, std::get<int>(object)))
+    return failed(tr("project.scene.not_a_placement", {{"object", object_word(scene)}}));
+  return object;
+}
+std::string part_word(const OpenScene& scene, std::size_t word) {
+  const auto& words = scene.line.words;
+  if (word >= words.size() || words[word] == kPlacementRootWord) return {};
+  return words[word];
+}
+
+ToolResult overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  try {
+    const auto fields = prefab_instances::fields(scene.document, std::get<int>(placement));
+    return answer(fields.empty() ? std::string(tr("project.scene.no_overrides")) + "\n" : overrides_listing(fields));
+  } catch (const std::exception& problem) {
+    return failed(problem.what());
+  }
+}
+
+std::optional<prefabs::PartOverride> line_change(OpenScene& scene, int placement, std::string& error,
+                                                 std::vector<std::string>& notes) {
+  const auto path = part_word(scene, kPartWord);
+  const auto current = inherited_part(scene.document, placement, scene.game_dir, path, true, error);
+  const auto base = current ? inherited_part(scene.document, placement, scene.game_dir, path, false, error) : current;
+  if (!base) return std::nullopt;
+  const std::vector<std::string> words(scene.line.words.begin() + kFirstOverrideWord, scene.line.words.end());
+  auto change = part_change(*current, *base, words, scene.game_dir / config::kScriptsDirName, error, notes);
+  const auto overrides = prefab_instances::overrides_of(scene.document, placement);
+  const auto old = overrides.find(path);
+  if (change && old != overrides.end()) change->removed = change->removed || old->second.removed;
+  return change;
+}
+
+ToolResult override_part(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  std::string error;
+  std::vector<std::string> notes;
+  const auto change = line_change(scene, index, error, notes);
+  if (!change) return failed(error);
+  if (!prefab_instances::replace_override(scene.document, index, part_word(scene, kPartWord), *change, error))
+    return failed(error);
+  return saved_object(scene, index, notes);
+}
+
+ToolResult revert_overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  const std::string field = scene.line.words.size() > kFieldWord ? scene.line.words[kFieldWord] : "";
+  std::string error;
+  if (!prefab_instances::revert(scene.document, index, part_word(scene, kPartWord), field, error)) return failed(error);
+  return saved_object(scene, index, {});
+}
+
+ToolResult apply_overrides(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  const int index = std::get<int>(placement);
+  std::string error;
+  if (!prefab_instances::apply(scene.document, index, scene.game_dir, error)) return failed(error);
+  return saved_object(scene, index, {});
+}
+
+ToolResult unpack_placement(OpenScene& scene) {
+  const auto placement = named_placement(scene);
+  if (const auto* problem = std::get_if<ToolResult>(&placement)) return *problem;
+  std::string error;
+  const int root = prefab_instances::unpack(scene.document, std::get<int>(placement), scene.game_dir, error);
+  if (root == kNoIndex) return failed(error);
+  return saved_object(scene, root, {});
+}
+
 // The earlier save a diff compares with: what --against names, when it is one (no --revision does).
 std::optional<std::string> earlier_save(const ToolLine& line) {
   std::optional<std::string> against = line.value(kAgainstOption);
@@ -237,6 +325,11 @@ constexpr Known kSubcommands[] = {
     {"get", get, kFirstAssignment, kFirstAssignment},  {"set", set, kFirstAssignment, kAnyMore},
     {"add", add, kFirstAssignment, kAnyMore},          {"remove", remove, kFirstAssignment, kFirstAssignment},
     {kCompactWord, compact, kObjectWord, kObjectWord},
+    {"overrides", overrides, kFirstAssignment, kFirstAssignment},
+    {"override", override_part, kFirstOverrideWord + 1, kAnyMore},
+    {"revert", revert_overrides, kFirstAssignment, kFieldWord + 1},
+    {"apply", apply_overrides, kFirstAssignment, kFirstAssignment},
+    {"unpack", unpack_placement, kFirstAssignment, kFirstAssignment},
 };
 
 // The options diff and compact have no use for.
