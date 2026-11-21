@@ -119,7 +119,7 @@ TEST_CASE("MCP argument errors name the argument and what it accepts") {
   CHECK(text_of(result_of(session, "scene_list", {{"limit", -1}})) == "limit: must be at least 0, not -1");
   CHECK(text_of(result_of(session, "scene_list", {{"limit", "5"}})) == "limit: must be a whole number");
   CHECK(text_of(result_of(session, "scene_edit", {{"action", "sett"}, {"object", "Coin1"}})) ==
-        "action: must be one of: set, add, remove");
+        "action: must be one of: set, add, duplicate, group, remove");
   CHECK(text_of(result_of(session, "scene_get", Json::object())) == "missing argument: object");
   CHECK(contains(result_of(session, "game_run", {{"game", "/elsewhere"}}), "unknown argument: game (accepted: "));
   const Json long_word{{"action", "set"}, {"object", "Coin1"}, {"assignments", {std::string(4097, 'x')}}};
