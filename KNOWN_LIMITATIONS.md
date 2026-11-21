@@ -722,9 +722,10 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   files of each kind, and says nothing when a folder had more. `api` covers the engine's classes only, not the game's own behaviours: read the game's
   scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
-  set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
-  viewport images, runtime queries and event history. Live add creates empty objects only;
-  asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
+  edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
+  selection of several objects and framing, undo/redo, save, play controls, single stepping,
+  bounded viewport images, runtime queries and event history. Model importing, prefabs,
+  materials, terrain brushes and scene switching still use files or the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
@@ -745,7 +746,8 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   cut at 8 KiB, as any tool's text.
   Classes a snippet defines or reopens are tracked by hot reload as coming from `(game_eval)`, so
   hot reloading their script files may not go cleanly afterwards: stop and play again.
-- MCP adds one object per `scene_edit` call; a row of copies takes one call each.
+- `scene_edit` sets the same words on each of several objects: a row of copies at different
+  places takes one `set` per copy after the `duplicate`.
 - Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
   and pass back than the numeric ids of older objects.
 - `game_shot` needs a display (Xvfb works on a server).

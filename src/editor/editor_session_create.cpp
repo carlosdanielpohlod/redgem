@@ -5,40 +5,11 @@
 #include <utility>
 
 #include "core/log.hpp"
-#include "editor/new_objects.hpp"
-#include "scene/props.hpp"
+#include "editor/new_object_kinds.hpp"
 
 namespace redgem {
-namespace {
 
-// Defaults of objects created from the editor's menus.
-constexpr const char* kNewEmptyName = "GameObject";
-constexpr const char* kNewTerrainName = "Terrain";
-constexpr const char* kNewEnvironmentName = "Environment";
-constexpr float kNewTerrainSize = 100.0f;                // meters across
-constexpr int kNewTerrainCells = 64;                     // quads per side: about 1.5 m each
-constexpr float kGroundLevel = 0.0f;                     // meters: new terrains lie at y = 0
-constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};  // light gray
-constexpr float kNewLampIntensity = 500.0f;              // watts, like Blender's default point light
-
-// What GameObject > Environment starts with: a sunset (colors as "#rrggbb").
-constexpr std::pair<const char*, const char*> kSunsetColors[] = {{props::environment::kSkyTop, "#33457f"},
-                                                                 {props::environment::kSkyHorizon, "#ffab73"},
-                                                                 {props::environment::kGroundColor, "#4a3c3a"},
-                                                                 {props::environment::kFogColor, "#e8a988"}};
-constexpr std::pair<const char*, double> kSunsetNumbers[] = {
-    {props::environment::kFogDensity, 0.003}, {props::environment::kAmbient, 0.8},
-    {props::environment::kExposure, 1.0},     {props::environment::kBloom, 0.45},
-    {props::environment::kVignette, 0.35},    {props::environment::kSunGlow, 1.6},
-    {props::environment::kWind, 0.6}};
-
-const char* light_name(LightType type) {
-  return type == LightType::Directional ? new_objects::kSunName
-         : type == LightType::Spot      ? "Spot Light"
-                                        : "Point Light";
-}
-
-}  // namespace
+using new_objects::Kind;
 
 ObjectId EditorSession::place_new(int node, Vec3 position) {
   Transform local = document_.node(node).local;
@@ -54,68 +25,39 @@ ObjectId EditorSession::place_created(const std::function<int()>& add, Vec3 posi
   return place_new(add(), position);
 }
 
-ObjectId EditorSession::create_empty(Vec3 position) {
-  return place_created([this] { return document_.add_empty(document_.unique_name(kNewEmptyName)); }, position);
+// One of the GameObject menu's objects, as new_objects makes it, placed at `position`.
+ObjectId EditorSession::create_kind(Kind kind, Vec3 position) {
+  return place_created(
+      [this, kind] { return new_objects::add_object(document_, kind, new_objects::default_name(kind)); }, position);
 }
 
+ObjectId EditorSession::create_empty(Vec3 position) { return create_kind(Kind::Empty, position); }
+
 ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
-  const auto add = [this, shape] {
-    return document_.add_primitive(shape, document_.unique_name(primitive_name(shape)), kNewShapeColor);
-  };
-  return place_created(add, position);
+  constexpr Kind kKinds[] = {Kind::Cube, Kind::Sphere, Kind::Plane, Kind::Cylinder, Kind::Capsule};
+  return create_kind(kKinds[static_cast<int>(shape)], position);
 }
 
 ObjectId EditorSession::create_terrain(Vec3 position) {
-  const auto add = [this] {
-    return document_.add_terrain(document_.unique_name(kNewTerrainName), {kNewTerrainSize, kNewTerrainCells},
-                                 new_objects::kGrassColor);
-  };
-  return place_created(add, {position.x, kGroundLevel, position.z});  // wherever the camera looks from
-}
-
-// A new light, aimed like a sun unless it shines all around.
-int EditorSession::add_light(LightType type) {
-  const float intensity = type == LightType::Directional ? new_objects::kSunIntensity : kNewLampIntensity;
-  const int node =
-      document_.add_light(type, document_.unique_name(light_name(type)), new_objects::kLightColor, intensity);
-  if (type != LightType::Point) {
-    Transform local = document_.node(node).local;
-    local.rotation = new_objects::sun_rotation();
-    document_.set_local(node, local, false);
-  }
-  return node;
+  // (Wherever the camera looks from, on the ground.)
+  return create_kind(Kind::Terrain, {position.x, new_objects::kGroundLevel, position.z});
 }
 
 ObjectId EditorSession::create_light(LightType type, Vec3 position) {
-  return place_created([this, type] { return add_light(type); }, position);
+  const Kind kind = type == LightType::Directional ? Kind::Sun
+                    : type == LightType::Spot      ? Kind::SpotLight
+                                                   : Kind::PointLight;
+  return create_kind(kind, position);
 }
 
-ObjectId EditorSession::create_camera(Vec3 position) {
-  const auto add = [this] {
-    return document_.add_camera(document_.unique_name(new_objects::kCameraName), new_objects::kCameraFov);
-  };
-  return place_created(add, position);
-}
-
-ObjectId EditorSession::find_environment() const {
-  for (int i = 0; i < document_.node_count(); ++i) {
-    if (get_bool(document_.node(i).props, props::kEnvironment).value_or(false)) return i;
-  }
-  return kNoObject;
-}
+ObjectId EditorSession::create_camera(Vec3 position) { return create_kind(Kind::Camera, position); }
 
 ObjectId EditorSession::create_environment() {
   if (!editing()) return kNoObject;
-  const ObjectId existing = find_environment();
-  if (existing != kNoObject) {
-    selection_.set(existing);
-    return existing;
-  }
-  const int node = document_.add_empty(document_.unique_name(kNewEnvironmentName));
-  document_.set_prop(node, props::kEnvironment, true, false);  // same undo step as the creation
-  for (const auto& [key, value] : kSunsetColors) document_.set_prop(node, key, std::string(value), false);
-  for (const auto& [key, value] : kSunsetNumbers) document_.set_prop(node, key, value, false);
-  return place_new(node, Vec3::zero());
+  const int existing = new_objects::environment_of(document_);
+  if (existing == kNoIndex) return create_kind(Kind::Environment, Vec3::zero());
+  selection_.set(existing);
+  return existing;
 }
 
 ObjectId EditorSession::import_model(const std::filesystem::path& path, Vec3 position, std::string& error,

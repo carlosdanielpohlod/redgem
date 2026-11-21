@@ -244,7 +244,7 @@ TEST_CASE("live MCP catalog exposes status only under read-only and narrows edit
   options.read_only = false;
   for (const auto& tool : mcp::catalog(options)) {
     if (tool["name"] == "scene_edit")
-      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set", "add", "remove"}));
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set", "add", "duplicate", "group", "remove"}));
   }
 }
 
@@ -532,23 +532,96 @@ TEST_CASE("frame takes an object, and needs the editor window like the other vie
   CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "undo"}, {"object", "Coin1"}})));
 }
 
-TEST_CASE("a pinned editor connection leaves from out of scene_edit; discovery keeps it for the files") {
-  const auto from_offered = [](const mcp::Options& options) {
+TEST_CASE("every connection offers scene_edit's from, which the live editor copies with") {
+  for (const std::string connection : {"", mcp::kDiscoverEditor, "connection.json"}) {
+    mcp::Options options;
+    options.editor_connection = connection;
     for (const auto& tool : mcp::catalog(options)) {
-      if (tool["name"] == "scene_edit") return tool["inputSchema"]["properties"].contains("from");
+      if (tool["name"] == "scene_edit") CHECK(tool["inputSchema"]["properties"].contains("from"));
     }
-    return false;
-  };
-  mcp::Options options;
-  CHECK(from_offered(options));
-  options.editor_connection = mcp::kDiscoverEditor;
-  CHECK(from_offered(options));
-  options.editor_connection = "connection.json";
-  CHECK_FALSE(from_offered(options));
+  }
   Game game;
-  const auto refused =
-      invoke_editor(*game.session, "scene_edit", {{"action", "add"}, {"object", "Copy"}, {"from", "Coin1"}});
-  CHECK(text(refused) == "live add creates an empty object; from is not supported");
+  auto& session = *game.session;
+  const auto copy =
+      invoke_editor(session, "scene_edit",
+                    {{"action", "add"}, {"object", "Copy"}, {"from", "Coin1"}, {"assignments", {"position=4,1,0"}}});
+  REQUIRE_MESSAGE(ok(copy), text_of(copy));
+  const int index = find_object(session.scene_desc(), "Copy").index;
+  REQUIRE(index != kNoIndex);
+  CHECK(session.document().node(index).mesh == session.document().node(coin(game)).mesh);
+  CHECK(session.document().node(index).local.position.x == 4);
+  CHECK(session.selection() == static_cast<ObjectId>(index));
+  session.undo();
+  CHECK(find_object(session.scene_desc(), "Copy").index == kNoIndex);
+  CHECK_FALSE(session.document().can_undo());
+}
+
+TEST_CASE("live duplicate, group and multi-object edits are one undo step each") {
+  Game game;
+  auto& session = *game.session;
+  auto& doc = session.document();
+  const auto count = doc.node_count();
+  const Json coins = {"Coin1", "Coin2"};
+  const auto copies = invoke_editor(session, "scene_edit",
+                                    {{"action", "duplicate"}, {"objects", coins}, {"assignments", {"prop.copy=true"}}});
+  REQUIRE_MESSAGE(ok(copies), text_of(copies));
+  CHECK(text_of(copies).find("Coin1.001") != std::string::npos);
+  CHECK(session.selected().ids().size() == 2);
+  session.undo();
+  CHECK(doc.node_count() == count);
+  const auto grouped =
+      invoke_editor(session, "scene_edit", {{"action", "group"}, {"object", "Coins"}, {"objects", coins}});
+  REQUIRE_MESSAGE(ok(grouped), text_of(grouped));
+  const int group = find_object(session.scene_desc(), "Coins").index;
+  CHECK(doc.node(find_object(session.scene_desc(), "Coin1").index).parent == group);
+  CHECK(doc.node(find_object(session.scene_desc(), "Coin2").index).parent == group);
+  CHECK(ok(invoke_editor(session, "scene_edit",
+                         {{"action", "set"}, {"objects", coins}, {"assignments", {"prop.visible=false"}}})));
+  CHECK(doc.node(find_object(session.scene_desc(), "Coin2").index).props.count("visible") == 1);
+  session.undo();
+  session.undo();
+  CHECK(find_object(session.scene_desc(), "Coins").index == kNoIndex);
+  CHECK(doc.node(find_object(session.scene_desc(), "Coin1").index).parent == kNoIndex);
+  CHECK(ok(invoke_editor(session, "scene_edit", {{"action", "remove"}, {"objects", coins}, {"confirm", true}})));
+  CHECK(doc.node_count() == count - 2);
+}
+
+TEST_CASE("live add makes the GameObject menu's kinds, and a failed one leaves nothing") {
+  Game game;
+  auto& session = *game.session;
+  const auto count = session.document().node_count();
+  const auto lamp = invoke_editor(session, "scene_edit",
+                                  {{"action", "add"},
+                                   {"object", "Lamp"},
+                                   {"kind", "spot_light"},
+                                   {"assignments", {"light_color=#ff0000", "light_intensity=50"}}});
+  REQUIRE_MESSAGE(ok(lamp), text_of(lamp));
+  const auto& light = session.document().node(find_object(session.scene_desc(), "Lamp").index).light;
+  REQUIRE(light.has_value());
+  CHECK(light->type == LightType::Spot);
+  CHECK(light->intensity == doctest::Approx(50));
+  CHECK(light->color.r == doctest::Approx(1));
+  CHECK(session.scene().at(find_object(session.scene_desc(), "Lamp").index).light.has_value());
+  CHECK(ok(invoke_editor(session, "scene_edit", {{"action", "add"}, {"object", "Box"}, {"kind", "cube"}})));
+  CHECK(session.document().node(find_object(session.scene_desc(), "Box").index).mesh != kNoIndex);
+  const auto bad =
+      invoke_editor(session, "scene_edit",
+                    {{"action", "add"}, {"object", "Eye"}, {"kind", "camera"}, {"assignments", {"camera_fov=500"}}});
+  CHECK_FALSE(ok(bad));
+  CHECK(text_of(bad).find("camera_fov") != std::string::npos);
+  CHECK(find_object(session.scene_desc(), "Eye").index == kNoIndex);
+  session.undo();
+  session.undo();
+  CHECK(session.document().node_count() == count);
+}
+
+TEST_CASE("live select takes several objects") {
+  Game game;
+  auto& session = *game.session;
+  CHECK(ok(invoke_editor(session, "editor", {{"action", "select"}, {"objects", {"Coin1", "Coin2", "Player"}}})));
+  CHECK(session.selected().ids().size() == 3);
+  CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "select"}})));
+  CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "undo"}, {"objects", {"Coin1"}}})));
 }
 
 TEST_CASE("live game_query refuses an ambiguous name instead of answering about the first match") {

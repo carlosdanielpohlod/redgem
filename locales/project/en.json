@@ -269,6 +269,8 @@
     "",
     "  keys: position=x,y,z  rotation=x,y,z (degrees)  scale=s or x,y,z  name=N  parent=<object> (parent= : top)",
     "        prop.key=value (prop.key= removes it)  script+=Door  script-=Door  script=Door,Sound",
+    "        light=sun|point|spot  light_color=#rrggbb  light_intensity=W  light_range=m  spot_cone=in,out",
+    "        camera_fov=degrees  camera_near=m  camera_far=m",
     ""
   ],
   "project.search.assets_usage": [
@@ -333,5 +335,10 @@
   "project.tools.needs_game": "missing <game_dir>",
   "project.tools.not_a_game": "{game_dir} is not a game: it has no scene.glb",
   "project.tools.option_needs_value": "{option} needs a value",
-  "project.tools.unknown_option": "unknown option {option}"
+  "project.tools.unknown_option": "unknown option {option}",
+  "project.scene.needs_light": "{key} changes a light, and this object has none (add one with kind sun, point_light or spot_light)",
+  "project.scene.needs_camera": "{key} changes a camera, and this object has none (add one with kind camera)",
+  "project.scene.light_kinds": "light is sun, point or spot, not {value}",
+  "project.scene.needs_color": "{key} needs #rrggbb or r,g,b (each 0 to 1), not {value}",
+  "project.scene.needs_number_in": "{key} needs a number from {least} to {most}, not {value}"
 }

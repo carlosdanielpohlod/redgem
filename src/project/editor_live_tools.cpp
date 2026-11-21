@@ -8,6 +8,7 @@
 #include "project/mcp_tools.hpp"
 #include "project/scene_assignments.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/runtime_query.hpp"
@@ -50,14 +51,6 @@ void require_current_scene(const EditorSession& session, const Json& args) {
     throw std::invalid_argument("the requested scene is not the editor's open scene");
 }
 
-std::string apply_words(SceneEdit& edit, int& index, const Json& args) {
-  for (const auto& word : args.value("assignments", std::vector<std::string>{})) {
-    const auto error = apply_assignment(edit, index, word);
-    if (!error.empty()) return error;
-  }
-  return {};
-}
-
 // The scene changed on disk while the editor had unsaved edits: the editor asks its user which to
 // keep, and that question (a dialog, which makes the editor busy too) is what holds every change.
 void require_no_external_change(const EditorSession& session) {
@@ -77,56 +70,44 @@ void require_editable(const EditorSession& session, bool busy) {
     throw std::invalid_argument("editor is busy; stop playing or finish the current gesture");
 }
 
-void validate_removal(const Json& args, const std::vector<std::string>& words) {
-  if (!args.value("confirm", false)) throw std::invalid_argument("remove needs confirm=true");
-  if (!words.empty()) throw std::invalid_argument("remove does not accept assignments");
-}
-
-void validate_edit(const Json& args) {
-  const std::string action = args.at("action");
-  if (args.contains("from")) throw std::invalid_argument("live add creates an empty object; from is not supported");
-  if (action != "add" && args.contains("parent")) throw std::invalid_argument("parent is only accepted by add");
-  const auto words = args.value("assignments", std::vector<std::string>{});
-  if (action == "set" && words.empty()) throw std::invalid_argument("set needs assignments");
-  if (action == "remove") validate_removal(args, words);
-}
-
-int add_empty(EditorSession& session, const Json& args) {
-  const std::string name = args.at("object");
-  const auto problem = name_problem(name);
-  if (!problem.empty()) throw std::invalid_argument(problem);
-  int parent = kNoIndex;
-  if (args.contains("parent")) parent = object(session, {{"object", args["parent"]}});
-  return session.document().add_empty(name, parent);
-}
-
-std::string apply_edit(EditorSession& session, SceneEdit& edit, int& index, const Json& args) {
-  const std::string action = args.at("action");
-  if (action == "add") index = add_empty(session, args);
-  if (action == "remove") {
-    session.document().remove(index);
-    index = kNoIndex;
-    return {};
+// Selects what an edit leaves: the objects it made or changed, none after a removal.
+void select_outcome(EditorSession& session, const EditOutcome& outcome) {
+  std::vector<ObjectId> ids;
+  ids.reserve(outcome.objects.size());
+  for (const int index : outcome.objects) ids.push_back(static_cast<ObjectId>(index));
+  if (ids.empty()) {
+    session.select(kNoObject);
+    return;
   }
-  return apply_words(edit, index, args);
+  session.select_all(ids);
 }
 
 Json edit(EditorSession& session, const Json& args, bool busy) {
   require_editable(session, busy);
-  validate_edit(args);
-  int index = args.at("action") == "add" ? kNoIndex : object(session, args);
-  const std::string removed = index == kNoIndex ? "" : object_line(session.scene_desc(), index);
   SceneEdit edit{session.document(), session.game_dir() / config::kScriptsDirName, {}};
+  EditOutcome outcome;
   std::string error;
-  if (!session.document().edit_nodes([&] { return apply_edit(session, edit, index, args); }, error))
-    throw std::invalid_argument(error);
+  const auto apply = [&] {
+    outcome = edit_scene(edit, args);
+    return std::string();
+  };
+  if (!session.document().edit_nodes(apply, error)) throw std::invalid_argument(error);
   session.refresh_preview();
-  session.select(index == kNoIndex ? kNoObject : static_cast<ObjectId>(index));
-  return tool_result(index == kNoIndex ? "removed " + removed : object_line(session.scene_desc(), index));
+  select_outcome(session, outcome);
+  return tool_result(outcome.text);
+}
+
+// The objects select names: `object`, and those of `objects`.
+std::vector<ObjectId> selected_by(EditorSession& session, const Json& args) {
+  std::vector<ObjectId> ids;
+  if (args.contains("object")) ids.push_back(static_cast<ObjectId>(object(session, args)));
+  for (const auto& reference : args.value("objects", std::vector<std::string>{}))
+    ids.push_back(static_cast<ObjectId>(object(session, {{"object", reference}})));
+  return ids;
 }
 
 void apply_control(EditorSession& session, const std::string& action, const Json& args) {
-  if (action == "select") session.select(static_cast<ObjectId>(object(session, args)));
+  if (action == "select") session.select_all(selected_by(session, args));
   if (action == "undo") session.undo();
   if (action == "redo") session.redo();
   if (action == "save") {
@@ -143,10 +124,19 @@ bool window_action(const std::string& action) {
 // The actions about an object: select needs one, frame takes one (else the selection).
 bool takes_object(const std::string& action) { return action == "select" || action == "frame"; }
 
+bool selects_nothing(const std::string& action, const Json& args) {
+  return action == "select" && !args.contains("object") && !args.contains("objects");
+}
+
+bool misplaced_objects(const std::string& action, const Json& args) {
+  return action != "select" && args.contains("objects");
+}
+
 void validate_control(const std::string& action, const Json& args) {
   if (!takes_object(action) && args.contains("object"))
     throw std::invalid_argument("object is only accepted by select and frame");
-  if (action == "select" && !args.contains("object")) throw std::invalid_argument("select needs an object");
+  if (selects_nothing(action, args)) throw std::invalid_argument("select needs object or objects");
+  if (misplaced_objects(action, args)) throw std::invalid_argument("objects is only accepted by select");
   if (action != "capture" && args.contains("max_size"))
     throw std::invalid_argument("max_size is only accepted by capture");
 }

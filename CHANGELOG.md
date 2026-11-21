@@ -17,6 +17,14 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents edit objects as the Inspector and the GameObject menu do.** MCP `scene_edit` gains
+  `duplicate` (copies with their children), `group` (a new parent, keeping where the objects are)
+  and `objects`, so one call sets, copies or removes several objects as one undo step. `add` takes
+  a `kind` (cube, sphere, plane, cylinder, capsule, sun, point_light, spot_light, camera, terrain,
+  environment) and, in the live editor too, `from` to copy an object. `redgem scene set` and
+  `scene_edit` change lights and cameras: `light=spot`, `light_color=#ffcc88`, `light_intensity`,
+  `light_range`, `camera_fov`, `camera_near` and `camera_far`. The editor tool's `select` takes
+  `objects`. An agent could place only empty objects live and edit one object a call.
 - **Materials glow from scripts.** `Material.set_emission("window_glass", [255, 190, 120],
   strength: 4.0)` lights every material of that name, in every object, spawned copies and later
   scenes too, until `Material.reset_emission`. A village's windows could not light up at night.

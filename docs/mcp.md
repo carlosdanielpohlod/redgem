@@ -27,7 +27,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 |------|--------------|
 | `scene_list` | Lists objects, taking optional `scene`, `limit` (default 50, `0` for all) and `depth`. |
 | `scene_get` | Reads one `object` by persistent `#id`, unique name or hierarchy path. |
-| `scene_edit` | Takes `action` (`set`, `add`, `remove`), `object` and optional `assignments` (`key=value` strings), `from`, `parent`, `scene`. Removal requires `confirm: true`. Saves the scene file. |
+| `scene_edit` | Changes objects (see [Editing objects](#editing-objects)): `action` `set`, `add`, `duplicate`, `group` or `remove`, on `object` or several `objects`, with `assignments` (`key=value` strings), `kind`, `from`, `parent`, `scene`. Removal requires `confirm: true`. Saves the scene file. |
 | `scene_diff` | Compares with an earlier scene file named by `against` (a `.glb` inside the game), or with the scene as a Git `revision` saved it (`HEAD`, `HEAD~1`, `main`, a commit hash). Takes one of the two. |
 | `asset_search` | Finds the game's assets by the words of `query` in their name or folder, best match first: a line each with the kind and the path. `kind` keeps one kind (`model`, `texture`, `sound`, `script`, `prefab`: the folders `models/`, `images/`, `sounds/`, `scripts/`, `prefabs/`), `tag` the assets inside a subfolder of that name; `limit` defaults to 20 (`0` for all). |
 | `template_search` | Finds the templates new games start from by the words of `query` in their name or description. |
@@ -93,6 +93,40 @@ game kept in Git, compare with the last commit (`revision: "HEAD"`).
 `from` is available only in file mode; `parent` also works when adding a live empty object.
 With `--editor auto`, check `editor` `status` to know whether calls reach an editor.
 
+## Editing objects
+
+`scene_edit` changes the scene the same way on the files and in a live editor:
+
+| Action | What it does |
+|--------|--------------|
+| `set` | Sets `assignments` on `object`, or on each of `objects`. |
+| `add` | Makes one object named `object`: empty, of a `kind`, or a copy of `from` (with its mesh, children, scripts and properties; a copy of a template is no template), under `parent` when given. |
+| `duplicate` | Copies `object` or `objects`, each with its children, named apart (`Crate.001`); `assignments` are set on each copy. |
+| `group` | Makes an empty object named `object` (under `parent`, else where the first member is) and moves `objects` under it, keeping where they are in the world. |
+| `remove` | Removes `object` or `objects` with their children. Needs `confirm: true`. |
+
+`kind` is one of the GameObject menu's objects: `empty`, `cube`, `sphere`, `plane`, `cylinder`,
+`capsule` (shapes with colliders), `sun`, `point_light`, `spot_light`, `camera`, `terrain` and
+`environment` (one a scene; a second is refused). A name already taken gets a number.
+
+The assignments are those of `redgem scene set` (see [the command line](command-line.md)):
+`position`, `rotation` (degrees), `scale`, `name`, `parent`, `script+=`, `script-=`, `tint`, and
+`prop.<key>`. The Inspector's cards are properties too: `prop.visible=false` hides an object,
+`prop.tag`, `prop.prefab=true` (a template), `prop.body`, `prop.collider`, `prop.trigger`,
+`prop.mass`, `prop.layer` and `prop.cast_shadow`. A light takes `light=sun|point|spot`,
+`light_color=#rrggbb` (or `r,g,b`, each 0 to 1), `light_intensity` (watts, W/m² for a sun),
+`light_range` (meters, 0 for the engine's own) and `spot_cone=inner,outer`; a camera takes
+`camera_fov` (degrees, 5 to 150), `camera_near` and `camera_far` (0 for none).
+
+```json
+{"action": "add", "object": "Lamp", "kind": "point_light", "parent": "Hall", "assignments": ["position=0,3,0", "light_color=#ffcc88"]}
+{"action": "duplicate", "objects": ["Crate1", "Crate2"], "assignments": ["prop.tag=spare"]}
+{"action": "group", "object": "Crates", "objects": ["Crate1", "Crate2", "Crate1.001", "Crate2.001"]}
+```
+
+Objects are named as `scene_get` names them. Each answer gives a line per object it made or
+changed, with its id, so the next call can name it by `#id`.
+
 ## Live editor
 
 Start the editor with its bridge explicitly enabled:
@@ -120,25 +154,22 @@ a second. To pin one editor instance, pass its file:
 redgem mcp /path/to/game --editor /path/to/connection.json
 ```
 
-If that editor exits, calls fail with an error that says how to restart it. A pinned editor
-always answers scene edits live, so its `scene_edit` schema leaves out `from`.
+If that editor exits, calls fail with an error that says how to restart it.
 
 With `auto`, an `events` cursor belongs to whichever process answered: the editor, or this server
 when no editor is open. After an editor opens or closes, start again from `since: 0`.
 
 Scene listing, object details and scene comparison now read the editor's unsaved document.
-`scene_edit` supports `set`, `add` and `remove`. `add` creates an empty object, optionally under
-`parent`, with initial `assignments`; attach scripts and properties as with the CLI. `from`
-(asset-backed duplication) remains file-only. `remove` deletes a subtree and requires
-`confirm: true`. Every call is one undo step: invalid assignments or exceptions roll it back
-without losing earlier undo/redo. Changes update the viewport and remain unsaved until `save`.
+`scene_edit` works there as on the files. Every call is one undo step: invalid assignments or
+exceptions roll it back without losing earlier undo/redo. Changes update the viewport, select
+what the call made or changed, and remain unsaved until `save`.
 
 The `editor` tool takes these actions:
 
 | Action | Result |
 |--------|--------|
 | `status` | Scene, play state, dirty flag, selection, undo/redo, external-conflict state, and whether a copy of an earlier session's unsaved edits waits for an answer (`recovery_pending`: the editor offers it when no other dialog is open). |
-| `select` | Select the requested `object`. |
+| `select` | Select the requested `object`, or every one of `objects`. |
 | `frame` | Point the editor camera at `object` (selecting it), or at the selection. |
 | `undo`, `redo`, `save` | Apply the corresponding editor command. Saving is explicit. |
 | `play`, `pause`, `resume`, `stop` | Control the editor's game, using its normal input, audio and viewport. |
@@ -149,7 +180,7 @@ The `editor` tool takes these actions:
 reduced further when necessary for the reply, with the PNG as base64 text, to stay within the
 bridge's 256 KiB limit (about 188 KiB of PNG). Only the scene
 viewport is captured, never the desktop or other applications. `object` is accepted only by
-`select` and `frame`; `max_size` only by `capture`. Read-only mode permits `status` and `capture` only.
+`select` and `frame`, `objects` only by `select`; `max_size` only by `capture`. Read-only mode permits `status` and `capture` only.
 
 Edits and document commands are refused while playing, during gestures/dialogs, or with an
 external file conflict pending. Play starts a copy of the unsaved scene; Stop discards that
