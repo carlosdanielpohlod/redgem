@@ -18,6 +18,7 @@ inline constexpr int kEveryone = 0;
 // The id of the machine hosting the game. Whoever joins gets 2, 3, ... in the order they arrive.
 inline constexpr int kHostId = 1;
 inline constexpr int kFirstGuestId = kHostId + 1;
+inline constexpr int kNoPeerId = 0;  // no machine: what free_peer_id gives for a full room
 // Machines in one game, the host included: the most the protocol carries (ids 1 to kMaxPeers),
 // and how many a game takes unless it says (game.json's "network": {"max_players": N}, see
 // NetworkSession::set_room_size). Two at the least: a host and one more.

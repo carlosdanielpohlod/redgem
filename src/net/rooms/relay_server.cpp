@@ -31,10 +31,10 @@ void RelayServer::poll(float seconds) {
   accept_newcomers();
   // By index: nothing below adds members, but entering a room touches other members.
   for (std::size_t i = 0; i < members_.size(); ++i) serve(*members_[i], seconds);
-  // What a poll passed on goes out together: a write a machine, however many spoke.
-  for (const auto& member : members_) member->connection.flush();
   shed_load();
   drop_closed_members();
+  // What a poll passed on goes out together, the news of who left too: a write a machine.
+  for (const auto& member : members_) member->connection.flush();
 }
 
 bool RelayServer::wait(float seconds) const {

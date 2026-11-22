@@ -476,7 +476,7 @@ TEST_CASE("a server not told how many players a room holds takes as many as its 
     Online online_game(kGamesRooms, plain.game, kOneThread);
     CHECK(server::status_json(online_game.server.status())["players"]["limit_per_room"] == net::kDefaultRoomSize);
   }
-  std::ofstream(plain.game / "game.json") << R"({"network": {"max_players": 20}})";
+  std::ofstream(plain.game / "game.json") << "{\"network\": {\"max_players\": " << kMatchPlayers << "}}";
   Online online_game(kGamesRooms, plain.game, kOneThread);
   CHECK(server::status_json(online_game.server.status())["players"]["limit_per_room"] == kMatchPlayers);
 }

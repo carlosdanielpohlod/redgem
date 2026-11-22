@@ -149,7 +149,6 @@ class RelayServer {
   void join_room(Member& member, const std::string& room, const nlohmann::json& auth);
   // Whether a room can take a newcomer: it has a place left (`free_id`), and is not ending (its
   // opener just left: the room closes at the end of this poll).
-  static bool takes_newcomers(int free_id, const Member* opener);
   void let_in(Member& member, int id);
   // Connection approval (relay_server_approval.cpp).
   void ask(Member& member, Member& opener, int id, const nlohmann::json& auth);

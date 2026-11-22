@@ -61,7 +61,7 @@ int free_peer_id(const std::vector<int>& taken, int room_size) {
   for (int id = kFirstGuestId; id <= largest; ++id) {
     if (std::find(taken.begin(), taken.end(), id) == taken.end()) return id;
   }
-  return 0;
+  return kNoPeerId;
 }
 
 }  // namespace redgem::net::wire

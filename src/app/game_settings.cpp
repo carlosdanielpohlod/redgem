@@ -141,6 +141,11 @@ std::string read_tick_hz(const nlohmann::json& json, GameSettings& settings) {
          std::to_string(config::kDefaultTickHz) + " Hz";
 }
 
+// Whether the game has a "network" object of settings (not just the network flag).
+bool has_network_section(const nlohmann::json& json) {
+  return json.contains(kNetworkKey) && json[kNetworkKey].is_object();
+}
+
 bool within_send_range(std::int64_t asked) { return asked >= config::kMinSendHz && asked <= config::kMaxSendHz; }
 
 bool holds_usable_send_rate(const nlohmann::json& section) {
@@ -151,7 +156,7 @@ bool holds_usable_send_rate(const nlohmann::json& section) {
 // what is wrong with it otherwise. (A "network" that is true or false is the game's network flag:
 // see app/game_identity.hpp.)
 std::string read_send_hz(const nlohmann::json& json, GameSettings& settings) {
-  if (!json.contains(kNetworkKey) || !json[kNetworkKey].is_object()) return {};
+  if (!has_network_section(json)) return {};
   const nlohmann::json& section = json[kNetworkKey];
   if (!section.contains(kSendHzKey)) return {};
   if (holds_usable_send_rate(section)) {
@@ -163,16 +168,17 @@ std::string read_send_hz(const nlohmann::json& json, GameSettings& settings) {
          std::to_string(config::kDefaultSendHz) + " poses a second";
 }
 
+bool within_player_range(std::int64_t asked) { return asked >= net::kMinRoomSize && asked <= kMostPlayers; }
+
 bool holds_usable_player_count(const nlohmann::json& section) {
-  if (!holds_whole_number(section, kMaxPlayersKey)) return false;
-  const auto asked = section[kMaxPlayersKey].get<std::int64_t>();
-  return asked >= net::kMinRoomSize && asked <= kMostPlayers;
+  return holds_whole_number(section, kMaxPlayersKey) &&
+         within_player_range(section[kMaxPlayersKey].get<std::int64_t>());
 }
 
 // How many players a game holds, when the "network" section gives a number that can be used; what
 // is wrong with it otherwise.
 std::string read_max_players(const nlohmann::json& json, GameSettings& settings) {
-  if (!json.contains(kNetworkKey) || !json[kNetworkKey].is_object()) return {};
+  if (!has_network_section(json)) return {};
   const nlohmann::json& section = json[kNetworkKey];
   if (!section.contains(kMaxPlayersKey)) return {};
   if (holds_usable_player_count(section)) {

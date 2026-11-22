@@ -325,7 +325,8 @@ A room holds 16 machines unless the game says otherwise. `"network": {"max_playe
 machines into a room the game hosts or opens on a relay. It may be from 2 to 63. `redgem check`
 refuses a number out of those limits, and a game played with one is warned and keeps 16. A
 dedicated server takes the same number of players for each of its rooms, unless `--max-players`
-says otherwise; the server itself is the 64th machine. A newcomer to a full room is turned away.
+says otherwise; the server is one machine more than its players. A newcomer to a full room is turned away. A relay and a dedicated server let one address
+connect 24 machines (`--per-address`): raise it when a whole room plays behind one address.
 
 Traffic grows with the square of the room: each moving player's poses go to every other machine.
 At 20 poses a second a room of 32 moving players sends about 32 × 31 × 700 bytes, near 700 KB a

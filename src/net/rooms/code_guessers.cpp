@@ -9,9 +9,10 @@ namespace redgem::net {
 
 namespace {
 
-// Wrong codes before an address is kept out: a whole party behind one address may each get the
-// code wrong twice (someone read it out badly). Guessing a room takes millions more.
-constexpr float kMaxWrongCodes = 2.0f * kMaxPeers;
+// Wrong codes before an address is kept out: a party of a room's usual size behind one address
+// may each get the code wrong twice (someone read it out badly). Guessing a room takes millions
+// more. (Not kMaxPeers: a game's bigger rooms must not make guessing easier.)
+constexpr float kMaxWrongCodes = 2.0f * kDefaultRoomSize;
 constexpr float kKeptOutSeconds = 120.0f;         // kept out for this long
 constexpr float kForgetWrongCodeSeconds = 30.0f;  // one wrong code is forgotten after this
 

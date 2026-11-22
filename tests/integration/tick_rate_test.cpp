@@ -84,6 +84,10 @@ GameManifest manifest_of(const std::string& game_json) {
   return read_game_manifest(game.dir);
 }
 
+// A game.json whose network section says how many players a room holds.
+std::string players_json(const std::string& players) { return "{\"network\": {\"max_players\": " + players + "}}"; }
+std::string players_json(int players) { return players_json(std::to_string(players)); }
+
 }  // namespace
 
 TEST_CASE("a game ticks at game.json's tick_hz, else at 60") {
@@ -157,12 +161,12 @@ TEST_CASE("objects send game.json's network send_hz poses a second, else 20") {
 TEST_CASE("a game holds game.json's network max_players, else 16") {
   constexpr int kMatchPlayers = 32;
   CHECK(manifest_of("{}").settings.max_players == net::kDefaultRoomSize);
-  const GameManifest match = manifest_of(R"({"network": {"max_players": 32}})");
+  const GameManifest match = manifest_of(players_json(kMatchPlayers));
   CHECK(match.settings.max_players == kMatchPlayers);
   CHECK(match.max_players_error.empty());
   for (const char* unusable : {"1", "64", "20.5", "\"many\""}) {
     CAPTURE(unusable);
-    const GameManifest manifest = manifest_of(std::string("{\"network\": {\"max_players\": ") + unusable + "}}");
+    const GameManifest manifest = manifest_of(players_json(unusable));
     CHECK(manifest.settings.max_players == net::kDefaultRoomSize);
     CHECK(manifest.max_players_error.find("network.max_players must be a whole number from 2 to 63") !=
           std::string::npos);
@@ -170,14 +174,15 @@ TEST_CASE("a game holds game.json's network max_players, else 16") {
 }
 
 TEST_CASE("a game hosted by a player takes as many machines as game.json's max_players") {
-  const TempGame game(R"({"network": {"max_players": 24}})");
+  constexpr int kTeamsPlayers = 24;
+  const TempGame game(players_json(kTeamsPlayers));
   EngineOptions options;
   options.game_dir = game.dir;
   const SceneDesc scene;
   options.scene = &scene;
   auto created = Engine::create(options);
   if (auto* failed = std::get_if<std::string>(&created)) FAIL(*failed);
-  CHECK(std::get<std::unique_ptr<Engine>>(created)->network().room_size() == 24);
+  CHECK(std::get<std::unique_ptr<Engine>>(created)->network().room_size() == kTeamsPlayers);
 }
 
 TEST_CASE("a game with network settings plays online, as one with \"network\": true does") {

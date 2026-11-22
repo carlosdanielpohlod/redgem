@@ -151,8 +151,10 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
     lost_ = true;  // (its network stalled, most likely: what reconnecting is for too)
     return;
   }
-  if (!gathering_ || outgoing_.size() >= kGatheredBytes) flush();
+  if (sends_at_once()) flush();
 }
+
+bool Connection::sends_at_once() const { return !gathering_ || outgoing_.size() >= kGatheredBytes; }
 
 void Connection::flush() {
   if (!can_write()) return;
