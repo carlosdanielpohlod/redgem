@@ -176,6 +176,8 @@ Where an object is, how it is turned and how big it is.
 
 - `position -> Vector3`: its position in the world (Vector3)
 - `position = Vector3 vector`: moves it; a physics object is teleported
+- `render_position -> Vector3`: where it is drawn this frame: between its body's last two physics steps (or those of the body it rides on); its position otherwise *Experimental.*
+- `render_rotation -> Vector3`: how it is turned as drawn this frame, in degrees (see render_position) *Experimental.*
 - `local_position -> Vector3`: its position relative to its parent
 - `local_position = Vector3 vector`: moves it relative to its parent
 - `rotation -> Vector3`: its rotation, Euler degrees (Vector3)

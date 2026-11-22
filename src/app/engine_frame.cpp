@@ -262,10 +262,10 @@ void Engine::hand_to_presenter() {
                        &context_.material_emission, context_.backdrop_blur, &decals_});
 }
 
-// A frame that took a whole step, or whose step is still on the physics thread, draws the last step
-// it has: the clock's share is of a step it does not have yet. (Each frame then stays about a step
-// behind the clock.)
-bool Engine::draws_last_step() const { return !paced_by_clock() || step_in_flight_; }
+// A frame that took a whole step, or whose step is waiting for or on the physics thread (as its
+// scripts run, then as it is drawn), draws the last step it has: the clock's share is of a step it
+// does not have yet. (Each frame then stays about a step behind the clock.)
+bool Engine::draws_last_step() const { return !paced_by_clock() || step_prepared_ || step_in_flight_; }
 
 float Engine::drawn_share() const { return draws_last_step() ? 1.0f : std::clamp(clock_.alpha(), 0.0f, 1.0f); }
 
