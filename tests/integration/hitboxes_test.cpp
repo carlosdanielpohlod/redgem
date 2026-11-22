@@ -17,16 +17,17 @@ using namespace redgem::test::physics_game;
 namespace {
 
 // The skinned fixture: a Rig holding an Arm skinned to two bones, Lower and Upper above it, whose
-// one-second Wave clip bends Upper about X, playing in a loop from the start.
+// one-second Wave clip bends Upper about X from upright to level (easing in and out), playing in a
+// loop from the start.
 // The hit box layer meets nothing: rays find it, bodies pass through it.
 constexpr const char* kGame =
     R"({"title": "Hits", "physics": {"layers": ["default", "hitbox"], "collides": {"hitbox": []}}})";
-constexpr int kQuarterSecond = 15;
-constexpr float kMoved = 0.3f;  // meters the hand box goes, at least, in a quarter second
+constexpr int kThreeQuarterSecond = 45;  // frames: Upper is bent about 80 degrees by then
+constexpr float kMoved = 1.0f;           // meters the hand box, a meter out along Upper, goes by then
 
 constexpr const char* kBuild =
     "$boxes = Hitboxes.build(Scene.find('Rig'), {"
-    "  'Upper' => { region: :hand, size: [0.4, 0.8, 0.4], offset: [0, 0.4, 0] },"
+    "  'Upper' => { region: :hand, size: 0.4, offset: [0, 1, 0] },"
     "  'Lower' => { region: :forearm, shape: :capsule, size: [0.4, 1.6, 0.4], offset: [0, 1, 0] }"
     "}, layer: 'hitbox')";
 
@@ -80,7 +81,7 @@ TEST_CASE("hit boxes follow the animated pose, and a ray meets the box where it 
   frames(engine, 1);
   ruby(engine, "$before = $boxes[0].transform.position");
   CHECK(region_at(engine, "$before") == ":hand");
-  for (int frame = 0; frame < kQuarterSecond; ++frame) {
+  for (int frame = 0; frame < kThreeQuarterSecond; ++frame) {
     frames(engine, 1);
     CHECK(region_at(engine, "$boxes[0].transform.position") == ":hand");  // every frame, where it is now
   }

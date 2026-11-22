@@ -49,6 +49,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Particles`](#particles) | Short-lived sparks, smoke and dust. | [Stable](stability.md) |
 | [`Particles::Emitter`](#particlesemitter) | A continuous particle effect attached to an object, returned by Particles.emitter. | [Experimental](stability.md) |
 | [`Decals`](#decals) | Marks laid on the scene's surfaces: bullet holes, scorches, cracks. | [Experimental](stability.md) |
+| [`Hitboxes`](#hitboxes) | Hit boxes on an animated character's bones, and the body part a shot hit. | [Experimental](stability.md) |
 | [`Scatter`](#scatter) | Great numbers of copies of a mesh (grass, trees, rocks), drawn only. | [Stable](stability.md) |
 | [`Save`](#save) | What the game keeps between runs. | [Stable](stability.md) |
 | [`HTTP`](#http) | Web requests; the answer comes to the block. | [Stable](stability.md) |
@@ -885,6 +886,15 @@ Marks laid on the scene's surfaces: bullet holes, scorches, cracks. *Experimenta
 - `Decals.clear -> void`: removes every mark *Experimental.*
 
 Marks darken what they lie on (their color multiplies it), so they take its light and shade. They stay on the object they fell on as it moves, and go with it when it is destroyed or hidden. Skinned meshes, meshes with shape keys, prefabs, the view model, water, and see-through or cut-out materials take none; a two-sided surface takes them on both sides. Marks are local: never sent to other machines, and a machine that draws nothing keeps none. A scene loaded anew starts without them.
+
+## Hitboxes
+
+Hit boxes on an animated character's bones, and the body part a shot hit. *Experimental.* See [gameplay.md#hit-boxes-on-animated-characters](gameplay.md#hit-boxes-on-animated-characters).
+
+- `Hitboxes.build(GameObject character, Hash[String | Symbol, Hash[Symbol, untyped]] map, layer: String | Symbol | nil = nil) -> Array[GameObject]`: makes a kinematic box, capsule or sphere under each named bone (region:, size:, offset:, shape:), kept where its bone is every frame; returns them *Experimental.*
+- `Hitboxes.region(Hash[Symbol, untyped] | nil hit) -> Symbol | nil`: the region of the hit box a raycast hit met, or nil for no hit or anything else *Experimental.*
+
+A hit box is a child object of its bone (props region, hitbox and layer), so destroying the character takes its boxes along. Boxes are posed where the game runs, a dedicated server included: the host judges hits against the pose it shows, which for another player's character follows that player's synced animation, a moment behind (no lag compensation).
 
 ## Scatter
 
