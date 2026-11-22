@@ -30,6 +30,8 @@ class PrefabPreview {
   static Counts counts(const SceneDesc& scene);
   void load(const SceneDesc& document, const std::filesystem::path& game_dir, const prefabs::Limits& limits);
   void report(const std::string& error);
+  // The terrains' weights painted since (false when the terrains are not the snapshot's any more).
+  bool sync_weights(const SceneDesc& document);
   void remember_references(const SceneDesc& document);
   bool reference_unchanged(const NodeDesc& node, int id) const;
   bool refresh_root_node(const NodeDesc& authored, int node, const prefabs::Origin& origin);

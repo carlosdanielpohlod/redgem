@@ -74,8 +74,9 @@ void SceneDocument::clear_redo() {
 bool SceneDocument::drop_oldest_step() {
   const bool mesh_left = uncount_step(undo_.front());
   const bool pictures_left = shows_pictures(undo_.front().materials);
+  const bool weights_left = !undo_.front().weights.empty();  // (copies of them may go with it)
   undo_.erase(undo_.begin());
-  return mesh_left || pictures_left;
+  return mesh_left || pictures_left || weights_left;
 }
 
 bool SceneDocument::uncount_step(const Snapshot& step) {
