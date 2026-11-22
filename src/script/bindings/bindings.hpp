@@ -20,6 +20,7 @@ void install_exposure_bindings(mrb_state* mrb);
 void install_physics_bindings(mrb_state* mrb);
 void install_rigidbody_bindings(mrb_state* mrb);
 void install_physics_query_bindings(mrb_state* mrb);
+void install_rewind_bindings(mrb_state* mrb);
 void install_joint_bindings(mrb_state* mrb);
 void install_light_bindings(mrb_state* mrb);
 void install_navigation_bindings(mrb_state* mrb);

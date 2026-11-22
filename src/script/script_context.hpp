@@ -157,6 +157,16 @@ struct ScriptContext {
   // grid now. Null outside a running engine.
   Navigation* navigation = nullptr;
   std::function<void()> bake_navigation;
+  // Lag compensation (Physics.rewind, app/lag_history.hpp): what the engine does with the host's
+  // history. Null outside a running engine; `rewind` gives nothing but on the host.
+  struct LagCompensation {
+    std::function<void(ObjectId)> track;
+    std::function<void(ObjectId, double)> shown;
+    std::function<std::optional<double>(double)> rewind;  // the time it went to
+    std::function<void()> restore;
+    double longest = 0.0;  // seconds a rewind goes back at most (game.json's network.max_rewind_ms)
+  };
+  LagCompensation lag;
   // The running scene's water surfaces, as the simulation last found them (Water). Null outside a
   // running engine.
   const std::vector<WaterSurface>* water = nullptr;

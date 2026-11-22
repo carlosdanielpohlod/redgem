@@ -50,6 +50,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
   if (!manifest.send_hz_error.empty()) log::warning(manifest.send_hz_error);
+  if (!manifest.max_rewind_error.empty()) log::warning(manifest.max_rewind_error);
   if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
@@ -63,6 +64,7 @@ void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
   context.send_hz = settings.send_hz;
+  context.lag.longest = settings.max_rewind_ms * config::kSecondsPerMillisecond;
   context.ui_reference = settings.ui;
   context.menu_settings = settings.menu;
 }
@@ -292,6 +294,27 @@ void Engine::connect_world() {
   context_.navigation = &navigation_;
   context_.water = &water_.surfaces();
   context_.bake_navigation = [this] { bake_navigation(); };
+  connect_lag_compensation();
+}
+
+void Engine::connect_lag_compensation() {
+  context_.lag.track = [this](ObjectId id) { lag_.track(scene_, id); };
+  context_.lag.shown = [this](ObjectId id, double at) { lag_.shown_at(id, at); };
+  context_.lag.rewind = [this](double time) { return rewind_to(time); };
+  context_.lag.restore = [this] { lag_.restore(scene_, *physics_); };
+}
+
+std::optional<double> Engine::rewind_to(double time) {
+  if (!network_.hosting()) return std::nullopt;
+  const double went = lag_.clamped(time, network_.clock());
+  if (!lag_.rewind(scene_, *physics_, went)) return std::nullopt;
+  return went;
+}
+
+void Engine::record_lag() {
+  if (!network_.hosting()) return;
+  lag_.set_longest(context_.lag.longest);
+  lag_.record(scene_, *physics_, network_.clock());
 }
 
 void Engine::connect_network() {

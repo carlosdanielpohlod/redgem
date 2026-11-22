@@ -6,6 +6,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_object.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/components.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/physics.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/physics_rewind.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/joint.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/navigation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
@@ -494,6 +495,7 @@ redgem_add_library(redgem_runtime
   script/bindings/physics_bindings.cpp
   script/bindings/physics_args.cpp
   script/bindings/physics_query_bindings.cpp
+  script/bindings/rewind_bindings.cpp
   script/bindings/rigidbody_bindings.cpp
   script/bindings/joint_args.cpp
   script/bindings/joint_bindings.cpp
@@ -648,6 +650,7 @@ redgem_add_library(redgem_runtime
   app/scene_activation.cpp
   app/scene_bodies.cpp
   app/render_poses.cpp
+  app/lag_history.cpp
   app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp

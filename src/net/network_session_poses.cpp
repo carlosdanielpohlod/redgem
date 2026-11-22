@@ -61,20 +61,24 @@ PoseUpdate whole_pose(const PoseUpdate& update, const Pose& shown) {
 bool NetworkSession::send_pose(const std::string& key, Vec3 position, Quat rotation,
                                const std::optional<Animated>& animated) {
   if (!can_send_pose(key, position, rotation)) return false;
-  return deliver(pose_message(encoded(poses_.sent.update(key, position, rotation, animated)), id_), kEveryone);
+  const nlohmann::json message = pose_message(encoded(poses_.sent.update(key, position, rotation, animated)), id_);
+  return deliver(relaying() ? stamped(message, clock_) : message, kEveryone);
 }
 
 void NetworkSession::hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   const int from = message.value(kFrom, 0);
-  if (message[kKind] == kPose) return hear_pose(from, message[kData].get_binary(), events);
-  events.push_back(NetworkEvent::message(from, message[kName], message.value(kData, nlohmann::json())));
+  if (message[kKind] == kPose) return hear_pose(from, message, events);
+  // (Only the host goes by when a guest says it saw the others: see Physics.rewind.)
+  const std::optional<double> seen_at = relaying() ? time_in(message, kViewTime) : std::nullopt;
+  events.push_back(NetworkEvent::message(from, message[kName], message.value(kData, nlohmann::json()), seen_at));
 }
 
-void NetworkSession::hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events) {
-  const auto update = decoded(pose);
+void NetworkSession::hear_pose(int from, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
+  const auto update = decoded(message[kData].get_binary());
   if (!update) return;  // not a pose: nothing of it is used
   if (const auto whole = poses_.heard.take(from, *update)) {
-    events.push_back(NetworkEvent::message(from, kPoseMessageName, placement(*update, *whole)));
+    const auto at = time_in(message, kHostTime);
+    events.push_back(NetworkEvent::message(from, kPoseMessageName, placement(*update, *whole), at));
   }
 }
 
@@ -97,7 +101,7 @@ void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed
   if (verdict.ignored) return;  // more objects than are followed: nobody hears of it
   const Pose shown{verdict.position, claimed->rotation};
   relay_pose(link.peer, *update, shown, passed, verdict.valid);
-  events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(*update, shown)));
+  events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(*update, shown), clock_));
   if (!verdict.valid) correct(link, update->key, verdict.position, verdict.kick);
 }
 
@@ -110,7 +114,7 @@ void NetworkSession::relay_pose(int from, const PoseUpdate& update, const Pose& 
     return;
   }
   if (diverged_of(from) < kMaxDivergedObjects) diverged_.insert(source);
-  queue_for_everyone_but(from, pose_message(encoded(whole_pose(update, shown)), from));
+  queue_for_everyone_but(from, stamped(pose_message(encoded(whole_pose(update, shown)), from), clock_));
 }
 
 bool NetworkSession::passes_as_sent(const std::pair<int, std::string>& source, const PoseUpdate& update,

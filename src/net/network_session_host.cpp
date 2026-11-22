@@ -58,7 +58,9 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
   take_from_game(link, passed_on(message, link.peer), events);
 }
 
-void NetworkSession::take_from_game(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events) {
+void NetworkSession::take_from_game(Link& link, const nlohmann::json& given, std::vector<NetworkEvent>& events) {
+  // A pose goes on stamped with when the host passed it on: the time the others show it at.
+  const nlohmann::json passed = given[kKind] == kPose ? stamped(given, clock_) : given;
   if (checks_movement(passed)) {
     relay_checked_pose(link, passed, events);
     return;

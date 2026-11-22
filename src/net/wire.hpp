@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -79,7 +80,7 @@ namespace wire {
 // turned away, told why, and both sides log it: nothing of one version is understood by another.
 // What says so never changes, so that every version understands it: a frame (length, then
 // MessagePack) holding a map with kKind, kVersion and, in a refusal, kReason.
-inline constexpr int kProtocolVersion = 2;
+inline constexpr int kProtocolVersion = 3;
 // The largest a version that arrives can be (a number past it is not one).
 inline constexpr int kLargestProtocolVersion = 65535;
 
@@ -125,7 +126,12 @@ inline constexpr const char* kResume = "u";
 inline constexpr const char* kWindow = "z";
 inline constexpr const char* kBye =
     "e";  // a guest to its host: I leave (no place to hold); the host to all: the game is over
-inline constexpr const char* kBack = "b";  // to the others: kFrom reconnected (it missed what was said meanwhile)
+inline constexpr const char* kBack = "b";
+// Lag compensation. On a pose the host passes on (and one it sends): its clock when it did, in
+// seconds (NetworkSession::clock). On a guest's game message: the host time the guest showed the
+// others at as it sent it (Network.view_time).
+inline constexpr const char* kHostTime = "ht";
+inline constexpr const char* kViewTime = "vt";  // to the others: kFrom reconnected (it missed what was said meanwhile)
 
 // The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
 // handed out again once free, so they never outgrow what a message may carry.
@@ -139,6 +145,12 @@ nlohmann::json pose_message(const std::vector<std::uint8_t>& pose, int from);
 // A message from a machine in the game as it is passed on to the others: from whom the host (or
 // relay) knows it is, whatever it claims, and to whom it says.
 nlohmann::json passed_on(const nlohmann::json& message, int from);
+// Whether `message` holds a time under `key` (kHostTime, kViewTime): a finite number.
+bool holds_time(const nlohmann::json& message, const char* key);
+// That time, when it holds one.
+std::optional<double> time_in(const nlohmann::json& message, const char* key);
+// `message` (a pose) stamped with the host's clock as it passes it on.
+nlohmann::json stamped(nlohmann::json message, double host_time);
 // Whether what arrived is a message of ours, every field of the kind it should be (a list of
 // peers: ids there can be, each once, and fewer than a full game). Anything else comes from a
 // broken or hostile program, and nothing of it is used.

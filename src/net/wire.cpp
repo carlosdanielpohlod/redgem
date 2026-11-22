@@ -3,6 +3,7 @@
 #include "net/wire.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace redgem::net::wire {
 
@@ -18,9 +19,25 @@ nlohmann::json pose_message(const std::vector<std::uint8_t>& pose, int from) {
   return {{kKind, kPose}, {kFrom, from}, {kData, nlohmann::json::binary(pose)}};
 }
 
+bool holds_time(const nlohmann::json& message, const char* key) {
+  const auto found = message.find(key);
+  return found != message.end() && found->is_number() && std::isfinite(found->get<double>());
+}
+
+std::optional<double> time_in(const nlohmann::json& message, const char* key) {
+  if (!holds_time(message, key)) return std::nullopt;
+  return message[key].get<double>();
+}
+
+nlohmann::json stamped(nlohmann::json message, double host_time) {
+  message[kHostTime] = host_time;
+  return message;
+}
+
 nlohmann::json passed_on(const nlohmann::json& message, int from) {
   nlohmann::json passed = {{kKind, message[kKind]}, {kFrom, from}, {kData, message.value(kData, nlohmann::json())}};
   if (message.contains(kName)) passed[kName] = message[kName];
+  if (holds_time(message, kViewTime)) passed[kViewTime] = message[kViewTime];
   const int to = message.value(kTo, kEveryone);
   if (to != kEveryone) passed[kTo] = to;
   return passed;

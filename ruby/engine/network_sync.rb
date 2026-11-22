@@ -64,8 +64,8 @@ module Network
     # Whether an object is this machine's in a game: one the others have to hear about.
     def shared_by_me?(owner) = online? && owner == id
 
-    def receive_sync(data, from)
-      @synced[data[0]]&.__receive(data[1], data[2], from, data[3]) if Said.placement?(data)
+    def receive_sync(data, from, at = nil)
+      @synced[data[0]]&.__receive(data[1], data[2], from, data[3], at) if Said.placement?(data)
     end
 
     # A spawned object was destroyed here: when it was this machine's, the others lose it too.
@@ -128,6 +128,7 @@ class NetworkSync < Behaviour
 
   def start
     Network.__track(self)
+    Physics.__lag_track(game_object)  # (the host keeps where it was a moment ago: Physics.rewind)
     @since_sent = 0.0
     watch_afresh
   end
@@ -172,7 +173,8 @@ class NetworkSync < Behaviour
 
   # Where the owner says the object is, and what its animation does when that came along. Only the
   # owner is believed.
-  def __receive(position, rotation, from, animation = nil)
+  # `at`: when the host passed the pose on (Network.time), when it says.
+  def __receive(position, rotation, from, animation = nil, at = nil)
     return unless from == owner
 
     @position = Vector3[*position]
@@ -180,7 +182,7 @@ class NetworkSync < Behaviour
     animation = nil unless animated?
     return take_animation(animation) unless @snapshots
 
-    @snapshots.add(@position, @rotation, animation)
+    @snapshots.add(@position, @rotation, animation, at)
   end
 
   # The host did not believe a move of the object (Network.validate_movement): it is put back
@@ -208,6 +210,16 @@ class NetworkSync < Behaviour
 
     transform.position = position
     transform.rotation = rotation
+    note_shown_at(@snapshots.shown_at)
+  end
+
+  # The host time the object is shown at now: what the others' shots at it were aimed at (see
+  # Physics.rewind), on the host as on the machine that shows it.
+  def note_shown_at(at)
+    return unless at
+
+    Network.__shown_at(at)
+    Physics.__lag_shown(game_object, at)
   end
 
   # Does what the owner said its animation did, `late` seconds ago (shown as far behind as its pose).

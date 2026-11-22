@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 
+#include <optional>
 #include <vector>
 
 #include "core/config.hpp"
@@ -47,6 +48,26 @@ mrb_value network_port(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, ne
 mrb_value network_peers(mrb_state* mrb, mrb_value) { return ids_value(mrb, network(mrb).peers()); }
 mrb_value network_players(mrb_state* mrb, mrb_value) { return ids_value(mrb, network(mrb).players()); }
 mrb_value network_send_hz(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, binding::context(mrb).send_hz); }
+mrb_value network_time(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, network(mrb).clock()); }
+
+// Network.__view_time = seconds or nil: the host time this machine shows the others at, for the
+// messages it sends (NetworkSession::set_view_time).
+mrb_value network_set_view_time(mrb_state* mrb, mrb_value) {
+  mrb_value seconds = mrb_nil_value();
+  mrb_get_args(mrb, "o", &seconds);
+  if (mrb_nil_p(seconds)) {
+    network(mrb).set_view_time(std::nullopt);
+  } else {
+    network(mrb).set_view_time(mrb_as_float(mrb, seconds));
+  }
+  return seconds;
+}
+
+// The network's clock, and when this machine shows the others (lag compensation).
+void install_network_time_bindings(RClass* network_module, mrb_state* mrb) {
+  mrb_define_module_function(mrb, network_module, "time", network_time, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "__view_time=", network_set_view_time, MRB_ARGS_REQ(1));
+}
 
 }  // namespace
 
@@ -69,6 +90,7 @@ void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
   // The fewest and most poses a second an object's NetworkSync may send (its send_hz setting).
   mrb_define_const(mrb, network_module, "MIN_SEND_HZ", mrb_int_value(mrb, config::kMinSendHz));
   mrb_define_const(mrb, network_module, "MAX_SEND_HZ", mrb_int_value(mrb, config::kMaxSendHz));
+  install_network_time_bindings(network_module, mrb);
 }
 
 }  // namespace redgem

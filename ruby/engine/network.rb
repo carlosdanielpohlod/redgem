@@ -171,8 +171,22 @@ module Network
       __deliver(name, data, to)
     end
 
-    # Runs the block with a message's data and the id of who sent it.
+    # Runs the block with a message's data, the id of who sent it and, on the host, the time the
+    # sender showed the others at when it sent it (its view time; nil from the host itself or
+    # offline): a shot judged there is traced in Physics.rewind(view_time) { ... }.
     def on(name, &block) = (@handlers[name.to_s] ||= []) << block
+
+    # The time on the host's clock (Network.time) this machine shows the others' objects at: a
+    # moment behind the host, since their poses come through it and are shown a little behind the
+    # newest (NetworkSync). Every message a guest sends carries it, for the host to judge a shot
+    # by what the shooter saw. On the host, and out of a game, the network's time now.
+    def view_time = host? || !online? ? time : @view_time || time
+
+    # A watched object was shown at host time `at` this frame.
+    def __shown_at(at)
+      @view_time = at
+      self.__view_time = at unless host?
+    end
 
     def on_connect(&block) = listen(:connected, block)        # this machine is in the game
     def on_fail(&block) = listen(:failed, block)              # |reason| the join did not work out (reason may be nil)
@@ -183,10 +197,11 @@ module Network
     def on_reconnected(&block) = listen(:reconnected, block)   # |peer| it is back in its place, with its id
     def on_lost(&block) = listen(:lost, block)                 # |reason| this machine could not get back in
 
-    # Called by the engine for everything that happens on the network.
-    def __event(kind, peer, name, data, ticket = 0)
-      return receive(name, data, peer) if kind == :message
-      return consider(peer, data, ticket) if kind == :approval
+    # Called by the engine for everything that happens on the network. `detail`: a message's time
+    # on the host's clock (see receive), or an approval's ticket.
+    def __event(kind, peer, name, data, detail = nil)
+      return receive(name, data, peer, detail) if kind == :message
+      return consider(peer, data, detail.to_i) if kind == :approval
 
       happened(kind, peer, name)
     end
@@ -265,12 +280,26 @@ module Network
 
     # A message came: one of the engine's own, or one for the game's handlers.
     # (What is said about objects between two levels is of a level this machine does not have.)
-    def receive(name, data, from)
-      engine_message = ENGINE_MESSAGES[name]
+    # `time`: for a pose, when the host passed it on; for a guest's message heard on the host, the
+    # time the guest showed the others at as it sent it (its view time, for Physics.rewind).
+    def receive(name, data, from, time = nil)
       return if Level.holds?(name)
-      return __send__(engine_message, data, from) if engine_message
+      return receive_engine_message(name, data, from, time) if ENGINE_MESSAGES.key?(name)
 
-      (@handlers[name] || []).dup.each { |block| block.call(data, from) }
+      (@handlers[name] || []).dup.each { |block| hand_to(block, data, from, time) }
+    end
+
+    # One of the engine's own messages: a pose takes its time too.
+    def receive_engine_message(name, data, from, time)
+      return receive_sync(data, from, time) if name == SYNC
+
+      __send__(ENGINE_MESSAGES[name], data, from)
+    end
+
+    # A handler gets what was sent, who sent it and its view time, as many of them as it takes.
+    def hand_to(block, data, from, time)
+      given = [data, from, time]
+      block.lambda? && block.arity >= 0 ? block.call(*given.first(block.arity)) : block.call(*given)
     end
   end
 end

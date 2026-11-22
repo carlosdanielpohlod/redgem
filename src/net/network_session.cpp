@@ -38,10 +38,12 @@ NetworkEvent NetworkEvent::approval(int peer, int ticket, const nlohmann::json& 
   return event;
 }
 
-NetworkEvent NetworkEvent::message(int from, const std::string& name, const nlohmann::json& data) {
+NetworkEvent NetworkEvent::message(int from, const std::string& name, const nlohmann::json& data,
+                                   std::optional<double> time) {
   NetworkEvent event = of(Kind::Message, from);
   event.name = name;
   event.data = data;
+  event.time = time;
   return event;
 }
 
@@ -168,6 +170,7 @@ void NetworkSession::say_bye() {
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   std::vector<NetworkEvent> events;
   if (offline()) return events;
+  clock_ += seconds;
   events.swap(pending_events_);
   movement_.advance(seconds);
   placed_.advance(seconds);
@@ -242,7 +245,9 @@ void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
 
 bool NetworkSession::send(const std::string& name, const nlohmann::json& data, int to) {
   if (!can_send(name, data, to)) return false;
-  return deliver(game_message(name, data, id_, to), to);
+  nlohmann::json message = game_message(name, data, id_, to);
+  if (view_time_ && !relaying()) message[kViewTime] = *view_time_;
+  return deliver(message, to);
 }
 
 bool NetworkSession::deliver(const nlohmann::json& message, int to) {

@@ -164,6 +164,7 @@ void Engine::update_frame(float delta) {
   process_destroyed();
   head_aims_.apply(scene_, delta);  // heads turn on top of the clips' pose and the scripts'
   if (context_.renders_particles) particle_emitters_.advance(delta, scene_, particles_);
+  record_lag();  // (where the frame shows them, all moved)
 }
 
 void Engine::apply_root_motion() {

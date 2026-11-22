@@ -38,6 +38,7 @@
 #include "app/game_settings.hpp"
 #include "app/game_identity.hpp"
 #include "app/presenter.hpp"
+#include "app/lag_history.hpp"
 #include "app/render_poses.hpp"
 #include "app/scene_activation.hpp"
 #include "storage/save_store.hpp"
@@ -235,6 +236,13 @@ class Engine {
   void connect_audio();
   // The scene, its bodies and its navigation, for the scripts.
   void connect_world();
+  // Physics.rewind's hooks (ScriptContext::LagCompensation).
+  void connect_lag_compensation();
+  // Rewinds what the host keeps to where it was shown at `time`, clamped; the time it went to, or
+  // nothing when this machine is not the host or is rewound already.
+  std::optional<double> rewind_to(double time);
+  // Keeps, on the host, where this frame showed the objects the network keeps in step.
+  void record_lag();
   void connect_saves();
   void select_save_slot(const std::string& name);
   void fill_context(const GameSettings& settings);
@@ -399,6 +407,7 @@ class Engine {
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
+  LagHistory lag_;  // on the host: where the objects the network keeps in step were shown (Physics.rewind)
   RenderPoses render_poses_;  // where the bodies the physics moves are drawn, between two steps
   DebugDrawBuffer debug_draw_;
   FrameProfiler profiler_;

@@ -77,11 +77,16 @@ struct NetworkEvent {
   std::string name;  // a message's; a Failed join's reason, when the host gave one
   nlohmann::json data;
   int ticket = 0;  // an Approval's: what the decision names
+  // A message's time on the host's clock (NetworkSession::clock), when it has one: for a pose, when
+  // the host passed it on (or heard it); for a guest's message heard on the host, the time the guest
+  // showed the others at as it sent it (NetworkSession::set_view_time).
+  std::optional<double> time;
 
   // Something that happened, to or about `peer`.
   static NetworkEvent of(Kind kind, int peer = 0);
-  // What `from` said.
-  static NetworkEvent message(int from, const std::string& name, const nlohmann::json& data);
+  // What `from` said, at `time` (see above).
+  static NetworkEvent message(int from, const std::string& name, const nlohmann::json& data,
+                              std::optional<double> time = std::nullopt);
   // A newcomer who would be `peer` asks to come in, with what it carries for the game to decide on.
   static NetworkEvent approval(int peer, int ticket, const nlohmann::json& auth);
 };
@@ -176,6 +181,12 @@ class NetworkSession {
 
   // Moves messages in and out. `seconds` since the last call, for giving up on a join.
   std::vector<NetworkEvent> poll(float seconds);
+  // Seconds this machine's network has run: the seconds its polls were told, added up. The host's
+  // is the game's clock for what happened when (lag compensation): it stamps the poses it passes on.
+  double clock() const { return clock_; }
+  // The host time this machine shows the others' objects at (Network.view_time), sent with each
+  // message of its game it sends from now on (nothing: none). Only a guest's is sent.
+  void set_view_time(std::optional<double> view_time) { view_time_ = view_time; }
   // What a wait for this machine's network watches (see Socket::wait): the socket a game hosted
   // here listens on first, then every connection, in the order they were made. For a loop with
   // nothing to do until something arrives (machines on one computer, in a test), between polls.
@@ -367,7 +378,7 @@ class NetworkSession {
   // What another machine in the game sent, passed on by the host or not: a message, or a pose
   // (network_session_poses.cpp).
   void hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
-  void hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events);
+  void hear_pose(int from, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   // ... on the host, with movement validation: whether a message a machine sent is a pose to check.
   // (Also once turned off, while the others place an object where the host believed it.)
   bool checks_movement(const nlohmann::json& message) const {
@@ -509,6 +520,8 @@ class NetworkSession {
   std::vector<Link> links_;
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;
+  double clock_ = 0.0;                       // see clock()
+  std::optional<double> view_time_;          // see set_view_time()
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
   float reconnect_window_ = 0.0f;             // seconds a dropped machine's place is held (allow_reconnect)
   std::vector<Held> held_;                    // ... on the host

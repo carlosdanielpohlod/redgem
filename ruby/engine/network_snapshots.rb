@@ -15,7 +15,8 @@ class NetworkSync < Behaviour
     LONGEST_GAP = 0.5         # seconds between two arrivals past which it was a pause, not the pace
     MAX_EXTRAPOLATION = 0.2   # seconds an object goes on past its newest pose when the next one is late
 
-    Pose = Struct.new(:time, :position, :rotation)
+    # `at`: when the host passed the pose on, on its clock (Network.time), when it said.
+    Pose = Struct.new(:time, :position, :rotation, :at)
 
     # `interval`: the seconds expected between poses. `delay`: seconds to show the object behind,
     # always (nil: as the arrivals say).
@@ -38,11 +39,11 @@ class NetworkSync < Behaviour
     # Where the owner says the object is, as of now. Far from where it was, it was moved there at
     # once (a teleport): the poses before are forgotten, so it is never shown sliding across.
     # An animation that came along is done when the object is shown at that moment.
-    def add(position, rotation, animation = nil)
+    def add(position, rotation, animation = nil, at = nil)
       newest = @poses.last
       make_way(newest, position) if newest
       go_on_from_shown(@clock - delay)
-      @poses << Pose.new(@clock, position, rotation)
+      @poses << Pose.new(@clock, position, rotation, at)
       @poses.shift while @poses.size > KEPT
       @animations << [@clock, animation] if animation
       @animations.shift while @animations.size > KEPT
@@ -64,8 +65,13 @@ class NetworkSync < Behaviour
       moment = @clock - delay
       drop_older_than(moment)
       shown = pose_at(moment)
+      @shown_at = shown.at
       [shown.position, shown.rotation]
     end
+
+    # The host time of the pose last shown (pose): as far between the times the host passed the two
+    # poses on as it is between them. nil until a pose with a time is shown.
+    attr_reader :shown_at
 
     private
 
@@ -81,7 +87,7 @@ class NetworkSync < Behaviour
 
       drop_older_than(moment)
       shown = pose_at(moment)
-      @poses = [Pose.new(moment, shown.position, shown.rotation)]
+      @poses = [Pose.new(moment, shown.position, shown.rotation, shown.at)]
     end
 
     def gone_on?(moment) = @poses.size > 1 && moment > @poses.last.time
@@ -113,7 +119,9 @@ class NetworkSync < Behaviour
     def blend(from, to, share)
       angles = from.rotation.to_a.zip(to.rotation.to_a)
       rotation = Vector3[*angles.map { |a, b| NetworkSync.toward(a, b, share) }]
-      Pose.new(nil, from.position.lerp(to.position, share), rotation)
+      Pose.new(nil, from.position.lerp(to.position, share), rotation, time_between(from.at, to.at, share))
     end
+
+    def time_between(from, to, share) = from && to ? from + ((to - from) * share) : to || from
   end
 end

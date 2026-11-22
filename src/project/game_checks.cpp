@@ -196,6 +196,7 @@ void check_game_file(const fs::path& game_dir, CheckReport& report) {
   if (!manifest.max_bodies_error.empty()) report.errors.push_back(manifest.max_bodies_error);
   if (!manifest.tick_hz_error.empty()) report.errors.push_back(manifest.tick_hz_error);
   if (!manifest.send_hz_error.empty()) report.errors.push_back(manifest.send_hz_error);
+  if (!manifest.max_rewind_error.empty()) report.errors.push_back(manifest.max_rewind_error);
   if (!manifest.prefab_budget_error.empty()) report.errors.push_back(manifest.prefab_budget_error);
   for (const std::string& warning : manifest.physics_warnings) report.warnings.push_back(warning);
 }

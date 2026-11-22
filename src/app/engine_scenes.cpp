@@ -105,6 +105,7 @@ void Engine::install_world(SceneActivation& incoming) {
   scene_desc_ = std::move(incoming.desc());
   scene_ = std::move(incoming.scene());
   render_poses_.clear();  // (the old scene's objects are not the new one's)
+  lag_.clear();
   adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
   settle_world();

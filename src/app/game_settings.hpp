@@ -56,6 +56,9 @@ struct GameSettings {
   // How many poses a second NetworkSync sends of an object that says nothing itself:
   //   "network": {"send_hz": 64}       (a "network" object also says the game plays online)
   int send_hz = config::kDefaultSendHz;
+  // How far back, in milliseconds, the host rewinds to judge a shot (Physics.rewind):
+  //   "network": {"max_rewind_ms": 150}
+  int max_rewind_ms = config::kDefaultMaxRewindMs;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
   // How many threads solve the game's physics: the "threads" key of the "physics" section (see
@@ -105,6 +108,9 @@ struct GameManifest {
   // What is wrong with the "network" section's "send_hz"; empty when it can be used or there is
   // none. (Objects send config::kDefaultSendHz poses a second instead; `redgem check` refuses it.)
   std::string send_hz_error;
+  // The same for its "max_rewind_ms". (The host rewinds config::kDefaultMaxRewindMs at most instead;
+  // `redgem check` refuses it.)
+  std::string max_rewind_error;
   // What is wrong with "prefab_budget_mb"; empty when it can be used or the file has none. (The
   // prefabs get the engine's budgets instead; `redgem check` refuses it.)
   std::string prefab_budget_error;

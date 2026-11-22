@@ -24,6 +24,12 @@ inline constexpr float kDefaultFixedDeltaSeconds = tick_seconds(kDefaultTickHz);
 inline constexpr int kDefaultSendHz = 20;
 inline constexpr int kMinSendHz = 5;
 inline constexpr int kMaxSendHz = kMaxTickHz;
+// How far back the host rewinds the objects the network keeps in step to judge a shot by what its
+// shooter saw (Physics.rewind): game.json's "network": {"max_rewind_ms": N}, from 0 (never) to
+// kMostMaxRewindMs. Past it, a shooter far away shoots at where the others were that long ago.
+inline constexpr int kDefaultMaxRewindMs = 200;
+inline constexpr int kMostMaxRewindMs = 1000;
+inline constexpr double kSecondsPerMillisecond = 0.001;
 // Upper bound for a single rendered frame so a debugger pause does not explode the simulation.
 inline constexpr float kMaxFrameSeconds = 0.25f;
 inline constexpr int kMaxFixedStepsPerFrame = 8;  // at kDefaultTickHz

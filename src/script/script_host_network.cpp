@@ -50,9 +50,16 @@ const char* network_event_name(net::NetworkEvent::Kind kind) {
 
 // A network event as what Network.__event takes. This makes Ruby values, which can fail: only
 // for where Ruby errors are caught.
+// The last of an event's arguments: a message's time on the host's clock (nil without one), or an
+// approval's ticket.
+mrb_value event_detail(mrb_state* mrb, const net::NetworkEvent& event) {
+  if (event.kind != net::NetworkEvent::Kind::Message) return mrb_int_value(mrb, event.ticket);
+  return event.time ? mrb_float_value(mrb, *event.time) : mrb_nil_value();
+}
+
 std::vector<mrb_value> event_arguments(mrb_state* mrb, const net::NetworkEvent& event) {
   return {mrb_symbol_value(mrb_intern_cstr(mrb, network_event_name(event.kind))), mrb_int_value(mrb, event.peer),
-          binding::text_value(mrb, event.name), value_from(mrb, event.data), mrb_int_value(mrb, event.ticket)};
+          binding::text_value(mrb, event.name), value_from(mrb, event.data), event_detail(mrb, event)};
 }
 
 }  // namespace
