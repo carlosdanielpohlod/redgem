@@ -55,6 +55,7 @@ unit/temp_dirs_test.cpp
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
   unit/import_settings_test.cpp
+  unit/lod_levels_test.cpp
   unit/mcp_test.cpp
   unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
@@ -727,7 +728,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/async_scene_render_test.cpp
                render_system/staged_upload_render_test.cpp
                render_system/specular_brdf_render_test.cpp
-               render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
+               render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/screen_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/mirrored_render_test.cpp
                render_system/view_model_render_test.cpp
