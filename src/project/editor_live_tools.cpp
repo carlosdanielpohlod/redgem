@@ -9,6 +9,7 @@
 #include "project/scene_assignments.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_diff.hpp"
+#include "project/prefab_edits.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
 #include "project/scene_lookup.hpp"
@@ -89,6 +90,18 @@ Json edit(EditorSession& session, const Json& args, bool busy) {
   const EditOutcome outcome = edit_scene(edit, args);  // one undo step, or none when it throws
   session.refresh_preview();
   select_outcome(session, outcome);
+  return tool_result(outcome.text);
+}
+
+// scene_prefab in the open scene: each change one undo step, its placement (or what unpack made)
+// selected.
+Json prefab(EditorSession& session, const Json& args, bool busy) {
+  if (reads_prefab(args.at("action")))
+    return tool_result(edit_prefab(session.document(), session.game_dir(), args).text);
+  require_editable(session, busy);
+  const PrefabOutcome outcome = edit_prefab(session.document(), session.game_dir(), args);
+  session.refresh_preview();
+  session.select(static_cast<ObjectId>(outcome.object));
   return tool_result(outcome.text);
 }
 
@@ -275,6 +288,7 @@ Json read(EditorSession& session, const std::string& name, const Json& args) {
 
 Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   if (name == "scene_edit") return edit(session, args, busy);
+  if (name == "scene_prefab") return prefab(session, args, busy);
   if (name == "editor") return control(session, args, busy, window);
   return read(session, name, args);
 }

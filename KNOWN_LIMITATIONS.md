@@ -71,12 +71,14 @@ the same pull request.
   off the muzzle by as much as the shake moves the picture.
 - Decals (`Decals.place`) only darken what they lie on (their color multiplies it): a mark lighter
   than its surface (white paint on a dark wall) cannot be made, and they do not shine or reflect.
-  They are cut from the surfaces' triangles when placed, on the machine's main thread: a mark on a
-  dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
-  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
-  with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
-  editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and see-through or
-  cut-out materials (glass, leaves, a fence) take none.
+  They are cut from the surfaces' triangles near them when placed, on the machine's main thread, and
+  a mark is cut short past 512 triangles. The triangles of a dense mesh (512 or more in a part) are
+  sorted for that as the scene loads, about 20 ms for each 130 000 (kept, about 2 MB); a model
+  spawned later is sorted at the first mark on it. A mesh reshaped in place while the game runs is
+  not sorted again: new marks on what moved may fall short. They are not in reflections, and fog
+  does not lighten them with distance. A mesh that changes shape after a mark is placed (a sculpted
+  terrain in the editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and
+  see-through or cut-out materials (glass, leaves, a fence) take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -280,6 +282,14 @@ the same pull request.
   picture is read. A sound's settings are read once per name while a game runs; the editor's
   Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
   of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
+- Levels of detail made on import (experimental): each level is a mesh of its own when the game
+  loads, so the vertices it shares with the full mesh in the file are held once per level in
+  memory. Meshes moved by a skeleton or by shape keys get no levels. A level is chosen by its
+  bounding sphere and the view's field of view: the shadow map and reflection captures draw the
+  level the camera sees. Each level copies its mesh object's tint, shadow, sway and visibility
+  props when it is made: a later change to them in the Inspector does not reach the levels.
+  Where two parts of a mesh (two materials) meet, their vertices stay put, so no crack opens;
+  separate meshes are simplified apart and may part a little where they touch.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
@@ -780,8 +790,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
-  bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials and terrain brushes still use files or the editor UI. Native
+  bounded viewport images, runtime queries, event history and prefab placements' overrides.
+  Model importing, saving an object as a prefab, materials and terrain brushes still use files or
+  the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try

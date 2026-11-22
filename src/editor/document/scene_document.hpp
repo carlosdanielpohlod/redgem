@@ -145,6 +145,12 @@ class SceneDocument {
   // and animations (shape keys and their weights too) come along. Models using several buffers
   // are refused; the model's lights/cameras are dropped.
   int import_model(const std::filesystem::path& path, std::string& error, int parent = kNoIndex);
+  // A level of detail of a mesh node: a child named `name` that draws `indices` (one list for each
+  // part of the node's mesh) of the same vertices, with `props`. The new mesh shares the file's
+  // vertex data. Unrecorded: it joins the step before (the model's import). Returns the child;
+  // kNoIndex when the node has no mesh or the lists do not fit its parts.
+  int add_detail_level(int node, const std::vector<std::vector<std::uint32_t>>& indices, const std::string& name,
+                       const PropertyMap& props);
 
   // Materials (shared by every object whose mesh uses them).
   int material_count() const { return static_cast<int>(desc_.materials.size()); }

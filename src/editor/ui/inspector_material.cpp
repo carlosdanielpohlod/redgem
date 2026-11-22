@@ -4,6 +4,7 @@
 #include "core/translations.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
+#include "editor/lod_levels.hpp"
 #include "editor/ui/inspector_cards.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
@@ -60,6 +61,16 @@ void draw_material(PanelContext& context, int material) {
   ImGui::PopID();
 }
 
+// How many triangles it has, at each level of detail when it has some.
+void draw_triangles(const SceneDesc& desc, int index) {
+  const std::vector<std::size_t> counts = lod_levels::level_triangles(desc, index);
+  if (counts.empty()) return;
+  const bool levelled = counts.size() > 1;
+  property_label(tr(levelled ? "editor.inspector.mesh.levels" : "editor.inspector.mesh.triangles"));
+  ImGui::TextUnformatted(lod_levels::counts_list(counts).c_str());
+  if (levelled) tooltip(tr("editor.inspector.mesh.levels_tooltip"));
+}
+
 }  // namespace
 
 void draw_mesh(PanelContext& context, int index) {
@@ -69,6 +80,7 @@ void draw_mesh(PanelContext& context, int index) {
   const MeshDesc& mesh = context.session.scene_desc().meshes[node.mesh];
   property_label(tr("editor.inspector.mesh.label"));
   ImGui::TextUnformatted(mesh.name.empty() ? tr("editor.inspector.mesh.unnamed") : mesh.name.c_str());
+  draw_triangles(context.session.scene_desc(), index);
   for (const int material : editor_logic::materials_of(mesh)) draw_material(context, material);
 }
 

@@ -53,6 +53,7 @@
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
 #include "render/scatter_chunks.hpp"
+#include "render/screen_levels.hpp"
 #include "render/shader_programs.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shadow_cascades.hpp"
@@ -145,7 +146,8 @@ struct RecordSource {
   float first_bone = 0.0f;
   float first_morph = 0.0f;
   float sway = 0.0f;
-  float record = 0.0f;  // its number
+  float record = 0.0f;            // its number
+  render_math::DrawnRange range;  // where it fades
 };
 
 // Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
@@ -567,8 +569,10 @@ struct Renderer::Impl {
   // Writes the shape keys an object shows at texel `first` (see morph_shapes.hpp), and says where
   // in `look`. Returns where the next object's texels go.
   std::size_t write_morphs(const GameObject& object, std::size_t first, render_math::InstanceLook& look);
+  // The distances an object is drawn at this frame (its level of detail's among them).
+  render_math::DrawnRange drawn_range_of(const GameObject& object) const;
   // Writes the record of the object in `slot`, unless it was written from the same last frame.
-  bool write_record(std::size_t slot, const render_math::InstanceLook& look);
+  bool write_record(std::size_t slot, const render_math::InstanceLook& look, const render_math::DrawnRange& range);
   // Writes an object's bones from texel `first` on: where each of its joints is now, times the
   // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
   std::optional<render_detail::SkeletonPose> pose_skeleton(const Scene& scene, const GameObject& object,

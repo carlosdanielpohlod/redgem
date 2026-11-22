@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
+  overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
+  file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor
+  each change is one undo step.
 - **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
   { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
   under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
@@ -33,6 +37,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   takes the surface's light and shade; without an image it is a soft round spot. It stays on the
   object it fell on as that moves. Marks are kept up to `Decals.limit` (256 unless set): past it the
   oldest goes. They are local looks: never sent over the network, and none on a dedicated server.
+  A mark is cut only from the triangles near it: the triangles of dense meshes are sorted as the
+  scene loads, so a mark on a 130 000-triangle terrain costs a few microseconds, fit for automatic
+  fire.
 - **Import settings for models, textures and sounds.** A sidecar next to an asset
   (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
   extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's
@@ -40,6 +47,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   Project panel, and applying a model's settings imports it again in the open scene.
   `redgem assets <game> --settings <asset> [field=value...]` shows and sets them. Experimental.
   See [Import settings](docs/import-settings.md).
+- **Levels of detail made on import.** A model's import settings (`lod_levels`, `lod_ratio`,
+  `lod_screen_size`, `lod_fade`) make lighter copies of each of its meshes with meshoptimizer when
+  the editor imports it. The game draws one level at a time by how big the mesh looks on screen,
+  and two levels cross-fade with a dither near each switch. The editor log and the Inspector's
+  mesh card show the triangles of each level. Experimental. See
+  [Levels of detail](docs/import-settings.md#levels-of-detail).
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why

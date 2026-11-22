@@ -27,6 +27,16 @@ void copy_parts(const NodeDesc& node, GameObject& object) {
   object.light = node.light;
 }
 
+float number_or(const PropertyMap& props, const char* key, float otherwise) {
+  return static_cast<float>(get_number(props, key).value_or(otherwise));
+}
+
+ScreenLevel screen_level_of(const PropertyMap& props) {
+  const ScreenLevel unset;
+  return {number_or(props, props::kScreenSizeFrom, unset.from), number_or(props, props::kScreenSizeTo, unset.to),
+          number_or(props, props::kLodRadius, unset.radius), number_or(props, props::kLodFade, unset.fade)};
+}
+
 // What a node's custom properties say about the object itself (its skeleton is known by then).
 void apply_props(const PropertyMap& props, GameObject& object) {
   object.props = props;
@@ -41,6 +51,7 @@ void apply_props(const PropertyMap& props, GameObject& object) {
   }
   if (const auto from = get_number(props, props::kVisibleFrom)) object.visible_from = static_cast<float>(*from);
   if (const auto to = get_number(props, props::kVisibleTo)) object.visible_to = static_cast<float>(*to);
+  object.screen_level = screen_level_of(props);
 }
 
 // The shape keys of its mesh, at the weights the mesh starts with.
