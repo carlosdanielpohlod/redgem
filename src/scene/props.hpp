@@ -134,6 +134,13 @@ inline constexpr const char* kGroundColor = "ground_color";
 inline constexpr const char* kFogColor = "fog_color";
 // Numbers.
 inline constexpr const char* kFogDensity = "fog_density";
+// Fog that lies low (experimental): the height it is fog_density thick at (meters, any sign), how
+// fast it thins going up (per meter), and how much sunlight it throws toward the eye.
+inline constexpr const char* kFogHeight = "fog_height";
+inline constexpr const char* kFogFalloff = "fog_falloff";
+inline constexpr const char* kFogSunScatter = "fog_sun_scatter";
+// The thin air of long distances (experimental): per meter at height 0.
+inline constexpr const char* kHaze = "haze";
 inline constexpr const char* kAmbient = "ambient";
 inline constexpr const char* kExposure = "exposure";
 inline constexpr const char* kBloom = "bloom";

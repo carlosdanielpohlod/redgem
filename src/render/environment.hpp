@@ -17,7 +17,11 @@ struct Environment {
   Vec3 sky_horizon;  // around the horizon (also what the sun glow tints)
   Vec3 ground;       // below the horizon (lights surfaces from below)
   Vec3 fog_color;
-  float fog_density = 0.0f;        // exponential fog per meter
+  float fog_density = 0.0f;        // exponential fog per meter (at fog_height)
+  float fog_height = 0.0f;         // meters: where the fog is fog_density thick
+  float fog_falloff = 0.0f;        // per meter up, the fog thins by e this many times (0: as thick everywhere)
+  float fog_sun_scatter = 0.0f;    // how much sunlight the fog throws toward the eye (0: none)
+  float haze = 0.0f;               // the thin air of long distances, per meter at height 0 (0: none)
   float ambient = 0.0f;            // strength of the sky's light on surfaces
   float exposure = 0.0f;           // brightness multiplier before tone mapping
   float bloom = 0.0f;              // glow around bright things (0 = off)
@@ -60,8 +64,8 @@ Environment default_environment();
 
 // The defaults with whatever the props override:
 //   sky_top, sky_horizon, ground_color, fog_color   "#rrggbb"
-//   fog_density, ambient, exposure, bloom, vignette, sun_glow, wind, shadows, ambient_occlusion,
-//   contrast, saturation, grain, aberration, glow_limit   numbers
+//   fog_density, fog_falloff, fog_sun_scatter, haze, ambient, exposure, bloom, vignette, sun_glow, wind, shadows,
+//   ambient_occlusion, contrast, saturation, grain, aberration, glow_limit   numbers fog_height (meters, any sign)
 //   sky_image (a name), sky_rotation (degrees), sky_intensity
 //   msaa (samples: 2, 4 or 8), shadow_cascades (1 to 4), shadow_distance (meters),
 //   shadow_softness (degrees across the sun: the real one is about half a degree),

@@ -17,6 +17,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Fog that lies low, fog lit by the sun, and haze far away** (experimental). The environment's
+  `fog_height` and `fog_falloff` make fog that is `fog_density` thick at a height and thins going
+  up: a valley holds mist that the hills rise out of. `fog_sun_scatter` lets the fog glow looking
+  toward the sun. `haze` is the thin air of long distances: far hills turn pale and blue. All are 0
+  unless given, so scenes look as before.
+
 - **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
   least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
   grass on the painted roads, trees only on the forest floor. Games with no ground layers need no

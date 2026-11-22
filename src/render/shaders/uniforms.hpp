@@ -21,6 +21,11 @@ inline constexpr const char* kLocalShadowCount = "localShadowCount";
 inline constexpr const char* kLocalShadows = "localShadows";
 inline constexpr const char* kFogColor = "fogColor";
 inline constexpr const char* kFogDensity = "fogDensity";
+// Fog that lies low, lit by the sun, and haze far away (see lit_air.hpp).
+inline constexpr const char* kFogHeight = "fogHeight";
+inline constexpr const char* kFogFalloff = "fogFalloff";
+inline constexpr const char* kFogSunScatter = "fogSunScatter";
+inline constexpr const char* kHazeDensity = "hazeDensity";
 inline constexpr const char* kViewPosition = "viewPos";
 inline constexpr const char* kMetallic = "metallic";
 inline constexpr const char* kRoughness = "roughness";

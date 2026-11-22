@@ -31,6 +31,9 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 |----------|---------|
 | `sky_top`, `sky_horizon`, `ground_color` | colors of the sky gradient, as `#rrggbb`; they also light the scene |
 | `fog_color`, `fog_density` | distance fog (it follows the horizon color unless given its own) |
+| `fog_height`, `fog_falloff` | experimental: fog that lies low. `fog_density` is its thickness at `fog_height` meters, and it thins by e every 1/`fog_falloff` meters up (0, the default, keeps it as thick at any height) |
+| `fog_sun_scatter` | experimental: how much sunlight the fog throws toward the eye: looking toward the sun, fog glows (0, the default, is none; 1 is a lot) |
+| `haze` | experimental: the thin air of long distances, per meter (0, the default, is none; 0.0002 to 0.001 suits open land): far hills turn pale and blue, as it takes blue out of their light first. It thins with height too, by e every 1200 m |
 | `ambient`, `exposure` | strength of the sky's light, overall brightness |
 | `bloom`, `vignette`, `sun_glow` | glow around bright things, dark corners, the sun's disc and halo (0 turns each off) |
 | `wind` | how much foliage sways |

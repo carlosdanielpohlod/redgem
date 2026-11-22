@@ -487,9 +487,9 @@ vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight li
   vec3 surface = mix(light.surface, foamLight, foam);
   vec3 transmitted = light.transmitted;
   transmitted *= 1.0 - foam;
-  float air = exp(-fogDensity * length(viewPos - fragPosition));
+  Air air = airTo(fragPosition);
   // The snapshot already contains atmospheric fog. Only the new surface contribution needs it.
-  return optics.background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
+  return optics.background * transmitted + surface * air.through + air.glow * (1.0 - transmitted) * (1.0 - air.through);
 }
 // Meters of depth per horizontal meter from the shore: only a bottom steeper than this (about 76
 // degrees) can be deeper than this many reaches where foam still shows. Deeper water skips the

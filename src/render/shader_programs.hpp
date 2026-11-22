@@ -90,6 +90,10 @@ struct LitUniforms {
   int local_shadows = kNoLocation;
   int fog_color = kNoLocation;
   int fog_density = kNoLocation;
+  int fog_height = kNoLocation;
+  int fog_falloff = kNoLocation;
+  int fog_sun_scatter = kNoLocation;
+  int haze_density = kNoLocation;
   int time = kNoLocation;
   int sky_top = kNoLocation;
   int sky_horizon = kNoLocation;

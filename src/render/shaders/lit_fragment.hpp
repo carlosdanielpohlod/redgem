@@ -3,13 +3,14 @@
 // The fragment shader every surface of a scene is lit by. It is one GLSL program, kept in parts
 // that share its uniforms and constants: this head (what it takes, how light meets a surface),
 // the shadows of the sun and of point and spot lights (lit_shadows.hpp), leaves lit from behind
-// (lit_foliage.hpp), the light from all around (lit_sky.hpp) and
-// its main (lit_main.hpp). lit_fragment() puts them together in that order, with copies fading by distance
-// (copy_fade.hpp) and which texels are drawn after the head.
+// (lit_foliage.hpp), the light from all around (lit_sky.hpp), the air on the way to the eye
+// (lit_air.hpp) and its main (lit_main.hpp). lit_fragment() puts them together in that order,
+// with copies fading by distance (copy_fade.hpp) and which texels are drawn after the head.
 
 #include <string>
 
 #include "render/shaders/copy_fade.hpp"
+#include "render/shaders/lit_air.hpp"
 #include "render/shaders/lit_clearcoat.hpp"
 #include "render/shaders/lit_foliage.hpp"
 #include "render/shaders/lit_main.hpp"
@@ -24,7 +25,7 @@ namespace redgem::shaders {
 
 // Physically based shading (GGX / Smith / Schlick, glTF metallic-roughness) with a sun, the
 // nearest point lights, light from the sky all around (a gradient, or a sky picture), emission
-// (factor x map) and exponential fog. Normal maps (no tangents needed: the frame comes from
+// (factor x map) and fog and haze. Normal maps (no tangents needed: the frame comes from
 // screen-space derivatives), roughness/metallic maps (glTF: G and B), occlusion maps (R) and soft
 // sun shadows. Base colors from glTF are linear; textures are sRGB. The output is linear HDR:
 // exposure, bloom, tone mapping and gamma happen in the post-processing passes.
@@ -65,8 +66,6 @@ uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
 uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
 uniform float pointLightRanges[MAX_POINT_LIGHTS];
 uniform vec4 pointLightSpots[MAX_POINT_LIGHTS];  // a spot's axis times its cone's scale, and its offset (0, 0, 0, 1: a point light)
-uniform vec3 fogColor;
-uniform float fogDensity;
 
 out vec4 finalColor;
 
@@ -208,7 +207,7 @@ inline std::string lit_switches(const LitFeatures& features) {
 inline std::string lit_fragment(const LitFeatures& features = {}) {
   const std::string switches = lit_switches(features);
   std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitLocalShadows + kLitFoliage +
-                       kLitSky + kLitClearcoat;
+                       kLitSky + kLitAir + kLitClearcoat;
   if (features.water) source += std::string(kWaterWaves) + kWaterFilter + kLitWater;
   source += lit_terrain() + kLitMain;
   const std::size_t version = source.find(kVersionLine);

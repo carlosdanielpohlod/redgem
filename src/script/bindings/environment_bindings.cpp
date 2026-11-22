@@ -36,6 +36,10 @@ constexpr Setting kSettings[] = {
     {env::kGroundColor, Kind::Color},
     {env::kFogColor, Kind::Color},
     {env::kFogDensity, Kind::Number},
+    {env::kFogHeight, Kind::Number},
+    {env::kFogFalloff, Kind::Number},
+    {env::kFogSunScatter, Kind::Number},
+    {env::kHaze, Kind::Number},
     {env::kAmbient, Kind::Number},
     {env::kExposure, Kind::Number},
     {env::kBloom, Kind::Number},
@@ -122,10 +126,14 @@ double number_of(mrb_state* mrb, mrb_value value, const char* key) {
 
 PropertyValue value_of(mrb_state* mrb, const Setting& setting, mrb_value value) {
   switch (setting.kind) {
-    case Kind::Color: return color_of(mrb, value, setting.key);
-    case Kind::Text: return text_of(mrb, value, setting.key);
-    case Kind::Flag: return flag_of(mrb, value, setting.key);
-    case Kind::Number: break;
+    case Kind::Color:
+      return color_of(mrb, value, setting.key);
+    case Kind::Text:
+      return text_of(mrb, value, setting.key);
+    case Kind::Flag:
+      return flag_of(mrb, value, setting.key);
+    case Kind::Number:
+      break;
   }
   return number_of(mrb, value, setting.key);
 }

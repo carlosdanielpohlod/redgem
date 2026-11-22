@@ -36,6 +36,10 @@ the same pull request.
 
 ## Rendering and animation
 
+- Low fog (`fog_falloff`), its sunlight (`fog_sun_scatter`) and `haze` lie over surfaces only.
+  The sky behind them gets none, so a scene with thick low fog matches its `fog_color` to the
+  horizon. What water reflects is fogged as before, as thick at any height. The fog's light is
+  one color: it is not shadowed, so fog in the shade of a hill glows toward the sun as in the open.
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Animation events and root motion come from a character's own clips only: the scene's clips

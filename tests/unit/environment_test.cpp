@@ -149,3 +149,33 @@ TEST_CASE("glowing particles have no limit unless the environment sets one") {
   props["glow_limit"] = kLimit;
   CHECK(environment_from_props(props).glow_limit == doctest::Approx(kLimit));
 }
+
+TEST_CASE("fog lies everywhere alike, without haze, unless the environment says otherwise") {
+  const Environment defaults = default_environment();
+  CHECK(defaults.fog_falloff == doctest::Approx(0.0f));
+  CHECK(defaults.fog_sun_scatter == doctest::Approx(0.0f));
+  CHECK(defaults.haze == doctest::Approx(0.0f));
+  CHECK(defaults.fog_height == doctest::Approx(0.0f));
+}
+
+TEST_CASE("low fog, its sunlight and the haze are read from the environment object") {
+  constexpr double kBelowTheSea = -12.5;
+  constexpr double kFalloff = 0.08;
+  constexpr double kScatter = 0.6;
+  constexpr double kHaze = 0.0004;
+  PropertyMap props;
+  props["fog_height"] = kBelowTheSea;  // a height may be below zero
+  props["fog_falloff"] = kFalloff;
+  props["fog_sun_scatter"] = kScatter;
+  props["haze"] = kHaze;
+  const Environment env = environment_from_props(props);
+  CHECK(env.fog_height == doctest::Approx(kBelowTheSea));
+  CHECK(env.fog_falloff == doctest::Approx(kFalloff));
+  CHECK(env.fog_sun_scatter == doctest::Approx(kScatter));
+  CHECK(env.haze == doctest::Approx(kHaze));
+
+  props["fog_falloff"] = -1.0;  // fog cannot thicken without end going up: none
+  props["haze"] = -1.0;
+  CHECK(environment_from_props(props).fog_falloff == doctest::Approx(0.0f));
+  CHECK(environment_from_props(props).haze == doctest::Approx(0.0f));
+}

@@ -1,7 +1,7 @@
 #pragma once
 
 // The lit fragment shader's main (see lit_fragment.hpp): a surface's material, then each light on
-// it, then the fog.
+// it, then the air on the way to the eye.
 
 namespace redgem::shaders {
 
@@ -80,8 +80,7 @@ void main() {
 #endif
   color += glow;
 
-  float fog = 1.0 - exp(-fogDensity * length(viewPos - fragPosition));
-  color = mix(color, fogColor, clamp(fog, 0.0, 1.0));
+  color = throughAir(color, fragPosition);
   bool shown = covering || alphaMixed > SWITCH_ON;  // its alpha says how much of the pixel it covers
   finalColor = vec4(color, shown ? min(alpha, 1.0) : 1.0);
 }

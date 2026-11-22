@@ -83,6 +83,10 @@ void Renderer::Impl::send_atmosphere(const Environment& env) {
   send(shader, lit_uniforms.ground, to_raylib(env.ground));
   send(shader, lit_uniforms.fog_color, to_raylib(env.fog_color));
   send(shader, lit_uniforms.fog_density, env.fog_density);
+  send(shader, lit_uniforms.fog_height, env.fog_height);
+  send(shader, lit_uniforms.fog_falloff, env.fog_falloff);
+  send(shader, lit_uniforms.fog_sun_scatter, env.fog_sun_scatter);
+  send(shader, lit_uniforms.haze_density, env.haze);
   send(shader, lit_uniforms.time, now());
 }
 

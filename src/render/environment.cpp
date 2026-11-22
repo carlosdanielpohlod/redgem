@@ -33,6 +33,9 @@ struct NumberProp {
 };
 constexpr NumberProp kNumberProps[] = {
     {props::environment::kFogDensity, &Environment::fog_density},
+    {props::environment::kFogFalloff, &Environment::fog_falloff},
+    {props::environment::kFogSunScatter, &Environment::fog_sun_scatter},
+    {props::environment::kHaze, &Environment::haze},
     {props::environment::kAmbient, &Environment::ambient},
     {props::environment::kExposure, &Environment::exposure},
     {props::environment::kBloom, &Environment::bloom},
@@ -133,6 +136,7 @@ Environment environment_from_props(const PropertyMap& props) {
   env.fog_color = env.sky_horizon;  // fog fades into the horizon unless given its own color
   read_color(props, props::environment::kFogColor, env.fog_color);
   for (const NumberProp& prop : kNumberProps) read_number(props, prop.key, env.*prop.value);
+  if (const auto height = finite_number(props, props::environment::kFogHeight)) env.fog_height = *height;
   for (const NumberProp& prop : kStrengthProps) read_strength(props, prop.key, env.*prop.value);
   read_sky_and_quality(props, env);
   read_auto_exposure(props, env.auto_exposure);
