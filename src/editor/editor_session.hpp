@@ -277,7 +277,7 @@ class EditorSession {
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
   std::set<std::string> unreadable_layers_;  // layers files that could not be read, warned of once
-  prefabs::Limits prefab_limits_;  // game.json's budgets, read as the game opens
+  prefabs::Limits prefab_limits_;            // game.json's budgets, read as the game opens
   CollisionLayers collision_layers_;
   std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;

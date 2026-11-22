@@ -114,8 +114,7 @@ void Engine::advance_game(float frame_seconds) {
   settle_physics();  // (where the step would have run in place: after the frame's start and its callbacks)
   run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
-  const float unscaled =
-      options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
+  const float unscaled = options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
 }
@@ -157,6 +156,7 @@ void Engine::update_frame(float delta) {
   // scripts run after and may override poses.
   animations_.advance(delta, scene_);
   apply_root_motion();
+  snap_hitboxes();
   particles_.update(delta);
   // (Animation events are part of the scripts' update: they come first in it.)
   hand_on_animation_events();
