@@ -106,6 +106,13 @@ TEST_CASE("a mesh is simplified to about the share of its triangles asked for, o
   for (std::uint32_t index : half) CHECK(index < vertices);
 }
 
+TEST_CASE("vertices where a part meets another stay put when it is simplified") {
+  const PrimitiveDesc ball = make_primitive(PrimitiveShape::Sphere);
+  const VertexLocks all(ball.positions.size() / 3, 1);
+  CHECK(simplified(ball, ball.indices, kHalfRatio, all).size() == ball.indices.size());
+  CHECK(simplified(ball, ball.indices, kHalfRatio, {}).size() < ball.indices.size());
+}
+
 TEST_CASE("only a mesh no skeleton or shape key moves is simplified") {
   MeshDesc mesh;
   mesh.primitives.push_back(make_primitive(PrimitiveShape::Sphere));
@@ -156,6 +163,26 @@ TEST_CASE("the Inspector counts a mesh node's triangles at each of its levels") 
   CHECK(counts_list({3, 2, 1}) == "3, 2, 1");
   const int empty = document.add_empty("Nothing", kNoIndex);
   CHECK(level_triangles(document.desc(), empty).empty());
+}
+
+TEST_CASE("a level looks like its mesh's object, and a mesh object under it is no level of it") {
+  int ball = kNoIndex;
+  SceneDocument document = ball_scene(ball);
+  document.set_prop(ball, props::kTint, std::string("#ff0000"), false);
+  document.set_prop(ball, props::kCastShadow, false, false);
+  const int wheel = document.add_primitive(PrimitiveShape::Sphere, "Wheel", redgem::Color{}, ball);
+  const std::vector<LevelCounts> counts = make_levels(document, ball, with_levels(kTwoLevels));
+  REQUIRE(counts.size() == 2);  // the ball and the wheel
+  const std::vector<int>& children = document.node(ball).children;
+  REQUIRE(children.size() == kTwoLevels + 1);
+  const NodeDesc& first = document.node(children[1]);  // (after the wheel)
+  CHECK(first.name == std::string(kBall) + " LOD 1");
+  CHECK(get_string(first.props, props::kTint) == "#ff0000");
+  CHECK(get_bool(first.props, props::kCastShadow) == false);
+  CHECK(number(first, props::kLodLevel) == doctest::Approx(1.0f));
+  CHECK_FALSE(document.node(ball).props.count(props::kLodLevel));
+  CHECK(level_triangles(document.desc(), ball) == counts[0].triangles);
+  CHECK(level_triangles(document.desc(), wheel) == counts[1].triangles);
 }
 
 TEST_CASE("no level of detail is made when none is asked for") {

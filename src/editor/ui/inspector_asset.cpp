@@ -34,6 +34,10 @@ constexpr std::pair<const char*, const char*> kFieldKeys[] = {
     {"up_axis", "editor.asset.field.up_axis"},
     {"colliders", "editor.asset.field.colliders"},
     {"materials", "editor.asset.field.materials"},
+    {"lod_levels", "editor.asset.field.lod_levels"},
+    {"lod_ratio", "editor.asset.field.lod_ratio"},
+    {"lod_screen_size", "editor.asset.field.lod_screen_size"},
+    {"lod_fade", "editor.asset.field.lod_fade"},
     {"color_space", "editor.asset.field.color_space"},
     {"normal_map", "editor.asset.field.normal_map"},
     {"max_size", "editor.asset.field.max_size"},
@@ -122,7 +126,7 @@ void reimport(PanelContext& context, const AssetState& asset) {
 void apply(PanelContext& context, AssetState& asset) {
   std::string error;
   if (!ready_to_apply(asset)) return;
-  if (!import_settings::save(asset.file, *asset.draft, error)) return log::error(error);
+  if (!import_settings::save(asset.file, asset.draft.value(), error)) return log::error(error);
   log::info(tr("editor.asset.saved", {{"file", asset.folder + "/" + asset.name}}));
   if (asset.folder == config::kModelsDirName) reimport(context, asset);
 }

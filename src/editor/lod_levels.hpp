@@ -31,11 +31,14 @@ struct ScreenRange {
 // one before.
 ScreenRange screen_range(int level, int levels, float first);
 
-// Triangles of a part (`indices` into its vertices) simplified to about `ratio` of them: indices
-// into the same vertices. Falls back to a coarser simplification when the shape's topology keeps
-// the first one from getting near that.
-std::vector<std::uint32_t> simplified(const PrimitiveDesc& part, const std::vector<std::uint32_t>& indices,
-                                      float ratio);
+// For each vertex of a part, 1 when it must stay put (where the part meets another), else 0.
+using VertexLocks = std::vector<unsigned char>;
+
+// Triangles of a part (`indices` into its vertices) simplified toward `ratio` of them: indices
+// into the same vertices. The surface moves little and `locks` (empty: none) stay put, so a shape
+// may keep more triangles than asked (or lose them all, when the part is tiny).
+std::vector<std::uint32_t> simplified(const PrimitiveDesc& part, const std::vector<std::uint32_t>& indices, float ratio,
+                                      const VertexLocks& locks = {});
 
 std::size_t triangles(const MeshDesc& mesh);
 // Whether a mesh can be simplified: no skeleton and no shape keys move its vertices.
@@ -48,8 +51,9 @@ struct LevelCounts {
 };
 
 // Makes the levels of every mesh node under `root` (unrecorded: part of the import's undo step),
-// and gives every level, the node's own mesh included, the props that say when it is drawn. A level
-// that would not be lighter than the one before is not made.
+// and gives every level, the node's own mesh included, the props that say when it is drawn. Each
+// level copies the node's draw props (tint, shadows, sway, visibility). A level that would not be
+// lighter than the one before, or would lose a part, is not made.
 std::vector<LevelCounts> make_levels(SceneDocument& document, int root, const import_settings::ModelSettings& settings);
 
 // How many triangles a mesh node shows at each of its levels of detail: its own mesh first, then

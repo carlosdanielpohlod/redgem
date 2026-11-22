@@ -266,7 +266,10 @@ the same pull request.
   loads, so the vertices it shares with the full mesh in the file are held once per level in
   memory. Meshes moved by a skeleton or by shape keys get no levels. A level is chosen by its
   bounding sphere and the view's field of view: the shadow map and reflection captures draw the
-  level the camera sees.
+  level the camera sees. Each level copies its mesh object's tint, shadow, sway and visibility
+  props when it is made: a later change to them in the Inspector does not reach the levels.
+  Where two parts of a mesh (two materials) meet, their vertices stay put, so no crack opens;
+  separate meshes are simplified apart and may part a little where they touch.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is

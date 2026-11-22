@@ -67,11 +67,17 @@ farther away. Near a switch, the two levels cross-fade with a dither: each pixel
 level or the other, so nothing is drawn twice.
 
 Each level carries the properties that decide when it is drawn: `screen_size_from`,
-`screen_size_to`, `lod_radius` and `lod_fade` (see the scene properties). Its own
-`visible_from` and `visible_to` still apply on top of them.
+`screen_size_to`, `lod_radius` and `lod_fade` (see the scene properties), and `lod_level`, its
+number. It copies the mesh object's `tint`, `cast_shadow`, `sway`, `visible`, `visible_from` and
+`visible_to`; its own `visible_from` and `visible_to` still apply on top of the sizes.
+
+Where two parts of a mesh (two materials) meet, the simplification keeps their vertices where
+they are, so the parts still meet. A level may keep more triangles than `lod_ratio` asks for
+when fewer would change the shape too much.
 
 Meshes moved by a skeleton or by shape keys get no levels. A level that would not be lighter
-than the one before is not made. Colliders stay on the full mesh only.
+than the one before, or that would lose a part of the mesh, is not made. Colliders stay on the
+full mesh only.
 
 ## Textures
 
