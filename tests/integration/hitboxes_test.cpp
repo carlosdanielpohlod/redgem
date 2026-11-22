@@ -18,7 +18,9 @@ namespace {
 
 // The skinned fixture: a Rig holding an Arm skinned to two bones, Lower and Upper above it, whose
 // one-second Wave clip bends Upper about X, playing in a loop from the start.
-constexpr const char* kGame = R"({"title": "Hits", "physics": {"layers": ["default", "hitbox"]}})";
+// The hit box layer meets nothing: rays find it, bodies pass through it.
+constexpr const char* kGame =
+    R"({"title": "Hits", "physics": {"layers": ["default", "hitbox"], "collides": {"hitbox": []}}})";
 constexpr int kQuarterSecond = 15;
 constexpr float kMoved = 0.3f;  // meters the hand box goes, at least, in a quarter second
 

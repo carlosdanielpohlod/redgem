@@ -624,8 +624,14 @@ A bone is named as the rig names it, or without a rig's `prefix:` (`"Head"` find
 `mixamorig:Head`). Each box takes `region:` (the bone's name unless said), `size:` (meters: one
 number, or `[width, height, depth]`; a capsule stands along the bone's up), `offset:` (meters from
 the bone, in its own axes) and `shape:` (`:box`, `:capsule` or `:sphere`). `layer:` puts them on a
-collision layer of `game.json`, so the shots can look for them alone and the character's own
-capsule does not stop them. The boxes are kinematic: they push nothing and fall for nothing.
+collision layer of `game.json`, so the shots can look for them alone. The boxes are kinematic
+bodies: nothing moves them but their bones, and on a layer that meets nothing they push and block
+nothing either, while rays still find them:
+
+```json
+"physics": { "layers": ["default", "hitbox"], "collides": { "hitbox": [] } }
+```
+
 `Hitboxes.region(hit)` says which part a raycast met, or nil.
 
 They are posed wherever the game runs, a dedicated server too, so the host can judge the hits. For
