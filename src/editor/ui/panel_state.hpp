@@ -1,9 +1,12 @@
 #pragma once
 
+#include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "core/import_settings.hpp"
 #include "core/log.hpp"
 #include "editor/edit_stream.hpp"
 #include "editor/inspector_logic.hpp"
@@ -41,10 +44,21 @@ struct InspectorState {
 // The folders of a game the Project panel lists.
 enum class ProjectFolder { Scripts, Models, Sounds, Scenes, Images, Prefabs };
 
+// The asset the Inspector shows while no object is selected (a click on a model, a picture or a
+// sound in the Project panel), and its import settings as edited and not yet applied.
+struct AssetState {
+  std::string folder;          // the game's folder it is in ("models"); empty for none
+  std::string name;            // its tile's name inside that folder ("trees/oak.glb"; a sound's has no extension)
+  std::filesystem::path file;  // the file itself
+  std::optional<import_settings::Settings> draft;
+  std::string problem;  // why its settings cannot be read, or why the last edit was refused
+};
+
 struct ProjectState {
   std::string new_prefab_name;
   std::string new_script_name;
   ProjectFolder folder = ProjectFolder::Scripts;  // the one whose files are shown
+  AssetState asset;
 };
 
 // Which kinds of messages the Console lists (the buttons at its top toggle them).

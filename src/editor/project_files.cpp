@@ -6,6 +6,7 @@
 
 #include "audio/audio.hpp"
 #include "core/config.hpp"
+#include "core/import_settings.hpp"
 #include "core/safe_path.hpp"
 
 namespace redgem {
@@ -45,8 +46,9 @@ bool of_kind(const std::filesystem::path& dir, const std::filesystem::path& file
   return file.extension() == kind.extension;
 }
 
+// (An asset's import settings are shown with it, not as a file of their own.)
 bool listed(const std::filesystem::path& dir, const std::filesystem::directory_entry& entry, const FileKind& kind) {
-  return plain_file(entry) && of_kind(dir, entry.path(), kind);
+  return plain_file(entry) && !import_settings::is_sidecar(entry.path()) && of_kind(dir, entry.path(), kind);
 }
 
 // The plain files of a folder of one kind.

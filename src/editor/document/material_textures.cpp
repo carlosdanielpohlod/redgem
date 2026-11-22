@@ -172,7 +172,21 @@ Json& writable_holder(Json& material, const SlotPlace& place) {
   return material[kPbr];
 }
 
+bool reads_color(Slot slot) { return slot == Slot::BaseColor || slot == Slot::Emissive; }
+
+// The color space a slot reads its picture in.
+import_settings::ColorSpace space_of(Slot slot) {
+  return reads_color(slot) ? import_settings::ColorSpace::Srgb : import_settings::ColorSpace::Linear;
+}
+
 }  // namespace
+
+SlotFit slot_fit(Slot slot, const import_settings::TextureSettings& settings) {
+  if (settings.normal_map && slot != Slot::Normal) return SlotFit::NormalMapElsewhere;
+  const bool says_space = settings.color_space != import_settings::ColorSpace::Auto;
+  if (says_space && settings.color_space != space_of(slot)) return SlotFit::OtherColorSpace;
+  return SlotFit::Fits;
+}
 
 int image_in(const MaterialDesc& material, Slot slot) { return material.*field_of(slot); }
 

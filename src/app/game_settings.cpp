@@ -34,6 +34,8 @@ constexpr const char* kQualityKey = "quality";
 constexpr const char* kScriptBudgetKey = config::kScriptBudgetKey;
 constexpr const char* kTickHzKey = "tick_hz";
 constexpr const char* kPhysicsKey = "physics";
+constexpr const char* kNetworkKey = "network";
+constexpr const char* kSendHzKey = "send_hz";
 constexpr const char* kUiKey = "ui";
 constexpr const char* kUiReferenceKey = "reference";
 constexpr const char* kUiMatchKey = "match";
@@ -136,6 +138,28 @@ std::string read_tick_hz(const nlohmann::json& json, GameSettings& settings) {
   return std::string(kGameSettingsFile) + ": " + kTickHzKey + " must be a whole number from " +
          std::to_string(config::kMinTickHz) + " to " + std::to_string(config::kMaxTickHz) + "; the game ticks at " +
          std::to_string(config::kDefaultTickHz) + " Hz";
+}
+
+bool within_send_range(std::int64_t asked) { return asked >= config::kMinSendHz && asked <= config::kMaxSendHz; }
+
+bool holds_usable_send_rate(const nlohmann::json& section) {
+  return holds_whole_number(section, kSendHzKey) && within_send_range(section[kSendHzKey].get<std::int64_t>());
+}
+
+// The poses a second objects send, when the "network" section gives a number that can be used;
+// what is wrong with it otherwise. (A "network" that is true or false is the game's network flag:
+// see app/game_identity.hpp.)
+std::string read_send_hz(const nlohmann::json& json, GameSettings& settings) {
+  if (!json.contains(kNetworkKey) || !json[kNetworkKey].is_object()) return {};
+  const nlohmann::json& section = json[kNetworkKey];
+  if (!section.contains(kSendHzKey)) return {};
+  if (holds_usable_send_rate(section)) {
+    settings.send_hz = section[kSendHzKey].get<int>();
+    return {};
+  }
+  return std::string(kGameSettingsFile) + ": network." + kSendHzKey + " must be a whole number from " +
+         std::to_string(config::kMinSendHz) + " to " + std::to_string(config::kMaxSendHz) + "; objects send " +
+         std::to_string(config::kDefaultSendHz) + " poses a second";
 }
 
 void read_physics(const nlohmann::json& json, GameManifest& manifest) {
@@ -269,6 +293,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
+  manifest.send_hz_error = read_send_hz(json, manifest.settings);
   manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
   read_sections(json, manifest);
   return manifest;

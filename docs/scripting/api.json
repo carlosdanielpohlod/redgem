@@ -6087,6 +6087,14 @@
           "about": "holds a dropped player's place and id that long, up to 300 (0 turns it off)"
         },
         {
+          "name": "send_hz",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)"
+        },
+        {
           "name": "host?",
           "stability": "stable",
           "static": true,
@@ -6533,6 +6541,20 @@
           ],
           "returns": {"type": "void"},
           "about": "sets its owner and key"
+        },
+        {
+          "name": "send_hz",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "poses a second its owner sends: its send_hz setting, else Network.send_hz"
+        },
+        {
+          "name": "send_interval",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds between two of its poses (1 / send_hz)"
         }
       ],
       "internal": [

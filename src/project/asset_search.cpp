@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "core/config.hpp"
+#include "core/import_settings.hpp"
 #include "project/closest_words.hpp"
 
 namespace redgem::tools {
@@ -75,10 +76,11 @@ bool hidden(const fs::path& file) {
   return !name.empty() && name.front() == kHiddenMark;
 }
 
-// An asset the game may use: a plain file (no link).
+// An asset the game may use: a plain file (no link), and not an asset's import settings.
 bool listed_file(const fs::directory_entry& entry) {
   std::error_code error;
-  return entry.is_regular_file(error) && !entry.is_symlink(error);
+  const bool plain = entry.is_regular_file(error) && !entry.is_symlink(error);
+  return plain && !import_settings::is_sidecar(entry.path());
 }
 
 std::vector<std::string> folder_tags(const fs::path& relative) {

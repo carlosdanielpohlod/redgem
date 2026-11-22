@@ -34,6 +34,9 @@ inline constexpr const char* kPrefabOverrides = "prefab_overrides";
 // On an object added under a placement: the path of the inherited part it hangs from (none: the
 // placement itself).
 inline constexpr const char* kPrefabParent = "prefab_parent";
+// On the object an imported model sits under: its file inside models/ ("trees/oak.glb"), so the
+// editor can import it again when its import settings change.
+inline constexpr const char* kModelFile = "model_file";
 inline constexpr const char* kTint = "tint";
 // Levels of detail: an object is drawn only while its distance from the camera (meters) is at
 // least `visible_from` and less than `visible_to`. Several versions of a model, each with its own

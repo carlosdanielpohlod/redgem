@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "render_system/render_stage.hpp"
+#include "scene/ground/ground_brush.hpp"
 #include "scene/ground/ground_rules.hpp"
 #include "scene/ground/splat_map.hpp"
 #include "scene/props.hpp"
@@ -272,6 +273,23 @@ TEST_CASE("the second splat picture's layers are drawn") {
   layers.splat = make_splat(kSplatSide, static_cast<int>(layers.layers.size()) - 1);
   const Picture drawn = draw_layers(layers, "terrain_layers_sixth");
   CHECK(greenish(drawn.at(kCenter, kGroundRow)));
+}
+
+TEST_CASE("a stroke of the editor's layer brush shows where it was painted") {
+  // (In front of the middle of the terrain, where the picture's middle sees the ground.)
+  constexpr float kStrokeZ = 2.5f;
+  constexpr float kStrokeRadius = 3.0f;
+  constexpr int kBlueLayer = 1;
+  RenderStage stage;
+  SceneDesc desc = layered_terrain(layers_of({kRed, kBlue}));
+  stage.upload(desc);
+  const LayerBrush stroke{0.0f, kStrokeZ, kStrokeRadius, 1.0f, kDefaultBrushFalloff, kBlueLayer};
+  REQUIRE(brush_layer(desc.terrains[0], desc.meshes[0].bounds, stroke) > 0);
+  stage.sync(desc);
+  const Picture drawn = stage.draw(Scene::from_desc(desc), "terrain_layers_brush");
+  CHECK(bluish(drawn.at(kCenter, kGroundRow)));
+  CHECK(reddish(drawn.at(kLeft, kGroundRow)));
+  CHECK(reddish(drawn.at(kRight, kGroundRow)));
 }
 
 TEST_CASE("new weights reach a terrain already drawn") {

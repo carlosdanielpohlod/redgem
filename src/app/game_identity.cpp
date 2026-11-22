@@ -118,6 +118,10 @@ void read_network(const nlohmann::json& json, GameIdentityReading& reading) {
     reading.identity.network = json[kNetworkKey].get<bool>();
     return;
   }
+  if (json[kNetworkKey].is_object()) {  // its settings (see app/game_settings.hpp): a game that plays online
+    reading.identity.network = true;
+    return;
+  }
   note(reading.error, tr("game.identity.bad_network", {{"place", place(kNetworkKey)}}));
 }
 
