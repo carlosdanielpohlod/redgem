@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <map>
 #include <optional>
 #include <string>
@@ -46,8 +47,9 @@ enum class ProjectFolder { Scripts, Models, Sounds, Scenes, Images, Prefabs };
 // The asset the Inspector shows while no object is selected (a click on a model, a picture or a
 // sound in the Project panel), and its import settings as edited and not yet applied.
 struct AssetState {
-  std::string folder;  // the game's folder it is in ("models"); empty for none
-  std::string name;    // inside that folder ("trees/oak.glb")
+  std::string folder;          // the game's folder it is in ("models"); empty for none
+  std::string name;            // its tile's name inside that folder ("trees/oak.glb"; a sound's has no extension)
+  std::filesystem::path file;  // the file itself
   std::optional<import_settings::Settings> draft;
   std::string problem;  // why its settings cannot be read, or why the last edit was refused
 };

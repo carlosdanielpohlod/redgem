@@ -70,6 +70,7 @@
   "editor.asset.field.stream": "Stream",
   "editor.asset.field.up_axis": "Up axis",
   "editor.asset.field.volume": "Volume",
+  "editor.asset.gone": "{file} is no longer there: choose it again in the Project panel",
   "editor.asset.model_hint": "Apply writes the settings and imports the model again wherever this scene holds it (one undo step for each).",
   "editor.asset.reimported": "imported the model again under {count} objects",
   "editor.asset.revert": "Revert",

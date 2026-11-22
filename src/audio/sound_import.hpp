@@ -15,7 +15,8 @@ struct VoicePlan {
 };
 
 // A loop always streams (raylib loops only streams). The settings' loop makes every play loop;
-// a play that asks for a loop loops anyway. Only a positional sound is ever mixed down.
+// a play that asks for a loop loops anyway. Only a positional sound is ever mixed down. A sound
+// played as recorded keeps the default settings.
 VoicePlan voice_plan(const SpatialSound& sound, const import_settings::SoundSettings& settings);
 
 }  // namespace redgem

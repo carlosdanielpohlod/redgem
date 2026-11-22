@@ -3,6 +3,7 @@
 
 #include <algorithm>
 
+#include "audio/audio.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
 #include "core/translations.hpp"
@@ -91,12 +92,19 @@ bool asset_chosen(const AssetState& asset, const FolderInfo& info, const std::st
   return asset.folder == info.dir && asset.name == name;
 }
 
+// The file a tile shows: a sound's tile is named without its extension.
+std::filesystem::path tile_file(const FolderInfo& info, const std::filesystem::path& folder, const std::string& name) {
+  if (info.folder != Folder::Sounds) return folder / name;
+  return find_sound_file(folder, name).value_or(folder / name);
+}
+
 // A click on a model, picture or sound: the Inspector shows its import settings.
 void choose_asset(PanelContext& context, const FolderInfo& info, const std::string& name) {
   if (!has_import_settings(info.folder)) return;
   AssetState& asset = context.state.project.asset;
-  asset = AssetState{info.dir, name, std::nullopt, {}};
-  asset.draft = import_settings::read_checked(context.session.game_dir() / info.dir / name, asset.problem);
+  const std::filesystem::path file = tile_file(info, context.session.game_dir() / info.dir, name);
+  asset = AssetState{info.dir, name, file, std::nullopt, {}};
+  asset.draft = import_settings::read_checked(file, asset.problem);
   context.session.select(kNoObject);
 }
 

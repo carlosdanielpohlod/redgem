@@ -43,6 +43,13 @@ void extract_pictures(const fs::path& path, const fs::path& images_dir) {
   log::info("extracted " + std::to_string(written) + " pictures into " + folder.string());
 }
 
+// Once per import or Apply, not once per copy.
+void extract_if_asked(const fs::path& path, const fs::path& images_dir) {
+  if (import_settings::model_settings(path).materials == import_settings::Materials::Extract) {
+    extract_pictures(path, images_dir);
+  }
+}
+
 }  // namespace
 
 ObjectId EditorSession::import_model(const fs::path& path, Vec3 position, std::string& error, ObjectId parent) {
@@ -53,6 +60,7 @@ ObjectId EditorSession::import_model(const fs::path& path, Vec3 position, std::s
   const int node = add_model(path, error, parent);
   if (node == kNoIndex) return kNoObject;
   log::info("imported " + path.filename().string());
+  extract_if_asked(path, game_dir_ / config::kImagesDirName);
   if (parent == kNoObject) return place_new(node, position);
   refresh_preview();  // the parent's world placement is needed below
   Transform world = preview_.world_transform(node);
@@ -66,8 +74,6 @@ int EditorSession::add_model(const fs::path& path, std::string& error, int paren
   const import_settings::ModelSettings settings = import_settings::model_settings(path);
   model_settings::apply(document_, node, settings);
   tag_model(node, path);
-  if (settings.materials == import_settings::Materials::Extract)
-    extract_pictures(path, game_dir_ / config::kImagesDirName);
   return node;
 }
 
@@ -82,11 +88,8 @@ int EditorSession::reimport_model(const std::string& model_file, std::string& er
     return 0;
   }
   const fs::path path = game_dir_ / config::kModelsDirName / model_file;
-  int done = 0;
-  for (const std::string& id : model_copies(model_file)) {
-    if (!reimport_copy(id, path, error)) break;
-    ++done;
-  }
+  const int done = reimport_copies(model_copies(model_file), path, error);
+  extract_if_asked(path, game_dir_ / config::kImagesDirName);
   selection_.clear();  // (the objects it held are gone)
   refresh_preview();
   return done;
@@ -99,6 +102,17 @@ std::vector<std::string> EditorSession::model_copies(const std::string& model_fi
     if (get_string(node.props, props::kModelFile) == model_file) ids.push_back(node.stable_id);
   }
   return ids;
+}
+
+int EditorSession::reimport_copies(const std::vector<std::string>& ids, const fs::path& path, std::string& error) {
+  int done = 0;
+  for (const std::string& id : ids) {
+    // (A copy inside another copy went with what that one held.)
+    if (index_with_id(document_, id) == kNoIndex) continue;
+    if (!reimport_copy(id, path, error)) break;
+    ++done;
+  }
+  return done;
 }
 
 bool EditorSession::reimport_copy(const std::string& root_id, const fs::path& path, std::string& error) {

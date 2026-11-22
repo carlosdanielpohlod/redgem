@@ -54,6 +54,7 @@ class SoundLibrary {
     if (!found) say_missing(name);
     return found;
   }
+  void forget_settings() { settings_.clear(); }
   // The import settings of a name's file (the defaults for a name with no file), read once.
   const import_settings::SoundSettings& settings(const std::string& name) {
     const auto known = settings_.find(name);
@@ -431,6 +432,7 @@ class RaylibAudio final : private RaylibParts, public MixedAudio {
   }
 
   void set_sounds_dir(const std::filesystem::path& dir) override {
+    library.forget_settings();  // (a game starting again reads the import settings as they are now)
     if (dir == library.dir()) return;
     stop_sounds();  // (their aliases share the samples about to go)
     library.set_dir(dir);

@@ -75,25 +75,36 @@ void draw_field(AssetState& asset, const Field& field) {
   draw_number(asset, field);
 }
 
-std::filesystem::path file_of(const PanelContext& context, const AssetState& asset) {
-  return context.session.game_dir() / asset.folder / asset.name;
+// Whether the file was taken away since it was chosen (said under the fields).
+bool gone(AssetState& asset) {
+  std::error_code fs_error;
+  if (std::filesystem::is_regular_file(asset.file, fs_error)) return false;
+  asset.problem = tr("editor.asset.gone", {{"file", asset.file.filename().string()}});
+  return true;
 }
 
-// Writes the sidecar; a model is then imported again wherever the open scene holds it.
-void apply(PanelContext& context, AssetState& asset) {
+// A draft to write, for a file still there.
+bool ready_to_apply(AssetState& asset) { return asset.draft.has_value() && !gone(asset); }
+
+void reimport(PanelContext& context, const AssetState& asset) {
   std::string error;
-  if (!asset.draft) return;
-  if (!import_settings::save(file_of(context, asset), *asset.draft, error)) return log::error(error);
-  log::info(tr("editor.asset.saved", {{"file", asset.folder + "/" + asset.name}}));
-  if (asset.folder != config::kModelsDirName) return;
   const int done = context.session.reimport_model(asset.name, error);
   if (!error.empty()) log::error(error);
   if (done > 0) log::info(tr("editor.asset.reimported", {{"count", std::to_string(done)}}));
 }
 
-void revert(PanelContext& context, AssetState& asset) {
+// Writes the sidecar; a model is then imported again wherever the open scene holds it.
+void apply(PanelContext& context, AssetState& asset) {
+  std::string error;
+  if (!ready_to_apply(asset)) return;
+  if (!import_settings::save(asset.file, *asset.draft, error)) return log::error(error);
+  log::info(tr("editor.asset.saved", {{"file", asset.folder + "/" + asset.name}}));
+  if (asset.folder == config::kModelsDirName) reimport(context, asset);
+}
+
+void revert(AssetState& asset) {
   asset.problem.clear();
-  asset.draft = import_settings::read_checked(file_of(context, asset), asset.problem);
+  asset.draft = import_settings::read_checked(asset.file, asset.problem);
 }
 
 void draw_problem(const AssetState& asset) {
@@ -114,7 +125,7 @@ void draw_buttons(PanelContext& context, AssetState& asset) {
   if (ImGui::Button(icon_label(ICON_FA_CHECK, "editor.asset.apply"))) apply(context, asset);
   ImGui::EndDisabled();
   ImGui::SameLine();
-  if (ImGui::Button(icon_label(ICON_FA_ROTATE_LEFT, "editor.asset.revert"))) revert(context, asset);
+  if (ImGui::Button(icon_label(ICON_FA_ROTATE_LEFT, "editor.asset.revert"))) revert(asset);
   ImGui::PushTextWrapPos();
   ImGui::TextColored(muted_color(), "%s", tr(hint_of(asset)));
   ImGui::PopTextWrapPos();

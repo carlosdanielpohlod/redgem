@@ -260,7 +260,8 @@ the same pull request.
   compression is `"none"` only (the engine has no KTX2 encoder), and a texture's color space and
   normal map flag only bring warnings in the Inspector: the material slot still decides how a
   picture is read. A sound's settings are read once per name while a game runs; the editor's
-  Project panel preview plays sounds as recorded.
+  Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
+  of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - Ground layers have no brush or rules yet: their weights are painted by editing the splat

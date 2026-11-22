@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <map>
+#include <sstream>
 #include <nlohmann/json.hpp>
 
 #include "core/files.hpp"
@@ -82,8 +85,19 @@ std::string words_of(const Choice<Enum> (&choices)[kCount]) {
 
 // --- Writing ---------------------------------------------------------------------------------
 
+constexpr int kFloatDigits = std::numeric_limits<float>::digits10;
+
+// A float as the shortest decimal that reads back as it (0.01, not 0.009999999776482582).
+double written_number(float number) {
+  std::ostringstream text;
+  text << std::setprecision(kFloatDigits) << number;
+  return std::stod(text.str());
+}
+
+std::string number_text(float number) { return json(written_number(number)).dump(); }
+
 json json_of(const ModelSettings& model) {
-  return {{key::kScale, model.scale},
+  return {{key::kScale, written_number(model.scale)},
           {key::kUpAxis, word_of(kUpAxes, model.up_axis)},
           {key::kColliders, word_of(kColliderChoices, model.colliders)},
           {key::kMaterials, word_of(kMaterialChoices, model.materials)}};
@@ -98,7 +112,7 @@ json json_of(const TextureSettings& texture) {
 json json_of(const SoundSettings& sound) {
   return {{key::kStream, sound.stream},
           {key::kLoop, sound.loop},
-          {key::kVolume, sound.volume},
+          {key::kVolume, written_number(sound.volume)},
           {key::kMono3d, sound.mono_3d}};
 }
 json json_of(const Settings& settings) {
@@ -121,12 +135,16 @@ bool read_bool(const json& given, const char* field, bool& out, std::string& err
 
 bool finite_number(const json& value) { return value.is_number() && std::isfinite(value.get<double>()); }
 
+bool float_in(const json& value, std::pair<float, float> range) {
+  return finite_number(value) && value.get<float>() >= range.first && value.get<float>() <= range.second;
+}
+
 bool read_float(const json& given, const char* field, std::pair<float, float> range, float& out, std::string& error) {
   if (!given.contains(field)) return true;
   const json& value = given[field];
-  const auto [least, most] = range;
-  const bool fits = finite_number(value) && value.get<double>() >= least && value.get<double>() <= most;
-  if (!fits) return refuse(error, field, "needs a number from " + json(least).dump() + " to " + json(most).dump());
+  if (!float_in(value, range)) {
+    return refuse(error, field, "needs a number from " + number_text(range.first) + " to " + number_text(range.second));
+  }
   out = value.get<float>();
   return true;
 }
@@ -157,7 +175,8 @@ bool read_choice(const json& given, const char* field, const Choice<Enum> (&choi
   if (!given.contains(field)) return true;
   const json& value = given[field];
   for (const auto& [known, word] : choices) {
-    if (value.is_string() && value.get<std::string>() == word) {
+    const bool chosen = value.is_string() && value.get<std::string>() == word;
+    if (chosen) {
       out = known;
       return true;
     }
@@ -342,7 +361,8 @@ bool set(Settings& settings, const std::string& field, const std::string& value,
 
 PictureSize fitted_size(PictureSize size, int max_size) {
   const int longest = std::max(size.width, size.height);
-  if (max_size == kNoSizeLimit || longest <= max_size) return size;
+  const bool fits = max_size == kNoSizeLimit || longest <= max_size;
+  if (fits) return size;
   const double scale = static_cast<double>(max_size) / longest;
   const auto side = [scale](int length) { return std::max(1, static_cast<int>(std::lround(length * scale))); };
   return {side(size.width), side(size.height)};

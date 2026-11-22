@@ -119,6 +119,7 @@ SpatialSound flat_sound(const FlatSound& sound) {
   flat.loop = sound.loop;
   flat.group = sound.group;
   flat.priority = sound.priority;
+  flat.as_recorded = sound.as_recorded;
   flat.positional = false;
   return flat;
 }

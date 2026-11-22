@@ -236,6 +236,8 @@ class EditorSession {
   void tag_model(int node, const std::filesystem::path& path);
   // The stable ids of the objects that hold `model_file`.
   std::vector<std::string> model_copies(const std::string& model_file) const;
+  // Each of those still there, until one fails; the count done.
+  int reimport_copies(const std::vector<std::string>& ids, const std::filesystem::path& path, std::string& error);
   bool reimport_copy(const std::string& root_id, const std::filesystem::path& path, std::string& error);
   // Moves what `fresh_id` holds under `root_id`, then drops what `root_id` held and `fresh_id`.
   std::string swap_model_nodes(const std::string& root_id, const std::string& fresh_id);

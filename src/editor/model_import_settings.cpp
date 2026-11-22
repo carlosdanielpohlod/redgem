@@ -53,7 +53,8 @@ void give_colliders(SceneDocument& document, int root, Colliders colliders) {
 // `error` set when it could not be).
 bool write_picture(const fs::path& file, const ImageData& image, std::string& error) {
   std::error_code fs_error;
-  if (image.encoded.empty() || fs::exists(file, fs_error)) return false;
+  const bool nothing_to_write = image.encoded.empty() || fs::exists(file, fs_error);
+  if (nothing_to_write) return false;
   fs::create_directories(file.parent_path(), fs_error);
   return write_bytes_file(file, image.encoded, error);
 }

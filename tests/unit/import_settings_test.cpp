@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "audio/audio.hpp"
 #include "audio/sound_import.hpp"
 #include "core/exit_codes.hpp"
 #include "core/files.hpp"
@@ -272,4 +273,27 @@ TEST_CASE("a model's top-level nodes are scaled and turned so that its up axis i
   CHECK(approx_equal(rotate(placed.rotation, Vec3{0.0f, 0.0f, 1.0f}), Vec3{0.0f, 1.0f, 0.0f}, kTolerance));
   const redgem::Transform kept = model_settings::settled(local, ModelSettings{});
   CHECK(approx_equal(kept.position, local.position, kTolerance));
+}
+
+TEST_CASE("a number is written as it was typed, and the least and the most are taken") {
+  Settings model = defaults(Kind::Model);
+  std::string error;
+  CHECK_MESSAGE(set(model, "scale", "0.001", error), error);
+  CHECK(set(model, "scale", "0.01", error));
+  CHECK(field_value(model, "scale") == "0.01");
+  CHECK(text_of(model).find("0.009") == std::string::npos);
+  CHECK(set(model, "scale", "1000", error));
+  CHECK_FALSE(set(model, "scale", "1000.5", error));
+  CHECK(error.find("from 0.001 to 1000") != std::string::npos);
+}
+
+TEST_CASE("a sound played as recorded leaves its import settings aside") {
+  SoundSettings settings;
+  settings.loop = true;
+  settings.volume = 0.1f;
+  FlatSound preview;
+  preview.as_recorded = true;
+  const VoicePlan plan = voice_plan(flat_sound(preview), settings);
+  CHECK_FALSE(plan.loop);
+  CHECK(plan.gain == doctest::Approx(1.0));
 }

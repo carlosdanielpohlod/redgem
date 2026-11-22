@@ -2,7 +2,8 @@
 
 namespace redgem {
 
-VoicePlan voice_plan(const SpatialSound& sound, const import_settings::SoundSettings& settings) {
+VoicePlan voice_plan(const SpatialSound& sound, const import_settings::SoundSettings& asked) {
+  const import_settings::SoundSettings settings = sound.as_recorded ? import_settings::SoundSettings{} : asked;
   VoicePlan plan;
   plan.loop = sound.loop || settings.loop;
   plan.stream = plan.loop || settings.stream;
