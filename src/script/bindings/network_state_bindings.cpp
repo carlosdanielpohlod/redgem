@@ -48,9 +48,8 @@ mrb_value network_peers(mrb_state* mrb, mrb_value) { return ids_value(mrb, netwo
 mrb_value network_players(mrb_state* mrb, mrb_value) { return ids_value(mrb, network(mrb).players()); }
 mrb_value network_send_hz(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, binding::context(mrb).send_hz); }
 
-}  // namespace
-
-void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
+// Whether the game is online, and how it holds a dropped player's place.
+void install_connection_functions(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "online?", network_online, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "connecting?", network_connecting, MRB_ARGS_NONE());
   // How long a game may hold a dropped player's place, at most (Network.reconnect_window=).
@@ -59,6 +58,10 @@ void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "reconnecting?", network_reconnecting, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "reconnect_window=", network_set_reconnect_window, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, network_module, "reconnect_window", network_reconnect_window, MRB_ARGS_NONE());
+}
+
+// Who this machine is in the session, who else is in it, and how often poses go out.
+void install_session_functions(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "host?", network_hosting, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "server?", network_serving, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "id", network_id, MRB_ARGS_NONE());
@@ -69,6 +72,13 @@ void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
   // The fewest and most poses a second an object's NetworkSync may send (its send_hz setting).
   mrb_define_const(mrb, network_module, "MIN_SEND_HZ", mrb_int_value(mrb, config::kMinSendHz));
   mrb_define_const(mrb, network_module, "MAX_SEND_HZ", mrb_int_value(mrb, config::kMaxSendHz));
+}
+
+}  // namespace
+
+void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
+  install_connection_functions(network_module, mrb);
+  install_session_functions(network_module, mrb);
 }
 
 }  // namespace redgem

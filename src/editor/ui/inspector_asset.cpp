@@ -112,9 +112,6 @@ bool gone(AssetState& asset) {
   return true;
 }
 
-// A draft to write, for a file still there.
-bool ready_to_apply(AssetState& asset) { return asset.draft.has_value() && !gone(asset); }
-
 void reimport(PanelContext& context, const AssetState& asset) {
   std::string error;
   const int done = context.session.reimport_model(asset.name, error);
@@ -123,12 +120,18 @@ void reimport(PanelContext& context, const AssetState& asset) {
 }
 
 // Writes the sidecar; a model is then imported again wherever the open scene holds it.
-void apply(PanelContext& context, AssetState& asset) {
+void save_draft(PanelContext& context, const AssetState& asset, const import_settings::Settings& draft) {
   std::string error;
-  if (!ready_to_apply(asset)) return;
-  if (!import_settings::save(asset.file, asset.draft.value(), error)) return log::error(error);
+  if (!import_settings::save(asset.file, draft, error)) return log::error(error);
   log::info(tr("editor.asset.saved", {{"file", asset.folder + "/" + asset.name}}));
   if (asset.folder == config::kModelsDirName) reimport(context, asset);
+}
+
+// A draft is written only while its file is still there.
+void apply(PanelContext& context, AssetState& asset) {
+  if (!asset.draft) return;
+  if (gone(asset)) return;  // (the file is looked for only when there is a draft to write)
+  save_draft(context, asset, *asset.draft);
 }
 
 void revert(AssetState& asset) {
