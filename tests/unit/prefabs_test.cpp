@@ -1,7 +1,9 @@
 #include <doctest/doctest.h>
 #include <filesystem>
+#include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "scene/prefabs.hpp"
@@ -111,6 +113,67 @@ TEST_CASE("prefab expansion enforces budgets and game-relative paths") {
   CHECK_THROWS(prefabs::resolve(input, files.dir, limits));
   CHECK_THROWS(prefabs::resolve(placements("../outside.glb"), files.dir));
   CHECK_THROWS(prefabs::resolve(placements("prefabs/missing.glb"), files.dir));
+}
+TEST_CASE("a prefab budget that runs out says which one to raise in game.json") {
+  PrefabFiles files;
+  files.write("prefabs/item.glb", kHierarchy);
+  const auto input = placements("prefabs/item.glb", 2);
+  prefabs::Limits source;
+  source.input_bytes = 1;
+  CHECK_THROWS_WITH(prefabs::resolve(input, files.dir, source),
+                    doctest::Contains("raise \"source\" in game.json's \"prefab_budget_mb\""));
+  prefabs::Limits decoded;
+  decoded.expanded_bytes = 1;
+  CHECK_THROWS_WITH(prefabs::resolve(input, files.dir, decoded),
+                    doctest::Contains("raise \"decoded\" in game.json's \"prefab_budget_mb\""));
+}
+namespace {
+// A prefab file bigger than the smallest budget game.json can ask for (1 MiB).
+void big_prefab(const PrefabFiles& files) {
+  constexpr std::size_t kPaddingBytes = 2 * prefabs::Limits::kMebibyte;
+  auto nodes = kHierarchy;
+  nodes[1]["extras"]["note"] = std::string(kPaddingBytes, 'x');
+  files.write("prefabs/big.glb", nodes);
+}
+void set_prefab_budget(const PrefabFiles& files, const std::string& budget) {
+  std::ofstream(files.dir / "game.json") << R"({"prefab_budget_mb": )" + budget + "}";
+}
+}  // namespace
+TEST_CASE("a game's prefab budget is the one its scenes, checks and editor expand prefabs within") {
+  PrefabFiles files;
+  big_prefab(files);
+  files.write("scene.glb", nlohmann::json::parse(R"([{"extras":{"prefab_file":"prefabs/big.glb"}}])"));
+  CHECK(std::holds_alternative<SceneDesc>(read_game_scene(files.dir)));
+  set_prefab_budget(files, R"({"source": 1})");
+  const auto lowered = read_game_scene(files.dir);
+  REQUIRE(std::holds_alternative<std::string>(lowered));
+  CHECK(std::get<std::string>(lowered).find("source budget of 1 MiB") != std::string::npos);
+  set_prefab_budget(files, R"({"source": 1024, "decoded": 2048})");
+  CHECK(read_prefab_limits(files.dir).input_bytes == 1024 * prefabs::Limits::kMebibyte);
+  CHECK(std::holds_alternative<SceneDesc>(read_game_scene(files.dir)));
+}
+TEST_CASE("the editor places prefabs within the game's budget") {
+  PrefabFiles files;
+  big_prefab(files);
+  files.write("scene.glb", nlohmann::json::array({{{"name", "Existing"}}}));
+  set_prefab_budget(files, R"({"source": 1})");
+  auto session = prefab_session(files);
+  std::string error;
+  CHECK(session->place_prefab("prefabs/big.glb", {}, error) == kNoObject);
+  CHECK(error.find("source budget of 1 MiB") != std::string::npos);
+}
+TEST_CASE("a prefab budget at its most asks to split the scene, and a spawn's never names game.json") {
+  PrefabFiles files;
+  files.write("prefabs/item.glb", kHierarchy);
+  const auto input = placements("prefabs/item.glb");
+  prefabs::Limits most;
+  most.input_bytes = prefabs::kMostBudgetMb * prefabs::Limits::kMebibyte;
+  most.spent_bytes = most.expanded_bytes = most.input_bytes;
+  CHECK_THROWS_WITH(prefabs::resolve(input, files.dir, most), doctest::Contains("split the scene"));
+  prefabs::Limits fixed;
+  fixed.expanded_bytes = 1;
+  fixed.from_game = false;
+  CHECK_THROWS_WITH(prefabs::resolve(input, files.dir, fixed), "prefab expansion exceeds its memory budget");
 }
 TEST_CASE("scene file loading resolves prefabs and reports broken references as errors") {
   PrefabFiles files;

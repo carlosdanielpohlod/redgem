@@ -15,6 +15,7 @@
 #endif
 
 #include "core/command_line.hpp"
+#include "project/mcp_build_tool.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/tool_line.hpp"
 
@@ -143,6 +144,7 @@ int serve_game(const mcp::Options& options) {
   });
   Wire wire;
   mcp::serve(std::cin, [&](const std::string& text) { wire.send(text); }, session);
+  mcp::wait_for_builds();  // (a build started through the server ends before the program)
   return kExitSuccess;
 }
 

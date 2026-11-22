@@ -15,7 +15,7 @@ prefabs::Limits remaining_budget(const SceneDesc& document, prefabs::Limits limi
   const auto copied =
       prefabs::instance_bytes(document) + prefabs::asset_bytes(document) - gltf_budget::decoded_bytes(document.images);
   if (copied > limits.expanded_bytes) throw std::runtime_error("scene exceeds the prefab preview copy budget");
-  limits.expanded_bytes -= copied;
+  limits.spent_bytes = copied;  // Spent, so a message still names the whole budget.
   return limits;
 }
 bool matches_reference(const NodeDesc& node, const prefabs::Origin& origin) {

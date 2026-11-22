@@ -41,7 +41,7 @@ TEST_CASE("MCP legacy initialization gates calls until the initialized notificat
   CHECK(session.receive(request("tools/list"))->contains("error"));
   CHECK_FALSE(session.receive({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}}));
   const auto listed = session.receive(request("tools/list"));
-  CHECK((*listed)["result"]["tools"].size() == 13);
+  CHECK((*listed)["result"]["tools"].size() == 14);
   CHECK_FALSE((*listed)["result"].contains("resultType"));
 }
 

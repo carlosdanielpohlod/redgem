@@ -14,6 +14,7 @@
 #include "core/short_text.hpp"
 #include "core/config.hpp"
 #include "project/mcp_game_tools.hpp"
+#include "project/mcp_build_tool.hpp"
 #include "project/mcp_project_tools.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_edits.hpp"
@@ -204,6 +205,7 @@ constexpr Native kNativeTools[] = {
     {"game_query", game_query},
     {"scene_edit", edit_files},
     {"project", project_tool},
+    {"build", build_tool},
 };
 
 Json native_result(const Options& options, const std::string& name, const Json& args) {

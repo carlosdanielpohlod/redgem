@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "app/game_settings.hpp"
 #include "app/terrain_files.hpp"
 #include "core/log.hpp"
 #include "editor/editor_logic.hpp"
@@ -29,7 +30,7 @@ std::vector<ObjectId> collision_layer_targets(const SceneDocument& document, con
 }  // namespace
 
 EditorSession::EditorSession(std::filesystem::path game_dir, SceneDocument document)
-    : game_dir_(std::move(game_dir)), document_(std::move(document)) {}
+    : game_dir_(std::move(game_dir)), prefab_limits_(read_prefab_limits(game_dir_)), document_(std::move(document)) {}
 
 bool EditorSession::set_collision_layer(const std::vector<ObjectId>& objects, const std::string& name) {
   if (!editing() || !collision_layers_.find(name)) return false;
@@ -51,7 +52,7 @@ const Scene& EditorSession::scene() const { return runtime_ ? runtime_->scene() 
 
 void EditorSession::refresh_preview() {
   follow_terrain_layers();
-  prefab_preview_.rebuild(document_.desc(), game_dir_);
+  prefab_preview_.rebuild(document_.desc(), game_dir_, prefab_limits_);
   preview_ = Scene::from_desc(preview_desc());
   selection_.keep_below(document_.node_count());
 }

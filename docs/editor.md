@@ -93,7 +93,16 @@ Click a slot to pick one of the pictures of the game's `images/` folder (or *Non
 picture from the Project panel's Images onto it. The picture goes inside the scene's `.glb` (the
 same picture used twice is stored once), so the scene still shows it in Blender and when copied to
 another scene; a picture no material shows any more is left out when the scene is saved. Each
-change is one undo step. PNG, JPEG and still WebP pictures can be used.
+change is one undo step. PNG, JPEG and still WebP pictures can be used. A picture's
+[import settings](import-settings.md#textures) can cap its size, and the Inspector warns when they
+say it belongs in another slot.
+
+## Import settings
+
+Click a model, a picture or a sound in the Project panel: with no object selected, the Inspector
+shows how the engine takes it in (its scale, colliders, size, loop...). **Apply** writes them next
+to the file and imports a model again wherever the open scene holds it. See
+[Import settings](import-settings.md).
 
 ## Several objects at once
 

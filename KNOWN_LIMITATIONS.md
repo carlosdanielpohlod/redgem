@@ -252,6 +252,16 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
+- Import settings (experimental): a model's settings apply only when the editor imports it, and
+  only Apply in the editor imports it again; a change made with `redgem assets --settings` or by
+  hand shows at the next import. Importing again replaces everything under the model's object,
+  objects you added there and scripts on its parts included; it is imported again in the open
+  scene only. Extracted pictures are copies: the imported model keeps its own. Texture
+  compression is `"none"` only (the engine has no KTX2 encoder), and a texture's color space and
+  normal map flag only bring warnings in the Inspector: the material slot still decides how a
+  picture is read. A sound's settings are read once per name while a game runs; the editor's
+  Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
+  of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
@@ -360,7 +370,9 @@ promise of how it will be closed.
   instance; use `tint`). Scripted prefab imports are synchronous and support rigid hierarchies
   only, and a running scene does not see a changed prefab file until reloaded. Export needs
   complete skeletons and descendant-only animation; it does not replace the original selection
-  with a reference or overwrite an existing source file.
+  with a reference or overwrite an existing source file. The editor reads `game.json`'s
+  `prefab_budget_mb` when it opens the game (reopen it after a change), and applying or unpacking
+  overrides still reads one prefab file of at most 256 MiB.
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
@@ -755,6 +767,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `build` runs in the MCP server's process, from the files on disk: an open editor's
+  unsaved edits are not in it, and its progress is not shown in the editor. A build cannot be
+  cancelled, and a server asked to quit waits for its build to end.
 - MCP's `project` tool checks a write as `redgem check` does: `game.json`'s physics, input and
   menu sections, and what the locales, dialogues and quests name of each other. Other sections of
   `game.json` and items no quest names are written as given. It edits files only: an open editor
