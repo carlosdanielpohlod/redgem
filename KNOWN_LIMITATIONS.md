@@ -264,16 +264,6 @@ the same pull request.
   of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
-- Ground layers have no editor brush yet: their weights are painted by rules (`redgem scene
-  paint`, `Terrain.paint_by_rules`) or by editing the splat pictures. Rules see the terrain mesh's
-  own heights, not its object's scale or place. The layers' textures are three texture arrays in
-  slots 17 to 19: a graphics card with fewer than 20 texture units for the fragment shader (most
-  phones) draws the terrain without them. A terrain's mesh must be its own: a mesh another object
-  also draws gets no layers. Changed layer pictures show after the scene is loaded again. Each
-  layer's pictures are sampled even where the layer is covered by others with a sharp height
-  blend. `Terrain` and `Scatter.place(layer:)` find the layers of objects of the scene's own
-  file (and their copies): a terrain from a scene loaded later, or spawned, has none for them.
-  `layer:` compares the painted weight, not the sharpened blend that is drawn.
 - The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
   painted by rules or by editing its splat pictures). An undo step of a stroke keeps a whole copy of
   the terrain's weights (8 MB for a 1024 map), so long painting sessions keep fewer undo steps.
@@ -284,7 +274,10 @@ the same pull request.
   fragment shader (most phones) draws the terrain without them. A terrain's mesh must be its own: a
   mesh another object also draws gets no layers. Changed layer pictures show after the scene is
   loaded again. Each layer's pictures are sampled even where the layer is covered by others with a
-  sharp height blend.
+  sharp height blend. `Terrain` and `Scatter.place(layer:)` find the layers of objects of the
+  scene's own file (and their copies): a terrain from a scene loaded later, or spawned, has none
+  for them. `layer:` compares the painted weight, not the sharpened blend that is drawn, and
+  follows the layers even of a terrain whose mesh is shared (which draws none).
 
 ## Tools
 

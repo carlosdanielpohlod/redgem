@@ -1796,7 +1796,7 @@ end
 # Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
 %a{redgem:stable}
 class Scatter
-  # places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least
+  # places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)
   %a{redgem:stable}
   def self.place: (String | GameObject template, count: Integer, area: [Vector3, Vector3], ?ground: GameObject | nil, ?seed: Integer, ?scale: Numeric | Range[Numeric], ?align: bool, ?layer: String | Symbol | nil, ?least: Numeric, ?tints: Array[RedGem::color] | nil, ?tint_variation: Numeric, ?fade: Numeric, ?normals_up: Numeric, ?lods: Array[[String, Numeric]] | nil) -> Scatter
   # removes every set

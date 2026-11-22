@@ -24,7 +24,7 @@ using namespace binding;
 constexpr ValueHolder kRulesHolder{"Terrain.paint_by_rules", "a rule's", "take", kAnyNumber};
 
 SceneDesc& scene_desc(mrb_state* mrb) {
-  return required(mrb, context(mrb).scene_desc, "ground layers need a running game");
+  return required(mrb, context(mrb).scene_desc, "Terrain and Scatter.place(layer:) need a running game");
 }
 
 mrb_value weights_value(mrb_state* mrb, const LayerWeights& weights, std::size_t layers) {

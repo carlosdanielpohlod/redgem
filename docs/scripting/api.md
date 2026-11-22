@@ -877,7 +877,7 @@ A continuous particle effect attached to an object, returned by Particles.emitte
 
 Great numbers of copies of a mesh (grass, trees, rocks), drawn only. See [../levels.md#grass-forests-and-cities](../levels.md#grass-forests-and-cities).
 
-- `Scatter.place(String | GameObject template, count: Integer, area: [Vector3, Vector3], ground: GameObject | nil = nil, seed: Integer = 0, scale: Numeric | Range[Numeric] = 1.0, align: bool = false, layer: String | Symbol | nil = nil, least: Numeric = 0.5, tints: Array[Color] | nil = nil, tint_variation: Numeric = 0.0, fade: Numeric = 0.0, normals_up: Numeric = 0.0, lods: Array[[String, Numeric]] | nil = nil) -> Scatter`: places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least
+- `Scatter.place(String | GameObject template, count: Integer, area: [Vector3, Vector3], ground: GameObject | nil = nil, seed: Integer = 0, scale: Numeric | Range[Numeric] = 1.0, align: bool = false, layer: String | Symbol | nil = nil, least: Numeric = 0.5, tints: Array[Color] | nil = nil, tint_variation: Numeric = 0.0, fade: Numeric = 0.0, normals_up: Numeric = 0.0, lods: Array[[String, Numeric]] | nil = nil) -> Scatter`: places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)
 - `Scatter.clear -> void`: removes every set
 - `count -> Integer`: how many copies a set placed
 - `remove -> void`: removes a set

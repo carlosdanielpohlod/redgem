@@ -5583,7 +5583,7 @@
             {"name": "lods", "type": "Array[[String, Numeric]] | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "Scatter"},
-          "about": "places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least"
+          "about": "places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)"
         },
         {
           "name": "clear",
@@ -5609,7 +5609,9 @@
         }
       ],
       "internal": [
-        "look_options"
+        "look_options",
+        "layer_share",
+        "least_without_layer?"
       ],
       "guide": "../levels.md#grass-forests-and-cities"
     },

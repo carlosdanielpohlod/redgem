@@ -93,6 +93,18 @@ SceneDesc meadow_with_road() {
   return desc;
 }
 
+// The meadow with every texel of its map the same mix of grass and road.
+SceneDesc meadow_mixed_with_road(float road_share) {
+  SceneDesc desc = meadow_with_road();
+  LayerWeights mix{};
+  mix[kGrass] = 1.0f - road_share;
+  mix[kRoad] = road_share;
+  for (int row = 0; row < kSplatSize; ++row) {
+    for (int column = 0; column < kSplatSize; ++column) set_texel(desc.terrains.front().splat, column, row, mix);
+  }
+  return desc;
+}
+
 std::unique_ptr<Engine> engine_for(const SceneDesc& scene) {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
@@ -237,7 +249,19 @@ TEST_CASE("Scatter.place on a layer puts copies only where that layer takes enou
   CHECK(grass < all);
 }
 
-TEST_CASE("Scatter.place refuses a layer it cannot find, a ground without layers, and a share past 1") {
+TEST_CASE("Scatter.place on a layer keeps the copies where the layer takes at least least: of the spot") {
+  constexpr float kRoadShare = 0.3f;  // of every spot: past least: 0.2, short of the usual 0.5
+  const SceneDesc scene = meadow_mixed_with_road(kRoadShare);
+  auto engine = engine_for(scene);
+  const std::string call =
+      "Scatter.place('Tuft', count: 50, area: [Vector3[-10, 0, -10], Vector3[10, 0, 10]], "
+      "ground: Scene.find('Ground'), layer: 'road'";
+  CHECK(ruby(*engine, call + ", least: 0.2).count") == "50");
+  CHECK(ruby(*engine, call + ").count") == "0");
+  CHECK(ruby(*engine, call + ", least: 0.5).count") == "0");
+}
+
+TEST_CASE("Scatter.place refuses a layer it cannot find, a ground without layers, and a bad least:") {
   const SceneDesc scene = meadow_with_road();
   auto engine = engine_for(scene);
   const std::string call = "Scatter.place('Tuft', count: 1, area: [Vector3[-1, 0, -1], Vector3[1, 0, 1]], ";
@@ -245,5 +269,6 @@ TEST_CASE("Scatter.place refuses a layer it cannot find, a ground without layers
   CHECK(fails(*engine, call + "layer: 'grass')"));
   CHECK(fails(*engine, call + "ground: Scene.find('Tuft'), layer: 'grass')"));
   CHECK(fails(*engine, call + "ground: Scene.find('Ground'), layer: 'grass', least: 1.5)"));
+  CHECK(fails(*engine, call + "ground: Scene.find('Ground'), least: 0.5)"));  // least: without a layer:
   CHECK(engine->scene().scattered().sets().empty());
 }
