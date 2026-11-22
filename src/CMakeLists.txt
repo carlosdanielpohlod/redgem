@@ -385,6 +385,7 @@ redgem_add_library(redgem_runtime
   scene/ground/splat_map.cpp
   scene/ground/terrain_layers_file.cpp
   scene/ground/ground_survey.cpp
+  scene/ground/ground_weights.cpp
   scene/ground/ground_rules.cpp
   scene/ground/ground_brush.cpp
   scene/shapes/terrain_sculpt.cpp
