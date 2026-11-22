@@ -37,6 +37,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `game_shot` | Returns a PNG picture of the saved game at `at` seconds (default 1), `width` pixels wide (default 512, 16:9), optionally through another `camera`. |
 | `game_query` | Asks the playing game: `inspect` an `object`, `raycast` `from` one point `to` another, or `overlap` a sphere `at` a point with a `radius`. |
 | `project` | Reads and changes the game beyond its scenes, as files (see [The project](#the-project)): `action` `settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`, `scenes`, `new_scene` or `new_game`. |
+| `build` | Makes a standalone game from the saved files, on a thread of its own (see [Building the game](#building-the-game)): `action` `start` or `status`. |
 | `api` | Reads the API index, a `class`, or a `search`. |
 | `events` | Reads this server's log history with `since`, `limit` (default 20, maximum 32), `level`. |
 
@@ -181,6 +182,29 @@ checked only through the quests that name it. The
 In a live editor each change is one undo step and stays unsaved until `save`; `apply` writes the
 prefab file at once (undo gives the placement its overrides back, the file stays written). On
 files, the scene is saved after each change. `--read-only` keeps `overrides`.
+
+## Building the game
+
+`build` makes the game a player can run, as the editor's Build menu does: `start` returns at once,
+and `status` says how it goes.
+
+```json
+{"action": "start", "target": "android", "format": "bundle"}
+{"action": "status", "wait": 25}
+```
+
+| Argument | Meaning |
+|----------|---------|
+| `target` | `linux`, `windows`, `android` or `macos` (default: this system; a Mac build only on a Mac). |
+| `format` | `apk` (default) or `bundle` (an App Bundle for Google Play), for Android. |
+| `loose` | `true` keeps the game's files in a `game/` folder instead of `game.rgpak`, to look into a build. |
+| `folder` | The folder next to the game it goes into; default `<game>-build`, or `<game>-build-<target>` for another system. |
+| `wait` | For `status`: how many seconds to wait for the build to end first (up to 25; call it again for a longer build). |
+
+`status` gives the build's step and time while it runs. Once it ended, it gives what it made (the
+executable, the app, the APK or bundle) or why not, with the last lines the build logged; these
+also reach `events`. A build works from the files on disk: save the editor's edits first. It
+replaces only what an earlier build wrote in that folder. One build runs at a time.
 
 ## Live editor
 

@@ -888,6 +888,7 @@ if(NOT ANDROID)
     project/prefab_edits.cpp
     project/project_json_files.cpp
     project/mcp_project_tools.cpp
+    project/mcp_build_tool.cpp
     project/scene_command.cpp
     project/scene_prefab_words.cpp
     project/script_messages.cpp
