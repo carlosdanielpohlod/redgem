@@ -103,7 +103,8 @@ std::optional<float> picture_difference(const std::filesystem::path& picture, co
   Image one = rgba_picture(picture);
   Image other = rgba_picture(baseline);
   std::optional<float> share;
-  if (IsImageValid(one) && IsImageValid(other)) share = same_size(one, other) ? differing_share(one, other) : kAllDiffer;
+  if (IsImageValid(one) && IsImageValid(other))
+    share = same_size(one, other) ? differing_share(one, other) : kAllDiffer;
   UnloadImage(one);
   UnloadImage(other);
   return share;

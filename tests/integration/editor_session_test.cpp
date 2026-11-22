@@ -9,6 +9,7 @@
 #include "core/config.hpp"
 #include "core/import_settings.hpp"
 #include "scene/props.hpp"
+#include "scene/shapes/primitives.hpp"
 #include "editor/editor_session.hpp"
 #include "core/files.hpp"
 #include "editor/scripts/script_files.hpp"
@@ -701,6 +702,33 @@ TEST_CASE("a model is imported with its import settings, and imported again when
   CHECK_FALSE(doc.node(doc.node(root_part).children.front()).props.count(props::kCollider));
   session->undo();  // a single step takes the reimport back
   CHECK(top_of(session->scene().find("Tree")).local.scale.x == doctest::Approx(2.0f));
+  session.reset();
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a model whose import settings ask for levels of detail comes in with them, and they leave with undo") {
+  const std::filesystem::path dir = copy_sandbox("import_lods");
+  const std::filesystem::path model = dir / config::kModelsDirName / "ball.glb";
+  std::filesystem::create_directories(model.parent_path());
+  std::string error;
+  SceneDocument ball = SceneDocument::create_empty(model);
+  ball.add_primitive(PrimitiveShape::Sphere, "Ball", redgem::Color{}, kNoIndex);
+  REQUIRE_MESSAGE(ball.save(error), error);
+  REQUIRE(write_text_file(import_settings::sidecar_of(model), R"({"lod_levels": 2, "colliders": "box"})", error));
+  auto session = open(dir);
+  const ObjectId imported = session->import_model(model, Vec3{}, error);
+  REQUIRE_MESSAGE(imported != kNoObject, error);
+  const ObjectId whole = session->scene().find("Ball");
+  const ObjectId lightest = session->scene().find("Ball LOD 2");
+  REQUIRE(whole != kNoObject);
+  REQUIRE(lightest != kNoObject);
+  CHECK(session->scene().at(lightest).parent == whole);
+  CHECK(session->scene().at(whole).screen_level.radius > 0.0f);
+  CHECK(session->scene().at(lightest).screen_level.to < session->scene().at(whole).screen_level.from);
+  CHECK(session->document().node(whole).props.count(props::kCollider) == 1);
+  CHECK(session->document().node(lightest).props.count(props::kCollider) == 0);  // (one collider is enough)
+  session->undo();
+  CHECK(session->scene().find("Ball LOD 2") == kNoObject);
   session.reset();
   std::filesystem::remove_all(dir);
 }

@@ -93,6 +93,7 @@ RedGem stands on open source. Thank you to the people behind these projects.
 | [cgltf](https://github.com/jkuhlmann/cgltf) 1.15 | Loading glTF scenes | MIT |
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.92.8 (docking) | The editor's interface | MIT |
 | [rlImGui](https://github.com/raylib-extras/rlImGui) | Dear ImGui on raylib | zlib |
+| [meshoptimizer](https://github.com/zeux/meshoptimizer) 0.25 | Lighter levels of detail of imported meshes | MIT |
 | [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) | Move, rotate and scale gizmos | MIT |
 | [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Reading and writing glTF JSON and settings; multiplayer messages (MessagePack) | MIT |
 | [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) 3.6.7 | HTTPS for the games' web requests | Apache 2.0 |

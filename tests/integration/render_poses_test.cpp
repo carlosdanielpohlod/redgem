@@ -22,15 +22,15 @@ using namespace redgem::test::physics_game;
 
 namespace {
 
-constexpr int kDrawnHz = 240;               // frames a second: four to a step of the default tick
-constexpr float kSpeed = 6.0f;              // meters a second, along x
+constexpr int kDrawnHz = 240;   // frames a second: four to a step of the default tick
+constexpr float kSpeed = 6.0f;  // meters a second, along x
 constexpr float kStart = 0.0f;
-constexpr int kWarmUpFrames = 8;            // a step or two before the first poses are both known
-constexpr int kMeasuredFrames = 120;        // half a second of frames
-constexpr float kEvenShare = 0.1f;          // how far a frame's step may be from the even one, as a share of it
+constexpr int kWarmUpFrames = 8;      // a step or two before the first poses are both known
+constexpr int kMeasuredFrames = 120;  // half a second of frames
+constexpr float kEvenShare = 0.1f;    // how far a frame's step may be from the even one, as a share of it
 constexpr float kTeleportX = 50.0f;
 constexpr int kOverlappingThreads = 2;  // physics threads: the frame's last step overlaps its drawing
-constexpr float kCarriedOffset = 2.0f;      // meters above the crate its rider sits
+constexpr float kCarriedOffset = 2.0f;  // meters above the crate its rider sits
 constexpr float kNear = 1e-4f;
 constexpr float kMillimetersPerMeter = 1000.0f;
 // Millimeters a frame's move may be off a whole number of steps: the body slows a little, as
@@ -69,9 +69,9 @@ class PosePresenter final : public Presenter {
 
 // How a sliding game runs.
 struct Sliding {
-  bool fixed_step = false;           // a whole step a frame, as the tools take
+  bool fixed_step = false;             // a whole step a frame, as the tools take
   std::optional<int> physics_threads;  // more than one overlaps each frame's last step with its drawing
-  bool rider_slides = false;         // the rider a sliding body of its own, listed before the crate
+  bool rider_slides = false;           // the rider a sliding body of its own, listed before the crate
 };
 
 // A sliding body: the crate's own, or a rider's that slides with it.
@@ -200,8 +200,8 @@ TEST_CASE("scripts see the body where the steps left it, a step's worth at a tim
   sliding.play(kWarmUpFrames + kMeasuredFrames);
   // In millimeters: every frame's move is about a whole number of steps, most often none.
   const long step = std::lround(kSpeed * config::kDefaultFixedDeltaSeconds * kMillimetersPerMeter);
-  const std::string moves = "$seen.each_cons(2).map { |a, b| ((b - a) * " + std::to_string(kMillimetersPerMeter) +
-                            ").round }";
+  const std::string moves =
+      "$seen.each_cons(2).map { |a, b| ((b - a) * " + std::to_string(kMillimetersPerMeter) + ").round }";
   const std::string steps = std::to_string(step);
   const std::string off_whole = "(mm - (mm.to_f / " + steps + ").round * " + steps + ").abs";
   CHECK(ruby(*sliding.engine, moves + ".all? { |mm| " + off_whole + " <= " + std::to_string(kWholeStepsOff) + " }") ==

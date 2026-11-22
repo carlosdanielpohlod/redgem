@@ -86,7 +86,7 @@ TEST_CASE("a decal leaves out a surface turned away from it, and one outside its
   const DecalBox box = decal_box(Vec3::zero(), {0, 0, 1}, kSize, kDepth, 0.0f);
   std::vector<DecalCorner> corners;
   clip_to_decal(box, {kWall[0], kWall[2], kWall[1]}, corners);  // its back
-  const Vec3 away{0, 0, kDepth};                                   // past the box's front
+  const Vec3 away{0, 0, kDepth};                                // past the box's front
   clip_to_decal(box, {kWall[0] + away, kWall[1] + away, kWall[2] + away}, corners);
   CHECK(corners.empty());
 }

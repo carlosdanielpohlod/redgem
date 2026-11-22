@@ -342,6 +342,9 @@ void Engine::connect_context() {
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
   context_.spawn = [this](const SpawnRequest& request) { return spawn(request); };
+  context_.make_object = [this](const NodeDesc& node, const SpawnRequest& request) {
+    return make_object(node, request);
+  };
   context_.spawn_prefab = [this](const std::string& file, const SpawnRequest& request) {
     return spawn_prefab(file, request);
   };

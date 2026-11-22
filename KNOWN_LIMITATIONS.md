@@ -55,6 +55,12 @@ the same pull request.
   the physics only: root motion leaves them alone. Root motion is not sent over the network:
   `NetworkSync` sends where the owner's character went, and on the other machines a character
   following a graph received from the owner is not pinned (its root moves in the pose).
+- Hit boxes (`Hitboxes.build`) are placed where their bones are after the clips pose them, before
+  scripts run: a head turned by `Animator#look_at` (which turns after the scripts) is met where the
+  clips put it. Their bodies keep the size they were made with when a bone is scaled (the box
+  object's own scale follows the bone), and they are made at run time only (the editor does not
+  show or place them). The host judges hits against its own pose of another player's character,
+  which follows that player's synced animation a moment behind.
 - The view model (`view_model = true`) is drawn over the world in one layer: particles, lights
   and debug lines are the world's, drawn with the world's field of view (start them at
   `Camera.from_view_model`), and the weapon is never hidden behind particles. It writes no motion
@@ -274,6 +280,14 @@ the same pull request.
   picture is read. A sound's settings are read once per name while a game runs; the editor's
   Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
   of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
+- Levels of detail made on import (experimental): each level is a mesh of its own when the game
+  loads, so the vertices it shares with the full mesh in the file are held once per level in
+  memory. Meshes moved by a skeleton or by shape keys get no levels. A level is chosen by its
+  bounding sphere and the view's field of view: the shadow map and reflection captures draw the
+  level the camera sees. Each level copies its mesh object's tint, shadow, sway and visibility
+  props when it is made: a later change to them in the Inspector does not reach the levels.
+  Where two parts of a mesh (two materials) meet, their vertices stay put, so no crack opens;
+  separate meshes are simplified apart and may part a little where they touch.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
@@ -324,6 +338,7 @@ menu whose look each game sets:
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.
+- Rooms of more than 16 machines.
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.
 - An unreliable, sequenced channel for inputs and positions beside the reliable one.
@@ -775,8 +790,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
-  bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials and terrain brushes still use files or the editor UI. Native
+  bounded viewport images, runtime queries, event history and prefab placements' overrides.
+  Model importing, saving an object as a prefab, materials and terrain brushes still use files or
+  the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try

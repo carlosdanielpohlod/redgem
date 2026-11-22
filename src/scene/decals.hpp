@@ -30,11 +30,11 @@ inline constexpr std::size_t kMaxDecalCorners = 3 * 512;
 // What a decal is placed with (Decals.place).
 struct DecalPlacement {
   Vec3 point;
-  Vec3 normal;  // out of the surface
+  Vec3 normal;         // out of the surface
   float size = 0.0f;   // meters across
   float depth = 0.0f;  // meters it reaches into and out of the surface, all told
   float spin_radians = 0.0f;
-  std::string image;   // a picture of the game's images/ folder; empty for a soft round spot
+  std::string image;  // a picture of the game's images/ folder; empty for a soft round spot
   Color color{0.0f, 0.0f, 0.0f, 1.0f};
 };
 
