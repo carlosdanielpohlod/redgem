@@ -17,6 +17,7 @@
 #include "scene/decal_clip.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/triangle_index.hpp"
 
 namespace redgem {
 
@@ -56,6 +57,10 @@ class DecalSystem {
   // whether it fell on any: nothing is kept when it did not.
   bool place(const Scene& scene, const SceneDesc& desc, const DecalPlacement& placement);
   void clear() { decals_.clear(); }
+  // A scene starts: no marks, and nothing kept of the last one's surfaces. With the new `scene` (on
+  // a machine that draws decals), the triangles of the dense meshes of its objects that take marks
+  // are sorted now, as it loads, rather than at the first mark on each.
+  void start_over(const Scene* scene, const SceneDesc& desc);
   // How many are kept at most (kMinDecalLimit to kMaxDecalLimit); a lower limit drops the oldest
   // at once.
   void set_limit(std::size_t limit);
@@ -66,6 +71,7 @@ class DecalSystem {
  private:
   std::deque<Decal> decals_;
   std::size_t limit_ = kDefaultDecalLimit;
+  TriangleIndexCache indexes_;
 };
 
 // Whether an object of the scene takes decals: one that is drawn, of a rigid mesh (a skeleton or
