@@ -245,7 +245,9 @@ TEST_CASE("render_position is where the frame draws an object; position, where t
 }
 
 TEST_CASE("a game that takes a whole step a frame renders where the physics has it") {
-  SlidingGame sliding(true);
+  Sliding whole_steps;
+  whole_steps.fixed_step = true;
+  SlidingGame sliding(whole_steps);
   sliding.play(kWarmUpFrames);
   CHECK(ruby(*sliding.engine, "t = Scene.find('Crate').transform; t.render_position == t.position") == "true");
 }
