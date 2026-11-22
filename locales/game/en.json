@@ -83,7 +83,7 @@
   "game.dialogue.talk": "Talk",
   "game.interaction.interact": "Interact",
   "game.interaction.prompt": "[{binding}] {prompt}",
-  "game.identity.bad_network": "{place} must be true or false",
+  "game.identity.bad_network": "{place} must be true, false or a section of network settings",
   "game.identity.bad_picture": "{place} must name a .png file inside the game folder, like images/icon.png",
   "game.identity.bad_version": "{place} must be a version like 1.2.0 (three numbers, then optionally -beta.1 or +build.5)",
   "game.identity.unusable": "{error}. The game plays as if game.json did not say it",

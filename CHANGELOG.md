@@ -123,6 +123,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **A game's send rate.** `game.json`'s `"network": {"send_hz": N}` (1 to 128, 20 by default)
+  sets how many poses a second `NetworkSync` sends of an object, and an object's own `send_hz:`
+  setting overrides it (`Network.send_hz`, `NetworkSync#send_hz`, experimental). The watchers'
+  interpolation expects poses at that rate. A `"network"` object also says the game plays
+  online. An owner no longer loses the part of a frame past its send time, so its rate is the
+  one asked for whatever the frame rate.
 - **A dedicated server keeps to the game's tick.** `redgem-server` takes its lobby's turns and
   its rooms' frames at the game's `tick_hz`, and its status budget (`frame_ms.budget`, the
   status line's "of N ms") is a step of it. The start line says the rate.
