@@ -39,6 +39,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_controls.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/decals.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_follow.rb
@@ -375,6 +376,8 @@ redgem_add_library(redgem_runtime
   scene/particle_emitters.cpp
   scene/particles.cpp
   scene/particle_look.cpp
+  scene/decal_clip.cpp
+  scene/decals.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
   scene/water_volume.cpp
@@ -515,6 +518,7 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
+  script/bindings/decals_bindings.cpp
   script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
   script/bindings/save_slot_bindings.cpp
@@ -572,6 +576,7 @@ redgem_add_library(redgem_runtime
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
   render/renderer_particles.cpp
+  render/renderer_decals.cpp
   render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
