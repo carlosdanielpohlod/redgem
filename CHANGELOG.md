@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
+  overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
+  file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor
+  each change is one undo step.
 - **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
   { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
   under each named bone, kept where the bone is in every frame (a ray cast by a script meets the

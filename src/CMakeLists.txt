@@ -906,6 +906,7 @@ if(NOT ANDROID)
     project/scene_assignments.cpp
     project/component_words.cpp
     project/scene_edits.cpp
+    project/prefab_edits.cpp
     project/project_json_files.cpp
     project/mcp_project_tools.cpp
     project/mcp_build_tool.cpp
