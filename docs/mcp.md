@@ -37,6 +37,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `game_query` | Asks the playing game: `inspect` an `object`, `raycast` `from` one point `to` another, or `overlap` a sphere `at` a point with a `radius`. |
 | `project` | Reads and changes the game beyond its scenes, as files (see [The project](#the-project)): `action` `settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`, `scenes`, `new_scene` or `new_game`. |
 | `build` | Makes a standalone game from the saved files, on a thread of its own (see [Building the game](#building-the-game)): `action` `start` or `status`. |
+| `terrain` | A terrain's ground layers and the rules that paint them, as files (see [Terrain layers](#terrain-layers)): `action` `layers`, `set_layers` or `paint`. |
 | `api` | Reads the API index, a `class`, or a `search`. |
 | `events` | Reads this server's log history with `since`, `limit` (default 20, maximum 32), `level`. |
 
@@ -160,6 +161,26 @@ error the game did not have is refused, with the errors, and the file stays as i
 warnings it brings, such as texts a new language still lacks, come with the answer. An item is
 checked only through the quests that name it. The
 `changes`, `texts` and `content` objects are free-form; the checks, not the schema, judge them.
+
+## Terrain layers
+
+A terrain object blends up to eight ground layers when it has `prop.terrain_layers=<name>`: the
+layers file `terrains/<name>.json` (see [Terrain](levels.md#terrain)). `terrain` reads and writes
+those files and paints them:
+
+| Action | Result |
+|--------|--------|
+| `layers` | The game's layers files; with `name`, that file; with `object`, the file the object names. |
+| `set_layers` | Writes `content` as `terrains/<name>.json`. A file the game could not read is refused, and nothing is written. Replacing a file needs `confirm: true`. |
+| `paint` | Paints the `object`'s layers by the rules of its file, on its saved mesh, and writes the weights beside the file (`terrains/<name>.splat0.png`), as `redgem scene paint` does. |
+
+```json
+{"action": "set_layers", "name": "beach", "content": {"layers": [{"name": "sand", "albedo": "textures/sand/Color.jpg"}, {"name": "grass"}], "rules": [{"layer": "sand"}, {"layer": "grass", "height": {"min": 2, "soft": 1.5}}]}}
+{"action": "paint", "object": "Ground"}
+```
+
+Name the layers with `scene_edit` (`prop.terrain_layers=beach`) and save the scene before `paint`:
+it works on the saved files. `--read-only` keeps `layers`.
 
 ## Building the game
 

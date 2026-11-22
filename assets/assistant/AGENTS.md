@@ -61,6 +61,8 @@ object at a time, as one undo step in an open editor:
   `set_story` writes a dialogue, quest or item, `new_scene` makes a scene. Read first with
   `settings`, `texts`, `story` and `scenes`.
 - `editor` `open_scene` and `save_as` take a `scene`; save before opening another one.
+- `terrain` `set_layers` writes a terrain's layers and rules (terrains/<name>.json); give the
+  object `prop.terrain_layers=<name>`, save, then `terrain` `paint` it.
 - `build` `start` makes the game for a `target` from the saved files; `build` `status` with
   `wait` says what it made, or why not.
 

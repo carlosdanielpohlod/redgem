@@ -16,6 +16,7 @@
 #include "project/mcp_game_tools.hpp"
 #include "project/mcp_build_tool.hpp"
 #include "project/mcp_project_tools.hpp"
+#include "project/mcp_terrain_tool.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
@@ -206,6 +207,7 @@ constexpr Native kNativeTools[] = {
     {"scene_edit", edit_files},
     {"project", project_tool},
     {"build", build_tool},
+    {"terrain", terrain_tool},
 };
 
 Json native_result(const Options& options, const std::string& name, const Json& args) {

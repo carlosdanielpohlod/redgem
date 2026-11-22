@@ -17,6 +17,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents paint terrains.** MCP's new `terrain` tool reads and writes a terrain's layers file
+  (terrains/<name>.json: its ground layers and the rules that paint them), refusing one the game
+  could not read, and paints an object's layers by those rules as `redgem scene paint` does.
 - **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
   { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
   under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
