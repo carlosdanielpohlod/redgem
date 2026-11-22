@@ -17,6 +17,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Import settings for models, textures and sounds.** A sidecar next to an asset
+  (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
+  extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's
+  streaming, loop, volume and stereo in 3D. The Inspector edits them for the file clicked in the
+  Project panel, and applying a model's settings imports it again in the open scene.
+  `redgem assets <game> --settings <asset> [field=value...]` shows and sets them. Experimental.
+  See [Import settings](docs/import-settings.md).
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why

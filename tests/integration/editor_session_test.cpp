@@ -7,6 +7,7 @@
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "core/config.hpp"
+#include "core/import_settings.hpp"
 #include "scene/props.hpp"
 #include "editor/editor_session.hpp"
 #include "core/files.hpp"
@@ -661,6 +662,45 @@ TEST_CASE("the whole selection is dragged under another object in one undo step"
   session->undo();
   CHECK(session->document().node(session->scene().find("Crate")).parent == kNoIndex);
   CHECK(session->document().node(session->scene().find("Coin")).parent == kNoIndex);
+  session.reset();
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a model is imported with its import settings, and imported again when they change") {
+  const std::filesystem::path dir = copy_sandbox("import_settings");
+  const std::filesystem::path model = dir / config::kModelsDirName / "hierarchy.glb";
+  std::filesystem::create_directories(model.parent_path());
+  std::filesystem::copy_file(fixture("hierarchy.glb"), model);
+  std::string error;
+  REQUIRE(write_text_file(import_settings::sidecar_of(model), R"({"scale": 2, "colliders": "box"})", error));
+  auto session = open(dir);
+  const ObjectId imported = session->import_model(model, Vec3{0.0f, 5.0f, 0.0f}, error);
+  REQUIRE_MESSAGE(imported != kNoObject, error);
+  const SceneDocument& doc = session->document();
+  CHECK(get_string(doc.node(imported).props, props::kModelFile) == "hierarchy.glb");
+  const auto top_of = [&doc](ObjectId root) { return doc.node(doc.node(root).children.front()); };
+  CHECK(top_of(imported).local.scale.x == doctest::Approx(2.0f));
+  const ObjectId child = session->scene().find("Child");
+  REQUIRE(child != kNoObject);
+  CHECK(get_string(doc.node(child).props, props::kCollider) == props::kColliderBox);
+
+  session->document().set_name(imported, "Tree");
+  const std::string root_id = doc.node(imported).stable_id;
+  const std::size_t held = doc.node(imported).children.size();
+  REQUIRE(write_text_file(import_settings::sidecar_of(model), R"({"scale": 3})", error));
+  CHECK(session->reimport_model("hierarchy.glb", error) == 1);
+  const ObjectId tree = session->scene().find("Tree");
+  REQUIRE(tree != kNoObject);
+  CHECK(doc.node(tree).stable_id == root_id);  // (the object itself stays)
+  CHECK(doc.node(tree).local.position.y == doctest::Approx(5.0f));
+  REQUIRE(doc.node(tree).children.size() == held);
+  CHECK(top_of(tree).local.scale.x == doctest::Approx(3.0f));
+  // (The new copy's child is named apart from the old one, which was still there as it came in.)
+  const ObjectId root_part = doc.node(tree).children.front();
+  REQUIRE_FALSE(doc.node(root_part).children.empty());
+  CHECK_FALSE(doc.node(doc.node(root_part).children.front()).props.count(props::kCollider));
+  session->undo();  // a single step takes the reimport back
+  CHECK(top_of(session->scene().find("Tree")).local.scale.x == doctest::Approx(2.0f));
   session.reset();
   std::filesystem::remove_all(dir);
 }

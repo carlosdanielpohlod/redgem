@@ -8,6 +8,7 @@
 #include <raylib.h>
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 #include "scene/scene_desc.hpp"
@@ -31,6 +32,13 @@ DecodedPicture decode_scene_picture(const ImageData& image);
 // The first file of `folder` that `name` can mean (as it is, or with a picture's extension), as
 // a texture. Missing, refused and undecodable files become an opaque checkerboard, with a warning.
 // Every result is independently owned by the caller, including placeholders.
+// Its import settings' max_size (core/import_settings.hpp) applies: a bigger picture is scaled down.
 Texture2D load_picture_file(const std::filesystem::path& folder, const std::string& name);
+
+// The file load_picture_file reads for `name`; nullopt when there is none.
+std::optional<std::filesystem::path> picture_file(const std::filesystem::path& folder, const std::string& name);
+
+// Scales a decoded picture down so that no side is longer than `max_size` (kNoSizeLimit: none).
+void fit_picture(Image& image, int max_size);
 
 }  // namespace redgem::render_detail
