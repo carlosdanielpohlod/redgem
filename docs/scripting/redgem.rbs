@@ -1793,12 +1793,43 @@ class Particles::Emitter
   def stop: () -> void
 end
 
+# Marks laid on the scene's surfaces: bullet holes, scorches, cracks.
+%a{redgem:experimental}
+module Decals
+  # projects a mark onto the surfaces at a point facing a normal, or at a raycast hit (its point and normal); returns whether it fell on any
+  %a{redgem:experimental}
+  def self.place: (Vector3 | Hash[Symbol, untyped] point, ?Vector3 | nil normal, ?size: Numeric, ?depth: Numeric | nil, ?image: String | Symbol | nil, ?color: RedGem::color, ?alpha: Integer, ?spin: Numeric) -> bool
+  # how many marks are kept
+  %a{redgem:experimental}
+  def self.count: () -> Integer
+  # how many marks are kept at most (256 unless set)
+  %a{redgem:experimental}
+  def self.limit: () -> Integer
+  # keeps at most this many marks, 1 to 4096: past it, placing one drops the oldest
+  %a{redgem:experimental}
+  def self.limit=: (Integer count) -> Integer
+  # removes every mark
+  %a{redgem:experimental}
+  def self.clear: () -> void
+end
+
+# Hit boxes on an animated character's bones, and the body part a shot hit.
+%a{redgem:experimental}
+module Hitboxes
+  # makes a kinematic box, capsule or sphere under each named bone (region:, size:, offset:, shape:), kept where its bone is every frame; returns them
+  %a{redgem:experimental}
+  def self.build: (GameObject character, Hash[String | Symbol, Hash[Symbol, untyped]] map, ?layer: String | Symbol | nil) -> Array[GameObject]
+  # the region of the hit box a raycast hit met, or nil for no hit or anything else
+  %a{redgem:experimental}
+  def self.region: (Hash[Symbol, untyped] | nil hit) -> (Symbol | nil)
+end
+
 # Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
 %a{redgem:stable}
 class Scatter
-  # places copies; returns a set (count, remove)
+  # places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)
   %a{redgem:stable}
-  def self.place: (String | GameObject template, count: Integer, area: [Vector3, Vector3], ?ground: GameObject | nil, ?seed: Integer, ?scale: Numeric | Range[Numeric], ?align: bool, ?tints: Array[RedGem::color] | nil, ?tint_variation: Numeric, ?fade: Numeric, ?normals_up: Numeric, ?lods: Array[[String, Numeric]] | nil) -> Scatter
+  def self.place: (String | GameObject template, count: Integer, area: [Vector3, Vector3], ?ground: GameObject | nil, ?seed: Integer, ?scale: Numeric | Range[Numeric], ?align: bool, ?layer: String | Symbol | nil, ?least: Numeric, ?tints: Array[RedGem::color] | nil, ?tint_variation: Numeric, ?fade: Numeric, ?normals_up: Numeric, ?lods: Array[[String, Numeric]] | nil) -> Scatter
   # removes every set
   %a{redgem:stable}
   def self.clear: () -> void
@@ -1962,6 +1993,9 @@ module Network
   # holds a dropped player's place and id that long, up to 300 (0 turns it off)
   %a{redgem:experimental}
   def self.reconnect_window=: (Numeric seconds) -> Numeric
+  # poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)
+  %a{redgem:experimental}
+  def self.send_hz: () -> Integer
   # whether this machine hosts
   %a{redgem:stable}
   def self.host?: () -> bool
@@ -2110,6 +2144,12 @@ class NetworkSync < Behaviour
   # sets its owner and key
   %a{redgem:stable}
   def assign: (owner: Integer, ?key: String) -> void
+  # poses a second its owner sends: its send_hz setting, else Network.send_hz
+  %a{redgem:experimental}
+  def send_hz: () -> Float
+  # seconds between two of its poses (1 / send_hz)
+  %a{redgem:experimental}
+  def send_interval: () -> Float
 end
 
 # A behaviour: something the player can use or talk to; its behaviours hear on_interact(actor), on_focus(actor) and on_blur(actor).

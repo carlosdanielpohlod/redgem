@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "audio/audio.hpp"
+#include "core/config.hpp"
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
@@ -34,6 +35,7 @@ class HttpClient;
 class AnimationPlayer;
 class HeadAims;
 class ParticleSystem;
+class DecalSystem;
 class ParticleEmitters;
 class Navigation;
 
@@ -148,6 +150,9 @@ struct ScriptContext {
   HeadAims* head_aims = nullptr;  // bones turned toward points (Animator#look_at)
   ParticleSystem* particles = nullptr;
   ParticleEmitters* particle_emitters = nullptr;
+  // The marks laid on the scene's surfaces (Decals), cut from `scene_desc`. Null outside a running
+  // engine.
+  DecalSystem* decals = nullptr;
   // Where the characters a game moves can walk (Navigation), and what bakes the running scene's
   // grid now. Null outside a running engine.
   Navigation* navigation = nullptr;
@@ -166,6 +171,9 @@ struct ScriptContext {
   std::string game_title;
   // The servers game.json knows by their fingerprints: a join that gives none checks these.
   std::vector<net::ServerPin> server_pins;
+  // The poses a second NetworkSync sends of an object that says nothing itself (game.json's
+  // "network": {"send_hz": N}): Network.send_hz.
+  int send_hz = config::kDefaultSendHz;
   // Its version (game.json), for Game.version; empty when it gives none.
   std::string game_version;
   bool quit_requested = false;
@@ -175,6 +183,9 @@ struct ScriptContext {
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
   std::function<ObjectId(const SpawnRequest&)> spawn;
   std::function<ObjectId(const std::string&, const SpawnRequest&)> spawn_prefab;
+  // Makes a new object of a node made in code (no mesh of its own), with its physics body, placed
+  // and parented as the request says (Hitboxes.build); null outside a running engine.
+  std::function<ObjectId(const NodeDesc&, const SpawnRequest&)> make_object;
   AudioSystem* audio = nullptr;
   // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;

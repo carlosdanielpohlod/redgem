@@ -59,6 +59,8 @@ struct SpatialSound {
   Vec3 velocity{};  // m/s: how it moves, for the Doppler effect
   // What its pitch is heard at, times, from the Doppler effect: the pool keeps it.
   float doppler = kNoShift;
+  // Played as its file is, its import settings left aside (the editor's previews).
+  bool as_recorded = false;
 };
 
 // A sound with no place in the world (Audio.play): a looping hum, an alarm, a voice line.
@@ -68,6 +70,7 @@ struct FlatSound {
   bool loop = false;
   MixGroup group = MixGroup::Effects;
   int priority = kDefaultSoundPriority;
+  bool as_recorded = false;  // see SpatialSound
 };
 SpatialSound flat_sound(const FlatSound& sound);
 

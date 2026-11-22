@@ -122,10 +122,14 @@ double number_of(mrb_state* mrb, mrb_value value, const char* key) {
 
 PropertyValue value_of(mrb_state* mrb, const Setting& setting, mrb_value value) {
   switch (setting.kind) {
-    case Kind::Color: return color_of(mrb, value, setting.key);
-    case Kind::Text: return text_of(mrb, value, setting.key);
-    case Kind::Flag: return flag_of(mrb, value, setting.key);
-    case Kind::Number: break;
+    case Kind::Color:
+      return color_of(mrb, value, setting.key);
+    case Kind::Text:
+      return text_of(mrb, value, setting.key);
+    case Kind::Flag:
+      return flag_of(mrb, value, setting.key);
+    case Kind::Number:
+      break;
   }
   return number_of(mrb, value, setting.key);
 }

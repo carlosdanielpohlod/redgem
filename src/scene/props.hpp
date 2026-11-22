@@ -17,6 +17,11 @@ inline constexpr const char* kMass = "mass";
 inline constexpr const char* kDensity = "density";
 // The collision layer of its body, one of game.json's physics layers (physics/collision_layers.hpp).
 inline constexpr const char* kLayer = "layer";
+// A hit box (Hitboxes.build): a kinematic volume under a bone of an animated character, kept where
+// the bone is every frame, and the part of the body it stands for (head, chest...) that a shot
+// tells by it. Experimental.
+inline constexpr const char* kHitbox = "hitbox";
+inline constexpr const char* kRegion = "region";
 inline constexpr const char* kVisible = "visible";
 inline constexpr const char* kWheel = "wheel";
 // A terrain: a square grid mesh made in the editor, whose ground can be sculpted there.
@@ -34,6 +39,9 @@ inline constexpr const char* kPrefabOverrides = "prefab_overrides";
 // On an object added under a placement: the path of the inherited part it hangs from (none: the
 // placement itself).
 inline constexpr const char* kPrefabParent = "prefab_parent";
+// On the object an imported model sits under: its file inside models/ ("trees/oak.glb"), so the
+// editor can import it again when its import settings change.
+inline constexpr const char* kModelFile = "model_file";
 inline constexpr const char* kTint = "tint";
 // Levels of detail: an object is drawn only while its distance from the camera (meters) is at
 // least `visible_from` and less than `visible_to`. Several versions of a model, each with its own

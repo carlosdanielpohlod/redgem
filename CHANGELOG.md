@@ -21,6 +21,29 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor
   each change is one undo step.
+- **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
+  { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
+  under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
+  pose of that frame), on a dedicated server too. `Hitboxes.region(hit)` says which part of the body
+  a raycast met.
+- **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
+  least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
+  grass on the painted roads, trees only on the forest floor. Games with no ground layers need no
+  change.
+
+- **Decals: bullet holes and other marks** (experimental). `Decals.place(hit)`, or
+  `Decals.place(point, normal, size:, image:, color:, alpha:, spin:)`, projects a mark onto the
+  meshes and terrain under it, straight from a raycast hit. A mark darkens what it lies on, so it
+  takes the surface's light and shade; without an image it is a soft round spot. It stays on the
+  object it fell on as that moves. Marks are kept up to `Decals.limit` (256 unless set): past it the
+  oldest goes. They are local looks: never sent over the network, and none on a dedicated server.
+- **Import settings for models, textures and sounds.** A sidecar next to an asset
+  (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
+  extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's
+  streaming, loop, volume and stereo in 3D. The Inspector edits them for the file clicked in the
+  Project panel, and applying a model's settings imports it again in the open scene.
+  `redgem assets <game> --settings <asset> [field=value...]` shows and sets them. Experimental.
+  See [Import settings](docs/import-settings.md).
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
@@ -64,6 +87,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   weights, and `Terrain.paint_by_rules` repaints them while the game runs.
   `Terrain.layer_at(ground, position)` and `Terrain.weights_at` say which ground is under a point
   (footsteps).
+- **Ground layers painted by hand in the editor (experimental).** The editor draws a terrain's
+  ground layers, and its Paint brush paints the chosen layer into the weights, with a strength and
+  a soft falloff. Each stroke is one undo step; Save writes the weights beside the layers file, and
+  Play shows them. See [painting ground layers by hand](docs/levels.md#painting-ground-layers-by-hand-experimental).
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that
@@ -127,6 +154,17 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **Bodies are drawn between physics steps.** A game drawn more often than it ticks draws its
+  dynamic bodies, characters and vehicles (and what rides on them, a camera parented to a
+  character included) between their last two steps, as far as the frame is into the next one, so
+  at 144 or 240 fps they move smoothly instead of in 60 Hz steps. Scripts still read the physics
+  pose. Runs that take a step a frame (tests, `redgem run`, `redgem shot`) draw as before.
+- **A game's send rate.** `game.json`'s `"network": {"send_hz": N}` (1 to 128, 20 by default)
+  sets how many poses a second `NetworkSync` sends of an object, and an object's own `send_hz:`
+  setting overrides it (`Network.send_hz`, `NetworkSync#send_hz`, experimental). The watchers'
+  interpolation expects poses at that rate. A `"network"` object also says the game plays
+  online. An owner no longer loses the part of a frame past its send time, so its rate is the
+  one asked for whatever the frame rate.
 - **A dedicated server keeps to the game's tick.** `redgem-server` takes its lobby's turns and
   its rooms' frames at the game's `tick_hz`, and its status budget (`frame_ms.budget`, the
   status line's "of N ms") is a step of it. The start line says the rate.

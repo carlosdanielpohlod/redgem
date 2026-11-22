@@ -29,8 +29,8 @@ std::vector<Field> fields(const SceneDocument& document, int placement);
 prefabs::Overrides overrides_of(const SceneDocument& document, int placement);
 
 // Adds `change` to the part at `path` (prefabs::merge_override). One undo step.
-bool set_override(SceneDocument& document, int placement, const std::string& path,
-                  const prefabs::PartOverride& change, std::string& error);
+bool set_override(SceneDocument& document, int placement, const std::string& path, const prefabs::PartOverride& change,
+                  std::string& error);
 
 // Makes `change` the whole override of the part at `path` (an empty one removes it). One undo step.
 bool replace_override(SceneDocument& document, int placement, const std::string& path,

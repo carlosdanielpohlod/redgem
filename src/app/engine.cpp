@@ -49,6 +49,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
+  if (!manifest.send_hz_error.empty()) log::warning(manifest.send_hz_error);
   if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
@@ -61,6 +62,7 @@ void warn_of_unusable(const GameManifest& manifest) {
 void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
+  context.send_hz = settings.send_hz;
   context.ui_reference = settings.ui;
   context.menu_settings = settings.menu;
 }
@@ -160,8 +162,8 @@ int Engine::chosen_physics_threads(const GameSettings& settings) const {
 void Engine::open_presenter(const GameSettings& settings) {
   if (presenter_ == nullptr) {
     // Shown by nobody, the game is as big as its settings say.
-    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height},
-                                                     fixed_delta());
+    own_presenter_ =
+        std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height}, fixed_delta());
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();
@@ -272,6 +274,7 @@ void Engine::connect_effects() {
   context_.head_aims = &head_aims_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
+  context_.decals = &decals_;
   context_.renders_particles = options_.presenter != nullptr;
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
@@ -336,6 +339,9 @@ void Engine::connect_context() {
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
   context_.spawn = [this](const SpawnRequest& request) { return spawn(request); };
+  context_.make_object = [this](const NodeDesc& node, const SpawnRequest& request) {
+    return make_object(node, request);
+  };
   context_.spawn_prefab = [this](const std::string& file, const SpawnRequest& request) {
     return spawn_prefab(file, request);
   };

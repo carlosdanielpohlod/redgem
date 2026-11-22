@@ -114,7 +114,8 @@ void draw_inspector(PanelContext& context) {
   ImGui::Begin(window_title(kInspectorTitle, kInspectorWindow));
   const ObjectId index = context.session.selection();
   if (index == kNoObject) {
-    ImGui::TextColored(muted_color(), "%s", icon_label(ICON_FA_ARROW_POINTER, "editor.inspector.nothing_selected"));
+    if (!draw_asset_settings(context))
+      ImGui::TextColored(muted_color(), "%s", icon_label(ICON_FA_ARROW_POINTER, "editor.inspector.nothing_selected"));
   } else if (group_shown(context.session)) {
     draw_group(context);
   } else {

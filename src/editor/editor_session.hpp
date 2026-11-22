@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <variant>
@@ -127,13 +128,25 @@ class EditorSession {
   // when a stroke begins. False when nothing changed or while playing.
   bool sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode);
   bool paint_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, Color tint);
+  // The ground layers of a terrain (see scene/ground/terrain_layers.hpp); null when it has none.
+  const TerrainLayers* terrain_layers(ObjectId terrain) const;
+  // One stroke of the Paint brush on a terrain with ground layers: `brush` (its radius in meters
+  // of the world) paints its layer into the weights around a point of the world. Call
+  // document().checkpoint() once when a stroke begins. False when nothing changed or while playing.
+  bool paint_layer(ObjectId terrain, Vec3 world_point, LayerBrush brush);
   // An object whose properties set the scene's sky, fog and effects (see render/environment.hpp),
   // filled with a sunset to start from. Selects the existing one if the scene already has it.
   ObjectId create_environment();
   // Adds a .glb model (e.g. from models/) to the scene at a world position, optionally under
-  // another object. One undo step.
+  // another object. One undo step. Its import settings (core/import_settings.hpp) are applied, and
+  // a model of models/ is remembered on its object (props::kModelFile) for reimport_model.
   ObjectId import_model(const std::filesystem::path& path, Vec3 position, std::string& error,
                         ObjectId parent = kNoObject);
+  // Imports `model_file` (inside models/) again under every object of the scene that holds it,
+  // with its import settings as they are now: what those objects held is replaced, and their own
+  // name, placement, properties and scripts stay. One undo step for each object. The count done;
+  // `error` says why the next one could not be.
+  int reimport_model(const std::string& model_file, std::string& error);
   // Places a game-relative prefab GLB as an empty linked reference, one undo step.
   // Invalid dependencies or placements leave the document and selection unchanged.
   ObjectId place_prefab(const std::string& file, Vec3 position, std::string& error, ObjectId parent = kNoObject);
@@ -205,6 +218,12 @@ class EditorSession {
   // followed for changes others make to it.
   void begin_editing();
   void apply_layer_settings();
+  // Reads the ground layers the objects name and the document does not hold yet (a layers file
+  // that cannot be read is warned of once, and its object keeps its own material).
+  void follow_terrain_layers();
+  void hold_layers_named(const std::string& name);
+  // Writes the weights painted since the last save into the game's terrains/ folder.
+  bool save_weights(std::string& error);
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
   void follow_scene_file(bool offer_archives = false);
@@ -225,6 +244,16 @@ class EditorSession {
   void refresh_and_reselect(const std::vector<std::string>& names);
   ObjectId place_linked(const std::string& file, const Transform& world, ObjectId parent, std::string& error);
   ObjectId place_new(int node, Vec3 position);
+  // import_model's document part: the model added under `parent`, its settings applied.
+  int add_model(const std::filesystem::path& path, std::string& error, int parent);
+  void tag_model(int node, const std::filesystem::path& path);
+  // The stable ids of the objects that hold `model_file`.
+  std::vector<std::string> model_copies(const std::string& model_file) const;
+  // Each of those still there, until one fails; the count done.
+  int reimport_copies(const std::vector<std::string>& ids, const std::filesystem::path& path, std::string& error);
+  bool reimport_copy(const std::string& root_id, const std::filesystem::path& path, std::string& error);
+  // Moves what `fresh_id` holds under `root_id`, then drops what `root_id` held and `fresh_id`.
+  std::string swap_model_nodes(const std::string& root_id, const std::string& fresh_id);
   // What every creation does: `add` makes the object (one undo step) and it is placed and
   // selected, while the game is stopped (kNoObject while it runs).
   ObjectId place_created(const std::function<int()>& add, Vec3 position);
@@ -247,7 +276,8 @@ class EditorSession {
                   const std::vector<Transform>& locals);
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
-  prefabs::Limits prefab_limits_;  // game.json's budgets, read as the game opens
+  std::set<std::string> unreadable_layers_;  // layers files that could not be read, warned of once
+  prefabs::Limits prefab_limits_;            // game.json's budgets, read as the game opens
   CollisionLayers collision_layers_;
   std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;

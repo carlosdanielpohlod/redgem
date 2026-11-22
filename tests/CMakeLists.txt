@@ -30,6 +30,7 @@ unit/temp_dirs_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
   unit/ground_rules_test.cpp
+  unit/ground_brush_test.cpp
   unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
@@ -53,6 +54,7 @@ unit/temp_dirs_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
+  unit/import_settings_test.cpp
   unit/mcp_test.cpp
   unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
@@ -148,6 +150,7 @@ unit/temp_dirs_test.cpp
   unit/instance_records_test.cpp
   unit/morph_shapes_test.cpp
   unit/scatter_test.cpp
+  unit/decals_test.cpp
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
@@ -251,6 +254,7 @@ unit/temp_dirs_test.cpp
   integration/symbol_cache_test.cpp
   integration/script_budget_test.cpp
   integration/tick_rate_test.cpp
+  integration/render_poses_test.cpp
   integration/script_budget_clock_test.cpp
   integration/save_budget_test.cpp
   integration/crash_handling_test.cpp
@@ -278,6 +282,8 @@ unit/temp_dirs_test.cpp
   integration/ui_input_test.cpp
   integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
+  integration/hitboxes_test.cpp
+  integration/decals_test.cpp
   integration/camera_switch_test.cpp
   integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp
@@ -305,6 +311,7 @@ unit/temp_dirs_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_layer_brush_test.cpp
   integration/editor_joints_test.cpp
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
@@ -724,6 +731,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/mirrored_render_test.cpp
                render_system/view_model_render_test.cpp
+               render_system/decals_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/ktx2_render_test.cpp

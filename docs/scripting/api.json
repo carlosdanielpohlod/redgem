@@ -5557,6 +5557,185 @@
       "guide": "gameplay.md#sparks-dust-and-smoke"
     },
     {
+      "name": "Decals",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "Marks laid on the scene's surfaces: bullet holes, scorches, cracks.",
+      "methods": [
+        {
+          "name": "place",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "point",
+              "type": "Vector3 | Hash[Symbol, untyped]"
+            },
+            {
+              "name": "normal",
+              "type": "Vector3 | nil",
+              "optional": true,
+              "default": "nil"
+            },
+            {
+              "name": "size",
+              "type": "Numeric",
+              "keyword": true,
+              "optional": true,
+              "default": "0.15"
+            },
+            {
+              "name": "depth",
+              "type": "Numeric | nil",
+              "keyword": true,
+              "optional": true,
+              "default": "nil"
+            },
+            {
+              "name": "image",
+              "type": "String | Symbol | nil",
+              "keyword": true,
+              "optional": true,
+              "default": "nil"
+            },
+            {
+              "name": "color",
+              "type": "Color",
+              "keyword": true,
+              "optional": true,
+              "default": ":black"
+            },
+            {
+              "name": "alpha",
+              "type": "Integer",
+              "keyword": true,
+              "optional": true,
+              "default": "255"
+            },
+            {
+              "name": "spin",
+              "type": "Numeric",
+              "keyword": true,
+              "optional": true,
+              "default": "0.0"
+            }
+          ],
+          "returns": {
+            "type": "bool"
+          },
+          "about": "projects a mark onto the surfaces at a point facing a normal, or at a raycast hit (its point and normal); returns whether it fell on any"
+        },
+        {
+          "name": "count",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {
+            "type": "Integer"
+          },
+          "about": "how many marks are kept"
+        },
+        {
+          "name": "limit",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {
+            "type": "Integer"
+          },
+          "about": "how many marks are kept at most (256 unless set)"
+        },
+        {
+          "name": "limit=",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "count",
+              "type": "Integer"
+            }
+          ],
+          "returns": {
+            "type": "Integer"
+          },
+          "about": "keeps at most this many marks, 1 to 4096: past it, placing one drops the oldest"
+        },
+        {
+          "name": "clear",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {
+            "type": "void"
+          },
+          "about": "removes every mark"
+        }
+      ],
+      "internal": [
+        "__at",
+        "__rgb"
+      ],
+      "notes": "Marks darken what they lie on (their color multiplies it), so they take its light and shade. They stay on the object they fell on as it moves, and go with it when it is destroyed or hidden. Skinned meshes, meshes with shape keys, prefabs, the view model, water, and see-through or cut-out materials take none; a two-sided surface takes them on both sides. Marks are local: never sent to other machines, and a machine that draws nothing keeps none. A scene loaded anew starts without them.",
+      "guide": "gameplay.md#leave-marks-decals"
+    },
+    {
+      "name": "Hitboxes",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "Hit boxes on an animated character's bones, and the body part a shot hit.",
+      "methods": [
+        {
+          "name": "build",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "character",
+              "type": "GameObject"
+            },
+            {
+              "name": "map",
+              "type": "Hash[String | Symbol, Hash[Symbol, untyped]]"
+            },
+            {
+              "name": "layer",
+              "type": "String | Symbol | nil",
+              "keyword": true,
+              "optional": true,
+              "default": "nil"
+            }
+          ],
+          "returns": {
+            "type": "Array[GameObject]"
+          },
+          "about": "makes a kinematic box, capsule or sphere under each named bone (region:, size:, offset:, shape:), kept where its bone is every frame; returns them"
+        },
+        {
+          "name": "region",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "hit",
+              "type": "Hash[Symbol, untyped] | nil"
+            }
+          ],
+          "returns": {
+            "type": "Symbol | nil"
+          },
+          "about": "the region of the hit box a raycast hit met, or nil for no hit or anything else"
+        }
+      ],
+      "internal": [
+        "__box",
+        "__hitbox_props",
+        "__size",
+        "__vector"
+      ],
+      "notes": "A hit box is a child object of its bone (props region, hitbox and layer), so destroying the character takes its boxes along. Boxes are posed where the game runs, a dedicated server included: the host judges hits against the pose it shows, which for another player's character follows that player's synced animation, a moment behind (no lag compensation).",
+      "guide": "gameplay.md#hit-boxes-on-animated-characters"
+    },
+    {
       "name": "Scatter",
       "stability": "stable",
       "kind": "class",
@@ -5574,6 +5753,8 @@
             {"name": "seed", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
             {"name": "scale", "type": "Numeric | Range[Numeric]", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "align", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "layer", "type": "String | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "least", "type": "Numeric", "keyword": true, "optional": true, "default": "0.5"},
             {"name": "tints", "type": "Array[Color] | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "tint_variation", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
             {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
@@ -5581,7 +5762,7 @@
             {"name": "lods", "type": "Array[[String, Numeric]] | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "Scatter"},
-          "about": "places copies; returns a set (count, remove)"
+          "about": "places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)"
         },
         {
           "name": "clear",
@@ -5607,7 +5788,9 @@
         }
       ],
       "internal": [
-        "look_options"
+        "look_options",
+        "layer_share",
+        "least_without_layer?"
       ],
       "guide": "../levels.md#grass-forests-and-cities"
     },
@@ -6085,6 +6268,14 @@
           "about": "holds a dropped player's place and id that long, up to 300 (0 turns it off)"
         },
         {
+          "name": "send_hz",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)"
+        },
+        {
           "name": "host?",
           "stability": "stable",
           "static": true,
@@ -6531,6 +6722,20 @@
           ],
           "returns": {"type": "void"},
           "about": "sets its owner and key"
+        },
+        {
+          "name": "send_hz",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "poses a second its owner sends: its send_hz setting, else Network.send_hz"
+        },
+        {
+          "name": "send_interval",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds between two of its poses (1 / send_hz)"
         }
       ],
       "internal": [

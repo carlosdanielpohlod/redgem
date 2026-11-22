@@ -27,6 +27,7 @@
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "scene/animation/head_aim.hpp"
+#include "scene/decals.hpp"
 #include "scene/particles.hpp"
 #include "scene/particle_emitters.hpp"
 #include "scene/water_interactions.hpp"
@@ -37,6 +38,7 @@
 #include "app/game_settings.hpp"
 #include "app/game_identity.hpp"
 #include "app/presenter.hpp"
+#include "app/render_poses.hpp"
 #include "app/scene_activation.hpp"
 #include "storage/save_store.hpp"
 #include "storage/save_slots.hpp"
@@ -133,6 +135,12 @@ class Engine {
   // says (see SpawnRequest). Returns the new root object.
   ObjectId spawn(const SpawnRequest& request);
   ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
+  // A new object of a node made in code (ScriptContext::make_object).
+  ObjectId make_object(const NodeDesc& node, const SpawnRequest& request);
+  // The hit boxes among new objects (made, spawned or copied with a character) are kept where their
+  // bones are from then on (snap_hitboxes).
+  bool is_hitbox(ObjectId id) const;
+  void note_hitboxes(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
   const prefabs::Source& load_runtime_prefab(const std::string& file);
   // The rest of a spawn, for its (original, copy) pairs (kNoObject originals: made from a prefab file).
   ObjectId finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request);
@@ -287,6 +295,9 @@ class Engine {
   // character controller goes there through the physics, sliding along walls; anything else is
   // moved there.
   void apply_root_motion();
+  // Puts the bodies of the hit boxes where their bones are now, at once: a ray cast in this frame's
+  // scripts meets the pose this frame shows, not the one of the last physics step.
+  void snap_hitboxes();
   void move_by(ObjectId object, const RootMotion& motion);
   // Hands the moments the characters' clips went past to the scripts listening (animation.on).
   void hand_on_animation_events();
@@ -314,6 +325,12 @@ class Engine {
   // bodies went and the contacts, once it has.
   void prepare_fixed_step(float dt);
   void finish_fixed_step(float dt);
+  // How far into the next fixed step the frame being drawn is (0 to 1): the share of the way from
+  // a body's pose before the last step to its pose after it that it is drawn at. A run that takes
+  // a whole step a frame, or whose step is still on the physics thread, draws the step's pose (1).
+  float drawn_share() const;
+  bool draws_last_step() const;
+  void hand_to_presenter();
   // The fixed steps a frame owes: the last one only prepared when the steps overlap the drawing.
   void run_fixed_steps(int steps);
   // Whether the world's steps overlap the drawing (more than one thread solves them).
@@ -374,12 +391,15 @@ class Engine {
   HeadAims head_aims_;
   ParticleSystem particles_;
   ParticleEmitters particle_emitters_;
+  std::vector<ObjectHandle> hitboxes_;  // hit boxes with bodies (note_hitboxes), while they last
+  DecalSystem decals_;
   WaterInteractions water_;
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
+  RenderPoses render_poses_;  // where the bodies the physics moves are drawn, between two steps
   DebugDrawBuffer debug_draw_;
   FrameProfiler profiler_;
   Stopwatch network_watch_;  // the real time between the network's polls

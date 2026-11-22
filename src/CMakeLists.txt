@@ -39,6 +39,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_controls.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/decals.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_follow.rb
@@ -47,6 +48,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_rig.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_cut.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/hitboxes.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation_graph.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
@@ -223,6 +225,7 @@ redgem_add_library(redgem_core
   core/game_archive.cpp
   core/game_archive_writer.cpp
   core/game_files.cpp
+  core/import_settings.cpp
   core/image_header.cpp
   core/webp_image.cpp
   core/ktx2_header.cpp
@@ -374,6 +377,8 @@ redgem_add_library(redgem_runtime
   scene/particle_emitters.cpp
   scene/particles.cpp
   scene/particle_look.cpp
+  scene/decal_clip.cpp
+  scene/decals.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
   scene/water_volume.cpp
@@ -381,7 +386,9 @@ redgem_add_library(redgem_runtime
   scene/ground/splat_map.cpp
   scene/ground/terrain_layers_file.cpp
   scene/ground/ground_survey.cpp
+  scene/ground/ground_weights.cpp
   scene/ground/ground_rules.cpp
+  scene/ground/ground_brush.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
@@ -417,6 +424,7 @@ redgem_add_library(redgem_runtime
   navigation/nav_steering.cpp
   navigation/navigation.cpp
   audio/audio.cpp
+  audio/sound_import.cpp
   audio/ducking.cpp
   audio/envelope_follower.cpp
   audio/audio_effects.cpp
@@ -511,6 +519,8 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
+  script/bindings/hitboxes_bindings.cpp
+  script/bindings/decals_bindings.cpp
   script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
   script/bindings/save_slot_bindings.cpp
@@ -568,6 +578,7 @@ redgem_add_library(redgem_runtime
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
   render/renderer_particles.cpp
+  render/renderer_decals.cpp
   render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
@@ -636,6 +647,7 @@ redgem_add_library(redgem_runtime
   app/scene_loader.cpp
   app/scene_activation.cpp
   app/scene_bodies.cpp
+  app/render_poses.cpp
   app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp
@@ -710,10 +722,12 @@ if(NOT ANDROID)
     editor/document/scene_document_memory.cpp
     editor/document/scene_document_history_bytes.cpp
     editor/document/scene_document_terrain.cpp
+  editor/document/scene_document_layers.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp
     editor/document/scene_document_clipboard.cpp
     editor/document/scene_document_images.cpp
+    editor/document/picture_fit.cpp
     editor/document/scene_document_create.cpp
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
@@ -727,10 +741,12 @@ if(NOT ANDROID)
     editor/editor_session_prefabs.cpp
     editor/prefab_preview.cpp
     editor/prefab_instances.cpp
+    editor/model_import_settings.cpp
     editor/prefab_files.cpp
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
     editor/editor_session_create.cpp
+    editor/editor_session_models.cpp
     editor/new_object_kinds.cpp
     editor/editor_session_play.cpp
     editor/editor_session_joints.cpp
@@ -784,6 +800,7 @@ if(NOT ANDROID)
     editor/ui/inspector_textures.cpp
     editor/ui/inspector_light_camera.cpp
     editor/ui/inspector_terrain.cpp
+    editor/ui/inspector_asset.cpp
     editor/ui/inspector_scripts.cpp
     editor/ui/inspector_physics.cpp
     editor/ui/inspector_joint.cpp
@@ -879,6 +896,7 @@ if(NOT ANDROID)
     project/scene_revision.cpp
     project/asset_search.cpp
     project/search_command.cpp
+    project/asset_settings_command.cpp
     project/scene_snapshot.cpp
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp

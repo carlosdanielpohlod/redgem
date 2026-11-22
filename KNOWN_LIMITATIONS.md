@@ -36,6 +36,10 @@ the same pull request.
 
 ## Rendering and animation
 
+- Only dynamic bodies, characters and vehicles (and what hangs from them) are drawn between their
+  last two steps. A kinematic body a script moves in `fixed_update` is drawn in steps, so a body
+  riding a moving kinematic platform shifts against it by up to a step at high frame rates. An
+  object a script places each `update` from a body's `transform.position` follows the step pose.
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Animation events and root motion come from a character's own clips only: the scene's clips
@@ -51,6 +55,12 @@ the same pull request.
   the physics only: root motion leaves them alone. Root motion is not sent over the network:
   `NetworkSync` sends where the owner's character went, and on the other machines a character
   following a graph received from the owner is not pinned (its root moves in the pose).
+- Hit boxes (`Hitboxes.build`) are placed where their bones are after the clips pose them, before
+  scripts run: a head turned by `Animator#look_at` (which turns after the scripts) is met where the
+  clips put it. Their bodies keep the size they were made with when a bone is scaled (the box
+  object's own scale follows the bone), and they are made at run time only (the editor does not
+  show or place them). The host judges hits against its own pose of another player's character,
+  which follows that player's synced animation a moment behind.
 - The view model (`view_model = true`) is drawn over the world in one layer: particles, lights
   and debug lines are the world's, drawn with the world's field of view (start them at
   `Camera.from_view_model`), and the weapon is never hidden behind particles. It writes no motion
@@ -59,6 +69,14 @@ the same pull request.
   lights of the scene do not light it, and its own fill light is fixed (white, from the eye).
   `Camera.from_view_model` works from the steady camera: while it shakes, what starts there is
   off the muzzle by as much as the shake moves the picture.
+- Decals (`Decals.place`) only darken what they lie on (their color multiplies it): a mark lighter
+  than its surface (white paint on a dark wall) cannot be made, and they do not shine or reflect.
+  They are cut from the surfaces' triangles when placed, on the machine's main thread: a mark on a
+  dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
+  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
+  with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
+  editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and see-through or
+  cut-out materials (glass, leaves, a fence) take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -252,16 +270,32 @@ the same pull request.
   instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
+- Import settings (experimental): a model's settings apply only when the editor imports it, and
+  only Apply in the editor imports it again; a change made with `redgem assets --settings` or by
+  hand shows at the next import. Importing again replaces everything under the model's object,
+  objects you added there and scripts on its parts included; it is imported again in the open
+  scene only. Extracted pictures are copies: the imported model keeps its own. Texture
+  compression is `"none"` only (the engine has no KTX2 encoder), and a texture's color space and
+  normal map flag only bring warnings in the Inspector: the material slot still decides how a
+  picture is read. A sound's settings are read once per name while a game runs; the editor's
+  Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
+  of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
-- Ground layers have no editor brush yet: their weights are painted by rules (`redgem scene
-  paint`, `Terrain.paint_by_rules`) or by editing the splat pictures. Rules see the terrain mesh's
-  own heights, not its object's scale or place. The layers' textures are three texture arrays in
-  slots 17 to 19: a graphics card with fewer than 20 texture units for the fragment shader (most
-  phones) draws the terrain without them. A terrain's mesh must be its own: a mesh another object
-  also draws gets no layers. Changed layer pictures show after the scene is loaded again. Each
-  layer's pictures are sampled even where the layer is covered by others with a sharp height
-  blend.
+- The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
+  painted by rules or by editing its splat pictures). An undo step of a stroke keeps a whole copy of
+  the terrain's weights (8 MB for a 1024 map), so long painting sessions keep fewer undo steps.
+  Painted weights are not in the editor's crash recovery copy: save to keep them. When two objects
+  name the same layers file, the editor draws and paints its layers on the first one only. Rules see
+  the terrain mesh's own heights, not its object's scale or place. The layers' textures are three
+  texture arrays in slots 17 to 19: a graphics card with fewer than 20 texture units for the
+  fragment shader (most phones) draws the terrain without them. A terrain's mesh must be its own: a
+  mesh another object also draws gets no layers. Changed layer pictures show after the scene is
+  loaded again. Each layer's pictures are sampled even where the layer is covered by others with a
+  sharp height blend. `Terrain` and `Scatter.place(layer:)` find the layers of objects of the
+  scene's own file (and their copies): a terrain from a scene loaded later, or spawned, has none
+  for them. `layer:` compares the painted weight, not the sharpened blend that is drawn, and
+  follows the layers even of a terrain whose mesh is shared (which draws none).
 
 ## Tools
 
@@ -295,12 +329,10 @@ menu whose look each game sets:
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
-- Hit boxes on the bones of animated characters, posed on a dedicated server.
 - Rooms of more than 16 machines.
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.
 - An unreliable, sequenced channel for inputs and positions beside the reliable one.
-- Marks left on walls (bullet holes).
 - A theme for `GameMenu`: fonts, colors, buttons, layout, the title screen's background and logo,
   transitions, sounds and music, from `game.json` or Ruby.
 
