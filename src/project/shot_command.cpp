@@ -57,7 +57,7 @@ WindowSettings hidden_window(FrameSize size) {
 
 // How many of a picture's pixels came back see-through, when that is too many for a picture drawn
 // whole (see picture_check.hpp); 0 for a picture drawn whole.
-std::size_t unfinished_pixels(const Image& image) {
+std::size_t too_many_see_through(const Image& image) {
   if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) return 0;
   const auto pixels = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
   const auto* rgba = static_cast<const std::uint8_t*>(image.data);
@@ -110,7 +110,7 @@ class ShotPresenter final : public Presenter {
   void take() {
     Image image = LoadImageFromTexture(picture_.texture);
     ImageFlipVertical(&image);  // (a framebuffer's rows start at the bottom)
-    unfinished_pixels_ = unfinished_pixels(image);
+    unfinished_pixels_ = too_many_see_through(image);
     out_of_memory_ = card_out_of_memory();
     memory_ = query_card_memory();
     saved_ = ExportImage(image, file_.string().c_str());
