@@ -87,12 +87,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   install_world(incoming);
   context_.scene_name = incoming.name();
   scene_generation_ = incoming.generation();
-  animations_.reset(scene_desc_.animations, scene_);
-  head_aims_.clear();
-  particles_.clear();
-  hitboxes_.clear();  // (the objects are gone with the scene)
-  particle_emitters_.clear();
-  decals_.clear();
+  forget_scene_effects();
   // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
   scripts_->run_scene_script(incoming.name());
@@ -108,6 +103,15 @@ void Engine::install_world(SceneActivation& incoming) {
   adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
   settle_world();
+}
+
+void Engine::forget_scene_effects() {
+  animations_.reset(scene_desc_.animations, scene_);
+  head_aims_.clear();
+  particles_.clear();
+  hitboxes_.clear();  // (the objects are gone with the scene)
+  particle_emitters_.clear();
+  decals_.clear();
 }
 
 void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {

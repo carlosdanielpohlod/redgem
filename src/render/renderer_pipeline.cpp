@@ -124,11 +124,7 @@ void Renderer::Impl::load_sky() {
 
 void Renderer::Impl::release() {
   gpu_timers.release();
-  if (texel_texture != 0) rlUnloadTexture(texel_texture);
-  texel_texture = 0;
-  release_slots(slots);
-  release_previous_texels();
-  release_particle_buffer(particle_buffer);
+  release_frame_buffers();
   release_assets();
   release_targets();
   free_maps(fallback_material);
@@ -138,6 +134,14 @@ void Renderer::Impl::release() {
   ui_fonts.clear();
   release_fixed_targets();
   release_shaders();
+}
+
+void Renderer::Impl::release_frame_buffers() {
+  if (texel_texture != 0) rlUnloadTexture(texel_texture);
+  texel_texture = 0;
+  release_slots(slots);
+  release_previous_texels();
+  release_particle_buffer(particle_buffer);
 }
 
 void Renderer::Impl::release_sky() {

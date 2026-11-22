@@ -92,13 +92,18 @@ void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed
     queue_for_everyone_but(link.peer, passed);  // nothing to check it against: as without validation
     return;
   }
-  if (placed_.from_before(link.peer, update->key, claimed->position)) return drop_late_pose(link.peer, update->key);
-  const MovementVerdict verdict = movement_.check(link.peer, update->key, claimed->position);
+  check_and_relay_pose(link, *update, *claimed, passed, events);
+}
+
+void NetworkSession::check_and_relay_pose(Link& link, const PoseUpdate& update, const Pose& claimed,
+                                          const nlohmann::json& passed, std::vector<NetworkEvent>& events) {
+  if (placed_.from_before(link.peer, update.key, claimed.position)) return drop_late_pose(link.peer, update.key);
+  const MovementVerdict verdict = movement_.check(link.peer, update.key, claimed.position);
   if (verdict.ignored) return;  // more objects than are followed: nobody hears of it
-  const Pose shown{verdict.position, claimed->rotation};
-  relay_pose(link.peer, *update, shown, passed, verdict.valid);
-  events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(*update, shown)));
-  if (!verdict.valid) correct(link, update->key, verdict.position, verdict.kick);
+  const Pose shown{verdict.position, claimed.rotation};
+  relay_pose(link.peer, update, shown, passed, verdict.valid);
+  events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(update, shown)));
+  if (!verdict.valid) correct(link, update.key, verdict.position, verdict.kick);
 }
 
 void NetworkSession::relay_pose(int from, const PoseUpdate& update, const Pose& shown, const nlohmann::json& passed,

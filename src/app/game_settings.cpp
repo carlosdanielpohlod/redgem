@@ -279,6 +279,16 @@ GameManifest default_manifest(const std::filesystem::path& game_dir) {
   return manifest;
 }
 
+// The fields a game can get wrong, each with what was wrong with it.
+void read_checked_fields(const nlohmann::json& json, GameManifest& manifest) {
+  manifest.id_error = read_id(json, manifest.settings.id);
+  manifest.android_error = read_android_section(json, manifest.settings.android);
+  manifest.script_budget_error = read_script_budget(json, manifest.settings);
+  manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
+  manifest.send_hz_error = read_send_hz(json, manifest.settings);
+  manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
+}
+
 }  // namespace
 
 GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
@@ -289,12 +299,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   read_window(json, manifest.settings);
   manifest.title_given = holds_text(json, kTitleKey);
   read_display(json, manifest.settings);
-  manifest.id_error = read_id(json, manifest.settings.id);
-  manifest.android_error = read_android_section(json, manifest.settings.android);
-  manifest.script_budget_error = read_script_budget(json, manifest.settings);
-  manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
-  manifest.send_hz_error = read_send_hz(json, manifest.settings);
-  manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
+  read_checked_fields(json, manifest);
   read_sections(json, manifest);
   return manifest;
 }

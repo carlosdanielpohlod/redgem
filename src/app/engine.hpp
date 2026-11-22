@@ -267,6 +267,8 @@ class Engine {
   void switch_to(SceneActivation& incoming);
   // Puts a scene made ready, with its bodies, in place of the running one.
   void install_world(SceneActivation& incoming);
+  // Forgets what the old scene's objects were doing: animations, aims, particles, hitboxes, decals.
+  void forget_scene_effects();
   void place_spawned(ObjectId id, const std::optional<Transform>& world);
   // Names, places and parents a new copy as its request says, before its bodies and scripts.
   void shape_spawned(ObjectId id, const SpawnRequest& request);

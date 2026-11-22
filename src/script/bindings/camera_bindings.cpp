@@ -189,16 +189,18 @@ mrb_value camera_shake_by(mrb_state* mrb, mrb_value) {
   return object;
 }
 
-}  // namespace
-
-void install_camera_bindings(mrb_state* mrb) {
-  RClass* camera_module = mrb_define_module(mrb, "Camera");
+// Where the main camera is and what it points at.
+void install_camera_view_functions(mrb_state* mrb, RClass* camera_module) {
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "__choose", camera_choose, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, camera_module, "__check", camera_check, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, camera_module, "__darken", camera_darken, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "screen_ray", camera_screen_ray, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, camera_module, "world_to_screen", camera_world_to_screen, MRB_ARGS_REQ(1));
+}
+
+// How the main camera's lens sees: its fields of view, its blurs and its shake.
+void install_camera_lens_functions(mrb_state* mrb, RClass* camera_module) {
   mrb_define_module_function(mrb, camera_module, "fov", camera_fov, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "fov=", camera_set_fov, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "view_model_fov", camera_view_model_fov, MRB_ARGS_NONE());
@@ -208,6 +210,14 @@ void install_camera_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, camera_module, "backdrop_blur", camera_backdrop_blur, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "backdrop_blur=", camera_set_backdrop_blur, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "__shake_by", camera_shake_by, MRB_ARGS_REQ(3));
+}
+
+}  // namespace
+
+void install_camera_bindings(mrb_state* mrb) {
+  RClass* camera_module = mrb_define_module(mrb, "Camera");
+  install_camera_view_functions(mrb, camera_module);
+  install_camera_lens_functions(mrb, camera_module);
 }
 
 }  // namespace redgem

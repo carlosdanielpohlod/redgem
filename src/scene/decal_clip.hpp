@@ -5,11 +5,18 @@
 // corner is on the decal's picture. All in the world.
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 #include "core/math.hpp"
 
 namespace redgem {
+
+inline constexpr std::size_t kDecalTriangleCorners = 3;
+inline constexpr std::size_t kDecalBoxCorners = 8;
+
+// A triangle's corners, in the world or in an object's own space.
+using DecalTriangle = std::array<Vec3, kDecalTriangleCorners>;
 
 // The box a decal is projected through: centered where it was placed, `half_size` to each side
 // across its picture (along `right` and `up`), `half_depth` in front of and behind the surface
@@ -41,10 +48,10 @@ struct DecalCorner {
 // its surface) that is inside the box, as triangles of three corners each: nothing when the
 // triangle faces away from the decal (unless it is seen from `either_side`, a two-sided surface's)
 // or misses the box.
-void clip_to_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, std::vector<DecalCorner>& out,
+void clip_to_decal(const DecalBox& box, const DecalTriangle& triangle, std::vector<DecalCorner>& out,
                    bool either_side = false);
 
 // The corners of the box, in the world.
-std::array<Vec3, 8> box_corners(const DecalBox& box);
+std::array<Vec3, kDecalBoxCorners> box_corners(const DecalBox& box);
 
 }  // namespace redgem

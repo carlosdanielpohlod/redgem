@@ -78,11 +78,13 @@ mrb_value decals_limit(mrb_state* mrb, mrb_value) {
   return mrb_int_value(mrb, static_cast<mrb_int>(decals(mrb).limit()));
 }
 
+bool is_whole_number(mrb_value value) { return mrb_integer_p(value); }
+
 // A whole number of decals: a fraction is refused, not cut off.
 mrb_value decals_set_limit(mrb_state* mrb, mrb_value) {
   mrb_value asked = mrb_nil_value();
   mrb_get_args(mrb, "o", &asked);
-  if (!mrb_integer_p(asked)) mrb_raise(mrb, E_TYPE_ERROR, "Decals.limit is a whole number of decals");
+  if (!is_whole_number(asked)) mrb_raise(mrb, E_TYPE_ERROR, "Decals.limit is a whole number of decals");
   const mrb_int limit = mrb_integer(asked);
   from_to(mrb, static_cast<mrb_float>(limit), static_cast<mrb_float>(kMinDecalLimit),
           static_cast<mrb_float>(kMaxDecalLimit), "Decals.limit");

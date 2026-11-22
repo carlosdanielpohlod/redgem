@@ -48,6 +48,8 @@ PROJECTS = [
      os.path.join(DEPS, "imgui-src", "LICENSE.txt")),
     ("rlImGui", "Dear ImGui on raylib", "https://github.com/raylib-extras/rlImGui",
      os.path.join(DEPS, "rlimgui-src", "LICENSE")),
+    ("meshoptimizer", "Lighter levels of detail of imported meshes, in the editor",
+     "https://github.com/zeux/meshoptimizer", os.path.join(DEPS, "meshoptimizer-src", "LICENSE.md")),
     ("ImGuizmo", "The editor's move, rotate and scale gizmos", "https://github.com/CedricGuillemet/ImGuizmo",
      os.path.join(DEPS, "imguizmo-src", "LICENSE")),
     ("Font Awesome Free", "The editor's icons", "https://fontawesome.com",

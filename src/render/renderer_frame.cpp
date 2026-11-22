@@ -80,15 +80,19 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   render_math::world_transforms(scene, worlds);
   slots.used = 0;  // the frame's passes start over in the buffer of what they see
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);  // (levels of detail are chosen by it)
-  write_frame_texels(scene);
-  gather_decals(scene, to_vec3(camera.position));
-  send_frame_texels();
-  apply_lights(scene, env, to_vec3(camera.position));
+  prepare_scene_data(scene, env, to_vec3(camera.position));
   view_aspect = aspect;
   view_model_fov = view_model_fov_of(scene);
   draw_shadow_map(camera, env, particles);
   capture_reflection_face(camera);
   send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
+}
+
+void Renderer::Impl::prepare_scene_data(const Scene& scene, const Environment& env, Vec3 eye) {
+  write_frame_texels(scene);
+  gather_decals(scene, eye);
+  send_frame_texels();
+  apply_lights(scene, env, eye);
 }
 
 void Renderer::Impl::use_environment(const Environment& env, const Camera3D& camera) {

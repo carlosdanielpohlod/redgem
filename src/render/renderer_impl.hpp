@@ -443,6 +443,8 @@ struct Renderer::Impl {
   void use_lit_features(const shaders::LitFeatures& features);
   void load_sky();
   void release();
+  // The buffers each frame fills: its texels, its slots of what the passes see, its particles.
+  void release_frame_buffers();
   void release_sky();
   void release_shaders();
 
@@ -539,6 +541,8 @@ struct Renderer::Impl {
   // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
                      const ParticleSystem* particles);
+  // The frame's per-object data (texels and decals) and its lights, seen from `eye`.
+  void prepare_scene_data(const Scene& scene, const Environment& env, Vec3 eye);
   // The frame's passes, each timed by gpu_timers: prepare_frame, draw_lit_scene, post_process.
   void draw_timed_passes(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
                          const ParticleSystem* particles, const RenderTexture2D* output);
