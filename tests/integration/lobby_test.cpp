@@ -20,7 +20,7 @@ constexpr float kPastJoinTimeout = kJoinTimeoutSeconds + 1.0f;
 constexpr int kSettleRounds = 50;
 // Wrong room codes an address may give (two for each machine of a full game), and more than it
 // takes to be kept out, with time forgiving a little of each meanwhile.
-constexpr int kPartyGuesses = 2 * kMaxPeers;
+constexpr int kPartyGuesses = 2 * kDefaultRoomSize;  // as the code guessers count (net/rooms/code_guessers.cpp)
 constexpr int kTooManyGuesses = kPartyGuesses + 2;
 constexpr float kIdleStep = kPingEverySeconds;  // seconds: a ping each way every step, nothing else
 constexpr int kIdleSteps = static_cast<int>(kServedIdleSeconds / kIdleStep) + 1;
