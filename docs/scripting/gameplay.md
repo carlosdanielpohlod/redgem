@@ -1437,8 +1437,9 @@ kept, and `Decals.clear` removes them all; a scene loaded anew starts without an
 
 Marks are looks only, and local: they are not sent to the other machines of a multiplayer game
 (each machine places its own where it sees a shot land), and a machine that draws nothing, a
-dedicated server, keeps none. Skinned characters, meshes with shape keys, prefabs and the view model
-take none.
+dedicated server, keeps none. Skinned characters, meshes with shape keys, prefabs, the view model,
+water, and see-through or cut-out materials (glass, leaves, a fence) take none. A two-sided
+surface (a flag, a sign) takes marks on both its sides.
 
 ## Light that flickers and fades
 

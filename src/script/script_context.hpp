@@ -149,10 +149,9 @@ struct ScriptContext {
   HeadAims* head_aims = nullptr;  // bones turned toward points (Animator#look_at)
   ParticleSystem* particles = nullptr;
   ParticleEmitters* particle_emitters = nullptr;
-  // The marks laid on the scene's surfaces (Decals), and what the running scene is made of, which
-  // they are cut from. Null outside a running engine.
+  // The marks laid on the scene's surfaces (Decals), cut from `scene_desc`. Null outside a running
+  // engine.
   DecalSystem* decals = nullptr;
-  const SceneDesc* scene_desc = nullptr;
   // Where the characters a game moves can walk (Navigation), and what bakes the running scene's
   // grid now. Null outside a running engine.
   Navigation* navigation = nullptr;

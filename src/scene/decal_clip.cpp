@@ -52,10 +52,11 @@ Polygon clip_to_box(const DecalBox& box, Polygon polygon) {
   return polygon;
 }
 
-bool faces_the_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle) {
+bool faces_the_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, bool either_side) {
   const Vec3 facing = cross(triangle[1] - triangle[0], triangle[2] - triangle[0]);
   const float area = length(facing);
-  return area > 0.0f && dot(facing, box.normal) > kLeastFacing * area;
+  const float toward = dot(facing, box.normal);
+  return area > 0.0f && (either_side ? std::fabs(toward) : toward) > kLeastFacing * area;
 }
 
 DecalCorner corner_of(const DecalBox& box, Vec3 point) {
@@ -81,8 +82,9 @@ DecalBox decal_box(Vec3 point, Vec3 normal, float size, float depth, float spin_
   return {point, rotate(spin, right), rotate(spin, cross(out_of, right)), out_of, size * kHalf, depth * kHalf};
 }
 
-void clip_to_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, std::vector<DecalCorner>& out) {
-  if (!faces_the_decal(box, triangle)) return;
+void clip_to_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, std::vector<DecalCorner>& out,
+                   bool either_side) {
+  if (!faces_the_decal(box, triangle, either_side)) return;
   const Polygon polygon = clip_to_box(box, Polygon(triangle.begin(), triangle.end()));
   if (polygon.size() >= kTriangleCorners) append_fan(box, polygon, out);
 }

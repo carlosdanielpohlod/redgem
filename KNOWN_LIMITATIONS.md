@@ -65,7 +65,8 @@ the same pull request.
   dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
   mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
   with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
-  editor) leaves the mark as it was. Skinned meshes and meshes with shape keys take none.
+  editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and see-through or
+  cut-out materials (glass, leaves, a fence) take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot

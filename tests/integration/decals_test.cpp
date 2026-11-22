@@ -92,9 +92,13 @@ TEST_CASE("Decals.place refuses a zero normal, a size or depth that is not a pos
   frames(*engine, 1);
   CHECK(error_of(*engine, "Decals.place(Vector3.zero, Vector3.zero)").find("normal") != std::string::npos);
   for (const char* wrong : {"size: 0", "size: -1", "size: 1000", "depth: 0", "alpha: 300", "color: :plaid",
-                            "spin: Float::NAN"}) {
-    error_of(*engine, std::string("Decals.place(Vector3.zero, Vector3.up, ") + wrong + ")");
+                            "color: [200, 0]", "color: [255, 0, 0, 100]", "spin: Float::NAN"}) {
+    CAPTURE(wrong);
+    CHECK_FALSE(error_of(*engine, std::string("Decals.place(Vector3.zero, Vector3.up, ") + wrong + ")").empty());
   }
+  CHECK(error_of(*engine, "Decals.place({ point: Vector3.zero, normal: Vector3.up }, Vector3.up)")
+            .find("normal") != std::string::npos);
+  CHECK(error_of(*engine, "Decals.limit = 2.9").find("whole") != std::string::npos);
   CHECK(ruby(*engine, "Decals.count") == "0");
 }
 

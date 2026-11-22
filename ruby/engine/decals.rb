@@ -21,15 +21,23 @@ module Decals
   def self.place(point, normal = nil, size: DEFAULT_SIZE, depth: nil, image: nil, color: :black,
                  alpha: UI::OPAQUE, spin: NO_SPIN)
     point, normal = __at(point, normal)
-    red, green, blue = UI.rgb(color)
-    __place(point, normal, size.to_f, (depth || size).to_f, spin.to_f, image.to_s, red.to_f, green.to_f,
-            blue.to_f, alpha.to_f)
+    red, green, blue = __rgb(color)
+    __place(point, normal, size.to_f, (depth || size).to_f, spin.to_f, image.to_s, red, green, blue, alpha.to_f)
   end
 
   # A point and a normal, or a raycast hit ({point:, normal:, ...}) for both.
   def self.__at(point, normal)
     return [point, normal] unless point.is_a?(Hash)
+    raise ArgumentError, "Decals.place: a raycast hit carries its own normal" if normal
 
     [point.fetch(:point), point.fetch(:normal)]
+  end
+
+  # A color's red, green and blue (0 to 255); its opacity is `alpha:`.
+  def self.__rgb(color)
+    channels = UI.rgb(color)
+    raise ArgumentError, "Decals.place: a color is three channels, not #{color.inspect}" unless channels.size == 3
+
+    channels.map(&:to_f)
   end
 end

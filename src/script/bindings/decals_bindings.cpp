@@ -42,8 +42,9 @@ Vec3 normal_of(mrb_state* mrb, mrb_value value) {
 }
 
 Color color_of(mrb_state* mrb, const PlaceArgs& args) {
-  return {channel_from(mrb, args.red, "a decal's color channel"), channel_from(mrb, args.green, "a decal's color channel"),
-          channel_from(mrb, args.blue, "a decal's color channel"), channel_from(mrb, args.alpha, "a decal's alpha")};
+  constexpr const char* kChannel = "a decal's color channel";
+  return {channel_from(mrb, args.red, kChannel), channel_from(mrb, args.green, kChannel),
+          channel_from(mrb, args.blue, kChannel), channel_from(mrb, args.alpha, "a decal's alpha")};
 }
 
 DecalPlacement placement_of(mrb_state* mrb, const PlaceArgs& args) {
@@ -73,11 +74,18 @@ mrb_value decals_count(mrb_state* mrb, mrb_value) {
   return mrb_int_value(mrb, static_cast<mrb_int>(decals(mrb).decals().size()));
 }
 
-mrb_value decals_limit(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, static_cast<mrb_int>(decals(mrb).limit())); }
+mrb_value decals_limit(mrb_state* mrb, mrb_value) {
+  return mrb_int_value(mrb, static_cast<mrb_int>(decals(mrb).limit()));
+}
 
+// A whole number of decals: a fraction is refused, not cut off.
 mrb_value decals_set_limit(mrb_state* mrb, mrb_value) {
-  const mrb_float limit = from_to(mrb, float_arg(mrb), static_cast<mrb_float>(kMinDecalLimit),
-                                  static_cast<mrb_float>(kMaxDecalLimit), "Decals.limit");
+  mrb_value asked = mrb_nil_value();
+  mrb_get_args(mrb, "o", &asked);
+  if (!mrb_integer_p(asked)) mrb_raise(mrb, E_TYPE_ERROR, "Decals.limit is a whole number of decals");
+  const mrb_int limit = mrb_integer(asked);
+  from_to(mrb, static_cast<mrb_float>(limit), static_cast<mrb_float>(kMinDecalLimit),
+          static_cast<mrb_float>(kMaxDecalLimit), "Decals.limit");
   decals(mrb).set_limit(static_cast<std::size_t>(limit));
   return mrb_int_value(mrb, static_cast<mrb_int>(decals(mrb).limit()));
 }

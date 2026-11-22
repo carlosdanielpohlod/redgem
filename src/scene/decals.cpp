@@ -32,10 +32,19 @@ Bounds local_reach(const DecalBox& box, const Transform& world) {
   return reach;
 }
 
+// How many corners a primitive's triangles list: its indices, or its positions in order for none.
+std::size_t listed_corners(const PrimitiveDesc& primitive) {
+  return primitive.indices.empty() ? primitive.positions.size() / kCornerFloats : primitive.indices.size();
+}
+
+std::size_t vertex_at(const PrimitiveDesc& primitive, std::size_t listed) {
+  return primitive.indices.empty() ? listed : primitive.indices[listed];
+}
+
 std::array<Vec3, 3> local_triangle(const PrimitiveDesc& primitive, std::size_t first_index) {
   std::array<Vec3, 3> triangle{};
   for (std::size_t corner = 0; corner < kTriangleIndices; ++corner) {
-    triangle[corner] = vec3_from(&primitive.positions[primitive.indices[first_index + corner] * kCornerFloats]);
+    triangle[corner] = vec3_from(&primitive.positions[vertex_at(primitive, first_index + corner) * kCornerFloats]);
   }
   return triangle;
 }
@@ -62,24 +71,48 @@ struct Cut {
   std::size_t room = 0;
 };
 
-void cut_primitive(const Cut& cut, const PrimitiveDesc& primitive, std::vector<DecalCorner>& out) {
-  for (std::size_t first = 0; first + kTriangleIndices <= primitive.indices.size(); first += kTriangleIndices) {
-    if (out.size() >= cut.room) return;
-    const std::array<Vec3, 3> local = local_triangle(primitive, first);
-    if (within_reach(local, cut.reach)) clip_to_decal(cut.box, world_triangle(local, cut.world), out);
+// Raises the corners a triangle gave the decal (from `first` on) off it, on the side the decal is.
+void lift_off(const std::array<Vec3, 3>& triangle, Vec3 toward, std::vector<DecalCorner>& out, std::size_t first) {
+  const Vec3 facing = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
+  const Vec3 out_of = dot(facing, toward) < 0.0f ? -facing : facing;
+  for (std::size_t corner = first; corner < out.size(); ++corner) {
+    out[corner].position = out[corner].position + out_of * kLift;
   }
 }
 
-bool is_water(const SceneDesc& desc, const PrimitiveDesc& primitive) {
-  const bool has_material = primitive.material >= 0 && static_cast<std::size_t>(primitive.material) < desc.materials.size();
-  return has_material && desc.materials[static_cast<std::size_t>(primitive.material)].water.enabled;
+void cut_triangle(const Cut& cut, const std::array<Vec3, 3>& triangle, bool either_side,
+                  std::vector<DecalCorner>& out) {
+  const std::size_t first = out.size();
+  clip_to_decal(cut.box, triangle, out, either_side);
+  lift_off(triangle, cut.box.normal, out, first);
 }
+
+// A two-sided surface takes a mark on either side.
+void cut_primitive(const Cut& cut, const PrimitiveDesc& primitive, bool either_side, std::vector<DecalCorner>& out) {
+  const std::size_t listed = listed_corners(primitive);
+  for (std::size_t first = 0; first + kTriangleIndices <= listed; first += kTriangleIndices) {
+    if (out.size() >= cut.room) return;
+    const std::array<Vec3, 3> local = local_triangle(primitive, first);
+    if (within_reach(local, cut.reach)) cut_triangle(cut, world_triangle(local, cut.world), either_side, out);
+  }
+}
+
+const MaterialDesc* material_of(const SceneDesc& desc, const PrimitiveDesc& primitive) {
+  const bool known = primitive.material >= 0 && static_cast<std::size_t>(primitive.material) < desc.materials.size();
+  return known ? &desc.materials[static_cast<std::size_t>(primitive.material)] : nullptr;
+}
+
+// Not water, nor see-through or cut out: decals are drawn before what is see-through, and a mark on
+// it, or on a cut-out's holes, would darken what is behind.
+bool solid(const MaterialDesc& material) { return material.alpha_mode == AlphaMode::Opaque && !material.water.enabled; }
 
 std::vector<DecalCorner> cut_mesh(const Cut& cut, const MeshDesc& mesh, const SceneDesc& desc) {
   std::vector<DecalCorner> corners;
   if (mesh.bounds.valid && !overlaps(mesh.bounds, cut.reach)) return corners;
   for (const PrimitiveDesc& primitive : mesh.primitives) {
-    if (!is_water(desc, primitive)) cut_primitive(cut, primitive, corners);
+    const MaterialDesc* material = material_of(desc, primitive);
+    if (material == nullptr) cut_primitive(cut, primitive, false, corners);
+    else if (solid(*material)) cut_primitive(cut, primitive, material->double_sided, corners);
   }
   corners.resize(std::min(corners.size(), cut.room));
   return corners;
@@ -90,7 +123,7 @@ DecalPiece piece_on(const Scene& scene, ObjectId id, const SceneDesc& desc, cons
   const Transform world = scene.world_transform(id);
   const Cut cut{box, world, local_reach(box, world), room};
   std::vector<DecalCorner> corners = cut_mesh(cut, desc.meshes[static_cast<std::size_t>(scene.at(id).mesh)], desc);
-  for (DecalCorner& corner : corners) corner.position = to_local(world, corner.position + box.normal * kLift);
+  for (DecalCorner& corner : corners) corner.position = to_local(world, corner.position);
   return {scene.handle(id), std::move(corners)};
 }
 

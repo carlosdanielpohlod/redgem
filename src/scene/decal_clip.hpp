@@ -39,8 +39,10 @@ struct DecalCorner {
 
 // Appends to `out` the part of a triangle (its corners in the world, in the order that faces out of
 // its surface) that is inside the box, as triangles of three corners each: nothing when the
-// triangle faces away from the decal or misses the box.
-void clip_to_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, std::vector<DecalCorner>& out);
+// triangle faces away from the decal (unless it is seen from `either_side`, a two-sided surface's)
+// or misses the box.
+void clip_to_decal(const DecalBox& box, const std::array<Vec3, 3>& triangle, std::vector<DecalCorner>& out,
+                   bool either_side = false);
 
 // The corners of the box, in the world.
 std::array<Vec3, 8> box_corners(const DecalBox& box);

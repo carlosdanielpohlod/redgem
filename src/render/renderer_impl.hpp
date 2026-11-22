@@ -671,9 +671,10 @@ struct Renderer::Impl {
 
   // --- Decals (renderer_decals.cpp) ------------------------------------------------------------
 
-  // Where the frame's decals are: on the objects they were placed on that are still there and drawn.
-  void gather_decals(const Scene& scene);
-  void gather_decal(const Scene& scene, const Decal& decal);
+  // Where the frame's decals are: on the objects they were placed on that are still there, drawn, and
+  // shown at the viewer's distance from them.
+  void gather_decals(const Scene& scene, Vec3 viewer);
+  void gather_decal(const Scene& scene, const Decal& decal, Vec3 viewer);
   const Texture2D* decal_picture(const std::string& image);
   // Darkens what the scene's opaque surfaces drew under each decal; nothing is written to depth.
   void draw_decals();

@@ -18,6 +18,7 @@ constexpr float kSize = 0.4f;
 constexpr float kDepth = 0.2f;
 constexpr float kFloorSide = 2.0f;
 constexpr float kQuarterTurn = kPi * kHalf;
+constexpr std::size_t kAxes = 3;  // floats of a position
 
 // The area the triangles of a list of corners cover.
 float area_of(const std::vector<DecalCorner>& corners) {
@@ -190,4 +191,61 @@ TEST_CASE("a decal does not fall on a mesh under the view model") {
   const Scene scene = Scene::from_desc(desc);
   DecalSystem decals;
   CHECK_FALSE(decals.place(scene, desc, on_the_floor(Vec3::zero())));
+}
+
+namespace {
+
+// The floor scene, its surface made of a material set up by `make`.
+template <typename Make>
+SceneDesc floor_of(Make make) {
+  SceneDesc desc = floor_desc();
+  MaterialDesc material;
+  make(material);
+  desc.materials = {material};
+  desc.meshes[0].primitives[0].material = 0;
+  return desc;
+}
+
+DecalPlacement under_the_floor() {
+  DecalPlacement placement = on_the_floor(Vec3::zero());
+  placement.normal = -Vec3::up();  // shot from below, at the floor's back
+  return placement;
+}
+
+}  // namespace
+
+TEST_CASE("a decal falls on opaque surfaces only, not on see-through or cut-out ones") {
+  const SceneDesc glass = floor_of([](MaterialDesc& material) { material.alpha_mode = AlphaMode::Blend; });
+  const SceneDesc fence = floor_of([](MaterialDesc& material) { material.alpha_mode = AlphaMode::Mask; });
+  const SceneDesc stone = floor_of([](MaterialDesc&) {});
+  DecalSystem decals;
+  CHECK_FALSE(decals.place(Scene::from_desc(glass), glass, on_the_floor(Vec3::zero())));
+  CHECK_FALSE(decals.place(Scene::from_desc(fence), fence, on_the_floor(Vec3::zero())));
+  CHECK(decals.place(Scene::from_desc(stone), stone, on_the_floor(Vec3::zero())));
+}
+
+TEST_CASE("a two-sided surface takes a decal from behind, a one-sided one does not") {
+  const SceneDesc two_sided = floor_of([](MaterialDesc& material) { material.double_sided = true; });
+  const SceneDesc one_sided = floor_of([](MaterialDesc&) {});
+  DecalSystem decals;
+  CHECK(decals.place(Scene::from_desc(two_sided), two_sided, under_the_floor()));
+  CHECK_FALSE(decals.place(Scene::from_desc(one_sided), one_sided, under_the_floor()));
+  for (const DecalCorner& corner : decals.decals().front().pieces.front().corners) {
+    CHECK(corner.position.y < 0.0f);  // raised off it on the side it was shot from
+  }
+}
+
+TEST_CASE("a decal falls on a mesh listed without indices") {
+  SceneDesc desc = floor_desc();
+  PrimitiveDesc& quad = desc.meshes[0].primitives[0];
+  std::vector<float> listed;
+  for (const unsigned index : quad.indices) {
+    for (std::size_t axis = 0; axis < kAxes; ++axis) listed.push_back(quad.positions[index * kAxes + axis]);
+  }
+  quad.positions = listed;
+  quad.indices.clear();
+  quad.normals.clear();
+  quad.texcoords.clear();
+  DecalSystem decals;
+  CHECK(decals.place(Scene::from_desc(desc), desc, on_the_floor(Vec3::zero())));
 }

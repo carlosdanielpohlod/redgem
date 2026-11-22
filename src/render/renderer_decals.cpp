@@ -2,6 +2,7 @@
 // opaque objects they lie on and before anything see-through. Each darkens what is under it (its
 // color multiplies it), so a mark takes the light and shade of its surface without being lit.
 
+#include "render/culling.hpp"
 #include "render/renderer_impl.hpp"
 
 namespace redgem {
@@ -15,8 +16,18 @@ constexpr float kPictureTop = 1.0f;    // a picture's rows go down from its top;
 constexpr ::Color kSpotMiddle{255, 255, 255, 255};  // marks wholly, in the decal's color
 constexpr ::Color kSpotEdge{255, 255, 255, 0};      // marks nothing
 
-// A decal's piece is on an object still there and drawn.
-bool on_a_drawn_object(const Scene& scene, ObjectId id) { return id != kNoObject && scene.at(id).visible; }
+// Whether an object the frame draws is shown at the viewer's distance from it.
+bool shown_from(const ObjectSight& sight, Vec3 viewer) {
+  const Vec3 center = sight.sight.sphere.center;
+  return sight.drawn && !outside_distance_range(center, viewer, sight.visible_from, sight.visible_to);
+}
+
+// A decal's piece is on an object still there, drawn this frame and at the distance it is shown
+// from (of several versions of a model, only the one shown keeps its marks).
+bool on_a_drawn_object(const std::vector<ObjectSight>& sights, ObjectId id, Vec3 viewer) {
+  if (id == kNoObject || static_cast<std::size_t>(id) >= sights.size()) return false;
+  return shown_from(sights[static_cast<std::size_t>(id)], viewer);
+}
 
 // Darkens what is drawn: what the shader gives multiplies it. The picture's alpha is left alone.
 void blend_by_multiplying() {
@@ -38,17 +49,17 @@ void send_corners(const std::vector<DecalCorner>& corners, const Texture2D& pict
 
 }  // namespace
 
-void Renderer::Impl::gather_decals(const Scene& scene) {
+void Renderer::Impl::gather_decals(const Scene& scene, Vec3 viewer) {
   frame_decals.clear();
   if (decals == nullptr) return;
-  for (const Decal& decal : decals->decals()) gather_decal(scene, decal);
+  for (const Decal& decal : decals->decals()) gather_decal(scene, decal, viewer);
 }
 
-void Renderer::Impl::gather_decal(const Scene& scene, const Decal& decal) {
+void Renderer::Impl::gather_decal(const Scene& scene, const Decal& decal, Vec3 viewer) {
   FrameDecal drawn{decal_picture(decal.image), decal.color, {}};
   for (const DecalPiece& piece : decal.pieces) {
     const ObjectId host = scene.resolve(piece.host);
-    if (!on_a_drawn_object(scene, host)) continue;
+    if (!on_a_drawn_object(sights, host, viewer)) continue;
     const std::vector<DecalCorner> corners = world_corners(piece, worlds[static_cast<std::size_t>(host)]);
     drawn.corners.insert(drawn.corners.end(), corners.begin(), corners.end());
   }
