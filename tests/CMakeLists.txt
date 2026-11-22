@@ -12,6 +12,8 @@ add_executable(redgem_tests
   unit/script_profile_test.cpp
   unit/profile_overlay_test.cpp
   unit/gpu_timers_test.cpp
+  unit/frame_pacer_test.cpp
+  unit/picture_check_test.cpp
   unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
@@ -481,6 +483,13 @@ add_test(NAME system.tools.shot
          COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot.png --at 0.5)
 set_tests_properties(system.tools.shot PROPERTIES LABELS system RUN_SERIAL TRUE
   PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot.png \\(512x288, scene main at 0.5 s\\)")
+# (Full HD, a few seconds in: a picture the card does not draw whole warns, see picture_check.hpp.)
+add_test(NAME system.tools.shot_full_hd_drawn_whole
+         COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_full_hd.png
+                 --at 4 --size 1920x1080)
+set_tests_properties(system.tools.shot_full_hd_drawn_whole PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot_full_hd.png \\(1920x1080, scene main at 4 s\\)"
+  FAIL_REGULAR_EXPRESSION "see-through")
 # (--at 0: the game as it starts, before its first step.)
 add_test(NAME system.tools.shot_at_the_start
          COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_start.png
