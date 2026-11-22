@@ -7,6 +7,7 @@
 #include "core/command_line.hpp"
 #include "core/translations.hpp"
 #include "project/asset_search.hpp"
+#include "project/asset_settings_command.hpp"
 #include "project/closest_words.hpp"
 
 namespace redgem::tools {
@@ -21,7 +22,9 @@ constexpr const char* kWordSeparator = " ";
 constexpr std::size_t kGameWord = 0;
 constexpr std::size_t kFirstSearchWord = 1;
 
-ToolGrammar assets_grammar() { return {{kKindOption, kTagOption, kLimitOption}, {command_line::kHelpOption}}; }
+ToolGrammar assets_grammar() {
+  return {{kKindOption, kTagOption, kLimitOption, kSettingsOption}, {command_line::kHelpOption}};
+}
 ToolGrammar templates_grammar() { return {{kLimitOption}, {command_line::kHelpOption}}; }
 
 ToolResult answer(std::string text) { return ToolResult{kExitSuccess, std::move(text), {}}; }
@@ -84,9 +87,15 @@ std::optional<AssetQuery> asset_query(const ToolLine& line, std::string& problem
   return query.kind ? std::optional<AssetQuery>(query) : std::nullopt;
 }
 
+// The words after the game: what to search for, or the assignments of --settings.
+std::vector<std::string> words_after_game(const ToolLine& line) {
+  return {line.words.begin() + static_cast<std::ptrdiff_t>(kFirstSearchWord), line.words.end()};
+}
+
 ToolResult search_game(const ToolLine& line) {
   const std::filesystem::path game_dir = line.words[kGameWord];
   if (!is_game_folder(game_dir)) return failed(tr("project.tools.not_a_game", {{"game_dir", game_dir.string()}}));
+  if (const auto asset = line.value(kSettingsOption)) return asset_settings(game_dir, *asset, words_after_game(line));
   std::string problem;
   const auto query = asset_query(line, problem);
   if (!query) return usage_failure(problem, assets_usage());

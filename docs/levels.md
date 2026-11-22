@@ -497,6 +497,30 @@ Call `step` from the walk animation or a timer. `Terrain.weights_at(ground, poin
 layer's share, such as
 `{"sand" => 0.7, "grass" => 0.3}`. `Terrain.layers(ground)` lists the layer names.
 
+### Painting ground layers by hand (experimental)
+
+The editor shows a terrain's ground layers as the game draws them. Select the terrain, turn on
+**Paint** in its Terrain card, and the card shows the layer brush in place of the tint:
+
+| Setting | Meaning |
+|---------|---------|
+| Layer | The ground layer the brush paints. |
+| Strength | 0 to 1: how far toward the layer a held brush moves the ground in a second, at its middle. At 1 the ground under the middle turns into the layer at once. |
+| Falloff | 0 to 1: the share of the radius, at its rim, over which the brush fades out. 0 is a hard edge, 1 fades from the middle on. |
+| Radius | The brush's size in meters. |
+
+Drag over the ground to paint. Each stroke is one undo step. **Save** writes the scene and the
+weights beside the layers file (`terrains/<name>.splat0.png`, and `.splat1.png` past four
+layers). Play shows the weights as painted, saved or not.
+
+A typical island: paint the whole terrain by rules first (`redgem scene paint games/ilha Island`),
+open it in the editor, then paint by hand where the rules miss: a sand path to the beach, grass
+around the houses, dirt where the boats are pulled up. The rules do not run again on their own, so
+the hand-painted weights stay until `redgem scene paint` runs again.
+
+![A terrain with two ground layers, red and blue, and one stroke of the layer brush painting the
+blue one across its middle.](images/terrain-layers/brush.png)
+
 ## Editing the level in Blender
 
 ```bash

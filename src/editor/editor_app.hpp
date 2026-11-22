@@ -322,6 +322,9 @@ class EditorApp {
   // The brush is on, and a terrain is selected.
   bool using_terrain_brush() const;
   void apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds);
+  // The Paint brush on a terrain with ground layers: its chosen layer into the weights.
+  void paint_layer_at(ObjectId terrain, Vec3 point, float seconds);
+  const char* paint_help() const;
   void use_brush();
   bool stroke_ends(bool brushing) const { return !brushing && stroke_started_; }
   void draw_gizmo();
@@ -403,6 +406,7 @@ class EditorApp {
   PanelVisibility panels_;
   ui::PanelState panel_state_;
   ui::TerrainTool terrain_tool_;
+  std::uint32_t layer_brush_steps_ = 0;       // how many times the layer brush painted (see LayerBrush::step)
   bool stroke_started_ = false;               // a brush stroke is in progress (one undo step)
   std::optional<Vec3> brush_point_;           // where the brush is on the ground this frame, if it is over it
   std::optional<std::string> pending_split_;  // window name of a script tab to split off

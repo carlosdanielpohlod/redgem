@@ -37,6 +37,8 @@ void draw_joint(PanelContext& context, int index);
 void draw_wheel(EditorSession& session, int index);
 // The properties without a card of their own.
 void draw_custom_props(PanelContext& context, int index);
+// The import settings of the asset chosen in the Project panel; false when none is chosen.
+bool draw_asset_settings(PanelContext& context);
 
 // What Add Component offers for each kind of component.
 void add_script_menu(PanelContext& context, int index);

@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/import_settings.hpp"
 #include "scene/scene_desc.hpp"
 
 namespace redgem::material_textures {
@@ -17,6 +18,12 @@ namespace redgem::material_textures {
 enum class Slot { BaseColor, MetallicRoughness, Normal, Occlusion, Emissive };
 inline constexpr std::array<Slot, 5> kSlots = {Slot::BaseColor, Slot::MetallicRoughness, Slot::Normal, Slot::Occlusion,
                                                Slot::Emissive};
+
+// How a picture's import settings (core/import_settings.hpp) suit a slot: a normal map belongs in
+// the normal slot, and a picture that says its color space is read so only where the slot reads
+// that space (base color and emission sRGB, the others linear).
+enum class SlotFit { Fits, NormalMapElsewhere, OtherColorSpace };
+SlotFit slot_fit(Slot slot, const import_settings::TextureSettings& settings);
 
 // The image a slot of a material shows (kNoIndex for none), to read and to change.
 int image_in(const MaterialDesc& material, Slot slot);

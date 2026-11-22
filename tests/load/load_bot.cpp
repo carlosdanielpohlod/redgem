@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "core/config.hpp"
 #include "core/math.hpp"
 #include "net/wire.hpp"
 
@@ -12,7 +13,7 @@ namespace redgem::load {
 namespace {
 
 constexpr const char* kLocalHost = "127.0.0.1";
-constexpr double kPosesPerSecond = 20.0;  // NetworkSync::SENDS_PER_SECOND
+constexpr double kPosesPerSecond = config::kDefaultSendHz;  // NetworkSync's default (Network.send_hz)
 constexpr double kShotsPerSecond = 2.0;
 constexpr double kRunRadius = 5.0;       // meters: a circle run at a jog
 constexpr double kTurnsPerSecond = 1.0;  // radians a second around it (five meters a second)

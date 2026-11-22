@@ -8,6 +8,7 @@
 
 #include "core/config.hpp"
 #include "core/filled_texts.hpp"
+#include "core/import_settings.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
 #include "editor/document/material_textures.hpp"
@@ -61,12 +62,25 @@ void set_slot(PanelContext& context, int material, Slot slot, int image) {
   doc.set_material(material, edited);
 }
 
+// Says when the picture's import settings say it belongs in another slot (it goes in all the same).
+void warn_of_misfit(const std::filesystem::path& path, Slot slot) {
+  const material_textures::SlotFit fit = material_textures::slot_fit(slot, import_settings::texture_settings(path));
+  const std::string file = path.filename().string();
+  if (fit == material_textures::SlotFit::NormalMapElsewhere) {
+    log::warning(tr("editor.inspector.material.normal_map_elsewhere", {{"file", file}}));
+  }
+  if (fit == material_textures::SlotFit::OtherColorSpace) {
+    log::warning(tr("editor.inspector.material.other_color_space", {{"file", file}}));
+  }
+}
+
 // A picture of the game's images/ folder goes into the scene and into the slot.
 void use_picture(PanelContext& context, int material, Slot slot, const std::string& file) {
   std::string error;
   const std::filesystem::path path = context.session.game_dir() / config::kImagesDirName / file;
   const int image = context.session.document().add_image(path, error);
   if (image == kNoPicture) return log::error("cannot use " + file + ": " + error);
+  warn_of_misfit(path, slot);
   set_slot(context, material, slot, image);
 }
 

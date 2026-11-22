@@ -5,6 +5,7 @@
 
 #include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
+#include "app/terrain_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
@@ -90,6 +91,7 @@ void EditorSession::apply_layer_settings() {
 }
 
 void EditorSession::begin_editing() {
+  unreadable_layers_.clear();
   follow_scene_file(true);
   scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_.clear();
@@ -132,7 +134,16 @@ void EditorSession::note_saved() {
   log::info("saved " + document_.path().string());
 }
 
+bool EditorSession::save_weights(std::string& error) {
+  for (const TerrainLayers* layers : document_.unsaved_weights()) {
+    if (!write_splat_pictures(game_dir_, *layers, error)) return false;
+  }
+  document_.weights_saved();
+  return true;
+}
+
 bool EditorSession::save(std::string& error) {
+  if (!save_weights(error)) return false;
   if (!document_.save(error)) return false;
   note_saved();
   return true;
@@ -142,6 +153,7 @@ bool EditorSession::save_as(const std::string& name, std::string& error) {
   const auto file = ready_new_scene_file(game_dir_, name, error);
   if (!file) return false;
   if (!files_found_from(*file, error)) return false;
+  if (!save_weights(error)) return false;
   if (!document_.save_as(*file, error)) return false;
   scene_name_ = name;
   note_saved();
@@ -227,6 +239,7 @@ void EditorSession::use_disk_document(SceneDocument document) {
   const auto selected = selected_names();
   forget_recovery();
   document_ = std::move(document);
+  unreadable_layers_.clear();
   follow_scene_file();
   refresh_and_reselect(selected);
   log::info("reloaded " + document_.path().string());

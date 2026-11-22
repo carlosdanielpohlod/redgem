@@ -49,6 +49,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
+  if (!manifest.send_hz_error.empty()) log::warning(manifest.send_hz_error);
   if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
@@ -61,6 +62,7 @@ void warn_of_unusable(const GameManifest& manifest) {
 void describe_game(ScriptContext& context, const GameSettings& settings) {
   context.game_title = settings.title;
   context.server_pins = settings.servers;
+  context.send_hz = settings.send_hz;
   context.ui_reference = settings.ui;
   context.menu_settings = settings.menu;
 }

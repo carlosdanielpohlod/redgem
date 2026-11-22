@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/image_header.hpp"
+#include "core/import_settings.hpp"
 #include "core/ktx2_header.hpp"
 #include "core/ktx2_image.hpp"
 #include "core/log.hpp"
@@ -110,12 +111,12 @@ Texture2D decoded_scene_texture(const ImageData& image) {
   return texture;
 }
 
-Image decode_picture_file(const std::filesystem::path& folder, const std::string& name) {
-  const auto file = find_asset_file(folder, name, kPictureExtensions);
-  if (!file) return {};
-  const auto encoded = read_file_up_to(*file, kMaxEncodedImageBytes);
+Image decode_picture_file(const std::filesystem::path& file) {
+  const auto encoded = read_file_up_to(file, kMaxEncodedImageBytes);
   if (!encoded) return {};
-  return decode_picture(*encoded);
+  Image decoded = decode_picture(*encoded);
+  if (IsImageValid(decoded)) fit_picture(decoded, import_settings::texture_settings(file).max_size);
+  return decoded;
 }
 
 }  // namespace
@@ -159,8 +160,19 @@ DecodedPicture decode_scene_picture(const ImageData& image) {
   return picture;
 }
 
+std::optional<std::filesystem::path> picture_file(const std::filesystem::path& folder, const std::string& name) {
+  return find_asset_file(folder, name, kPictureExtensions);
+}
+
+void fit_picture(Image& image, int max_size) {
+  const import_settings::PictureSize size{image.width, image.height};
+  const import_settings::PictureSize fitted = import_settings::fitted_size(size, max_size);
+  if (!(fitted == size)) ImageResize(&image, fitted.width, fitted.height);
+}
+
 Texture2D load_picture_file(const std::filesystem::path& folder, const std::string& name) {
-  Image decoded = decode_picture_file(folder, name);
+  const auto file = picture_file(folder, name);
+  Image decoded = file ? decode_picture_file(*file) : Image{};
   if (!IsImageValid(decoded))
     log::warning("picture '" + printable(name) + "' is missing or unreadable; using a checkerboard");
   const Texture2D texture = texture_or_placeholder(decoded);
