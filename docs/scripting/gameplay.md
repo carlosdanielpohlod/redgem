@@ -1426,6 +1426,38 @@ on about half of it. `lit: true` also receives the scene's filtered sun shadows,
 shadow cascades as surfaces. Sun shadowing leaves sky and point-light contributions intact.
 Unlit particles, including unlit glowing ones, keep their own color in shadows.
 
+## Leave marks: decals
+
+Experimental. `Decals.place` projects a mark onto the surfaces under it: a bullet hole on a wall, a
+scorch on the floor, blood on a crate. It falls on meshes and terrain alike, across a corner onto
+both sides, and stays on what it fell on: a door that swings carries its marks along.
+
+```ruby
+hit = Physics.raycast(eye, aim, 100)
+if hit
+  Decals.place(hit)  # a soft dark spot where the shot landed
+  Decals.place(hit[:point], hit[:normal], image: :bullet_hole, size: 0.08, spin: rand(360))
+end
+Decals.place(crater, Vector3.up, size: 3, color: [40, 30, 20], alpha: 220)
+```
+
+A mark darkens what it lies on: its color multiplies it, so it takes the surface's light and
+shade, dark in a dark corner and lit in the sun. `image:` is a picture of the game's `images/`
+folder (`image: :bullet_hole` draws `images/bullet_hole.png`): dark where it marks most, see-through
+where it marks nothing. Without one, a mark is a soft round spot. `alpha:` (0 to 255) says how much
+it darkens, and `spin:` turns it about the normal (degrees). `size:` is meters across, and `depth:`
+how far into and out of the surface it reaches (as far as it is wide unless said).
+
+`Decals.place` returns whether the mark fell on anything. Marks are kept up to `Decals.limit` (256
+unless set, at most 4096): past it, placing one drops the oldest. `Decals.count` says how many are
+kept, and `Decals.clear` removes them all; a scene loaded anew starts without any.
+
+Marks are looks only, and local: they are not sent to the other machines of a multiplayer game
+(each machine places its own where it sees a shot land), and a machine that draws nothing, a
+dedicated server, keeps none. Skinned characters, meshes with shape keys, prefabs, the view model,
+water, and see-through or cut-out materials (glass, leaves, a fence) take none. A two-sided
+surface (a flag, a sign) takes marks on both its sides.
+
 ## Light that flickers and fades
 
 An object with a light (a lamp, a fire's glow, made in Blender like any light) can change how

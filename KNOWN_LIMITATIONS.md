@@ -63,6 +63,14 @@ the same pull request.
   lights of the scene do not light it, and its own fill light is fixed (white, from the eye).
   `Camera.from_view_model` works from the steady camera: while it shakes, what starts there is
   off the muzzle by as much as the shake moves the picture.
+- Decals (`Decals.place`) only darken what they lie on (their color multiplies it): a mark lighter
+  than its surface (white paint on a dark wall) cannot be made, and they do not shine or reflect.
+  They are cut from the surfaces' triangles when placed, on the machine's main thread: a mark on a
+  dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
+  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
+  with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
+  editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and see-through or
+  cut-out materials (glass, leaves, a fence) take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
@@ -317,7 +325,6 @@ menu whose look each game sets:
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.
 - An unreliable, sequenced channel for inputs and positions beside the reliable one.
-- Marks left on walls (bullet holes).
 - A theme for `GameMenu`: fonts, colors, buttons, layout, the title screen's background and logo,
   transitions, sounds and music, from `game.json` or Ruby.
 
