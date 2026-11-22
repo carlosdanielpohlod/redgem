@@ -591,6 +591,7 @@ redgem_add_library(redgem_runtime
   render/material_alpha.cpp
   render/particle_layout.cpp
   render/visibility.cpp
+  render/screen_levels.cpp
   render/texel_rows.cpp
   render/instance_records.cpp
   render/instance_batches.cpp
@@ -727,6 +728,7 @@ if(NOT ANDROID)
     editor/document/scene_document_copies.cpp
     editor/document/scene_document_clipboard.cpp
     editor/document/scene_document_images.cpp
+    editor/document/scene_document_levels.cpp
     editor/document/picture_fit.cpp
     editor/document/scene_document_create.cpp
     editor/document/scene_document_skeletons.cpp
@@ -742,6 +744,7 @@ if(NOT ANDROID)
     editor/prefab_preview.cpp
     editor/prefab_instances.cpp
     editor/model_import_settings.cpp
+    editor/lod_levels.cpp
     editor/prefab_files.cpp
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
@@ -837,7 +840,7 @@ if(NOT ANDROID)
     editor/agent/session_history.cpp
     editor/editor_texts.cpp)
   redgem_embed_texts(redgem_editor editor)
-  target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack)
+  target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack PRIVATE meshoptimizer)
 
   redgem_add_library(redgem_project
     ${REDGEM_TEMPLATES_HEADER}
@@ -903,6 +906,7 @@ if(NOT ANDROID)
     project/scene_assignments.cpp
     project/component_words.cpp
     project/scene_edits.cpp
+    project/prefab_edits.cpp
     project/project_json_files.cpp
     project/mcp_project_tools.cpp
     project/mcp_build_tool.cpp

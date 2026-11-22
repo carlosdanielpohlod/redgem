@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "render/instance_records.hpp"
+#include "render/screen_levels.hpp"
 #include "scene/transform.hpp"
 
 namespace redgem {
@@ -27,10 +28,32 @@ bool same(const Transform& a, const Transform& b) {
   return same(a.position, b.position) && same(a.rotation, b.rotation) && same(a.scale, b.scale);
 }
 
+bool same(const render_math::DrawnRange& a, const render_math::DrawnRange& b) {
+  return a.from == b.from && a.to == b.to && a.fade == b.fade;
+}
+
 // Whether a record would be written from the very same as last time.
 bool same(const RecordSource& a, const RecordSource& b) {
   return same(a.world, b.world) && same(a.tint, b.tint) && a.first_bone == b.first_bone &&
-         a.first_morph == b.first_morph && a.sway == b.sway && a.record == b.record;
+         a.first_morph == b.first_morph && a.sway == b.sway && a.record == b.record && same(a.range, b.range);
+}
+
+// Where a fading object's record says it fades (none for the rest, whose shader then works out no noise).
+void fade_in_look(const render_math::DrawnRange& range, render_math::InstanceLook& look) {
+  if (range.fade <= 0.0f) return;
+  look.visible_from = range.from;
+  look.visible_to = range.to;
+  look.fade = range.fade;
+}
+
+// The distances the frame judges a fading object by: the shader fades it by where its origin is,
+// the frame by its sphere's center, so these take in how far apart those two are.
+render_math::DrawnRange judged_range(render_math::DrawnRange range, const render_math::Sight& seen, Vec3 origin) {
+  if (range.fade <= 0.0f) return range;
+  const float apart = length(seen.sphere.center - origin);
+  range.from = std::max(0.0f, range.from - apart);
+  range.to += apart;
+  return range;
 }
 
 // Whether an object is drawn as the view model: it, or an object it is under, says so.
@@ -39,6 +62,14 @@ bool in_view_model(const Scene& scene, const GameObject& object) {
     if (scene.at(id).view_model) return true;
   }
   return false;
+}
+
+// What an object's record says besides where it is (its shape keys come after).
+render_math::InstanceLook look_of(const GameObject& object, float first_bone, const render_math::DrawnRange& range) {
+  render_math::InstanceLook look{object.tint, first_bone};
+  look.sway = object.sways ? render_math::kSways : render_math::kStill;
+  fade_in_look(range, look);
+  return look;
 }
 
 }  // namespace
@@ -67,16 +98,16 @@ void Renderer::Impl::write_frame_texels(const Scene& scene) {
 std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone) {
   const auto slot = static_cast<std::size_t>(object.id);
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
-  render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
-  look.sway = object.sways ? render_math::kSways : render_math::kStill;
+  const render_math::DrawnRange range = drawn_range_of(object);
+  render_math::InstanceLook look = look_of(object, pose ? static_cast<float>(next_bone) : render_math::kNoBones, range);
   const std::size_t next = write_morphs(object, pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone, look);
   if (temporal.on) note_fresh_record(scene, object, look, pose ? pose->bones : 0);
   const render_math::Sight seen = reach_of(scene, object, pose);
-  // A skinned mesh is placed by its bones alone (glTF ignores its node's placement): it is never
-  // taken as mirrored (see KNOWN_LIMITATIONS).
+  // A skinned mesh is placed by its bones alone: it is never taken as mirrored (KNOWN_LIMITATIONS).
   const bool mirrored = !pose && mirrors(worlds[slot]);
-  sights[slot] = ObjectSight{write_record(slot, look), seen,    object.mesh, object.visible_from, object.visible_to,
-                             object.cast_shadow,       mirrored};
+  const render_math::DrawnRange judged = judged_range(range, seen, worlds[slot].position);
+  sights[slot] = ObjectSight{
+      write_record(slot, look, range), seen, object.mesh, judged.from, judged.to, object.cast_shadow, mirrored};
   sights[slot].view_model = drawn_apart(scene, object);
   return next;
 }
@@ -99,10 +130,16 @@ std::size_t Renderer::Impl::write_morphs(const GameObject& object, std::size_t f
   return first + render_math::kMorphTexels;
 }
 
-bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {
+render_math::DrawnRange Renderer::Impl::drawn_range_of(const GameObject& object) const {
+  const auto slot = static_cast<std::size_t>(object.id);
+  return render_math::drawn_range(object, render_math::longest_axis(worlds[slot].scale), view_tan_half_fov);
+}
+
+bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look,
+                                  const render_math::DrawnRange& range) {
   const std::size_t record = scattered_records + slot;
-  const RecordSource source{worlds[slot],     look.tint, look.first_bone,
-                            look.first_morph, look.sway, static_cast<float>(record)};
+  const RecordSource source{
+      worlds[slot], look.tint, look.first_bone, look.first_morph, look.sway, static_cast<float>(record), range};
   RecordSource& last = record_sources[slot];
   if (same(source, last)) return true;
   if (!render_math::write_instance(texels, record, model_matrix(worlds[slot]), look)) return false;

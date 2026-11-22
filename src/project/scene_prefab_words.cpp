@@ -3,6 +3,7 @@
 #include <exception>
 
 #include "app/game_settings.hpp"
+#include "core/config.hpp"
 #include "core/translations.hpp"
 #include "project/scene_assignments.hpp"
 #include "scene/prefabs.hpp"
@@ -126,6 +127,20 @@ std::optional<prefabs::PartOverride> part_change(const NodeDesc& current, const 
   diff_transform(before.local, after.local, change);
   diff_props(before.props, after.props, change);
   diff_components(before, after, change);
+  return change;
+}
+
+std::optional<prefabs::PartOverride> placement_part_change(const PlacedPart& part,
+                                                           const std::vector<std::string>& words, std::string& error,
+                                                           std::vector<std::string>& notes) {
+  const auto current = inherited_part(part.document, part.placement, part.game_dir, part.path, true, error);
+  const auto base =
+      current ? inherited_part(part.document, part.placement, part.game_dir, part.path, false, error) : current;
+  if (!base) return std::nullopt;
+  auto change = part_change(*current, *base, words, part.game_dir / config::kScriptsDirName, error, notes);
+  const auto overrides = prefab_instances::overrides_of(part.document, part.placement);
+  const auto old = overrides.find(part.path);
+  if (change && old != overrides.end()) change->removed = change->removed || old->second.removed;
   return change;
 }
 

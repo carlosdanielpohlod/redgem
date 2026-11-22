@@ -5,6 +5,7 @@
 #include "core/import_settings.hpp"
 #include "core/log.hpp"
 #include "editor/editor_session.hpp"
+#include "editor/lod_levels.hpp"
 #include "editor/model_import_settings.hpp"
 #include "scene/props.hpp"
 
@@ -50,6 +51,13 @@ void extract_if_asked(const fs::path& path, const fs::path& images_dir) {
   }
 }
 
+void make_levels(SceneDocument& document, int node, const fs::path& path,
+                 const import_settings::ModelSettings& settings) {
+  const std::vector<lod_levels::LevelCounts> counts = lod_levels::make_levels(document, node, settings);
+  if (counts.empty()) return;
+  log::info("levels of detail of " + path.filename().string() + ":\n" + lod_levels::counts_text(counts));
+}
+
 }  // namespace
 
 ObjectId EditorSession::import_model(const fs::path& path, Vec3 position, std::string& error, ObjectId parent) {
@@ -73,6 +81,7 @@ int EditorSession::add_model(const fs::path& path, std::string& error, int paren
   if (node == kNoIndex) return kNoIndex;
   const import_settings::ModelSettings settings = import_settings::model_settings(path);
   model_settings::apply(document_, node, settings);
+  make_levels(document_, node, path, settings);
   tag_model(node, path);
   return node;
 }
