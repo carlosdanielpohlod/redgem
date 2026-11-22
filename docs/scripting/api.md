@@ -884,7 +884,7 @@ Marks laid on the scene's surfaces: bullet holes, scorches, cracks. *Experimenta
 - `Decals.limit = Integer count`: keeps at most this many marks, 1 to 4096: past it, placing one drops the oldest *Experimental.*
 - `Decals.clear -> void`: removes every mark *Experimental.*
 
-Marks darken what they lie on (their color multiplies it), so they take its light and shade. They stay on the object they fell on as it moves, and go with it when it is destroyed or hidden. Skinned meshes, meshes with shape keys, prefabs and the view model take none. Marks are local: never sent to other machines, and a machine that draws nothing keeps none. A scene loaded anew starts without them.
+Marks darken what they lie on (their color multiplies it), so they take its light and shade. They stay on the object they fell on as it moves, and go with it when it is destroyed or hidden. Skinned meshes, meshes with shape keys, prefabs, the view model, water, and see-through or cut-out materials take none; a two-sided surface takes them on both sides. Marks are local: never sent to other machines, and a machine that draws nothing keeps none. A scene loaded anew starts without them.
 
 ## Scatter
 
