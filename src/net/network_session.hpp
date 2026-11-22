@@ -375,6 +375,10 @@ class NetworkSession {
   }
   // A pose from the machine at `link`, checked, passed on to everyone as the host believes it.
   void relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events);
+  // Checks a decoded pose against where the object was and may go, then passes it on as the host
+  // believes it.
+  void check_and_relay_pose(Link& link, const PoseUpdate& update, const Pose& claimed, const nlohmann::json& passed,
+                            std::vector<NetworkEvent>& events);
   // Passes a checked pose on: as it came while the others place the object where its machine
   // does, whole and where the host believes it once they no longer do (until the next whole pose
   // its machine sends that is believed: from then on they place it alike again).

@@ -6,8 +6,8 @@ namespace redgem {
 
 namespace {
 
-// What a game is made of: its objects and the world they are in.
-void install_world_bindings(mrb_state* mrb) {
+// The objects, where they are and how they are seen.
+void install_object_bindings(mrb_state* mrb) {
   install_vector3_bindings(mrb);  // first: the others hand Vector3s out
   install_game_object_bindings(mrb);
   install_transform_bindings(mrb);
@@ -15,10 +15,20 @@ void install_world_bindings(mrb_state* mrb) {
   install_scatter_bindings(mrb);
   install_camera_bindings(mrb);
   install_exposure_bindings(mrb);
+}
+
+// Bodies, the questions asked of them and the joints between them.
+void install_physics_family_bindings(mrb_state* mrb) {
   install_physics_bindings(mrb);
   install_rigidbody_bindings(mrb);  // after the physics': it adds to Rigidbody and CharacterController
   install_physics_query_bindings(mrb);
   install_joint_bindings(mrb);  // after the queries': it adds to Physics
+}
+
+// What a game is made of: its objects and the world they are in.
+void install_world_bindings(mrb_state* mrb) {
+  install_object_bindings(mrb);
+  install_physics_family_bindings(mrb);
   install_light_bindings(mrb);  // after GameObject's: it adds to that class
   install_navigation_bindings(mrb);
   install_water_bindings(mrb);

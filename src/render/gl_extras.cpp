@@ -3,6 +3,7 @@
 #include <rlgl.h>
 
 #include <algorithm>
+#include <string>
 
 #if defined(GRAPHICS_API_OPENGL_ES3)
 #include <GLES3/gl3.h>
@@ -10,10 +11,15 @@
 #include "external/glad.h"  // raylib's loader: its functions are loaded once raylib opens a window
 #endif
 
+#include "core/log.hpp"
+
 namespace redgem::render_detail {
 namespace {
 
 constexpr GLenum kDepthFormat = GL_DEPTH_COMPONENT24;  // of every depth the scene's pictures share
+// The longest a frame is waited for: past it the card is taken to be stuck, and drawing goes on.
+constexpr int kLongestFenceWaitSeconds = 10;
+constexpr GLuint64 kNanosecondsPerSecond = 1000000000;
 // How much nearer a polygon offset draws: by its slope, and by the depth buffer's least steps.
 constexpr float kNearerBySlope = -1.0f;
 constexpr float kNearerByUnits = -1.0f;
@@ -28,6 +34,22 @@ unsigned int render_buffer(int width, int height, int samples, GLenum format) {
 }
 
 }  // namespace
+
+CardFence insert_card_fence() { return glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0); }
+
+void wait_card_fence(CardFence fence) {
+  if (fence == nullptr) return;
+  const auto sync = static_cast<GLsync>(fence);
+  // (Flushed first: a mark the driver still holds back would never be passed.)
+  if (glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, kLongestFenceWaitSeconds * kNanosecondsPerSecond) ==
+      GL_TIMEOUT_EXPIRED)
+    log::warning("the graphics card has not finished a frame in " + std::to_string(kLongestFenceWaitSeconds) +
+                 " seconds: going on without it");
+}
+
+void release_card_fence(CardFence fence) {
+  if (fence != nullptr) glDeleteSync(static_cast<GLsync>(fence));
+}
 
 void forget_errors() {
   while (glGetError() != GL_NO_ERROR) {

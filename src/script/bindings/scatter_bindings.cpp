@@ -164,21 +164,36 @@ void set_looks(mrb_state* mrb, PlaceArgs& args, mrb_value tints, mrb_float varia
   args.normals_up = static_cast<float>(from_to(mrb, normals_up, kAsModelled, kStraightUp, "normals_up"));
 }
 
+// The numbers Scatter.__place is given for where and how big the copies are, before they are checked.
+struct PlaceNumbers {
+  mrb_float count = 0.0;
+  mrb_float seed = 0.0;
+  mrb_float smallest = 1.0;
+  mrb_float largest = 1.0;
+  mrb_bool align = false;
+};
+
+// count, seed, smallest, largest, align: how many copies are placed, and how.
+void set_request(mrb_state* mrb, ScatterRequest& request, const PlaceNumbers& numbers) {
+  request.count = static_cast<std::size_t>(from_to(mrb, numbers.count, kOneCopy, kMaxScatteredCopies, "the count"));
+  request.seed = static_cast<std::uint32_t>(from_to(mrb, numbers.seed, 0.0, kLargestSeed, "the seed"));
+  request.smallest = static_cast<float>(more_than(mrb, numbers.smallest, kNoScale, "the smallest scale"));
+  request.largest = static_cast<float>(at_least(mrb, numbers.largest, numbers.smallest, "the largest scale"));
+  request.align = numbers.align;
+}
+
 // Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align, layer,
 //                 least, tints, tint_variation, fade, normals_up, lods)
 PlaceArgs place_args(mrb_state* mrb) {
   PlaceArgs args{};
   mrb_value first, second, tints;
-  mrb_float count = 0.0, seed = 0.0, smallest = 1.0, largest = 1.0, variation = 0.0, fade = 0.0, normals_up = 0.0;
-  mrb_bool align = false;
-  mrb_get_args(mrb, "ofooofffbofofffo", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
-               &align, &args.layer, &args.least, &tints, &variation, &fade, &normals_up, &args.lods);
+  PlaceNumbers numbers;
+  mrb_float variation = 0.0, fade = 0.0, normals_up = 0.0;
+  mrb_get_args(mrb, "ofooofffbofofffo", &args.source, &numbers.count, &first, &second, &args.ground, &numbers.seed,
+               &numbers.smallest, &numbers.largest, &numbers.align, &args.layer, &args.least, &tints, &variation, &fade,
+               &normals_up, &args.lods);
   set_looks(mrb, args, tints, variation, fade, normals_up);
-  args.request.count = static_cast<std::size_t>(from_to(mrb, count, kOneCopy, kMaxScatteredCopies, "the count"));
-  args.request.seed = static_cast<std::uint32_t>(from_to(mrb, seed, 0.0, kLargestSeed, "the seed"));
-  args.request.smallest = static_cast<float>(more_than(mrb, smallest, kNoScale, "the smallest scale"));
-  args.request.largest = static_cast<float>(at_least(mrb, largest, smallest, "the largest scale"));
-  args.request.align = align;
+  set_request(mrb, args.request, numbers);
   args.least = from_to(mrb, args.least, kNoShare, kWholeSpot, "least");
   set_box(mrb, args.request, first, second);
   return args;

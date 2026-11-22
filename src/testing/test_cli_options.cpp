@@ -102,7 +102,7 @@ void read_wait_limit(Reading& reading) {
     fail(reading, tr("testing.cli.wait_limit_needs_seconds", {{"most", most}}));
     return;
   }
-  reading.result.options.wait_limit_seconds = *seconds;
+  reading.result.options.wait_limit_seconds = seconds;
 }
 
 void read_headless(Reading& reading) { reading.result.options.headless = true; }
