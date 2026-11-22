@@ -14,6 +14,7 @@ namespace redgem::render_detail {
 namespace {
 
 constexpr GLenum kDepthFormat = GL_DEPTH_COMPONENT24;  // of every depth the scene's pictures share
+constexpr GLuint64 kFenceWaitNanoseconds = 100000000;  // a wait at a time: 0.1 s, then again
 
 unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   unsigned int buffer = 0;
@@ -25,6 +26,20 @@ unsigned int render_buffer(int width, int height, int samples, GLenum format) {
 }
 
 }  // namespace
+
+CardFence insert_card_fence() { return glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0); }
+
+void wait_card_fence(CardFence fence) {
+  if (fence == nullptr) return;
+  const auto sync = static_cast<GLsync>(fence);
+  // (Flushed first: a mark the driver still holds back would never be passed.)
+  while (glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, kFenceWaitNanoseconds) == GL_TIMEOUT_EXPIRED) {
+  }
+}
+
+void release_card_fence(CardFence fence) {
+  if (fence != nullptr) glDeleteSync(static_cast<GLsync>(fence));
+}
 
 void forget_errors() {
   while (glGetError() != GL_NO_ERROR) {

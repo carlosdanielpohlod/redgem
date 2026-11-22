@@ -53,6 +53,14 @@ int largest_target_side();
 // Cube maps filtered across the seams between their faces (always so on OpenGL ES 3).
 void filter_cube_maps_across_seams();
 
+// A mark in the graphics card's queue of work (a sync object): waited for, it says the card has
+// done everything sent before it. Core in desktop OpenGL 3.3 and OpenGL ES 3.
+using CardFence = void*;
+CardFence insert_card_fence();
+// Waits until the card has passed the mark, however long that takes.
+void wait_card_fence(CardFence fence);
+void release_card_fence(CardFence fence);
+
 // Lets go of the errors earlier calls left, so that the next check is of a call's own.
 void forget_errors();
 

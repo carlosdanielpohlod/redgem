@@ -12,6 +12,7 @@ add_executable(redgem_tests
   unit/script_profile_test.cpp
   unit/profile_overlay_test.cpp
   unit/gpu_timers_test.cpp
+  unit/frame_pacer_test.cpp
   unit/debug_labels_test.cpp
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp

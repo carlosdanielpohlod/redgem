@@ -1,6 +1,7 @@
 #include "project/shot_command.hpp"
 
 #include <raylib.h>
+#include <rlgl.h>
 
 #include <cmath>
 #include <filesystem>
@@ -18,6 +19,7 @@
 #include "project/scene_text.hpp"
 #include "project/script_messages.hpp"
 #include "project/tool_play.hpp"
+#include "render/frame_pacer.hpp"
 #include "render/renderer.hpp"
 #include "render/window.hpp"
 
@@ -72,9 +74,12 @@ class ShotPresenter final : public Presenter {
   float frame_seconds() const override { return step_seconds_; }
 
   // Every frame is drawn, so that what builds up over frames (smoothed edges, trails) is there.
+  // No swap holds the frames back: the pacer keeps them from piling up ahead of the card.
   void present(const FrameView& view) override {
     renderer_.set_clock(static_cast<double>(steps_) * step_seconds_);
     painter_.paint(view, &picture_);
+    rlDrawRenderBatchActive();
+    pacer_.frame_drawn();
     if (steps_ == frame_) take();
   }
 
@@ -95,6 +100,7 @@ class ShotPresenter final : public Presenter {
   Window window_;
   Renderer renderer_;
   FramePainter painter_;
+  FramePacer pacer_;
   RenderTexture2D picture_{};
   long long frame_;
   std::filesystem::path file_;
