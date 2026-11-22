@@ -466,6 +466,23 @@ physics in `fixed_update`, and anything that counts frames to measure time in `T
 steps at most (a step's worth more at some ticks), whatever its tick. `redgem check` refuses a `tick_hz` out of bounds; a game played
 with one ticks at 60.
 
+### Drawn between steps
+
+A game is often drawn more often than it ticks (144 or 240 frames a second at 60 or 128 Hz). The
+bodies the physics moves on its own (dynamic bodies, characters and vehicles) are then drawn
+between where their last two steps left them, as far as the frame is into the next step, so they
+move smoothly instead of in steps. What rides on them (a camera, a gun, a vehicle's wheels) is
+drawn with them. They are drawn about a step behind the physics, about 17 ms at 60 Hz and 8 ms
+at 128.
+
+Scripts never see it: `transform.position` and every query are where the steps left the body, as
+the physics has it. A body a script moved or turned since its last step is drawn where the script
+put it. A character's turning is drawn as its scripts set it. Kinematic bodies and objects with no
+body are drawn where scripts put them, in steps when a script moves them in `fixed_update`. An
+object a script places each `update` from a body's `transform.position` (a camera that follows
+it) follows the step pose, not the drawn one. The tools that take a whole step a frame (`redgem run`,
+`redgem shot`, `redgem-test`) draw the steps' poses, as before.
+
 ## How many bodies a scene holds
 
 A scene's physics world holds 4096 bodies unless `game.json` asks for another number, from 64 to
@@ -1408,6 +1425,38 @@ Lit particles are lit at their corners by the sun, the sky and the nearest light
 on about half of it. `lit: true` also receives the scene's filtered sun shadows, using the same
 shadow cascades as surfaces. Sun shadowing leaves sky and point-light contributions intact.
 Unlit particles, including unlit glowing ones, keep their own color in shadows.
+
+## Leave marks: decals
+
+Experimental. `Decals.place` projects a mark onto the surfaces under it: a bullet hole on a wall, a
+scorch on the floor, blood on a crate. It falls on meshes and terrain alike, across a corner onto
+both sides, and stays on what it fell on: a door that swings carries its marks along.
+
+```ruby
+hit = Physics.raycast(eye, aim, 100)
+if hit
+  Decals.place(hit)  # a soft dark spot where the shot landed
+  Decals.place(hit[:point], hit[:normal], image: :bullet_hole, size: 0.08, spin: rand(360))
+end
+Decals.place(crater, Vector3.up, size: 3, color: [40, 30, 20], alpha: 220)
+```
+
+A mark darkens what it lies on: its color multiplies it, so it takes the surface's light and
+shade, dark in a dark corner and lit in the sun. `image:` is a picture of the game's `images/`
+folder (`image: :bullet_hole` draws `images/bullet_hole.png`): dark where it marks most, see-through
+where it marks nothing. Without one, a mark is a soft round spot. `alpha:` (0 to 255) says how much
+it darkens, and `spin:` turns it about the normal (degrees). `size:` is meters across, and `depth:`
+how far into and out of the surface it reaches (as far as it is wide unless said).
+
+`Decals.place` returns whether the mark fell on anything. Marks are kept up to `Decals.limit` (256
+unless set, at most 4096): past it, placing one drops the oldest. `Decals.count` says how many are
+kept, and `Decals.clear` removes them all; a scene loaded anew starts without any.
+
+Marks are looks only, and local: they are not sent to the other machines of a multiplayer game
+(each machine places its own where it sees a shot land), and a machine that draws nothing, a
+dedicated server, keeps none. Skinned characters, meshes with shape keys, prefabs, the view model,
+water, and see-through or cut-out materials (glass, leaves, a fence) take none. A two-sided
+surface (a flag, a sign) takes marks on both its sides.
 
 ## Light that flickers and fades
 

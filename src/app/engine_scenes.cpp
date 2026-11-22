@@ -88,6 +88,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   head_aims_.clear();
   particles_.clear();
   particle_emitters_.clear();
+  decals_.clear();
   // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
   scripts_->run_scene_script(incoming.name());
@@ -99,6 +100,7 @@ void Engine::install_world(SceneActivation& incoming) {
   runtime_prefab_bytes_ = 0;
   scene_desc_ = std::move(incoming.desc());
   scene_ = std::move(incoming.scene());
+  render_poses_.clear();  // (the old scene's objects are not the new one's)
   adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
   settle_world();

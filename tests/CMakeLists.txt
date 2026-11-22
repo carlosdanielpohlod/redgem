@@ -151,6 +151,7 @@ unit/temp_dirs_test.cpp
   unit/instance_records_test.cpp
   unit/morph_shapes_test.cpp
   unit/scatter_test.cpp
+  unit/decals_test.cpp
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
@@ -254,6 +255,7 @@ unit/temp_dirs_test.cpp
   integration/symbol_cache_test.cpp
   integration/script_budget_test.cpp
   integration/tick_rate_test.cpp
+  integration/render_poses_test.cpp
   integration/script_budget_clock_test.cpp
   integration/save_budget_test.cpp
   integration/crash_handling_test.cpp
@@ -281,6 +283,7 @@ unit/temp_dirs_test.cpp
   integration/ui_input_test.cpp
   integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
+  integration/decals_test.cpp
   integration/camera_switch_test.cpp
   integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp
@@ -727,6 +730,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/mirrored_render_test.cpp
                render_system/view_model_render_test.cpp
+               render_system/decals_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
                render_system/ktx2_render_test.cpp

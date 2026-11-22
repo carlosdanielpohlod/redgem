@@ -9,10 +9,12 @@
 #include <utility>
 #include <vector>
 
+#include "scene/ground/ground_weights.hpp"
 #include "scene/scatter.hpp"
 #include "scene/scatter_looks.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/bindings/terrain_lookup.hpp"
 #include "script/script_host.hpp"
 
 namespace redgem {
@@ -32,7 +34,9 @@ constexpr mrb_float kFullVariation = 1.0;
 constexpr mrb_float kNoFade = 0.0;
 constexpr mrb_float kAsModelled = 0.0;  // normals as the mesh has them
 constexpr mrb_float kStraightUp = 1.0;
-constexpr int kPlaceArgs = 14;
+constexpr mrb_float kNoShare = 0.0;
+constexpr mrb_float kWholeSpot = 1.0;
+constexpr int kPlaceArgs = 16;
 constexpr int kLodParts = 2;  // a template and the distance where it starts taking over
 constexpr int kMostLods = 3;  // base plus three replacements keeps record memory bounded
 constexpr auto kMostTints = static_cast<int>(kMaxScatterTints);
@@ -68,6 +72,53 @@ GroundProbe ground_of(mrb_state* mrb, mrb_value object) {
   };
 }
 
+// Where the ground's layer `layer` takes at least `least` of the spot (Scatter.place's layer:).
+struct LayerFilter {
+  const TerrainLayers* layers = nullptr;
+  const MeshDesc* mesh = nullptr;
+  Transform world;
+  std::size_t layer = 0;
+  float least = 0.0f;
+};
+
+bool enough_of_layer(const LayerFilter& filter, Vec3 point) {
+  const auto weights = ground_weights_at(*filter.layers, *filter.mesh, filter.world, point);
+  return weights.has_value() && (*weights)[filter.layer] >= filter.least;
+}
+
+// The probe, meeting the ground only where its layer takes enough of the spot.
+GroundProbe on_layer(GroundProbe probe, const LayerFilter& filter) {
+  return [probe = std::move(probe), filter](Vec3 above, float depth) -> std::optional<GroundHit> {
+    std::optional<GroundHit> hit = probe(above, depth);
+    if (hit.has_value() && !enough_of_layer(filter, hit->point)) return std::nullopt;
+    return hit;
+  };
+}
+
+// The index of the layer named `name` of the ground's layers; raises when it has none of that name.
+std::size_t layer_index(mrb_state* mrb, const TerrainLayers& layers, const std::string& name) {
+  for (std::size_t i = 0; i < layers.layers.size(); ++i) {
+    if (layers.layers[i].name == name) return i;
+  }
+  mrb_raisef(mrb, E_ARGUMENT_ERROR, "the ground has no layer named %s", name.c_str());
+  return 0;
+}
+
+// layer:, least: checked against the ground, before any copies are placed.
+LayerFilter layer_filter(mrb_state* mrb, mrb_value ground, mrb_value layer, mrb_float least) {
+  if (mrb_nil_p(ground)) mrb_raise(mrb, E_ARGUMENT_ERROR, "Scatter.place on a layer needs a ground");
+  const GameObject& terrain = alive_object(mrb, ground);
+  LayerFilter filter;
+  filter.layers = terrain_layers_of(mrb, terrain);
+  filter.mesh = terrain_mesh_of(mrb, terrain);
+  if (filter.layers == nullptr || filter.mesh == nullptr)
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "Scatter.place on a layer needs a ground with ground layers");
+  filter.world = scene(mrb).world_transform(terrain.id);
+  filter.layer = layer_index(mrb, *filter.layers, to_name(mrb, layer));
+  filter.least = static_cast<float>(least);
+  return filter;
+}
+
 // The box between two corners, whichever way round they are given.
 void set_box(mrb_state* mrb, ScatterRequest& request, mrb_value first, mrb_value second) {
   const Vec3 a = to_vec3(mrb, first);
@@ -82,6 +133,8 @@ struct PlaceArgs {
   mrb_value source;
   mrb_value ground;
   mrb_value lods;
+  mrb_value layer;
+  mrb_float least = 0.0;
   ScatterRequest request;
   ScatterLooks looks;
   float fade = 0.0f;
@@ -111,21 +164,22 @@ void set_looks(mrb_state* mrb, PlaceArgs& args, mrb_value tints, mrb_float varia
   args.normals_up = static_cast<float>(from_to(mrb, normals_up, kAsModelled, kStraightUp, "normals_up"));
 }
 
-// Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align, tints,
-//                 tint_variation, fade, normals_up, lods)
+// Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align, layer,
+//                 least, tints, tint_variation, fade, normals_up, lods)
 PlaceArgs place_args(mrb_state* mrb) {
   PlaceArgs args{};
   mrb_value first, second, tints;
   mrb_float count = 0.0, seed = 0.0, smallest = 1.0, largest = 1.0, variation = 0.0, fade = 0.0, normals_up = 0.0;
   mrb_bool align = false;
-  mrb_get_args(mrb, "ofooofffbofffo", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
-               &align, &tints, &variation, &fade, &normals_up, &args.lods);
+  mrb_get_args(mrb, "ofooofffbofofffo", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
+               &align, &args.layer, &args.least, &tints, &variation, &fade, &normals_up, &args.lods);
   set_looks(mrb, args, tints, variation, fade, normals_up);
   args.request.count = static_cast<std::size_t>(from_to(mrb, count, kOneCopy, kMaxScatteredCopies, "the count"));
   args.request.seed = static_cast<std::uint32_t>(from_to(mrb, seed, 0.0, kLargestSeed, "the seed"));
   args.request.smallest = static_cast<float>(more_than(mrb, smallest, kNoScale, "the smallest scale"));
   args.request.largest = static_cast<float>(at_least(mrb, largest, smallest, "the largest scale"));
   args.request.align = align;
+  args.least = from_to(mrb, args.least, kNoShare, kWholeSpot, "least");
   set_box(mrb, args.request, first, second);
   return args;
 }
@@ -171,6 +225,13 @@ ScatterSet set_of(mrb_state* mrb, const GameObject& object, const PlaceArgs& arg
   return set;
 }
 
+// What copies stand on: the ground, and only its layer when one is named.
+GroundProbe probe_of(mrb_state* mrb, const PlaceArgs& args) {
+  if (mrb_nil_p(args.layer)) return ground_of(mrb, args.ground);
+  const LayerFilter filter = layer_filter(mrb, args.ground, args.layer, args.least);
+  return on_layer(ground_of(mrb, args.ground), filter);
+}
+
 // -> [the set's id, how many copies were placed].
 mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   // (Placing thousands of copies is the engine's time, not the script's.)
@@ -178,7 +239,7 @@ mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   const PlaceArgs args = place_args(mrb);
   const GameObject& object = template_arg(mrb, args.source);
   const auto lods = lods_arg(mrb, args, object);
-  std::vector<Transform> places = scatter_places(args.request, ground_of(mrb, args.ground));
+  std::vector<Transform> places = scatter_places(args.request, probe_of(mrb, args));
   const auto placed = static_cast<mrb_int>(places.size());
   ScatterSet set = set_of(mrb, object, args, std::move(places));
   set.lods = lods;

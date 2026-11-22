@@ -277,6 +277,19 @@ Scatter.place("GrassTuft", count: 50_000, area: field, ground: find("Ground"), s
               normals_up: 0.7)                              # lit as the meadow, not as flat cards
 ```
 
+On a ground with [ground layers](#ground-layers-experimental), copies can grow on one layer alone:
+
+```ruby
+Scatter.place("GrassTuft", count: 50_000, area: field, ground: find("Island"), seed: 7, align: true,
+              layer: "grass", least: 0.6)     # only where grass weighs at least 0.6
+```
+
+`least` is compared with the painted weight (as `Terrain.weights_at` gives it), not with what is
+drawn: a layer with a high `sharpness` can cover a spot where it weighs a little under half. A try
+where the layer weighs less places nothing, so `count` is how many tries there are, as with a
+ground that ends. The same seed still places the same copies on every machine. Like ground layers,
+`layer:` is experimental.
+
 `fade` makes copies near the template's `visible_to` thin out pixel by pixel over that many meters
 instead of popping away (and fade in after its `visible_from`, when it has one: two levels of
 detail whose distances overlap by the fade cross over without a gap). `normals_up` bends the
