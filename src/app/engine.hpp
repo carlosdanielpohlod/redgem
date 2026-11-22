@@ -317,8 +317,9 @@ class Engine {
   void finish_fixed_step(float dt);
   // How far into the next fixed step the frame being drawn is (0 to 1): the share of the way from
   // a body's pose before the last step to its pose after it that it is drawn at. A run that takes
-  // a whole step a frame draws the step's pose (1).
+  // a whole step a frame, or whose step is still on the physics thread, draws the step's pose (1).
   float drawn_share() const;
+  bool draws_last_step() const;
   void hand_to_presenter();
   // The fixed steps a frame owes: the last one only prepared when the steps overlap the drawing.
   void run_fixed_steps(int steps);

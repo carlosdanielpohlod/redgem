@@ -472,12 +472,15 @@ A game is often drawn more often than it ticks (144 or 240 frames a second at 60
 bodies the physics moves on its own (dynamic bodies, characters and vehicles) are then drawn
 between where their last two steps left them, as far as the frame is into the next step, so they
 move smoothly instead of in steps. What rides on them (a camera, a gun, a vehicle's wheels) is
-drawn with them. This costs a step of lag at most, about 17 ms at 60 Hz and 8 ms at 128.
+drawn with them. They are drawn about a step behind the physics, about 17 ms at 60 Hz and 8 ms
+at 128.
 
 Scripts never see it: `transform.position` and every query are where the steps left the body, as
 the physics has it. A body a script moved or turned since its last step is drawn where the script
 put it. A character's turning is drawn as its scripts set it. Kinematic bodies and objects with no
-body are drawn where scripts put them. The tools that take a whole step a frame (`redgem run`,
+body are drawn where scripts put them, in steps when a script moves them in `fixed_update`. An
+object a script places each `update` from a body's `transform.position` (a camera that follows
+it) follows the step pose, not the drawn one. The tools that take a whole step a frame (`redgem run`,
 `redgem shot`, `redgem-test`) draw the steps' poses, as before.
 
 ## How many bodies a scene holds

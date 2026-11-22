@@ -43,6 +43,16 @@ class RenderPoses {
     bool turns = true;  // a character's turning is its scripts', not its body's: only its position
   };
 
+  // Where one object is drawn in the world, and how many it hangs from.
+  struct Placement {
+    int depth = 0;
+    ObjectId id = kNoObject;
+    Transform drawn;
+  };
+
+  // Where each object still where its step left it is drawn, parents first. All of it is found
+  // before any is placed: placing a parent moves what hangs from it.
+  std::vector<Placement> planned(const Scene& scene, float share) const;
   // Whether the object is still where its step left it: not moved by a script since, not gone.
   bool unmoved(const Scene& scene, const Steps& steps) const;
   // Its pose `share` of the way from before to after, at its scale of now.

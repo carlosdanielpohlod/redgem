@@ -7,6 +7,7 @@
 #include <cmath>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@ constexpr int kWarmUpFrames = 8;            // a step or two before the first po
 constexpr int kMeasuredFrames = 120;        // half a second of frames
 constexpr float kEvenShare = 0.1f;          // how far a frame's step may be from the even one, as a share of it
 constexpr float kTeleportX = 50.0f;
+constexpr int kOverlappingThreads = 2;  // physics threads: the frame's last step overlaps its drawing
 constexpr float kCarriedOffset = 2.0f;      // meters above the crate its rider sits
 constexpr float kNear = 1e-4f;
 constexpr float kMillimetersPerMeter = 1000.0f;
@@ -65,6 +67,33 @@ class PosePresenter final : public Presenter {
   std::vector<Vec3> rider;
 };
 
+// How a sliding game runs.
+struct Sliding {
+  bool fixed_step = false;           // a whole step a frame, as the tools take
+  std::optional<int> physics_threads;  // more than one overlaps each frame's last step with its drawing
+  bool rider_slides = false;         // the rider a sliding body of its own, listed before the crate
+};
+
+// A sliding body: the crate's own, or a rider's that slides with it.
+PropertyMap slider() {
+  PropertyMap props = moving("dynamic");
+  props["script"] = std::string("slider.rb");
+  return props;
+}
+
+// The crate, and the rider that hangs from it, in the order `how` lists them.
+SceneDesc sliding_scene(const Sliding& how) {
+  NodeDesc crate = node("Crate", {kStart, 1, 0}, {1, 1, 1}, slider());
+  NodeDesc rider = node("Rider", {0, kCarriedOffset, 0}, {1, 1, 1}, how.rider_slides ? slider() : PropertyMap{});
+  SceneDesc scene = how.rider_slides ? scene_with({rider, crate}) : scene_with({crate, rider});
+  const int last = static_cast<int>(scene.nodes.size()) - 1;
+  const int crate_at = how.rider_slides ? last : last - 1;
+  const int rider_at = how.rider_slides ? last - 1 : last;
+  scene.nodes[crate_at].children.push_back(rider_at);
+  scene.nodes[rider_at].parent = crate_at;
+  return scene;
+}
+
 // A crate sliding along x with nothing to stop it, a rider on it, drawn at kDrawnHz on the clock.
 struct SlidingGame {
   TempGame game{"{}"};
@@ -72,22 +101,17 @@ struct SlidingGame {
   PosePresenter screen;
   std::unique_ptr<Engine> engine;
 
-  explicit SlidingGame(bool fixed_step = false) {
+  explicit SlidingGame(const Sliding& how = {}) {
     std::string error;
     std::filesystem::create_directories(game.dir / config::kScriptsDirName);
     REQUIRE_MESSAGE(write_text_file(game.dir / config::kScriptsDirName / "slider.rb", kSlider, error), error);
-    PropertyMap crate = moving("dynamic");
-    crate["script"] = std::string("slider.rb");
-    scene = scene_with({node("Crate", {kStart, 1, 0}, {1, 1, 1}, crate),
-                        node("Rider", {0, kCarriedOffset, 0}, {1, 1, 1}, {})});
-    const int crate_at = static_cast<int>(scene.nodes.size()) - 2;  // (the rider is last, the crate before it)
-    scene.nodes[crate_at].children.push_back(crate_at + 1);
-    scene.nodes[crate_at + 1].parent = crate_at;
+    scene = sliding_scene(how);
     EngineOptions options;
     options.game_dir = game.dir;
     options.scene = &scene;
     options.presenter = &screen;
-    options.fixed_step = fixed_step;
+    options.fixed_step = how.fixed_step;
+    options.physics_threads = how.physics_threads;
     auto created = Engine::create(options);
     if (auto* failed = std::get_if<std::string>(&created)) FAIL(*failed);
     engine = std::move(std::get<std::unique_ptr<Engine>>(created));
@@ -140,6 +164,28 @@ TEST_CASE("at 240 frames a second a sliding body is drawn a quarter of a step fu
                           << "; physics: " << spread(drawn_steps(seen_by_scripts(*sliding.engine))));
 }
 
+TEST_CASE("with its last step on the physics thread, a sliding body is still drawn evenly") {
+  Sliding overlapped;
+  overlapped.physics_threads = kOverlappingThreads;
+  SlidingGame sliding(overlapped);
+  sliding.play(kWarmUpFrames + kMeasuredFrames);
+  const float even = kSpeed / static_cast<float>(kDrawnHz);
+  for (const float step : drawn_steps(sliding.screen.crate)) {
+    CHECK(step == doctest::Approx(even).epsilon(kEvenShare));
+  }
+}
+
+TEST_CASE("a sliding body that hangs from another, listed before it, is drawn evenly too") {
+  Sliding hanging;
+  hanging.rider_slides = true;
+  SlidingGame sliding(hanging);
+  sliding.play(kWarmUpFrames + kMeasuredFrames);
+  const float even = kSpeed / static_cast<float>(kDrawnHz);
+  for (const float step : drawn_steps(sliding.screen.rider)) {
+    CHECK(step == doctest::Approx(even).epsilon(kEvenShare));
+  }
+}
+
 TEST_CASE("what rides on an interpolated body is drawn with it") {
   SlidingGame sliding;
   sliding.play(kWarmUpFrames + kMeasuredFrames);
@@ -176,7 +222,9 @@ TEST_CASE("a body a script moved since its last step is drawn where the script p
 }
 
 TEST_CASE("a game that takes a whole step a frame draws the step's pose") {
-  SlidingGame sliding(true);
+  Sliding whole_steps;
+  whole_steps.fixed_step = true;
+  SlidingGame sliding(whole_steps);
   sliding.play(kWarmUpFrames);
   const float x = std::stof(ruby(*sliding.engine, "Scene.find('Crate').transform.position.x"));
   CHECK(sliding.screen.crate.back().x == doctest::Approx(x));
