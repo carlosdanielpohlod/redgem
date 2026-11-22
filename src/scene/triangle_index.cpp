@@ -1,6 +1,7 @@
 #include "scene/triangle_index.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace redgem {
@@ -13,14 +14,10 @@ constexpr int kAxisX = 0;
 constexpr int kAxisY = 1;
 constexpr int kAxisZ = 2;
 
-// How many corners a primitive's triangles list: its indices, or its positions in order for none.
-std::size_t listed_corners(const PrimitiveDesc& primitive) {
-  return primitive.indices.empty() ? primitive.positions.size() / kPositionFloats : primitive.indices.size();
-}
-
-Vec3 corner_at(const PrimitiveDesc& primitive, std::size_t listed) {
-  const std::size_t vertex = primitive.indices.empty() ? listed : primitive.indices[listed];
-  return vec3_from(&primitive.positions[vertex * kPositionFloats]);
+// Whether a box is made of finite numbers (a corner that is not would unsettle the sorting).
+bool finite(const Bounds& box) {
+  const bool low = std::isfinite(box.min.x) && std::isfinite(box.min.y) && std::isfinite(box.min.z);
+  return low && std::isfinite(box.max.x) && std::isfinite(box.max.y) && std::isfinite(box.max.z);
 }
 
 float on_axis(Vec3 point, int axis) {
@@ -36,6 +33,15 @@ int longest_axis(const Bounds& bounds) {
 
 }  // namespace
 
+std::size_t listed_corners(const PrimitiveDesc& primitive) {
+  return primitive.indices.empty() ? primitive.positions.size() / kPositionFloats : primitive.indices.size();
+}
+
+Vec3 listed_corner(const PrimitiveDesc& primitive, std::size_t listed) {
+  const std::size_t vertex = primitive.indices.empty() ? listed : primitive.indices[listed];
+  return vec3_from(&primitive.positions[vertex * kPositionFloats]);
+}
+
 bool boxes_overlap(const Bounds& a, const Bounds& b) {
   const bool across = a.min.x <= b.max.x && b.min.x <= a.max.x;
   const bool along = a.min.z <= b.max.z && b.min.z <= a.max.z;
@@ -47,16 +53,15 @@ TriangleIndex::TriangleIndex(const PrimitiveDesc& primitive) {
   Sorting sorting;
   sorting.boxes.resize(count);
   sorting.middles.resize(count);
-  order_.resize(count);
   for (std::size_t triangle = 0; triangle < count; ++triangle) {
     Bounds& box = sorting.boxes[triangle];
     for (std::size_t corner = 0; corner < kTriangleCorners; ++corner) {
-      box.include(corner_at(primitive, triangle * kTriangleCorners + corner));
+      box.include(listed_corner(primitive, triangle * kTriangleCorners + corner));
     }
     sorting.middles[triangle] = box.center();
-    order_[triangle] = static_cast<std::uint32_t>(triangle);
+    if (finite(box)) order_.push_back(static_cast<std::uint32_t>(triangle));
   }
-  if (count > 0) build(sorting, 0, static_cast<std::uint32_t>(count));
+  if (!order_.empty()) build(sorting, 0, static_cast<std::uint32_t>(order_.size()));
 }
 
 // The node for the triangles order_[first, first + count), and those under it; returns where it is.
@@ -117,14 +122,15 @@ void TriangleIndex::append_leaf(const Node& leaf, std::vector<std::size_t>& out)
 
 bool TriangleIndexCache::Kept::made_of(const PrimitiveDesc& primitive) const {
   const bool same_positions = primitive.positions.data() == positions && primitive.positions.size() == floats;
-  return same_positions && primitive.indices.size() == corners;
+  return same_positions && primitive.indices.data() == indices && primitive.indices.size() == corners;
 }
 
 const TriangleIndex* TriangleIndexCache::of(const PrimitiveDesc& primitive) {
   if (listed_corners(primitive) / kTriangleCorners < kLeastIndexedTriangles) return nullptr;
   const auto found = kept_.find(&primitive);
   if (found != kept_.end() && found->second.made_of(primitive)) return &found->second.index;
-  Kept made{primitive.positions.data(), primitive.positions.size(), primitive.indices.size(), TriangleIndex(primitive)};
+  Kept made{primitive.positions.data(), primitive.positions.size(), primitive.indices.data(), primitive.indices.size(),
+            TriangleIndex(primitive)};
   return &kept_.insert_or_assign(&primitive, std::move(made)).first->second.index;
 }
 

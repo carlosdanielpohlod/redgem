@@ -287,9 +287,9 @@ TEST_CASE("a decal system starts over for a scene: no marks, its dense surfaces 
   const Scene scene = Scene::from_desc(desc);
   DecalSystem decals;
   REQUIRE(decals.place(scene, desc, on_the_floor(Vec3::zero())));
-  decals.start_over(&desc);
+  decals.start_over(&scene, desc);
   CHECK(decals.decals().empty());
   CHECK(decals.place(scene, desc, on_the_floor(Vec3::zero())));
-  decals.start_over(nullptr);  // a machine that draws none sorts nothing
+  decals.start_over(nullptr, desc);  // a machine that draws none sorts nothing
   CHECK(decals.decals().empty());
 }

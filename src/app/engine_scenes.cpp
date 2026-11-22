@@ -88,7 +88,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   head_aims_.clear();
   particles_.clear();
   particle_emitters_.clear();
-  decals_.start_over(context_.renders_particles ? &scene_desc_ : nullptr);
+  decals_.start_over(context_.renders_particles ? &scene_ : nullptr, scene_desc_);
   // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
   scripts_->run_scene_script(incoming.name());

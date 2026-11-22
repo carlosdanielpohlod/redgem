@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <utility>
 #include <vector>
 
 #include "scene/shapes/terrain.hpp"
@@ -69,4 +73,33 @@ TEST_CASE("a triangle index cache sorts a dense primitive once, and a small one 
   dense = make_terrain({kTerrainSize, kDenseCells / 2});  // its lists replaced: sorted anew
   REQUIRE(cache.of(dense) != nullptr);
   CHECK(cache.of(dense)->triangles() == dense.indices.size() / kCorners);
+}
+
+TEST_CASE("a triangle index cache sorts anew a primitive whose corners were listed anew, as many as before") {
+  PrimitiveDesc dense = make_terrain({kTerrainSize, kDenseCells});
+  TriangleIndexCache cache;
+  REQUIRE(cache.of(dense) != nullptr);
+  std::vector<std::uint32_t> reversed;  // the same triangles, listed last first
+  for (std::size_t first = dense.indices.size(); first >= kCorners; first -= kCorners) {
+    reversed.insert(reversed.end(), dense.indices.begin() + static_cast<std::ptrdiff_t>(first - kCorners),
+                    dense.indices.begin() + static_cast<std::ptrdiff_t>(first));
+  }
+  dense.indices = std::move(reversed);
+  const TriangleIndex* index = cache.of(dense);
+  REQUIRE(index != nullptr);
+  std::vector<std::size_t> found;
+  index->find(box_around(Vec3{12.3f, 0, -7.7f}), found);
+  const std::vector<std::size_t> wanted = overlapping(dense, box_around(Vec3{12.3f, 0, -7.7f}));
+  REQUIRE_FALSE(wanted.empty());
+  for (const std::size_t first : wanted) CHECK(std::find(found.begin(), found.end(), first) != found.end());
+}
+
+TEST_CASE("a triangle index leaves out a triangle with a corner that is not a number") {
+  PrimitiveDesc terrain = make_terrain({kTerrainSize, kDenseCells});
+  terrain.positions[terrain.indices[0] * kFloats] = std::numeric_limits<float>::quiet_NaN();
+  const TriangleIndex index(terrain);
+  CHECK(index.triangles() < terrain.indices.size() / kCorners);
+  std::vector<std::size_t> found;
+  index.find(box_around(Vec3::zero()), found);
+  CHECK_FALSE(found.empty());
 }

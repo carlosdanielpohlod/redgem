@@ -57,10 +57,10 @@ class DecalSystem {
   // whether it fell on any: nothing is kept when it did not.
   bool place(const Scene& scene, const SceneDesc& desc, const DecalPlacement& placement);
   void clear() { decals_.clear(); }
-  // A scene starts: no marks, and nothing kept of the last one's surfaces. With the new scene's
-  // `surfaces` (on a machine that draws decals), the triangles of its dense meshes are sorted now,
-  // as it loads, rather than at the first mark on each.
-  void start_over(const SceneDesc* surfaces);
+  // A scene starts: no marks, and nothing kept of the last one's surfaces. With the new `scene` (on
+  // a machine that draws decals), the triangles of the dense meshes of its objects that take marks
+  // are sorted now, as it loads, rather than at the first mark on each.
+  void start_over(const Scene* scene, const SceneDesc& desc);
   // How many are kept at most (kMinDecalLimit to kMaxDecalLimit); a lower limit drops the oldest
   // at once.
   void set_limit(std::size_t limit);

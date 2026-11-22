@@ -9,7 +9,6 @@ namespace {
 // Meters a decal's corners are raised off the surface they lie on, so that they are not drawn
 // into it where its depth and theirs come out a hair apart.
 constexpr float kLift = 0.002f;
-constexpr std::size_t kCornerFloats = 3;
 constexpr std::size_t kTriangleIndices = 3;
 
 Vec3 to_world(const Transform& world, Vec3 local) {
@@ -27,19 +26,10 @@ Bounds local_reach(const DecalBox& box, const Transform& world) {
   return reach;
 }
 
-// How many corners a primitive's triangles list: its indices, or its positions in order for none.
-std::size_t listed_corners(const PrimitiveDesc& primitive) {
-  return primitive.indices.empty() ? primitive.positions.size() / kCornerFloats : primitive.indices.size();
-}
-
-std::size_t vertex_at(const PrimitiveDesc& primitive, std::size_t listed) {
-  return primitive.indices.empty() ? listed : primitive.indices[listed];
-}
-
 std::array<Vec3, 3> local_triangle(const PrimitiveDesc& primitive, std::size_t first_index) {
   std::array<Vec3, 3> triangle{};
   for (std::size_t corner = 0; corner < kTriangleIndices; ++corner) {
-    triangle[corner] = vec3_from(&primitive.positions[vertex_at(primitive, first_index + corner) * kCornerFloats]);
+    triangle[corner] = listed_corner(primitive, first_index + corner);
   }
   return triangle;
 }
@@ -174,6 +164,15 @@ bool marked_in_the_world(const Scene& scene, ObjectId id, const SceneDesc& desc)
   return takes_decals(scene.at(id), desc) && !held_as_view_model(scene, id);
 }
 
+std::size_t mesh_of(const Scene& scene, ObjectId id) { return static_cast<std::size_t>(scene.at(id).mesh); }
+
+// Sorts the triangles of the parts of a mesh marks fall on (those dense enough to be).
+void sort_mesh(TriangleIndexCache& indexes, const SceneDesc& desc, const MeshDesc& mesh) {
+  for (const PrimitiveDesc& primitive : mesh.primitives) {
+    if (takes_marks(desc, primitive)) indexes.of(primitive);
+  }
+}
+
 std::size_t corners_of(const Decal& decal) {
   std::size_t corners = 0;
   for (const DecalPiece& piece : decal.pieces) corners += piece.corners.size();
@@ -201,14 +200,12 @@ bool DecalSystem::place(const Scene& scene, const SceneDesc& desc, const DecalPl
   return true;
 }
 
-void DecalSystem::start_over(const SceneDesc* surfaces) {
+void DecalSystem::start_over(const Scene* scene, const SceneDesc& desc) {
   decals_.clear();
   indexes_.forget();
-  if (surfaces == nullptr) return;
-  for (const MeshDesc& mesh : surfaces->meshes) {
-    for (const PrimitiveDesc& primitive : mesh.primitives) {
-      if (takes_marks(*surfaces, primitive)) indexes_.of(primitive);
-    }
+  if (scene == nullptr) return;
+  for (const ObjectId id : scene->alive_ids()) {
+    if (marked_in_the_world(*scene, id, desc)) sort_mesh(indexes_, desc, desc.meshes[mesh_of(*scene, id)]);
   }
 }
 

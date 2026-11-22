@@ -13,10 +13,16 @@
 
 namespace redgem {
 
+// How many corners a primitive's triangles list (three a triangle): its indices, or its positions
+// in order for none.
+std::size_t listed_corners(const PrimitiveDesc& primitive);
+// The position of the corner listed at `listed`, in the primitive's own space.
+Vec3 listed_corner(const PrimitiveDesc& primitive, std::size_t listed);
+
 class TriangleIndex {
  public:
-  // Sorts the triangles `primitive` lists (by its indices, or its positions in order for none), in
-  // its own space. They are not kept: the index stands for the primitive as it was then.
+  // Sorts the triangles `primitive` lists, in its own space, leaving out any with a corner that is
+  // not a finite number. They are not kept: the index stands for the primitive as it was then.
   explicit TriangleIndex(const PrimitiveDesc& primitive);
 
   // Appends the first listed corner (the index into the primitive's corner list, a multiple of
@@ -65,6 +71,7 @@ class TriangleIndexCache {
   struct Kept {
     const float* positions;
     std::size_t floats;
+    const std::uint32_t* indices;
     std::size_t corners;  // listed by its indices
     TriangleIndex index;
     // Whether it was made of the primitive as it is now (its lists not replaced since).

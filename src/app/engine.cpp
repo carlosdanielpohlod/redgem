@@ -276,7 +276,7 @@ void Engine::connect_effects() {
   context_.particle_emitters = &particle_emitters_;
   context_.decals = &decals_;
   context_.renders_particles = options_.presenter != nullptr;
-  decals_.start_over(context_.renders_particles ? &scene_desc_ : nullptr);  // the first scene's surfaces
+  decals_.start_over(context_.renders_particles ? &scene_ : nullptr, scene_desc_);  // the first scene's
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
 
