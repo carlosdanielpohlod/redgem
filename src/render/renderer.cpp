@@ -153,6 +153,8 @@ void Renderer::set_backdrop_blur(float amount) {
 }
 
 void Renderer::set_auto_exposure(const AutoExposureOverrides& overrides) { impl_->exposure_overrides = overrides; }
+void Renderer::set_decals(const DecalSystem* decals) { impl_->decals = decals; }
+
 void Renderer::set_material_emission(const EmissionOverrides& overrides) {
   if (same_emission(overrides, impl_->emission_overrides)) return;
   impl_->emission_overrides = overrides;

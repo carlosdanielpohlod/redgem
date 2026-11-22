@@ -217,7 +217,9 @@ void Engine::prepare_fixed_step(float dt) {
 
 void Engine::finish_fixed_step(float dt) {
   context_.time.delta = dt;  // (the contacts' callbacks read the step's)
+  render_poses_.begin_step(scene_, *physics_);
   bodies::pull_poses(scene_, *physics_);
+  render_poses_.end_step(scene_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
   for (const ContactEvent& event : physics_->drain_events()) {
     if (both_alive(event)) scripts_->dispatch(event);
@@ -236,16 +238,31 @@ void Engine::find_water() { update_scene_water(water_, scene_, scene_desc_, *phy
 
 void Engine::present() {
   const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
+  // Drawn between their last two steps (labels and all), the bodies are back where the steps left
+  // them before any script runs again.
+  render_poses_.place(scene_, drawn_share());
   append_debug_labels(context_, debug_draw_);
   append_profile_overlay(context_, {presenter_->gpu_timings(), &scripts_->vm().sampler().profile()});
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
+  hand_to_presenter();
+  render_poses_.restore(scene_);
+  forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
+}
+
+void Engine::hand_to_presenter() {
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        context_.auto_exposure, controls_, images_dir_, context_.stop_recording_requested,
                        &water_.snapshot(), shows_profile_stats(context_), &debug_draw_, &water_.surfaces(),
-                       &context_.material_emission, context_.backdrop_blur});
-  forget_decoded_pictures();  // (the presenter has the scene's pictures by now)
+                       &context_.material_emission, context_.backdrop_blur, &decals_});
 }
+
+// A frame that took a whole step, or whose step is still on the physics thread, draws the last step
+// it has: the clock's share is of a step it does not have yet. (Each frame then stays about a step
+// behind the clock.)
+bool Engine::draws_last_step() const { return options_.fixed_step || step_in_flight_; }
+
+float Engine::drawn_share() const { return draws_last_step() ? 1.0f : std::clamp(clock_.alpha(), 0.0f, 1.0f); }
 
 int Engine::run() {
   while (!finished()) frame(presenter_->frame_seconds());

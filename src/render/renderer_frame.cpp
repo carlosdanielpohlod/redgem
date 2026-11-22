@@ -80,6 +80,7 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   render_math::world_transforms(scene, worlds);
   slots.used = 0;  // the frame's passes start over in the buffer of what they see
   write_frame_texels(scene);
+  gather_decals(scene, to_vec3(camera.position));
   send_frame_texels();
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
@@ -134,6 +135,7 @@ void Renderer::Impl::draw_surfaces(Vec3 viewer, bool sampled) {
   covering = sampled;
   const std::size_t first = draw_objects(false, viewer);
   covering = false;
+  draw_decals();
   if (temporal.on) draw_motion(first, viewer);
   if (lit_features.water) capture_water_background();
   draw_see_through(first, viewer);

@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/config.hpp"
@@ -23,10 +24,34 @@ using import_settings::Field;
 
 constexpr const char* kTrueText = "true";
 constexpr const char* kFalseText = "false";
-constexpr const char* kFieldKeyPrefix = "editor.asset.field.";
 constexpr const char* kIdPrefix = "##";
 constexpr float kNumberSpeed = 0.01f;
 constexpr const char* kFractionMarks = ".eE";
+
+// The text key of each import setting's label, written out whole so a key no field shows is found.
+constexpr std::pair<const char*, const char*> kFieldKeys[] = {
+    {"scale", "editor.asset.field.scale"},
+    {"up_axis", "editor.asset.field.up_axis"},
+    {"colliders", "editor.asset.field.colliders"},
+    {"materials", "editor.asset.field.materials"},
+    {"color_space", "editor.asset.field.color_space"},
+    {"normal_map", "editor.asset.field.normal_map"},
+    {"max_size", "editor.asset.field.max_size"},
+    {"mipmaps", "editor.asset.field.mipmaps"},
+    {"compression", "editor.asset.field.compression"},
+    {"stream", "editor.asset.field.stream"},
+    {"loop", "editor.asset.field.loop"},
+    {"volume", "editor.asset.field.volume"},
+    {"mono_3d", "editor.asset.field.mono_3d"},
+};
+
+// A field's label: its text, or its own name when no text is kept for it.
+std::string label_of(const Field& field) {
+  for (const auto& [name, key] : kFieldKeys) {
+    if (field.name == name) return tr(key);
+  }
+  return field.name;
+}
 
 bool is_switch(const Field& field) { return field.value == kTrueText || field.value == kFalseText; }
 bool is_fraction(const Field& field) { return field.value.find_first_of(kFractionMarks) != std::string::npos; }
@@ -68,7 +93,7 @@ void draw_number(AssetState& asset, const Field& field) {
 }
 
 void draw_field(AssetState& asset, const Field& field) {
-  property_label(tr((kFieldKeyPrefix + field.name).c_str()));
+  property_label(label_of(field).c_str());
   ImGui::SetNextItemWidth(kFillWidth);
   if (!field.choices.empty()) return draw_choice(asset, field);
   if (is_switch(field)) return draw_switch(asset, field);
