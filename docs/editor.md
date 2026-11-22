@@ -26,7 +26,8 @@ icons):
   the gizmo. Drop a model on the ground to place it there, or a script on an object to attach it.
 * **Inspector**: name, tag, visible, *Template* (hidden in the game, copied with `Scene.spawn`), then
   one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission
-  and their pictures, see [Material pictures](#material-pictures)),
+  and their pictures, see [Material pictures](#material-pictures)), Pose preview (see
+  [Pose preview](#pose-preview)),
   Light (type, color, intensity, range and spot cones), Camera (field of view, clipping), one card per Ruby script,
   Physics (body, trigger, collider, layer, mass), Joint (kind, the object it is connected to, anchor,
   axis, limits, motor, a distance joint's lengths and spring, break force; see
@@ -103,6 +104,17 @@ Click a model, a picture or a sound in the Project panel: with no object selecte
 shows how the engine takes it in (its scale, colliders, size, loop...). **Apply** writes them next
 to the file and imports a model again wherever the open scene holds it. See
 [Import settings](import-settings.md).
+
+## Pose preview
+
+Select a model that a clip of the scene moves (a skinned character, or its mesh alone). The
+Inspector's **Pose preview** card lists those clips. Pick one and drag **Time** to see the model
+as the clip poses it that many seconds in, without pressing Play: no script runs. The pose is held
+past the clip's end. Pick **Rest pose**, select another object, or press Play, and the model is
+back at rest.
+
+Only the Scene view shows the pose. The scene keeps the rest pose: saving, undo and the game all
+see the model as it was. Moving the posed model with the gizmo keeps the pose on screen.
 
 ## Several objects at once
 

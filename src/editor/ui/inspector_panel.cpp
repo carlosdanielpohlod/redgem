@@ -77,6 +77,7 @@ void draw_components(PanelContext& context, int index) {
   draw_header(context, index);
   draw_transform(context, index);
   draw_mesh(context, index);
+  draw_pose(context, index);
   draw_light(context, index);
   draw_camera(context, index);
   draw_terrain(context, index);

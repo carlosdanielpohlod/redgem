@@ -55,6 +55,7 @@ void EditorSession::refresh_preview() {
   prefab_preview_.rebuild(document_.desc(), game_dir_, prefab_limits_);
   preview_ = Scene::from_desc(preview_desc());
   selection_.keep_below(document_.node_count());
+  show_pose();
 }
 
 void EditorSession::follow_terrain_layers() {
@@ -78,6 +79,7 @@ void EditorSession::refresh_node(ObjectId node) {
   if (!document_.has_node(node)) return refresh_preview();
   if (!prefab_preview_.refresh(document_.desc(), node)) return refresh_preview();
   preview_.refresh_from_desc(preview_desc(), node);
+  show_pose();
 }
 
 std::vector<int> EditorSession::selected_roots() const {

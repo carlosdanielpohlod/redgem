@@ -21,6 +21,8 @@ void draw_header(PanelContext& context, int index);
 void draw_transform(PanelContext& context, int index);
 // The mesh with its materials; a light's and a camera's settings.
 void draw_mesh(PanelContext& context, int index);
+// The clips that move the object, to pose it by one at a chosen time (Scene view only).
+void draw_pose(PanelContext& context, int index);
 // The pictures a material is drawn with, one row per texture slot.
 void draw_texture_slots(PanelContext& context, int material);
 void draw_light(PanelContext& context, int index);

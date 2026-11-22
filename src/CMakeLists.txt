@@ -745,6 +745,8 @@ if(NOT ANDROID)
     editor/prefab_instances.cpp
     editor/model_import_settings.cpp
     editor/lod_levels.cpp
+    editor/pose_preview.cpp
+    editor/editor_session_pose.cpp
     editor/prefab_files.cpp
     editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
@@ -800,6 +802,7 @@ if(NOT ANDROID)
     editor/ui/inspector_object.cpp
     editor/ui/inspector_group.cpp
     editor/ui/inspector_material.cpp
+    editor/ui/inspector_pose.cpp
     editor/ui/inspector_textures.cpp
     editor/ui/inspector_light_camera.cpp
     editor/ui/inspector_terrain.cpp
