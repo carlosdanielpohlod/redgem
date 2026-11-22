@@ -551,6 +551,7 @@ redgem_add_library(redgem_runtime
   render/shadow_cascades.cpp
   render/temporal.cpp
   render/gl_extras.cpp
+  render/card_memory.cpp
   render/gpu_timers.cpp
   render/frame_pacer.cpp
   render/picture_check.cpp

@@ -1,5 +1,9 @@
 {
   "game.loading": "Loading…",
+  "game.card_memory.free": "graphics memory: {free} MB free",
+  "game.card_memory.ran_out": "the graphics card ran out of memory, so some of what is drawn is missing or wrong ({memory}). Use fewer or smaller textures, or a lower quality",
+  "game.card_memory.unknown": "the driver does not tell how much graphics memory is used",
+  "game.card_memory.used": "graphics memory: {used} of {total} MB used",
   "game.controls.action_fire": "Fire",
   "game.controls.action_horizontal_negative": "Move left",
   "game.controls.action_interact": "Interact",

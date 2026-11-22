@@ -360,6 +360,8 @@
   "project.shot.needs_size_and_time":
       "--size needs <width>x<height> (512x288), and --at seconds or --frames N from 0 up to an hour of the game",
   "project.shot.saved": "saved {file} ({width}x{height}, scene {scene} at {seconds} s)",
+  "project.shot.out_of_card_memory": "the graphics card ran out of memory while drawing {file}: the picture is wrong ({memory}). Use fewer or smaller textures, or a smaller --size",
+  "project.shot.unfinished": "{count} of the picture's pixels came back see-through: the graphics card did not draw {file} whole",
   "project.shot.unfinished": "{count} of the picture's pixels came back see-through: the graphics card did not draw it whole",
   "project.shot.usage": [
     "usage: redgem shot <game> <out.png> [--at seconds | --frames N] [--scene name] [--size WxH] [--camera name]",

@@ -36,6 +36,11 @@ the same pull request.
 
 ## Rendering and animation
 
+- Graphics memory is told only by NVIDIA's drivers (used and total) and AMD's (what is free); Intel's,
+  Apple's and Android's drivers tell nothing. Running out of it is noticed only when the driver
+  reports GL_OUT_OF_MEMORY: some drivers move textures to the computer's memory instead, and get
+  slow without an error. Textures are kept uncompressed unless imported as KTX2, so a scene of many
+  4K textures can fill a 6 GB card.
 - Only dynamic bodies, characters and vehicles (and what hangs from them) are drawn between their
   last two steps. A kinematic body a script moves in `fixed_update` is drawn in steps, so a body
   riding a moving kinematic platform shifts against it by up to a step at high frame rates. An

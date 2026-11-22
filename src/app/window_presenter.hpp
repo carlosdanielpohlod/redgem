@@ -77,6 +77,7 @@ class WindowPresenter final : public Presenter {
   bool open() const override;
   float frame_seconds() const override;
   GpuTimings gpu_timings() const override { return renderer_.gpu_timings(); }
+  std::string card_memory() const override;
   bool prepare_scene(const SceneDesc& desc, int generation, std::size_t bytes, const FrameBudget& budget) override {
     return painter_.prepare(desc, generation, bytes, budget);
   }

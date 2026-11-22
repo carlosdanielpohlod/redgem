@@ -88,6 +88,9 @@ class Presenter {
   // How long the graphics card took over the passes of a frame lately, measured while the
   // statistics overlay is shown; nothing measured by a presenter that does not draw, or cannot time.
   virtual GpuTimings gpu_timings() const { return {}; }
+  // What the driver tells of the graphics card's memory, as a line for the statistics overlay
+  // (see card_memory.hpp); empty from a presenter that does not draw, or a driver that tells nothing.
+  virtual std::string card_memory() const { return {}; }
   // Readies what the scene the game is about to show under `generation` is drawn with (its
   // textures and meshes), a share a call, while the scene before it is still shown: about
   // `bytes` a call, within `budget`, at least one asset. True once it is all ready. One that does

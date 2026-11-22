@@ -71,6 +71,7 @@ std::vector<std::string> profile_overlay_lines(const ProfileSummary& stats, cons
   std::vector<std::string> lines;
   add_frame_lines(lines, stats);
   add_gpu_lines(lines, extras.gpu);
+  if (!extras.card_memory.empty()) lines.push_back(extras.card_memory);
   add_script_lines(lines, extras.scripts);
   return lines;
 }

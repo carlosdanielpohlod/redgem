@@ -3,6 +3,8 @@
 #include <rlgl.h>
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <string>
 
 #if defined(GRAPHICS_API_OPENGL_ES3)
@@ -23,6 +25,25 @@ constexpr GLuint64 kNanosecondsPerSecond = 1000000000;
 // How much nearer a polygon offset draws: by its slope, and by the depth buffer's least steps.
 constexpr float kNearerBySlope = -1.0f;
 constexpr float kNearerByUnits = -1.0f;
+
+// What drivers that tell of the card's memory answer to (NVX_gpu_memory_info, ATI_meminfo).
+constexpr GLenum kNvxTotalKilobytes = 0x9048;
+constexpr GLenum kNvxAvailableKilobytes = 0x9049;
+constexpr GLenum kAtiTextureFreeKilobytes = 0x87FC;
+constexpr std::size_t kAtiMeminfoValues = 4;  // free, largest free block, and the same for shared memory
+
+// Whether the card has said it ran out of memory: remembered from the first time, for good.
+bool& out_of_memory_seen() {
+  static bool seen = false;
+  return seen;
+}
+
+// The next error the card left, remembering an out-of-memory one.
+GLenum next_error() {
+  const GLenum error = glGetError();
+  if (error == GL_OUT_OF_MEMORY) out_of_memory_seen() = true;
+  return error;
+}
 
 unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   unsigned int buffer = 0;
@@ -52,8 +73,30 @@ void release_card_fence(CardFence fence) {
 }
 
 void forget_errors() {
-  while (glGetError() != GL_NO_ERROR) {
+  while (next_error() != GL_NO_ERROR) {
   }
+}
+
+bool no_new_error() { return next_error() == GL_NO_ERROR; }
+
+bool card_ran_out_of_memory() {
+  forget_errors();
+  return out_of_memory_seen();
+}
+
+CardMemoryKilobytes card_memory_kilobytes() {
+  forget_errors();
+  GLint total = 0;
+  GLint available = 0;
+  glGetIntegerv(kNvxTotalKilobytes, &total);
+  glGetIntegerv(kNvxAvailableKilobytes, &available);
+  if (no_new_error() && total > 0) return {total, available};
+  forget_errors();
+  std::array<GLint, kAtiMeminfoValues> ati{};
+  glGetIntegerv(kAtiTextureFreeKilobytes, ati.data());
+  if (no_new_error()) return {0, ati[0]};
+  forget_errors();
+  return {};
 }
 
 int largest_target_side() {
@@ -89,7 +132,7 @@ bool resolve(const Multisampled& target, unsigned int framebuffer) {
   rlBlitFramebuffer(0, 0, target.width, target.height, 0, 0, target.width, target.height,
                     GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   rlDisableFramebuffer();
-  return glGetError() == GL_NO_ERROR;
+  return no_new_error();
 }
 
 unsigned int depth_texture(int width, int height) {

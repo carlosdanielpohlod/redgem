@@ -15,6 +15,7 @@
 #include "audio/audio.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "render/card_memory.hpp"
 
 namespace redgem {
 
@@ -174,7 +175,10 @@ void WindowPresenter::pass_sound() {
   mixdown_->render(passed_sound_.data(), frames);
 }
 
+std::string WindowPresenter::card_memory() const { return card_memory_text(query_card_memory()); }
+
 void WindowPresenter::finish_frame(bool statistics_overlay) {
+  watch_card_memory();
   const bool basic_counter = options_.show_fps && !statistics_overlay;
   if (basic_counter) window_.draw_frame_rate();
   rlDrawRenderBatchActive();  // (whoever wants the frame's picture finds it drawn)

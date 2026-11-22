@@ -17,11 +17,11 @@
 #include "app/recording.hpp"
 #include "core/command_line.hpp"
 #include "core/config.hpp"
-#include "core/log.hpp"
 #include "core/translations.hpp"
 #include "project/scene_text.hpp"
 #include "project/script_messages.hpp"
 #include "project/tool_play.hpp"
+#include "render/card_memory.hpp"
 #include "render/frame_pacer.hpp"
 #include "render/picture_check.hpp"
 #include "render/renderer.hpp"
@@ -55,13 +55,13 @@ WindowSettings hidden_window(FrameSize size) {
   return settings;
 }
 
-// A word on a picture the card did not draw whole: it is saved, and whoever reads it is told.
-void warn_if_unfinished(const Image& image) {
-  if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) return;
+// How many of a picture's pixels came back see-through, when that is too many for a picture drawn
+// whole (see picture_check.hpp); 0 for a picture drawn whole.
+std::size_t unfinished_pixels(const Image& image) {
+  if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) return 0;
   const auto pixels = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
   const auto* rgba = static_cast<const std::uint8_t*>(image.data);
-  if (!unfinished(rgba, pixels)) return;
-  log::warning(tr("project.shot.unfinished", {{"count", std::to_string(see_through_pixels(rgba, pixels))}}));
+  return unfinished(rgba, pixels) ? see_through_pixels(rgba, pixels) : 0;
 }
 
 // Shows a game to nobody, frame by frame off screen, and keeps the picture of one frame.
@@ -100,12 +100,19 @@ class ShotPresenter final : public Presenter {
   void at_step(long long steps) { steps_ = steps; }
   bool taken() const { return taken_; }
   bool saved() const { return saved_; }
+  // What went wrong with the picture taken, if anything: the card ran out of memory, or the
+  // picture came back see-through over much of it (that many pixels; 0 when drawn whole).
+  bool out_of_memory() const { return out_of_memory_; }
+  std::size_t unfinished_pixels() const { return unfinished_pixels_; }
+  const CardMemory& memory() const { return memory_; }
 
  private:
   void take() {
     Image image = LoadImageFromTexture(picture_.texture);
     ImageFlipVertical(&image);  // (a framebuffer's rows start at the bottom)
-    warn_if_unfinished(image);
+    unfinished_pixels_ = unfinished_pixels(image);
+    out_of_memory_ = card_out_of_memory();
+    memory_ = query_card_memory();
     saved_ = ExportImage(image, file_.string().c_str());
     UnloadImage(image);
     taken_ = true;
@@ -122,6 +129,9 @@ class ShotPresenter final : public Presenter {
   long long steps_ = 0;
   bool taken_ = false;
   bool saved_ = false;
+  bool out_of_memory_ = false;
+  std::size_t unfinished_pixels_ = 0;
+  CardMemory memory_;
 };
 
 struct ShotRequest {
@@ -135,7 +145,7 @@ ToolResult usage_failure(const std::string& problem) {
   return failed(problem + "\n\n" + tr("project.shot.usage"), kExitUsage);
 }
 
-std::string said(const ShotRequest& request, const MessageCollector& messages) {
+std::string said(const ShotRequest& request, const MessageCollector& messages, const CardMemory& memory) {
   const double seconds = static_cast<double>(request.frame) / steps_per_second(request.play.game_dir);
   return messages.lines() +
          tr("project.shot.saved", {{"file", request.file.string()},
@@ -143,7 +153,17 @@ std::string said(const ShotRequest& request, const MessageCollector& messages) {
                                    {"height", std::to_string(request.size.height)},
                                    {"scene", request.play.scene},
                                    {"seconds", number_text(seconds, kSecondsDecimals)}}) +
-         "\n";
+         "\n" + card_memory_said(memory) + "\n";
+}
+
+// What is wrong with a picture that was taken and saved: the card ran out of memory, or did not
+// draw it whole. Nothing when it is right.
+std::optional<std::string> picture_problem(const ShotRequest& request, const ShotPresenter& shot) {
+  const std::string file = request.file.string();
+  if (shot.out_of_memory())
+    return tr("project.shot.out_of_card_memory", {{"file", file}, {"memory", card_memory_said(shot.memory())}});
+  if (shot.unfinished_pixels() == 0) return std::nullopt;
+  return tr("project.shot.unfinished", {{"count", std::to_string(shot.unfinished_pixels())}, {"file", file}});
 }
 
 // Shows the game as it starts, then plays until the picture is taken, or the game ends first.
@@ -168,7 +188,8 @@ ToolResult shoot(const ShotRequest& request) {
   play_to_picture(*std::get<std::unique_ptr<Engine>>(created), shot);
   if (!shot.taken()) return failed(messages.lines() + tr("project.shot.ended_early"));
   if (!shot.saved()) return failed(tr("project.shot.cannot_write", {{"file", request.file.string()}}));
-  return ToolResult{kExitSuccess, said(request, messages), {}};
+  if (const auto problem = picture_problem(request, shot)) return failed(messages.lines() + *problem);
+  return ToolResult{kExitSuccess, said(request, messages, shot.memory()), {}};
 }
 
 // When and how big the picture is, from the line, into `request`. False when the line says

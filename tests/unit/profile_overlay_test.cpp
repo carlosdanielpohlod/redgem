@@ -51,3 +51,11 @@ TEST_CASE("the scripts' busiest methods close the overlay, at most the overlay's
   CHECK(lines[kFrameLines] == "Scripts (9 samples):");
   CHECK(lines[kFrameLines + 1] == "Method#n0 22.2% self, 22.2% total");
 }
+
+TEST_CASE("the graphics card's memory follows its passes, when the driver tells it") {
+  ProfileOverlayExtras extras;
+  extras.card_memory = "graphics memory: 4210 of 6141 MB used";
+  const std::vector<std::string> lines = profile_overlay_lines(summary(), extras);
+  REQUIRE(lines.size() == kFrameLines + 1);
+  CHECK(lines[kFrameLines] == extras.card_memory);
+}

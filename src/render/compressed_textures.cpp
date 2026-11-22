@@ -77,7 +77,7 @@ unsigned int uploaded_texture(const TranscodedPicture& picture, GLenum format) {
     upload_level(picture.levels[static_cast<std::size_t>(level)], level, format);
   use_levels(count);
   glBindTexture(GL_TEXTURE_2D, 0);
-  if (glGetError() == GL_NO_ERROR) return id;
+  if (no_new_error()) return id;
   glDeleteTextures(1, &id);
   return 0;
 }

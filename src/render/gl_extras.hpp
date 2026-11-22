@@ -64,8 +64,21 @@ CardFence insert_card_fence();
 void wait_card_fence(CardFence fence);
 void release_card_fence(CardFence fence);
 
-// Lets go of the errors earlier calls left, so that the next check is of a call's own.
+// Lets go of the errors earlier calls left, so that the next check is of a call's own. (An
+// out-of-memory error among them is still remembered: see card_ran_out_of_memory.)
 void forget_errors();
+// Whether the calls since forget_errors left no error.
+bool no_new_error();
+// Whether the card has reported running out of memory since the program started.
+bool card_ran_out_of_memory();
+
+// The card's memory as its driver tells it, in kilobytes (0: not told). NVIDIA's drivers tell
+// both (NVX_gpu_memory_info), AMD's the free part (ATI_meminfo), the others nothing.
+struct CardMemoryKilobytes {
+  long long total = 0;
+  long long free = 0;
+};
+CardMemoryKilobytes card_memory_kilobytes();
 
 // Queries of how long the graphics card took over what was sent between a begin and an end
 // (GL_TIME_ELAPSED, core in desktop OpenGL 3.3). OpenGL ES 3 has them only as an extension, which

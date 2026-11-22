@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **How much graphics memory a game uses.** `redgem shot` ends with a line such as `graphics
+  memory: 2310 of 6141 MB used`, and the statistics overlay shows the same line under the graphics
+  card's passes. NVIDIA's drivers tell used and total, AMD's what is free, the others nothing.
+
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor
@@ -213,6 +217,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   dedicated server. The project hub shows it with an icon of its own.
 
 ### Fixed
+
+- **A graphics card that runs out of memory no longer fails silently.** It drops what it cannot hold,
+  and frames come out black, as noise, or with missing textures. The game now logs an error the
+  first time the card reports it, and `redgem shot` fails with a non-zero exit, as it also does when
+  its picture comes back see-through over much of it. Before, the shot warned and exited 0.
 
 - **`redgem shot` of a heavy scene no longer comes out black.** A shot draws its frames off
   screen, and nothing held them back: on a scene with tens of thousands of scattered copies the

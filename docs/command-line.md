@@ -196,6 +196,7 @@ itself; [Making games with an AI assistant](assistants.md#repeating-a-headless-s
 ```console
 $ redgem shot games/my_game shot.png --at 2
 saved shot.png (512x288, scene main at 2 s)
+graphics memory: 2310 of 6141 MB used
 ```
 
 It plays the game to that moment (1 second unless `--at` says otherwise; `--frames N` counts fixed
@@ -204,6 +205,12 @@ every frame off screen, and saves the picture of the one asked for. Small unless
 `--size 1280x720` for more. `--camera Name` shows the game through the camera of that object
 instead of the scene's first camera; `--scene` starts on another scene. It needs a graphics card:
 it opens a hidden window to draw with. The same moment gives the same picture.
+
+The last line tells how much of the graphics card's memory the game used, when the driver says
+(NVIDIA's tell used and total, AMD's what is free). A shot fails, with a non-zero exit, when the card
+ran out of memory, or when the picture came back see-through over much of it (a picture the card did
+not draw whole). The picture is still saved, for a look at what went wrong. Too many or too large
+textures are the usual cause: use fewer or smaller ones, or a smaller `--size`.
 
 ## `redgem check`: look a game over
 

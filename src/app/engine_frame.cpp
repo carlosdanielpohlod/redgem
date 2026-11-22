@@ -2,6 +2,8 @@
 
 #include "app/engine.hpp"
 
+#include <string>
+
 #include <algorithm>
 
 #include "app/scene_bodies.hpp"
@@ -241,7 +243,8 @@ void Engine::present() {
   // them before any script runs again.
   render_poses_.place(scene_, drawn_share());
   append_debug_labels(context_, debug_draw_);
-  append_profile_overlay(context_, {presenter_->gpu_timings(), &scripts_->vm().sampler().profile()});
+  const std::string card_memory = shows_profile_stats(context_) ? presenter_->card_memory() : std::string();
+  append_profile_overlay(context_, {presenter_->gpu_timings(), &scripts_->vm().sampler().profile(), card_memory});
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   hand_to_presenter();

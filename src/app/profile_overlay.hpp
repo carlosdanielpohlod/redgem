@@ -15,10 +15,11 @@ class ScriptProfile;
 inline constexpr std::size_t kOverlayScriptRows = 5;
 
 // What the overlay shows besides the frame's phases: the graphics card's time over each pass (left
-// out when it measured none) and the scripts' sampled methods (left out without samples).
+// out when it measured none), its memory, and the scripts' sampled methods (left out without samples).
 struct ProfileOverlayExtras {
   GpuTimings gpu;
   const ScriptProfile* scripts = nullptr;
+  std::string card_memory;  // a line of the graphics card's memory (left out when empty)
 };
 
 // The overlay's lines, top to bottom.
