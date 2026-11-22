@@ -35,5 +35,10 @@ void store_vertex_colors(GlbFile& glb, nlohmann::json& attributes, const std::ve
 // accessors (the positions with `bounds`), and the mesh after the file's others. Returns the
 // mesh's index.
 int append_mesh(GlbFile& glb, const std::string& name, const PrimitiveDesc& primitive, const Bounds& bounds);
+// A mesh drawn with the vertices of mesh `source` and other triangles (a level of detail): each
+// of its parts keeps the source part's vertex streams and material, with `indices[part]` as its
+// triangles. Returns the mesh's index; nullopt when `source` has not that many parts.
+std::optional<int> append_mesh_level(GlbFile& glb, int source, const std::vector<std::vector<std::uint32_t>>& indices,
+                                     const std::string& name);
 
 }  // namespace redgem::glb_geometry

@@ -44,10 +44,11 @@ nlohmann::json node(const std::string& id, const nlohmann::json& extra) {
 }
 // A crate whose lid holds a handle, and a wheel beside it.
 void write_crate(const GameFolder& game, double lid_mass = 2) {
-  game.write("prefabs/crate.glb",
-             {node("crate", {{"children", {1, 3}}}),
-              node("lid", {{"translation", {0, 1, 0}}, {"children", {2}}, {"extras", {{"mass", lid_mass}, {"tag", "lid"}}}}),
-              node("handle", {{"translation", {0, 0.5, 0}}}), node("wheel", {{"translation", {1, 0, 0}}})});
+  game.write(
+      "prefabs/crate.glb",
+      {node("crate", {{"children", {1, 3}}}),
+       node("lid", {{"translation", {0, 1, 0}}, {"children", {2}}, {"extras", {{"mass", lid_mass}, {"tag", "lid"}}}}),
+       node("handle", {{"translation", {0, 0.5, 0}}}), node("wheel", {{"translation", {1, 0, 0}}})});
 }
 SceneDesc placement(const Overrides& overrides = {}) {
   SceneDesc scene;

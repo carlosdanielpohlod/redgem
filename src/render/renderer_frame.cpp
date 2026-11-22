@@ -79,11 +79,11 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);
   slots.used = 0;  // the frame's passes start over in the buffer of what they see
+  view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);  // (levels of detail are chosen by it)
   write_frame_texels(scene);
   gather_decals(scene, to_vec3(camera.position));
   send_frame_texels();
   apply_lights(scene, env, to_vec3(camera.position));
-  view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
   view_model_fov = view_model_fov_of(scene);
   draw_shadow_map(camera, env, particles);

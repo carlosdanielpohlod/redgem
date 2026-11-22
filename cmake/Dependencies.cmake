@@ -180,6 +180,20 @@ FetchContent_Declare(basis_universal
   URL_HASH SHA256=${REDGEM_BASISU_SHA256}
   PATCH_COMMAND ${CMAKE_COMMAND} -E rm -rf ${REDGEM_BASISU_UNUSED})
 
+# --- meshoptimizer (levels of detail: a model's meshes simplified on import) --------------------
+# Only its library is built: no demo, no tools, no glTF packer.
+set(REDGEM_MESHOPT_COMMIT "6daea4695c48338363b08022d2fb15deaef6ac09") # v0.25
+set(REDGEM_MESHOPT_SHA256 "2b82cd0a414cfe239ce59bfd1a5ec5769030ae736be8098f3a58c2b5ba6644ad")
+FetchContent_Declare(meshoptimizer
+  URL https://codeload.github.com/zeux/meshoptimizer/tar.gz/${REDGEM_MESHOPT_COMMIT}
+  URL_HASH SHA256=${REDGEM_MESHOPT_SHA256})
+set(MESHOPT_BUILD_DEMO OFF CACHE BOOL "" FORCE)
+set(MESHOPT_BUILD_GLTFPACK OFF CACHE BOOL "" FORCE)
+set(MESHOPT_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(meshoptimizer)
+set_target_properties(meshoptimizer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # --- SQLite (where a dedicated server keeps its game's saves; one C file, in the public domain) ----
 # Only where the server is built: a game on a phone keeps its saves in a file.
 if(NOT ANDROID)
