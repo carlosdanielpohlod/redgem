@@ -16,6 +16,7 @@
 #include "project/mcp_game_tools.hpp"
 #include "project/mcp_project_tools.hpp"
 #include "project/scene_command.hpp"
+#include "project/prefab_edits.hpp"
 #include "project/scene_edits.hpp"
 #include "project/scene_revision.hpp"
 #include "project/search_command.hpp"
@@ -52,13 +53,27 @@ Words scene_words(const Options& options, const Json& args, const char* action) 
 
 // scene_edit on the saved scene: opened, edited as the editor would, and saved (not saved when
 // the call is wrong, which throws what to change).
-Json edit_files(const Options& options, const Json& args) {
+SceneDocument saved_scene(const Options& options, const Json& args) {
   std::string error;
   const auto file = named_scene_file(options.game, args.value("scene", std::string(config::kMainSceneName)), error);
   if (!file) throw std::invalid_argument(error);
   auto opened = SceneDocument::open(*file);
   if (const auto* problem = std::get_if<std::string>(&opened)) throw std::invalid_argument(*problem);
-  SceneDocument& document = std::get<SceneDocument>(opened);
+  return std::move(std::get<SceneDocument>(opened));
+}
+
+// scene_prefab on the saved scene: saved when the action changes it.
+Json prefab_files(const Options& options, const Json& args) {
+  SceneDocument document = saved_scene(options, args);
+  const PrefabOutcome outcome = edit_prefab(document, options.game, args);
+  std::string error;
+  if (!reads_prefab(args.at("action")) && !document.save(error)) return tool_result(error, true);
+  return tool_result(outcome.text);
+}
+
+Json edit_files(const Options& options, const Json& args) {
+  std::string error;
+  SceneDocument document = saved_scene(options, args);
   SceneEdit edit{document, options.game / config::kScriptsDirName, {}};
   const EditOutcome outcome = edit_scene(edit, args);
   if (!document.save(error)) return tool_result(error, true);
@@ -203,6 +218,7 @@ constexpr Native kNativeTools[] = {
     {"game_shot", game_shot},
     {"game_query", game_query},
     {"scene_edit", edit_files},
+    {"scene_prefab", prefab_files},
     {"project", project_tool},
 };
 

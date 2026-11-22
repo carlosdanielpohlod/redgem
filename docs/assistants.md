@@ -90,6 +90,7 @@ ran main for 30 frames (0.5 s): 1 errors, 0 warnings
 | Copy, group or remove several | `scene_edit` `duplicate`, `group` or `remove` with `objects` |
 | Settings, input, texts, dialogues, quests | `project` (`settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`) |
 | Another level | `project` `new_scene`, then `editor` `open_scene` |
+| Change one copy of a prefab | `scene_prefab` `override` a `part`, then `revert`, `apply` or `unpack` |
 | Does it play | `game_run`; `print` and `assert` read the game, e.g. `Scene.find('Coin6').transform.position` |
 | Why does it fall through the floor | `game_query` `raycast` or `inspect` (velocity, grounded) |
 | What it looks like | `game_shot` (512x288), or `editor` `capture` for the editor's view |

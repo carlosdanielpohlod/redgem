@@ -55,6 +55,9 @@ object at a time, as one undo step in an open editor:
   `spot_light`, `camera`, `terrain`, `environment`; `from` copies an object instead.
 - `duplicate`, `remove` (with `confirm: true`) and `set` take `objects`, a list; `group` makes a
   parent named `object` for the `objects`, leaving them where they are.
+- `scene_prefab` changes one placement of a prefab: `override` a `part` (`lid`) with `assignments`,
+  `revert`, `apply` its overrides to the prefab file or `unpack` it (both with `confirm: true`);
+  `overrides` lists them.
 - `editor` `select` takes `objects`; `editor` `save` keeps the editor's changes.
 - `project` changes the rest of the game as files, each write checked as `redgem check` checks it:
   `set_settings` merges `changes` into `game.json`, `set_texts` sets a language's `texts`,

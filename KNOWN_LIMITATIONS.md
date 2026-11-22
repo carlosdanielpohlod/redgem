@@ -748,8 +748,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
   edits (set, add of the GameObject menu's kinds, copies, groups and removals of several objects),
   selection of several objects and framing, undo/redo, save, play controls, single stepping,
-  bounded viewport images, runtime queries and event history. Model importing, prefabs,
-  materials and terrain brushes still use files or the editor UI. Native
+  bounded viewport images, runtime queries, event history and prefab placements' overrides.
+  Model importing, saving an object as a prefab, materials and terrain brushes still use files or
+  the editor UI. Native
   calls run serially and cannot be interrupted by a cancellation notification. The bridge cannot
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try

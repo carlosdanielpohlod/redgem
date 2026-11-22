@@ -17,6 +17,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
+  overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
+  file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor
+  each change is one undo step.
 - **A large world raises its prefab budgets.** `"prefab_budget_mb": {"source": 1024, "decoded": 2048}`
   in `game.json` lets a scene's prefab files take more than 256 MiB as read and 512 MiB decoded, up
   to a scene's own 4096 MiB. When a scene's prefabs pass a budget, the error (and `redgem check`)
