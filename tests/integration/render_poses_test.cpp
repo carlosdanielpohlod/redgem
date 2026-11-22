@@ -6,9 +6,12 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "app/app_config.hpp"
 #include "app/presenter.hpp"
 #include "core/config.hpp"
 #include "physics_game.hpp"
@@ -28,6 +31,9 @@ constexpr float kTeleportX = 50.0f;
 constexpr float kCarriedOffset = 2.0f;      // meters above the crate its rider sits
 constexpr float kNear = 1e-4f;
 constexpr float kMillimetersPerMeter = 1000.0f;
+// Millimeters a frame's move may be off a whole number of steps: the body slows a little, as
+// Jolt damps every body's speed by default (0.05 a second).
+constexpr long kWholeStepsOff = 5;
 
 constexpr const char* kSlider = R"(
 class Slider < Behaviour
@@ -99,6 +105,27 @@ std::vector<float> drawn_steps(const std::vector<Vec3>& drawn) {
   return steps;
 }
 
+// Where the scripts saw the crate each frame (where the steps left it), as x alone.
+std::vector<Vec3> seen_by_scripts(Engine& engine) {
+  std::istringstream text(ruby(engine, "$seen.join(' ')"));
+  std::vector<Vec3> seen;
+  for (float x = 0.0f; text >> x;) seen.push_back({x, 0.0f, 0.0f});
+  return seen;
+}
+
+// The least, the most and the spread (standard deviation) of a frame's step, in millimeters.
+std::string spread(const std::vector<float>& steps) {
+  const float count = static_cast<float>(steps.size());
+  const float mean = std::accumulate(steps.begin(), steps.end(), 0.0f) / count;
+  float squares = 0.0f;
+  for (const float step : steps) squares += (step - mean) * (step - mean);
+  const auto [least, most] = std::minmax_element(steps.begin(), steps.end());
+  std::ostringstream text;
+  text << "min " << *least * kMillimetersPerMeter << " mm, max " << *most * kMillimetersPerMeter << " mm, sd "
+       << std::sqrt(squares / count) * kMillimetersPerMeter << " mm";
+  return text.str();
+}
+
 }  // namespace
 
 TEST_CASE("at 240 frames a second a sliding body is drawn a quarter of a step further each frame") {
@@ -108,6 +135,9 @@ TEST_CASE("at 240 frames a second a sliding body is drawn a quarter of a step fu
   for (const float step : drawn_steps(sliding.screen.crate)) {
     CHECK(step == doctest::Approx(even).epsilon(kEvenShare));
   }
+  // The measurement for the record: the drawn steps, and the physics' own, frame by frame.
+  MESSAGE("PROBE drawn: " << spread(drawn_steps(sliding.screen.crate))
+                          << "; physics: " << spread(drawn_steps(seen_by_scripts(*sliding.engine))));
 }
 
 TEST_CASE("what rides on an interpolated body is drawn with it") {
@@ -122,11 +152,14 @@ TEST_CASE("what rides on an interpolated body is drawn with it") {
 TEST_CASE("scripts see the body where the steps left it, a step's worth at a time") {
   SlidingGame sliding;
   sliding.play(kWarmUpFrames + kMeasuredFrames);
-  // In millimeters: every frame's move is a whole number of steps, most often none.
+  // In millimeters: every frame's move is about a whole number of steps, most often none.
   const long step = std::lround(kSpeed * config::kDefaultFixedDeltaSeconds * kMillimetersPerMeter);
   const std::string moves = "$seen.each_cons(2).map { |a, b| ((b - a) * " + std::to_string(kMillimetersPerMeter) +
                             ").round }";
-  CHECK(ruby(*sliding.engine, moves + ".all? { |mm| mm % " + std::to_string(step) + " == 0 }") == "true");
+  const std::string steps = std::to_string(step);
+  const std::string off_whole = "(mm - (mm.to_f / " + steps + ").round * " + steps + ").abs";
+  CHECK(ruby(*sliding.engine, moves + ".all? { |mm| " + off_whole + " <= " + std::to_string(kWholeStepsOff) + " }") ==
+        "true");
   CHECK(ruby(*sliding.engine, moves + ".count(0) > " + moves + ".size / 2") == "true");
   // After a frame, the scene holds the step's pose again.
   const float x = std::stof(ruby(*sliding.engine, "Scene.find('Crate').transform.position.x"));
@@ -136,7 +169,8 @@ TEST_CASE("scripts see the body where the steps left it, a step's worth at a tim
 TEST_CASE("a body a script moved since its last step is drawn where the script put it") {
   SlidingGame sliding;
   sliding.play(kWarmUpFrames);
-  ruby(*sliding.engine, "Scene.find('Crate').transform.position = Vector3.new(" + std::to_string(kTeleportX) + ", 1, 0)");
+  const std::string teleported = "Vector3.new(" + std::to_string(kTeleportX) + ", 1, 0)";
+  ruby(*sliding.engine, "Scene.find('Crate').transform.position = " + teleported);
   sliding.engine->present();
   CHECK(sliding.screen.crate.back().x == doctest::Approx(kTeleportX));
 }
