@@ -5557,6 +5557,62 @@
       "guide": "gameplay.md#sparks-dust-and-smoke"
     },
     {
+      "name": "Hitboxes",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "Hit boxes on an animated character's bones, and the body part a shot hit.",
+      "methods": [
+        {
+          "name": "build",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "character",
+              "type": "GameObject"
+            },
+            {
+              "name": "map",
+              "type": "Hash[String | Symbol, Hash[Symbol, untyped]]"
+            },
+            {
+              "name": "layer",
+              "type": "String | Symbol | nil",
+              "keyword": true,
+              "optional": true,
+              "default": "nil"
+            }
+          ],
+          "returns": {
+            "type": "Array[GameObject]"
+          },
+          "about": "makes a kinematic box, capsule or sphere under each named bone (region:, size:, offset:, shape:), kept where its bone is every frame; returns them"
+        },
+        {
+          "name": "region",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {
+              "name": "hit",
+              "type": "Hash[Symbol, untyped] | nil"
+            }
+          ],
+          "returns": {
+            "type": "Symbol | nil"
+          },
+          "about": "the region of the hit box a raycast hit met, or nil for no hit or anything else"
+        }
+      ],
+      "internal": [
+        "__box",
+        "__size",
+        "__vector"
+      ],
+      "notes": "A hit box is a child object of its bone (props region, hitbox and layer), so destroying the character takes its boxes along. Boxes are posed where the game runs, a dedicated server included: the host judges hits against the pose it shows, which for another player's character follows that player's synced animation, a moment behind (no lag compensation).",
+      "guide": "gameplay.md#hit-boxes-on-animated-characters"
+    },
+    {
       "name": "Scatter",
       "stability": "stable",
       "kind": "class",

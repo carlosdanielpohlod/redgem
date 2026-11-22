@@ -3,6 +3,7 @@
 
 #include "app/engine.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,6 +14,8 @@
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
 #include "physics/physics_config.hpp"
+#include "scene/property.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 
@@ -87,6 +90,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   animations_.reset(scene_desc_.animations, scene_);
   head_aims_.clear();
   particles_.clear();
+  hitboxes_.clear();  // (the objects are gone with the scene)
   particle_emitters_.clear();
   // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
@@ -121,6 +125,22 @@ void Engine::shape_spawned(ObjectId id, const SpawnRequest& request) {
 ObjectId Engine::spawn(const SpawnRequest& request) {
   if (!scene_.is_alive(request.source)) return kNoObject;
   return finish_spawn(scene_.clone_pairs(request.source), request);
+}
+
+ObjectId Engine::make_object(const NodeDesc& node, const SpawnRequest& request) {
+  const ObjectId id = scene_.instantiate_rigid({node}, 0, scene_desc_).front();
+  finish_spawn({{kNoObject, id}}, request);
+  if (get_bool(node.props, props::kHitbox).value_or(false)) hitboxes_.push_back(scene_.handle(id));
+  return id;
+}
+
+void Engine::snap_hitboxes() {
+  const auto gone = [this](ObjectHandle hitbox) { return scene_.resolve(hitbox) == kNoObject; };
+  hitboxes_.erase(std::remove_if(hitboxes_.begin(), hitboxes_.end(), gone), hitboxes_.end());
+  for (const ObjectHandle hitbox : hitboxes_) {
+    const ObjectId id = scene_.resolve(hitbox);
+    physics_->teleport(id, scene_.world_transform(id));
+  }
 }
 
 ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request) {

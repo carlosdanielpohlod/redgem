@@ -602,6 +602,36 @@ end
 `box_cast`, `capsule_cast`, `overlap_box` and `overlap_capsule` work the same way. Hits come
 nearest first, each object once, at most 64.
 
+## Hit boxes on animated characters
+
+Experimental. A shooter tells a head shot from a hit on the arm by volumes under the character's
+bones. `Hitboxes.build` makes them: one under each bone it names, kept where that bone is in every
+frame, so a ray meets the arm that is there now, mid-swing.
+
+```ruby
+Hitboxes.build(soldier, {
+  "Head"     => { region: :head, size: 0.25, offset: [0, 0.1, 0] },
+  "Spine2"   => { region: :chest, size: [0.4, 0.35, 0.25] },
+  "LeftArm"  => { region: :arm, shape: :capsule, size: [0.12, 0.3, 0.12], offset: [0, 0.15, 0] },
+  "RightArm" => { region: :arm, shape: :capsule, size: [0.12, 0.3, 0.12], offset: [0, 0.15, 0] },
+}, layer: "hitbox")
+
+hit = Physics.raycast(eye, aim, 100, layers: ["hitbox"])
+damage = { head: 100, chest: 30, arm: 15 }.fetch(Hitboxes.region(hit), 0) if hit
+```
+
+A bone is named as the rig names it, or without a rig's `prefix:` (`"Head"` finds
+`mixamorig:Head`). Each box takes `region:` (the bone's name unless said), `size:` (meters: one
+number, or `[width, height, depth]`; a capsule stands along the bone's up), `offset:` (meters from
+the bone, in its own axes) and `shape:` (`:box`, `:capsule` or `:sphere`). `layer:` puts them on a
+collision layer of `game.json`, so the shots can look for them alone and the character's own
+capsule does not stop them. The boxes are kinematic: they push nothing and fall for nothing.
+`Hitboxes.region(hit)` says which part a raycast met, or nil.
+
+They are posed wherever the game runs, a dedicated server too, so the host can judge the hits. For
+another player's character, the host's pose follows that player's synced animation (see
+[NetworkSync](multiplayer.md)), a moment behind what that player sees: hits are not rewound to it.
+
 ## Chase the player: navigation
 
 `Navigation.path` finds the way around walls, along floors and up stairs and slopes, from one point

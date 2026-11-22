@@ -40,6 +40,7 @@ void install_animation_bindings(mrb_state* mrb);
 void install_animation_graph_bindings(mrb_state* mrb);
 void install_head_aim_bindings(mrb_state* mrb);
 void install_particles_bindings(mrb_state* mrb);
+void install_hitboxes_bindings(mrb_state* mrb);
 void install_save_bindings(mrb_state* mrb);
 void install_save_slot_bindings(mrb_state* mrb);
 void install_i18n_bindings(mrb_state* mrb);

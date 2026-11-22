@@ -175,6 +175,9 @@ struct ScriptContext {
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
   std::function<ObjectId(const SpawnRequest&)> spawn;
   std::function<ObjectId(const std::string&, const SpawnRequest&)> spawn_prefab;
+  // Makes a new object of a node made in code (no mesh of its own), with its physics body, placed
+  // and parented as the request says (Hitboxes.build); null outside a running engine.
+  std::function<ObjectId(const NodeDesc&, const SpawnRequest&)> make_object;
   AudioSystem* audio = nullptr;
   // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;

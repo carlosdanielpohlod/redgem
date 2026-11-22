@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
+  { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
+  under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
+  pose of that frame), on a dedicated server too. `Hitboxes.region(hit)` says which part of the body
+  a raycast met.
 - **Prefab overrides can be reverted, applied to the prefab file, or unpacked.**
   `redgem scene overrides`, `override`, `revert`, `apply` and `unpack` list and change a prefab
   placement's overrides from the command line, each change one undo step in the editor's

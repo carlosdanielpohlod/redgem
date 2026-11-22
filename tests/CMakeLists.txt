@@ -277,6 +277,7 @@ unit/temp_dirs_test.cpp
   integration/ui_input_test.cpp
   integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
+  integration/hitboxes_test.cpp
   integration/camera_switch_test.cpp
   integration/scene_parenting_test.cpp
   integration/input_actions_test.cpp

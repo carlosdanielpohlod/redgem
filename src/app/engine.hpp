@@ -133,6 +133,9 @@ class Engine {
   // says (see SpawnRequest). Returns the new root object.
   ObjectId spawn(const SpawnRequest& request);
   ObjectId spawn_prefab(const std::string& file, const SpawnRequest& request);
+  // A new object of a node made in code (ScriptContext::make_object). A hit box among them is kept
+  // where its bone is from then on (snap_hitboxes).
+  ObjectId make_object(const NodeDesc& node, const SpawnRequest& request);
   const prefabs::Source& load_runtime_prefab(const std::string& file);
   // The rest of a spawn, for its (original, copy) pairs (kNoObject originals: made from a prefab file).
   ObjectId finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request);
@@ -287,6 +290,9 @@ class Engine {
   // character controller goes there through the physics, sliding along walls; anything else is
   // moved there.
   void apply_root_motion();
+  // Puts the bodies of the hit boxes where their bones are now, at once: a ray cast in this frame's
+  // scripts meets the pose this frame shows, not the one of the last physics step.
+  void snap_hitboxes();
   void move_by(ObjectId object, const RootMotion& motion);
   // Hands the moments the characters' clips went past to the scripts listening (animation.on).
   void hand_on_animation_events();
@@ -374,6 +380,7 @@ class Engine {
   HeadAims head_aims_;
   ParticleSystem particles_;
   ParticleEmitters particle_emitters_;
+  std::vector<ObjectHandle> hitboxes_;  // made by Hitboxes.build, while they last
   WaterInteractions water_;
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
