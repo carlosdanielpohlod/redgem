@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
+  least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
+  grass on the painted roads, trees only on the forest floor. Games with no ground layers need no
+  change.
+
 - **Decals: bullet holes and other marks** (experimental). `Decals.place(hit)`, or
   `Decals.place(point, normal, size:, image:, color:, alpha:, spin:)`, projects a mark onto the
   meshes and terrain under it, straight from a raycast hit. A mark darkens what it lies on, so it
