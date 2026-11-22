@@ -60,7 +60,7 @@ SceneDocument saved_scene(const Options& options, const Json& args) {
   if (!file) throw std::invalid_argument(error);
   auto opened = SceneDocument::open(*file);
   if (const auto* problem = std::get_if<std::string>(&opened)) throw std::invalid_argument(*problem);
-  return std::move(std::get<SceneDocument>(opened));
+  return std::get<SceneDocument>(std::move(opened));
 }
 
 // scene_prefab on the saved scene: saved when the action changes it.

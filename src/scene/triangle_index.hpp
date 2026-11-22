@@ -69,10 +69,10 @@ class TriangleIndexCache {
 
  private:
   struct Kept {
-    const float* positions;
-    std::size_t floats;
-    const std::uint32_t* indices;
-    std::size_t corners;  // listed by its indices
+    const float* positions = nullptr;
+    std::size_t floats = 0;
+    const std::uint32_t* indices = nullptr;
+    std::size_t corners = 0;  // listed by its indices
     TriangleIndex index;
     // Whether it was made of the primitive as it is now (its lists not replaced since).
     bool made_of(const PrimitiveDesc& primitive) const;

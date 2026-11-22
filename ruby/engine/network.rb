@@ -82,8 +82,9 @@ module Network
   ENGINE_MESSAGES = {
     SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned, DESPAWN => :receive_despawn,
     LEVEL => :receive_level, LEVEL_PLAYED => :receive_level_played, LEVEL_READY => :receive_level_ready,
-    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, PLACE => :receive_place, INTERACT => :receive_interact,
-    TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at, TALK_LEFT => :receive_talk_left,
+    LEVEL_GO => :receive_level_go, CORRECT => :receive_correction, PLACE => :receive_place,
+    INTERACT => :receive_interact, TALK => :receive_talk, STEP => :receive_step, TALK_AT => :receive_talk_at,
+    TALK_LEFT => :receive_talk_left,
     VARIABLE => :receive_variable, VARIABLES => :receive_variables, QUEST_REPORT => :receive_quest_report
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
@@ -221,11 +222,20 @@ module Network
     # Someone came, went, or the game started or ended: the engine reacts, then the game's handlers
     # hear of it (a failed join's with its reason, when there is one).
     def happened(kind, peer, name)
-      REACTIONS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
-      told = [told_about(kind, peer, name)]
-      told << (name.to_s.empty? ? nil : name) if kind == :left # (why the host let it go)
+      react(REACTIONS, kind, peer)
+      told = told_for(kind, peer, name)
       (@listeners[kind] || []).dup.each { |block| block.call(*told.first(arguments_for(block, told))) }
-      AFTERWARDS.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
+      react(AFTERWARDS, kind, peer)
+    end
+
+    def react(reactions, kind, peer) = reactions.fetch(kind, []).each { |reaction| __send__(reaction, peer) }
+
+    # What every handler of an event may take: what told_about says, then, for a player who left,
+    # why the host let it go.
+    def told_for(kind, peer, name)
+      told = [told_about(kind, peer, name)]
+      told << (name.to_s.empty? ? nil : name) if kind == :left
+      told
     end
 
     # How many of what an event tells a handler takes: a lambda or a method that takes the peer

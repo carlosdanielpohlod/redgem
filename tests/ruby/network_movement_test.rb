@@ -97,9 +97,7 @@ class NetworkMovementTest < RedGemTest::Case
     end
     yield
   ensure
-    class << Network
-      alias_method :__in_game?, :in_game_for_real?
-    end
+    Network.singleton_class.__send__(:alias_method, :__in_game?, :in_game_for_real?)
   end
 
   # The object as if its NetworkSync had started.
