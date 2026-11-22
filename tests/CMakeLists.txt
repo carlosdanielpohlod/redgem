@@ -152,6 +152,7 @@ unit/temp_dirs_test.cpp
   unit/morph_shapes_test.cpp
   unit/scatter_test.cpp
   unit/decals_test.cpp
+  unit/triangle_index_test.cpp
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
