@@ -62,6 +62,8 @@ class RenderStage {
   Texture2D scene_texture(int image) const { return renderer_->scene_texture(image); }
   // Where the scene's pictures (a sky picture) and its particles' are looked for.
   void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
+  // The decals the next draws show; null for none.
+  void set_decals(const DecalSystem* decals) { renderer_->set_decals(decals); }
   // The scene as its camera sees it, with `particles` when given; also written to
   // <screenshots>/render/<name>.png for whoever looks at the run afterwards.
   Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr,

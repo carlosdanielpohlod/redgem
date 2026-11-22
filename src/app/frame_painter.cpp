@@ -39,7 +39,9 @@ void FramePainter::paint_world(const FrameView& view, const RenderTexture2D* out
   follow_game(view);
   const Camera3D camera = renderer_.scene_camera(view.scene);
   renderer_.set_underwater(underwater_of(view, camera));
+  renderer_.set_decals(view.decals);  // (only while it draws: the frame view points into the engine)
   renderer_.draw_world(view.scene, camera, output, &view.particles, view.water_ripples, view.debug_draw);
+  renderer_.set_decals(nullptr);
 }
 
 UnderwaterView FramePainter::underwater_of(const FrameView& view, const Camera3D& camera) {

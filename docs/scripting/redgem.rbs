@@ -1793,6 +1793,26 @@ class Particles::Emitter
   def stop: () -> void
 end
 
+# Marks laid on the scene's surfaces: bullet holes, scorches, cracks.
+%a{redgem:experimental}
+module Decals
+  # projects a mark onto the surfaces at a point facing a normal, or at a raycast hit (its point and normal); returns whether it fell on any
+  %a{redgem:experimental}
+  def self.place: (Vector3 | Hash[Symbol, untyped] point, ?Vector3 | nil normal, ?size: Numeric, ?depth: Numeric | nil, ?image: String | Symbol | nil, ?color: RedGem::color, ?alpha: Integer, ?spin: Numeric) -> bool
+  # how many marks are kept
+  %a{redgem:experimental}
+  def self.count: () -> Integer
+  # how many marks are kept at most (256 unless set)
+  %a{redgem:experimental}
+  def self.limit: () -> Integer
+  # keeps at most this many marks, 1 to 4096: past it, placing one drops the oldest
+  %a{redgem:experimental}
+  def self.limit=: (Integer count) -> Integer
+  # removes every mark
+  %a{redgem:experimental}
+  def self.clear: () -> void
+end
+
 # Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
 %a{redgem:stable}
 class Scatter

@@ -27,6 +27,7 @@
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "scene/animation/head_aim.hpp"
+#include "scene/decals.hpp"
 #include "scene/particles.hpp"
 #include "scene/particle_emitters.hpp"
 #include "scene/water_interactions.hpp"
@@ -381,6 +382,7 @@ class Engine {
   ParticleSystem particles_;
   ParticleEmitters particle_emitters_;
   std::vector<ObjectHandle> hitboxes_;  // made by Hitboxes.build, while they last
+  DecalSystem decals_;
   WaterInteractions water_;
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;

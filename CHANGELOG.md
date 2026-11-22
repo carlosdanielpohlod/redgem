@@ -22,6 +22,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
   pose of that frame), on a dedicated server too. `Hitboxes.region(hit)` says which part of the body
   a raycast met.
+- **Decals: bullet holes and other marks** (experimental). `Decals.place(hit)`, or
+  `Decals.place(point, normal, size:, image:, color:, alpha:, spin:)`, projects a mark onto the
+  meshes and terrain under it, straight from a raycast hit. A mark darkens what it lies on, so it
+  takes the surface's light and shade; without an image it is a soft round spot. It stays on the
+  object it fell on as that moves. Marks are kept up to `Decals.limit` (256 unless set): past it the
+  oldest goes. They are local looks: never sent over the network, and none on a dedicated server.
 - **Import settings for models, textures and sounds.** A sidecar next to an asset
   (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
   extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's

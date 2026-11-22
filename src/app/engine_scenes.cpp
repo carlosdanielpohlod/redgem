@@ -92,6 +92,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   particles_.clear();
   hitboxes_.clear();  // (the objects are gone with the scene)
   particle_emitters_.clear();
+  decals_.clear();
   // Every object is in place by now: each script's first update sees the whole scene.
   scripts_->attach_scripts();
   scripts_->run_scene_script(incoming.name());
