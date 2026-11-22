@@ -32,6 +32,10 @@ scene.
 | `up_axis` | `"y"` | `"z"` turns a model made with Z up so that it stands up. |
 | `colliders` | `"none"` | `"box"` or `"mesh"` gives each of the model's meshes a static collider of that shape. |
 | `materials` | `"keep"` | `"extract"` also writes the model's pictures into `images/<model>/`, so you can edit them or put them on other materials. Files already there are kept. |
+| `lod_levels` | `0` | How many levels of detail to make for each mesh, from `0` (none) to `4`. See below. |
+| `lod_ratio` | `0.5` | The share of triangles each level keeps of the one before, from `0.05` to `0.95`. |
+| `lod_screen_size` | `0.25` | The first level is drawn once the mesh covers less than this share of the view's height, from `0.01` to `1`. Each next level starts at half the size of the one before. |
+| `lod_fade` | `0.1` | How wide the cross-fade between two levels is, from `0` (a hard switch) to `1`. It is a share of the distance at which the mesh fills the view's height. |
 
 The scale and the up axis go on the model's own top-level objects. The object the model sits
 under keeps the place, turn and size you give it.
@@ -40,6 +44,34 @@ The editor remembers which file each imported model came from (the `model_file` 
 object). When you apply new settings in the editor, it imports the model again wherever the open
 scene holds it. Each of those objects keeps its name, its placement, its properties and its
 scripts. What it held is replaced by the new import.
+
+### Levels of detail
+
+With `lod_levels` above `0`, the editor makes lighter copies of each of the model's meshes when it
+imports it. Each copy keeps about `lod_ratio` of the triangles of the one before and uses the
+same vertices. It becomes a child of the mesh's object, named `<mesh> LOD 1`, `<mesh> LOD 2` and
+so on. The editor log lists the triangles of each level, and so does the mesh card of the
+Inspector.
+
+```json
+{
+  "lod_levels": 3,
+  "lod_ratio": 0.5,
+  "lod_screen_size": 0.3
+}
+```
+
+The game draws one level at a time, chosen by how big the mesh looks: the share of the view's
+height its bounding sphere covers. A wider field of view or a bigger object moves the switches
+farther away. Near a switch, the two levels cross-fade with a dither: each pixel comes from one
+level or the other, so nothing is drawn twice.
+
+Each level carries the properties that decide when it is drawn: `screen_size_from`,
+`screen_size_to`, `lod_radius` and `lod_fade` (see the scene properties). Its own
+`visible_from` and `visible_to` still apply on top of them.
+
+Meshes moved by a skeleton or by shape keys get no levels. A level that would not be lighter
+than the one before is not made. Colliders stay on the full mesh only.
 
 ## Textures
 

@@ -262,6 +262,11 @@ the same pull request.
   picture is read. A sound's settings are read once per name while a game runs; the editor's
   Project panel preview plays sounds as recorded. `mipmaps` needs a picture whose sides are powers
   of two on graphics that only take OpenGL ES 2 (some phones): other pictures get none there.
+- Levels of detail made on import (experimental): each level is a mesh of its own when the game
+  loads, so the vertices it shares with the full mesh in the file are held once per level in
+  memory. Meshes moved by a skeleton or by shape keys get no levels. A level is chosen by its
+  bounding sphere and the view's field of view: the shadow map and reflection captures draw the
+  level the camera sees.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
 - Ground layers have no editor brush yet: their weights are painted by rules (`redgem scene

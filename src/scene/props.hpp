@@ -43,6 +43,15 @@ inline constexpr const char* kTint = "tint";
 // range, make a detailed one up close and a light one far away.
 inline constexpr const char* kVisibleFrom = "visible_from";
 inline constexpr const char* kVisibleTo = "visible_to";
+// Levels of detail by how big an object looks: drawn while its bounding sphere covers at least
+// `screen_size_from` and less than `screen_size_to` of the view's height (sphere of `lod_radius`
+// meters in its own space, times its scale). Next to a switch, the two levels cross over with a
+// dither `lod_fade` wide (a share of the distance at which the object fills the view's height).
+// Experimental: the editor writes them when it makes a model's levels of detail.
+inline constexpr const char* kScreenSizeFrom = "screen_size_from";
+inline constexpr const char* kScreenSizeTo = "screen_size_to";
+inline constexpr const char* kLodRadius = "lod_radius";
+inline constexpr const char* kLodFade = "lod_fade";
 // False keeps an object out of the shadows (a sky dome, a glow): it is still drawn. On a point
 // or spot light, true makes it cast shadows (off unless said).
 inline constexpr const char* kCastShadow = "cast_shadow";

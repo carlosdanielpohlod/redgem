@@ -24,6 +24,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   Project panel, and applying a model's settings imports it again in the open scene.
   `redgem assets <game> --settings <asset> [field=value...]` shows and sets them. Experimental.
   See [Import settings](docs/import-settings.md).
+- **Levels of detail made on import.** A model's import settings (`lod_levels`, `lod_ratio`,
+  `lod_screen_size`, `lod_fade`) make lighter copies of each of its meshes with meshoptimizer when
+  the editor imports it. The game draws one level at a time by how big the mesh looks on screen,
+  and two levels cross-fade with a dither near each switch. The editor log and the Inspector's
+  mesh card show the triangles of each level. Experimental. See
+  [Levels of detail](docs/import-settings.md#levels-of-detail).
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
