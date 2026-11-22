@@ -9,7 +9,6 @@ namespace {
 // Meters a decal's corners are raised off the surface they lie on, so that they are not drawn
 // into it where its depth and theirs come out a hair apart.
 constexpr float kLift = 0.002f;
-constexpr std::size_t kTriangleIndices = 3;
 
 Vec3 to_world(const Transform& world, Vec3 local) {
   return world.position + rotate(world.rotation, hadamard(world.scale, local));
@@ -26,15 +25,15 @@ Bounds local_reach(const DecalBox& box, const Transform& world) {
   return reach;
 }
 
-std::array<Vec3, 3> local_triangle(const PrimitiveDesc& primitive, std::size_t first_index) {
-  std::array<Vec3, 3> triangle{};
-  for (std::size_t corner = 0; corner < kTriangleIndices; ++corner) {
+DecalTriangle local_triangle(const PrimitiveDesc& primitive, std::size_t first_index) {
+  DecalTriangle triangle{};
+  for (std::size_t corner = 0; corner < kTriangleCorners; ++corner) {
     triangle[corner] = listed_corner(primitive, first_index + corner);
   }
   return triangle;
 }
 
-bool within_reach(const std::array<Vec3, 3>& triangle, const Bounds& reach) {
+bool within_reach(const DecalTriangle& triangle, const Bounds& reach) {
   Bounds around;
   for (const Vec3 corner : triangle) around.include(corner);
   return boxes_overlap(around, reach);
@@ -42,9 +41,10 @@ bool within_reach(const std::array<Vec3, 3>& triangle, const Bounds& reach) {
 
 // The triangle in the world, its corners in the order that faces out of its surface (a mirroring
 // placement turns them the other way).
-std::array<Vec3, 3> world_triangle(const std::array<Vec3, 3>& local, const Transform& world) {
-  std::array<Vec3, 3> triangle{to_world(world, local[0]), to_world(world, local[1]), to_world(world, local[2])};
-  if (mirrors(world)) std::swap(triangle[1], triangle[2]);
+DecalTriangle world_triangle(const DecalTriangle& local, const Transform& world) {
+  DecalTriangle triangle{};
+  for (std::size_t corner = 0; corner < kTriangleCorners; ++corner) triangle[corner] = to_world(world, local[corner]);
+  if (mirrors(world)) std::swap(triangle[kSecondCorner], triangle[kThirdCorner]);
   return triangle;
 }
 
@@ -59,16 +59,15 @@ struct Cut {
 };
 
 // Raises the corners a triangle gave the decal (from `first` on) off it, on the side the decal is.
-void lift_off(const std::array<Vec3, 3>& triangle, Vec3 toward, std::vector<DecalCorner>& out, std::size_t first) {
-  const Vec3 facing = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
+void lift_off(const DecalTriangle& triangle, Vec3 toward, std::vector<DecalCorner>& out, std::size_t first) {
+  const Vec3 facing = normalize(triangle_facing(triangle));
   const Vec3 out_of = dot(facing, toward) < 0.0f ? -facing : facing;
   for (std::size_t corner = first; corner < out.size(); ++corner) {
     out[corner].position = out[corner].position + out_of * kLift;
   }
 }
 
-void cut_triangle(const Cut& cut, const std::array<Vec3, 3>& triangle, bool either_side,
-                  std::vector<DecalCorner>& out) {
+void cut_triangle(const Cut& cut, const DecalTriangle& triangle, bool either_side, std::vector<DecalCorner>& out) {
   const std::size_t first = out.size();
   clip_to_decal(cut.box, triangle, out, either_side);
   lift_off(triangle, cut.box.normal, out, first);
@@ -77,7 +76,7 @@ void cut_triangle(const Cut& cut, const std::array<Vec3, 3>& triangle, bool eith
 // The triangle whose corners are listed from `first` on, if it is near the box.
 void cut_listed(const Cut& cut, const PrimitiveDesc& primitive, std::size_t first, bool either_side,
                 std::vector<DecalCorner>& out) {
-  const std::array<Vec3, 3> local = local_triangle(primitive, first);
+  const DecalTriangle local = local_triangle(primitive, first);
   if (within_reach(local, cut.reach)) cut_triangle(cut, world_triangle(local, cut.world), either_side, out);
 }
 
@@ -89,17 +88,20 @@ std::vector<std::size_t> near_the_box(const TriangleIndex& index, const Bounds& 
   return near;
 }
 
+// Where each of a small primitive's triangles is listed from.
+std::vector<std::size_t> every_triangle(const PrimitiveDesc& primitive) {
+  std::vector<std::size_t> firsts;
+  for (std::size_t first = 0; first + kTriangleCorners <= listed_corners(primitive); first += kTriangleCorners) {
+    firsts.push_back(first);
+  }
+  return firsts;
+}
+
 // A two-sided surface takes a mark on either side. A dense one is looked up in its index; a small
 // one walked whole.
 void cut_primitive(const Cut& cut, const PrimitiveDesc& primitive, bool either_side, std::vector<DecalCorner>& out) {
-  if (const TriangleIndex* index = cut.indexes.of(primitive)) {
-    for (const std::size_t first : near_the_box(*index, cut.reach)) {
-      if (out.size() >= cut.room) return;
-      cut_listed(cut, primitive, first, either_side, out);
-    }
-    return;
-  }
-  for (std::size_t first = 0; first + kTriangleIndices <= listed_corners(primitive); first += kTriangleIndices) {
+  const TriangleIndex* index = cut.indexes.of(primitive);
+  for (const std::size_t first : index != nullptr ? near_the_box(*index, cut.reach) : every_triangle(primitive)) {
     if (out.size() >= cut.room) return;
     cut_listed(cut, primitive, first, either_side, out);
   }

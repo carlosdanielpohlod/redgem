@@ -8,6 +8,7 @@ namespace redgem {
 namespace {
 
 constexpr std::uint32_t kLeafTriangles = 8;  // at most, in a box of the tree's last level
+constexpr std::uint32_t kHalves = 2;         // a box's triangles are split in
 constexpr std::size_t kTriangleCorners = 3;
 constexpr std::size_t kPositionFloats = 3;
 constexpr int kAxisX = 0;
@@ -42,6 +43,19 @@ Vec3 listed_corner(const PrimitiveDesc& primitive, std::size_t listed) {
   return vec3_from(&primitive.positions[vertex * kPositionFloats]);
 }
 
+namespace {
+
+// The box around a triangle (numbered from 0) of a primitive, in its own space.
+Bounds box_of(const PrimitiveDesc& primitive, std::size_t triangle) {
+  Bounds box;
+  for (std::size_t corner = 0; corner < kTriangleCorners; ++corner) {
+    box.include(listed_corner(primitive, triangle * kTriangleCorners + corner));
+  }
+  return box;
+}
+
+}  // namespace
+
 bool boxes_overlap(const Bounds& a, const Bounds& b) {
   const bool across = a.min.x <= b.max.x && b.min.x <= a.max.x;
   const bool along = a.min.z <= b.max.z && b.min.z <= a.max.z;
@@ -54,12 +68,9 @@ TriangleIndex::TriangleIndex(const PrimitiveDesc& primitive) {
   sorting.boxes.resize(count);
   sorting.middles.resize(count);
   for (std::size_t triangle = 0; triangle < count; ++triangle) {
-    Bounds& box = sorting.boxes[triangle];
-    for (std::size_t corner = 0; corner < kTriangleCorners; ++corner) {
-      box.include(listed_corner(primitive, triangle * kTriangleCorners + corner));
-    }
-    sorting.middles[triangle] = box.center();
-    if (finite(box)) order_.push_back(static_cast<std::uint32_t>(triangle));
+    sorting.boxes[triangle] = box_of(primitive, triangle);
+    sorting.middles[triangle] = sorting.boxes[triangle].center();
+    if (finite(sorting.boxes[triangle])) order_.push_back(static_cast<std::uint32_t>(triangle));
   }
   if (!order_.empty()) build(sorting, 0, static_cast<std::uint32_t>(order_.size()));
 }
@@ -71,7 +82,7 @@ std::uint32_t TriangleIndex::build(Sorting& sorting, std::uint32_t first, std::u
   if (count <= kLeafTriangles) return at;
   nodes_[at].count = 0;
   split(sorting, nodes_[at].bounds, first, count);
-  const std::uint32_t half = count / 2;
+  const std::uint32_t half = count / kHalves;
   build(sorting, first, half);  // right after this node
   const std::uint32_t second = build(sorting, first + half, count - half);
   nodes_[at].second = second;
@@ -94,7 +105,7 @@ void TriangleIndex::split(Sorting& sorting, const Bounds& bounds, std::uint32_t 
   const auto earlier = [&](std::uint32_t a, std::uint32_t b) {
     return on_axis(sorting.middles[a], axis) < on_axis(sorting.middles[b], axis);
   };
-  std::nth_element(start, start + count / 2, start + count, earlier);
+  std::nth_element(start, start + count / kHalves, start + count, earlier);
 }
 
 void TriangleIndex::find(const Bounds& box, std::vector<std::size_t>& out) const {
