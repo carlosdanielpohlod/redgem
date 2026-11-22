@@ -64,12 +64,17 @@ SceneDocument saved_scene(const Options& options, const Json& args) {
 }
 
 // scene_prefab on the saved scene: saved when the action changes it.
+// (apply writes the prefab file before the scene: the scene is saved once first, so that a scene
+// that cannot be saved is found before the prefab file changes.)
 Json prefab_files(const Options& options, const Json& args) {
   SceneDocument document = saved_scene(options, args);
-  const PrefabOutcome outcome = edit_prefab(document, options.game, args);
+  const std::string action = args.at("action");
   std::string error;
-  if (!reads_prefab(args.at("action")) && !document.save(error)) return tool_result(error, true);
-  return tool_result(outcome.text);
+  if (action == "apply" && !document.save(error)) return tool_result(error, true);
+  const PrefabOutcome outcome = edit_prefab(document, options.game, args);
+  if (reads_prefab(action) || document.save(error)) return tool_result(outcome.text);
+  if (action == "apply") error = "the prefab file was written, but the scene was not saved: " + error;
+  return tool_result(error, true);
 }
 
 Json edit_files(const Options& options, const Json& args) {

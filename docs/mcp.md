@@ -169,8 +169,8 @@ checked only through the quests that name it. The
 | Action | Result |
 |--------|--------|
 | `overrides` | What it overrides, a line per field: `lid position=0,3,0`, `lid props.tag=unset`; `.` is the placement itself. |
-| `override` | Sets fields of the inherited `part` (`lid`, `load/wheel`; `.` for the placement) with `assignments`: the keys of `scene_edit` `set` but `name` and `parent`. `prop.key=` drops a property the file gives, `removed=true` leaves the part out. A field set back to the file's value is no longer overridden. |
-| `revert` | Drops one `field` of a `part`, every override of a `part`, or, with neither, all of them. Added children stay. |
+| `override` | Sets fields of the inherited `part` (`lid`, `load/wheel`) with `assignments`: the keys of `scene_edit` `set` but `name` and `parent`. `prop.key=` drops a property the file gives, `removed=true` leaves the part out (`revert` brings it back). A field set back to the file's value is no longer overridden. The placement's own fields are set with `scene_edit` `set`. |
+| `revert` | Drops one `field` of a `part` (`part` `.` with a `field`: the placement's own, such as `props.tag`), every override of a `part`, or, with neither, all of them. Added children stay. |
 | `apply` | Writes the overrides and added children into the prefab file, which every placement of it then has. Needs `confirm: true`. |
 | `unpack` | Replaces the placement with plain objects from its file, its overrides applied. Needs `confirm: true`. |
 
@@ -180,7 +180,8 @@ checked only through the quests that name it. The
 ```
 
 In a live editor each change is one undo step and stays unsaved until `save`; `apply` writes the
-prefab file at once (undo gives the placement its overrides back, the file stays written). On
+prefab file at once (undo gives the placement its overrides and added children back, while the
+file keeps them too: apply again, or revert, rather than undo). On
 files, the scene is saved after each change. `--read-only` keeps `overrides`.
 
 ## Building the game

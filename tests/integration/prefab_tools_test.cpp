@@ -113,6 +113,21 @@ TEST_CASE("scene_prefab refuses what is no placement, wrong words, and apply or 
   CHECK_THROWS_AS(game.call(action("apply")), std::invalid_argument);
   CHECK_THROWS_AS(game.call(action("unpack")), std::invalid_argument);
   CHECK_THROWS_AS(game.call(action("overrides", "Nobody")), std::invalid_argument);
+  Json root = raise_lid();
+  root["part"] = ".";
+  CHECK_THROWS_WITH_AS(game.call(root), doctest::Contains("scene_edit"), std::invalid_argument);
+  Json back = raise_lid();
+  back["assignments"] = {"removed=false"};
+  CHECK_THROWS_WITH_AS(game.call(back), doctest::Contains("revert"), std::invalid_argument);
+}
+
+TEST_CASE("scene_prefab revert of the placement itself takes a field, and leaves the parts' overrides") {
+  const Game game;
+  game.call(raise_lid());
+  Json whole = action("revert");
+  whole["part"] = ".";
+  CHECK_THROWS_AS(game.call(whole), std::invalid_argument);
+  CHECK(has(game.call(action("overrides")), "lid position=0,3,0"));
 }
 
 TEST_CASE("scene_prefab apply writes the overrides into the prefab file, and unpack leaves plain objects") {
@@ -142,12 +157,21 @@ TEST_CASE("live scene_prefab changes the open scene in one undo step, unsaved, a
   CHECK(has(game.call(action("overrides")), "no overrides"));  // the file is as it was
   session.undo();
   CHECK(has(invoke_editor(session, kTool, action("overrides")), "no overrides"));
+  Json unpack = action("unpack", "Second");
+  unpack["confirm"] = true;
+  REQUIRE(ok(invoke_editor(session, kTool, unpack)));
+  CHECK(session.document().node(session.selection()).name == "Second");
+  CHECK_FALSE(ok(invoke_editor(session, kTool, action("overrides", "Second"))));
 }
 
 TEST_CASE("read-only scene_prefab only lists overrides") {
   mcp::Options options;
   options.read_only = true;
+  bool found = false;
   for (const auto& tool : mcp::catalog(options)) {
-    if (tool["name"] == kTool) CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"overrides"}));
+    if (tool["name"] != kTool) continue;
+    found = true;
+    CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"overrides"}));
   }
+  CHECK(found);
 }

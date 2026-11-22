@@ -1,9 +1,9 @@
 #include "project/prefab_edits.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <vector>
 
-#include "core/config.hpp"
 #include "editor/prefab_instances.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_prefab_words.hpp"
@@ -15,6 +15,8 @@ namespace {
 namespace fs = std::filesystem;
 using mcp::Json;
 using Words = std::vector<std::string>;
+
+constexpr const char* kKeepWord = "removed=false";
 
 std::invalid_argument wrong(const std::string& what) { return std::invalid_argument(what); }
 
@@ -55,43 +57,40 @@ void check(bool done, const std::string& error) {
   if (!done) throw wrong(error);
 }
 
-// The inherited part at `path`, with the placement's override of it (`own`) or as the file gives it.
-NodeDesc part_as(const Placement& placement, const std::string& path, bool own) {
-  std::string error;
-  auto part = inherited_part(placement.document, placement.index, placement.game_dir, path, own, error);
-  if (!part) throw wrong(error);
-  return *part;
-}
-
-// The whole override the assignments make of the part, against the file's part.
-prefabs::PartOverride part_override(const Placement& placement, const std::string& path, const Words& words,
-                                    Words& notes) {
-  const NodeDesc current = part_as(placement, path, true);
-  const NodeDesc base = part_as(placement, path, false);
-  std::string error;
-  auto change = part_change(current, base, words, placement.game_dir / config::kScriptsDirName, error, notes);
-  if (!change) throw wrong(error);
-  const auto overrides = prefab_instances::overrides_of(placement.document, placement.index);
-  const auto old = overrides.find(path);
-  if (old != overrides.end()) change->removed = change->removed || old->second.removed;
-  return *change;
+// The words of a part's override, refused when they ask for what override cannot do.
+Words override_words(const Json& args) {
+  if (!args.contains("part")) throw wrong("override needs part: the inherited part's path, such as lid or load/wheel");
+  if (args["part"] == kPlacementRootWord)
+    throw wrong("the placement's own fields are set with scene_edit action=set; override takes an inherited part");
+  const Words words = args.value("assignments", Words{});
+  if (words.empty()) throw wrong("override needs assignments, such as position=0,1,0 or removed=true");
+  if (std::find(words.begin(), words.end(), kKeepWord) != words.end())
+    throw wrong("a removed part comes back with revert (its field removed)");
+  return words;
 }
 
 PrefabOutcome override_part(const Placement& placement, const Json& args) {
-  if (!args.contains("part")) throw wrong("override needs part: the inherited part's path (\".\" for the placement)");
-  const Words words = args.value("assignments", Words{});
-  if (words.empty()) throw wrong("override needs assignments, such as position=0,1,0 or removed=true");
+  const Words words = override_words(args);
+  const std::string path = args["part"];
   Words notes;
-  const std::string path = part_of(args);
-  const auto change = part_override(placement, path, words, notes);
   std::string error;
-  check(prefab_instances::replace_override(placement.document, placement.index, path, change, error), error);
+  const auto change =
+      placement_part_change({placement.document, placement.index, placement.game_dir, path}, words, error, notes);
+  if (!change) throw wrong(error);
+  check(prefab_instances::replace_override(placement.document, placement.index, path, *change, error), error);
   return changed(placement, notes);
+}
+
+// Whether a revert names the placement itself with no field: that is no part to revert.
+bool reverts_root_whole(const Json& args, const std::string& field) {
+  return args.value("part", std::string()) == kPlacementRootWord && field.empty();
 }
 
 PrefabOutcome revert(const Placement& placement, const Json& args) {
   const std::string field = args.value("field", std::string());
   if (!field.empty() && !args.contains("part")) throw wrong("revert's field needs the part it is of");
+  if (reverts_root_whole(args, field))
+    throw wrong("part=. needs the field of the placement to revert (props.tag); leave part out to revert all");
   std::string error;
   check(prefab_instances::revert(placement.document, placement.index, part_of(args), field, error), error);
   return changed(placement, {});
