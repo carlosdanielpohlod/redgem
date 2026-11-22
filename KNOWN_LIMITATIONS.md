@@ -53,9 +53,10 @@ the same pull request.
   following a graph received from the owner is not pinned (its root moves in the pose).
 - Hit boxes (`Hitboxes.build`) are placed where their bones are after the clips pose them, before
   scripts run: a head turned by `Animator#look_at` (which turns after the scripts) is met where the
-  clips put it. They keep the size they were made with when a bone is scaled, and are made at run
-  time only (the editor does not show or place them). The host judges hits against its own pose of
-  another player's character, which follows that player's synced animation a moment behind.
+  clips put it. Their bodies keep the size they were made with when a bone is scaled (the box
+  object's own scale follows the bone), and they are made at run time only (the editor does not
+  show or place them). The host judges hits against its own pose of another player's character,
+  which follows that player's synced animation a moment behind.
 - The view model (`view_model = true`) is drawn over the world in one layer: particles, lights
   and debug lines are the world's, drawn with the world's field of view (start them at
   `Camera.from_view_model`), and the weapon is never hidden behind particles. It writes no motion

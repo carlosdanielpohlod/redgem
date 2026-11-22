@@ -24,6 +24,7 @@ constexpr const char* kGame =
     R"({"title": "Hits", "physics": {"layers": ["default", "hitbox"], "collides": {"hitbox": []}}})";
 constexpr int kThreeQuarterSecond = 45;  // frames: Upper is bent about 80 degrees by then
 constexpr float kMoved = 1.0f;           // meters the hand box, a meter out along Upper, goes by then
+constexpr float kCopyAside = 5.0f;       // meters: the copy stands well away from the first one
 
 constexpr const char* kBuild =
     "$boxes = Hitboxes.build(Scene.find('Rig'), {"
@@ -74,6 +75,33 @@ TEST_CASE("hit boxes made on a skeleton's bones carry their region and layer, un
   CHECK(region_at(engine, "Vector3.new(30, 0, 0)") == "nil");
 }
 
+TEST_CASE("a hit box is as large as its size says, not a meter whatever it was given") {
+  SkinnedGame game;
+  Engine& engine = *game.engine;
+  ruby(engine, kBuild);
+  frames(engine, 1);
+  // The hand box is 0.4 meters a side: 0.15 from its middle is in it, 0.3 is past it.
+  CHECK(region_at(engine, "$boxes[0].transform.position + Vector3.new(0.15, 0, 0)") == ":hand");
+  CHECK(region_at(engine, "$boxes[0].transform.position + Vector3.new(0.3, 0, 0)") == "nil");
+  CHECK(region_at(engine, "$boxes[0].transform.position + Vector3.new(-0.3, 0, 0)") == "nil");
+}
+
+TEST_CASE("the hit boxes of a copy of a character follow the copy's bones") {
+  SkinnedGame game;
+  Engine& engine = *game.engine;
+  ruby(engine, kBuild);
+  ruby(engine, "$copy = Scene.spawn(Scene.find('Rig'), position: Vector3.new(10, 0, 0))");
+  frames(engine, 1);
+  ruby(engine,
+       "$hand = Scene.objects.find { |o| o.name == 'Upper hitbox' && o != $boxes[0] }; "
+       "$before = $hand.transform.position");
+  CHECK(number(engine, "$before.x") > kCopyAside);
+  frames(engine, kThreeQuarterSecond);
+  CHECK(number(engine, "($hand.transform.position - $before).length") > kMoved);
+  CHECK(region_at(engine, "$hand.transform.position") == ":hand");  // its body went with it
+  CHECK(region_at(engine, "$before") == "nil");
+}
+
 TEST_CASE("hit boxes follow the animated pose, and a ray meets the box where it is in that frame") {
   SkinnedGame game;
   Engine& engine = *game.engine;
@@ -99,6 +127,10 @@ TEST_CASE("Hitboxes.build refuses a bone the character lacks, an unknown shape a
         std::string::npos);
   CHECK(error_of(engine, "Hitboxes.build(Scene.find('Rig'), { 'Upper' => { size: [1, -1, 1] } })").find("size") !=
         std::string::npos);
+  CHECK(error_of(engine, "Hitboxes.build(Scene.find('Rig'), { 'Upper' => {} }, layer: 'hitboxes')").find("hitboxes") !=
+        std::string::npos);
   CHECK(ruby(engine, "Hitboxes.region(nil).inspect") == "nil");
   CHECK(ruby(engine, "Hitboxes.region({ object: Scene.find('Rig') }).inspect") == "nil");  // not a hit box
+  ruby(engine, "Scene.find('Lower').props[:hitbox] = true");
+  CHECK(ruby(engine, "Hitboxes.region({ object: Scene.find('Lower') }).inspect") == "nil");  // no region
 }

@@ -131,8 +131,18 @@ ObjectId Engine::spawn(const SpawnRequest& request) {
 ObjectId Engine::make_object(const NodeDesc& node, const SpawnRequest& request) {
   const ObjectId id = scene_.instantiate_rigid({node}, 0, scene_desc_).front();
   finish_spawn({{kNoObject, id}}, request);
-  if (get_bool(node.props, props::kHitbox).value_or(false)) hitboxes_.push_back(scene_.handle(id));
   return id;
+}
+
+// A hit box with a body: one Hitboxes.build made, or a copy of a character that has them.
+bool Engine::is_hitbox(ObjectId id) const {
+  return get_bool(scene_.at(id).props, props::kHitbox).value_or(false) && physics_->has_object(id);
+}
+
+void Engine::note_hitboxes(const std::vector<std::pair<ObjectId, ObjectId>>& copies) {
+  for (const auto& [original, id] : copies) {
+    if (is_hitbox(id)) hitboxes_.push_back(scene_.handle(id));
+  }
 }
 
 void Engine::snap_hitboxes() {
@@ -151,6 +161,7 @@ ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& 
     // (Once every body of the copy is there: a joint may hold two of its parts.)
     joints::create_copies({scene_, scene_desc_}, *physics_, copies, context_.scene_joints);
   }
+  note_hitboxes(copies);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   for (const auto& [original, id] : copies) scripts_->attach_object(id);
   return copies.front().second;

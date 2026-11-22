@@ -632,7 +632,9 @@ nothing either, while rays still find them:
 "physics": { "layers": ["default", "hitbox"], "collides": { "hitbox": [] } }
 ```
 
-`Hitboxes.region(hit)` says which part a raycast met, or nil.
+`Hitboxes.region(hit)` says which part a raycast met, or nil. Build a character's boxes once:
+each call adds boxes, and a copy spawned of the character carries its own. A copy that only shows
+another machine's object still gets boxes with bodies, which is one more reason for that layer.
 
 They are posed wherever the game runs, a dedicated server too, so the host can judge the hits. For
 another player's character, the host's pose follows that player's synced animation (see

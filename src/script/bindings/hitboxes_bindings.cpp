@@ -48,13 +48,24 @@ Vec3 size_of(mrb_state* mrb, mrb_value value) {
   return size;
 }
 
-// A kinematic volume of its shape, on its layer (none: the default), standing for its region.
-NodeDesc hitbox_node(mrb_state* mrb, const MakeArgs& args) {
+// A layer the game's physics has; none (empty) is the default one.
+void check_layer(mrb_state* mrb, const char* layer) {
+  const PhysicsWorld* physics = context(mrb).physics;
+  if (*layer == '\0' || physics == nullptr || physics->layers().find(layer)) return;
+  mrb_raisef(mrb, E_ARGUMENT_ERROR, "Hitboxes.build: no collision layer named %s in game.json (layers: %s)", layer,
+             physics->layers().names_listed().c_str());
+}
+
+// A kinematic volume of its shape, `size` meters a side (its own scale: the collider is a meter
+// a side at scale 1), on its layer (none: the default), standing for its region.
+NodeDesc hitbox_node(mrb_state* mrb, const MakeArgs& args, Vec3 size) {
   if (!known_shape(args.shape)) {
     mrb_raisef(mrb, E_ARGUMENT_ERROR, "a hit box is a box, a capsule or a sphere, not %s", args.shape);
   }
+  check_layer(mrb, args.layer);
   NodeDesc node;
   node.name = args.name;
+  node.local.scale = size;
   node.props = {{props::kCollider, std::string(args.shape)},
                 {props::kBody, std::string(props::kBodyKinematic)},
                 {props::kHitbox, true},
@@ -72,8 +83,8 @@ Transform placed_on(const Transform& bone, Vec3 offset, Vec3 size) {
 mrb_value hitboxes_make(mrb_state* mrb, mrb_value) {
   const MakeArgs args = make_args(mrb);
   const ObjectId bone = alive_id(mrb, args.bone);
-  const NodeDesc node = hitbox_node(mrb, args);
   const Vec3 size = size_of(mrb, args.size);
+  const NodeDesc node = hitbox_node(mrb, args, size);
   const Transform world = placed_on(scene(mrb).world_transform(bone), to_vec3(mrb, args.offset), size);
   const auto& make = context(mrb).make_object;
   if (!make) mrb_raise(mrb, E_RUNTIME_ERROR, "Hitboxes are only available while a game runs");

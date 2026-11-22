@@ -5728,6 +5728,7 @@
       ],
       "internal": [
         "__box",
+        "__hitbox_props",
         "__size",
         "__vector"
       ],

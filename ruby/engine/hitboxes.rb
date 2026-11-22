@@ -19,7 +19,9 @@ module Hitboxes
   # "Name"): region (its name, the bone's name unless said), size (meters, one number or
   # [width, height, depth]; a capsule stands along the bone's up), offset (meters from the bone, in
   # its own axes) and shape (:box, :capsule or :sphere). layer: the collision layer of every box
-  # (the default layer unless said). Returns the boxes made, in the map's order.
+  # (the default layer unless said; one game.json lacks is refused). Returns the boxes made, in the
+  # map's order. Build them once for a character: each call adds boxes, and a copy spawned of it
+  # carries its own.
   def self.build(character, map, layer: nil)
     animator = character.animation
     map.map { |bone, settings| __box(animator.bone!(bone), bone.to_s, layer.to_s, **settings) }
@@ -40,7 +42,13 @@ module Hitboxes
   # The part of the body a raycast hit (Physics.raycast's Hash) met, as a Symbol: nil for no hit, or
   # a hit on anything but a hit box.
   def self.region(hit)
+    props = __hitbox_props(hit)
+    props[:region]&.to_sym if props
+  end
+
+  # The props of the hit box a hit met, or nil for no hit, or one on anything else.
+  def self.__hitbox_props(hit)
     props = hit && hit[:object]&.props
-    props[:region].to_sym if props&.[](:hitbox)
+    props if props&.[](:hitbox)
   end
 end
