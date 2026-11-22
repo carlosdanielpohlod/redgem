@@ -15,6 +15,7 @@
 #include "core/config.hpp"
 #include "project/mcp_game_tools.hpp"
 #include "project/mcp_build_tool.hpp"
+#include "project/mcp_import_settings_tool.hpp"
 #include "project/mcp_project_tools.hpp"
 #include "project/scene_command.hpp"
 #include "project/prefab_edits.hpp"
@@ -227,6 +228,7 @@ constexpr Native kNativeTools[] = {
     {"scene_prefab", prefab_files},
     {"project", project_tool},
     {"build", build_tool},
+    {"import_settings", import_settings_tool},
 };
 
 Json native_result(const Options& options, const std::string& name, const Json& args) {
@@ -237,10 +239,11 @@ Json native_result(const Options& options, const std::string& name, const Json& 
   if (!result) throw std::logic_error("missing native command");
   return tool_result(result->out + result->err, result->exit_code != kExitSuccess);
 }
-// The tools a connected editor answers, about its unsaved document and its own process.
+// The tools a connected editor answers, about its unsaved document and its own process
+// (import_settings: its apply imports models again in the open scene).
 bool answered_live(const std::string& name) {
   return name == "editor" || name == "events" || name == "game_query" || name.rfind("scene_", 0) == 0 ||
-         is_ruby_eval_tool(name);
+         name == "import_settings" || is_ruby_eval_tool(name);
 }
 
 constexpr const char* kNoEditor =

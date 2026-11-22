@@ -66,6 +66,8 @@ object at a time, as one undo step in an open editor:
 - `editor` `open_scene` and `save_as` take a `scene`; save before opening another one.
 - `build` `start` makes the game for a `target` from the saved files; `build` `status` with
   `wait` says what it made, or why not.
+- `import_settings` reads (`settings`) and changes (`set` with `fields`) how a model, texture or
+  sound is imported; `apply` imports a model again in the open editor's scene.
 
 ## Tests
 

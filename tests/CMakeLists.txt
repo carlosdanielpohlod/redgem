@@ -321,6 +321,7 @@ unit/temp_dirs_test.cpp
   integration/scene_tools_test.cpp
   integration/project_tools_test.cpp
   integration/prefab_tools_test.cpp
+  integration/import_settings_tool_test.cpp
   integration/build_tool_test.cpp
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp

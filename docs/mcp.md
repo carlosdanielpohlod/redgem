@@ -38,6 +38,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `game_query` | Asks the playing game: `inspect` an `object`, `raycast` `from` one point `to` another, or `overlap` a sphere `at` a point with a `radius`. |
 | `project` | Reads and changes the game beyond its scenes, as files (see [The project](#the-project)): `action` `settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`, `scenes`, `new_scene` or `new_game`. |
 | `build` | Makes a standalone game from the saved files, on a thread of its own (see [Building the game](#building-the-game)): `action` `start` or `status`. |
+| `import_settings` | How the engine takes in one `asset` (see [Import settings](#import-settings)): `action` `settings`, `set` or `apply`. |
 | `api` | Reads the API index, a `class`, or a `search`. |
 | `events` | Reads this server's log history with `since`, `limit` (default 20, maximum 32), `level`. |
 
@@ -206,6 +207,29 @@ and `status` says how it goes.
 executable, the app, the APK or bundle) or why not, with the last lines the build logged; these
 also reach `events`. A build works from the files on disk: save the editor's edits first. It
 replaces only what an earlier build wrote in that folder. One build runs at a time.
+
+## Import settings
+
+`import_settings` reads and sets the [import settings](import-settings.md) of one model, texture
+or sound, named by `asset`, its path inside the game:
+
+| Action | Result |
+|--------|--------|
+| `settings` | Its fields, a line each with the value and the choices: `up_axis = y (y, z)`. A file without a sidecar shows the defaults. |
+| `set` | Writes `fields` into its sidecar (`<asset>.import.json`). Every field is set, or none is: an unknown field or a value out of range refuses the call. `null` puts a field back to its default. |
+| `apply` | Imports a model of `models/` again wherever the editor's open scene holds it. Only a connected editor does this. |
+
+```json
+{"action": "set", "asset": "models/oak.glb", "fields": {"scale": 0.01, "up_axis": "z", "lod_levels": 2}}
+{"action": "apply", "asset": "models/oak.glb"}
+```
+
+A texture or a sound takes its new settings the next time it is loaded, and a model the next time
+it is imported. `apply` finds the objects the editor imported from that model (their
+`model_file` property). Each one keeps its name, place, properties and scripts, and what it held
+is replaced by the new import. Each object is one undo step, unsaved until `save`. Without an
+editor, `apply` is refused: the settings are saved, and the editor uses them when it imports the
+model. `--read-only` keeps `settings`.
 
 ## Live editor
 

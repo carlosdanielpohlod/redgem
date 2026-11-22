@@ -17,6 +17,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Agents change import settings.** MCP's new `import_settings` tool lists and sets an asset's
+  import settings, as `redgem assets --settings` does. With an editor connected, `apply` imports a
+  model again wherever the open scene holds it, one undo step an object.
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor

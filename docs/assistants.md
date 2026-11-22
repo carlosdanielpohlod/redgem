@@ -91,6 +91,7 @@ ran main for 30 frames (0.5 s): 1 errors, 0 warnings
 | Settings, input, texts, dialogues, quests | `project` (`settings`, `set_settings`, `texts`, `set_texts`, `story`, `set_story`) |
 | Another level | `project` `new_scene`, then `editor` `open_scene` |
 | Change one copy of a prefab | `scene_prefab` `override` a `part`, then `revert`, `apply` or `unpack` |
+| Scale a model, make its levels of detail, shrink a texture | `import_settings` `set` the `fields` of an `asset`, then `apply` in the editor |
 | Ship it | `build` `start` (a `target`), then `build` `status` with `wait` |
 | Does it play | `game_run`; `print` and `assert` read the game, e.g. `Scene.find('Coin6').transform.position` |
 | Why does it fall through the floor | `game_query` `raycast` or `inspect` (velocity, grounded) |

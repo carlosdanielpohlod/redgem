@@ -5,6 +5,7 @@
 
 #include "core/safe_path.hpp"
 #include "core/config.hpp"
+#include "project/mcp_import_settings_tool.hpp"
 #include "project/mcp_tools.hpp"
 #include "project/scene_assignments.hpp"
 #include "project/scene_command.hpp"
@@ -103,6 +104,27 @@ Json prefab(EditorSession& session, const Json& args, bool busy) {
   session.refresh_preview();
   session.select(static_cast<ObjectId>(outcome.object));
   return tool_result(outcome.text);
+}
+
+// What apply says: how many objects took the new settings, or why none did.
+std::string reimported_text(const std::string& model, int done) {
+  if (done == 0)
+    return "no object of the open scene came from models/" + model +
+           " (only objects the editor imported carry its model_file property)";
+  return "imported models/" + model + " again into " + std::to_string(done) +
+         " object(s), each one undo step; unsaved until editor save";
+}
+
+// import_settings in the editor: settings and set on the files, as without it; apply imports the
+// model again wherever the open scene holds it (the objects keep their names, places and scripts).
+Json reimport(EditorSession& session, const Json& args, bool busy) {
+  if (args.at("action") != "apply") return import_settings_files(session.game_dir(), args);
+  require_editable(session, busy);
+  const std::string model = model_to_reimport(session.game_dir(), args);
+  std::string error;
+  const int done = session.reimport_model(model, error);
+  if (error.empty()) return tool_result(reimported_text(model, done));
+  return tool_result(done == 0 ? error : reimported_text(model, done) + ", then it stopped: " + error, true);
 }
 
 // The objects select names: `object`, and those of `objects`.
@@ -290,6 +312,7 @@ Json handle(EditorSession& session, const std::string& name, const Json& args, b
   if (name == "scene_edit") return edit(session, args, busy);
   if (name == "scene_prefab") return prefab(session, args, busy);
   if (name == "editor") return control(session, args, busy, window);
+  if (name == "import_settings") return reimport(session, args, busy);
   return read(session, name, args);
 }
 }  // namespace

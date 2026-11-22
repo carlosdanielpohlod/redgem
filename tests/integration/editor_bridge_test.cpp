@@ -239,13 +239,15 @@ TEST_CASE("live MCP catalog exposes status only under read-only and narrows edit
   options.editor_connection = "connection.json";
   options.read_only = true;
   const auto read = mcp::catalog(options);
-  CHECK(read.size() == 10);
+  CHECK(read.size() == 11);
   for (const auto& tool : read) {
     if (tool["name"] == "editor")
       CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"status", "capture"}));
     if (tool["name"] == "project")
       CHECK(tool["inputSchema"]["properties"]["action"]["enum"] ==
             Json::array({"settings", "texts", "story", "scenes"}));
+    if (tool["name"] == "import_settings")
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"settings"}));
   }
   options.read_only = false;
   for (const auto& tool : mcp::catalog(options)) {
