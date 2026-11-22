@@ -123,8 +123,7 @@ int SystemTestRun::play() {
 void SystemTestRun::wait_a_frame() {
   ++waited_frames_;
   if (!waiting_since_) waiting_since_ = tick_started_;  // (its block's first try counts too)
-  const auto step =
-      std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(engine_.fixed_delta()));
+  const auto step = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(engine_.fixed_delta()));
   std::this_thread::sleep_until(last_waited_ + step);
   last_waited_ = Clock::now();
 }
@@ -201,8 +200,7 @@ int SystemTestRun::verdict() const {
 }
 
 // The test's file, loaded into a game that is ready to play, and played.
-int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& pictures,
-              const SystemTestOptions& options) {
+int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& pictures, const SystemTestOptions& options) {
   SystemTestRun run(engine, pictures, options.wait_limit_seconds);
   std::optional<std::string> error = load_test_library(engine.scripts(), input, &pictures);
   if (!error) error = run.load(options.test_file);

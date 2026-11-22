@@ -61,7 +61,7 @@ class RenderPoses {
   const Steps* carrier(const Scene& scene, ObjectId id) const;
 
   std::vector<Steps> steps_;
-  std::unordered_map<ObjectId, std::size_t> index_;  // into steps_
+  std::unordered_map<ObjectId, std::size_t> index_;   // into steps_
   std::vector<std::pair<ObjectId, Transform>> kept_;  // the locals of the objects placed, to put back
 };
 
