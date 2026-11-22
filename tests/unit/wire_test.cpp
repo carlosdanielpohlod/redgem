@@ -190,6 +190,25 @@ TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
   CHECK(wire::free_peer_id(everyone) == 0);
 }
 
+TEST_CASE("a game of a smaller room is full sooner, and a room's size is held to what the protocol carries") {
+  constexpr int kSmallRoom = 4;
+  CHECK(wire::free_peer_id({kFirstGuestId, kFirstGuestId + 1}, kSmallRoom) == kSmallRoom);
+  CHECK(wire::free_peer_id({kFirstGuestId, kFirstGuestId + 1, kSmallRoom}, kSmallRoom) == 0);
+  CHECK(wire::usable_room_size(0) == kMinRoomSize);
+  CHECK(wire::usable_room_size(kMaxPeers * 2) == kMaxPeers);
+}
+
+TEST_CASE("a room's size travels in a hello that opens it, as a number the protocol carries") {
+  const json opening{{wire::kKind, wire::kHello}, {wire::kRoom, kNewRoom}};
+  json sized = opening;
+  sized[wire::kRoomSize] = kMaxPeers;
+  CHECK(wire::well_formed(sized));
+  for (const json& wrong : {json(kMaxPeers + 1), json(1), json("32"), json(kMinRoomSize + 0.5)}) {
+    sized[wire::kRoomSize] = wrong;
+    CHECK_FALSE(wire::well_formed(sized));
+  }
+}
+
 TEST_CASE("a welcome cannot make a guest the host, or the opener of a room anything else") {
   const bool through_relay = true;
   const bool opening_room = true;

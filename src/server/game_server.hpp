@@ -29,9 +29,10 @@ namespace redgem::server {
 // its address (Network::DEFAULT_PORT).
 inline constexpr std::uint16_t kDefaultServerPort = 7777;
 // How big a server is unless told otherwise, and at most: the players of one room (every place of
-// a game but the host's, which is the server's), and the rooms open at once (each a whole game
-// running: memory and time on the server).
-inline constexpr int kDefaultMaxPlayers = 8;
+// a game but the host's, which is the server's; unless told, as many as the game holds: game.json's
+// "network": {"max_players": N}), and the rooms open at once (each a whole game running: memory
+// and time on the server).
+inline constexpr int kGamesPlayers = 0;  // RoomLimits::max_players: as many as the game holds
 inline constexpr int kMostPlayersPerRoom = net::kMaxPeers - 1;
 inline constexpr int kDefaultMaxRooms = 8;
 inline constexpr int kMostRooms = 64;
@@ -65,7 +66,7 @@ struct StatusSettings {
 struct ServerSettings {
   std::filesystem::path game_dir;
   std::uint16_t port = kDefaultServerPort;  // 0 picks a free one (see GameServer::port)
-  RoomLimits limits{kDefaultMaxPlayers, kDefaultMaxRooms};
+  RoomLimits limits{kGamesPlayers, kDefaultMaxRooms};
   int connections_per_address = net::kDefaultConnectionsPerAddress;  // machines one address may connect
   std::filesystem::path data_dir;   // where Save is kept; empty: nothing is written (kept in memory for this run)
   int threads = processor_count();  // the threads the rooms run on, at most
@@ -136,7 +137,8 @@ class GameServer {
     bool runs_on(const RoomThread& other) const { return thread == &other && !slot->closed(); }
   };
 
-  void read_tick();
+  // What game.json says the server keeps to: its tick, and its rooms' players unless told.
+  void read_game_settings();
   bool open_saves(std::string& error);
   bool take_identity(std::string& error);
   bool open_status(std::string& error);

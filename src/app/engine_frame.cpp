@@ -23,6 +23,7 @@ void Engine::frame(float frame_seconds) {
   answer_requests();
   follow_presenter();
   advance_or_loading(frame_seconds);
+  network_.flush();  // what the scripts said this frame, together
   // Audio can query static bodies. Do this before the next physics step runs in parallel.
   audio().update(frame_seconds);
   begin_prepared_step();

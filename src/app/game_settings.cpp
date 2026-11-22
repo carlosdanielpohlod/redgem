@@ -36,6 +36,7 @@ constexpr const char* kTickHzKey = "tick_hz";
 constexpr const char* kPhysicsKey = "physics";
 constexpr const char* kNetworkKey = "network";
 constexpr const char* kSendHzKey = "send_hz";
+constexpr const char* kMaxPlayersKey = "max_players";
 constexpr const char* kUiKey = "ui";
 constexpr const char* kUiReferenceKey = "reference";
 constexpr const char* kUiMatchKey = "match";
@@ -160,6 +161,27 @@ std::string read_send_hz(const nlohmann::json& json, GameSettings& settings) {
   return std::string(kGameSettingsFile) + ": network." + kSendHzKey + " must be a whole number from " +
          std::to_string(config::kMinSendHz) + " to " + std::to_string(config::kMaxSendHz) + "; objects send " +
          std::to_string(config::kDefaultSendHz) + " poses a second";
+}
+
+bool holds_usable_player_count(const nlohmann::json& section) {
+  if (!holds_whole_number(section, kMaxPlayersKey)) return false;
+  const auto asked = section[kMaxPlayersKey].get<std::int64_t>();
+  return asked >= net::kMinRoomSize && asked <= kMostPlayers;
+}
+
+// How many players a game holds, when the "network" section gives a number that can be used; what
+// is wrong with it otherwise.
+std::string read_max_players(const nlohmann::json& json, GameSettings& settings) {
+  if (!json.contains(kNetworkKey) || !json[kNetworkKey].is_object()) return {};
+  const nlohmann::json& section = json[kNetworkKey];
+  if (!section.contains(kMaxPlayersKey)) return {};
+  if (holds_usable_player_count(section)) {
+    settings.max_players = section[kMaxPlayersKey].get<int>();
+    return {};
+  }
+  return std::string(kGameSettingsFile) + ": network." + kMaxPlayersKey + " must be a whole number from " +
+         std::to_string(net::kMinRoomSize) + " to " + std::to_string(kMostPlayers) + "; a game holds " +
+         std::to_string(net::kDefaultRoomSize) + " players";
 }
 
 void read_physics(const nlohmann::json& json, GameManifest& manifest) {
@@ -294,6 +316,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
   manifest.send_hz_error = read_send_hz(json, manifest.settings);
+  manifest.max_players_error = read_max_players(json, manifest.settings);
   manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
   read_sections(json, manifest);
   return manifest;

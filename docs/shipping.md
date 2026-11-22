@@ -100,8 +100,9 @@ A game says in its `game.json` what it is shown by; all of it is optional:
   use worries players and stores. When `game.json` does not say, a build looks at the scripts:
   one that calls `Network.` or `HTTP.` gets the network, and the build warns to say
   `"network": true`. `"network": false` keeps the app offline even then (with a warning). A
-  `"network"` object (its settings, such as `{"send_hz": 64}`: see
-  [Send rate](scripting/multiplayer.md#send-rate)) counts as `true`. On computers it changes
+  `"network"` object (its settings, such as `{"send_hz": 64}` or `{"max_players": 32}`: see
+  [Send rate](scripting/multiplayer.md#send-rate) and
+  [Room size](scripting/multiplayer.md#room-size)) counts as `true`. On computers it changes
   nothing.
 
 A build refuses a `game.json` that says one of these and cannot be used (a version that is not

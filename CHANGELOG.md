@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Rooms of up to 64 machines.** A game sets how many machines a room holds with
+  `"network": {"max_players": 32}` in `game.json` (2 to 63, 16 by default). A hosted game, a
+  relay room and a dedicated server's rooms all take it. A machine sends what it has to say once a
+  frame, in one write, instead of one write per message. Experimental.
+
 - **Import settings for models, textures and sounds.** A sidecar next to an asset
   (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
   extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's
@@ -177,6 +182,12 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   built from the editor's primitives only, and each part is a small script of its own. Its own
   tests play the quest alone; the engine's tests play it with two players, hosted and on a
   dedicated server. The project hub shows it with an icon of its own.
+
+### Changed
+
+- A dedicated server's `--max-players` is the game's `network.max_players` (16) unless given, and
+  may be up to 63 (it was 8, up to 15). The network protocol is version 3: machines of an older
+  release cannot join. A game needs no change.
 
 ### Fixed
 

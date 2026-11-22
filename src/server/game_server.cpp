@@ -25,16 +25,18 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
-  read_tick();
+  read_game_settings();
   started_at_ = clock().now();
   return open_saves(error) && take_identity(error) &&
          lobby_.open(settings_.port, error, settings_.connections_per_address, identity_) && open_status(error);
 }
 
-void GameServer::read_tick() {
+void GameServer::read_game_settings() {
   const GameManifest game = read_game_manifest(settings_.game_dir);
   if (!game.tick_hz_error.empty()) log::warning(game.tick_hz_error);
+  if (!game.max_players_error.empty()) log::warning(game.max_players_error);
   tick_hz_ = game.settings.tick_hz;
+  if (settings_.limits.max_players == kGamesPlayers) settings_.limits.max_players = game.settings.max_players;
 }
 
 bool GameServer::take_identity(std::string& error) {

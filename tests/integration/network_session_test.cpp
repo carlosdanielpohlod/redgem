@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+
 #include <functional>
 
 #include "integration/wire_text.hpp"
@@ -26,7 +28,7 @@ constexpr int kManyVisits = 300;    // more than the largest id there is
 constexpr float kQuietStep = 4.0f;  // seconds
 constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep;
 constexpr std::size_t kShownBytes = 60;          // of a bad message, when a check fails
-constexpr int kSilentStrangers = kMaxPeers - 1;  // as many as a game has places for guests
+constexpr int kSilentStrangers = kDefaultRoomSize - 1;  // as many as a game has places for guests
 constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
 constexpr int kNextProtocol = wire::kProtocolVersion + 1;  // what a newer version of the engine speaks
 
@@ -431,6 +433,39 @@ TEST_CASE("only a few machines from one address may keep a host waiting for thei
   REQUIRE(lone.table.until([&guest] { return guest.state() != NetworkSession::State::Connecting; }));
   CHECK(guest.state() == NetworkSession::State::Online);
   CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});
+}
+
+TEST_CASE("a host whose game takes 32 machines lets 31 guests in and turns the next one away") {
+  constexpr int kMatchRoom = 32;  // 10v10, spectators, more
+  constexpr int kGuests = kMatchRoom - 1;
+  NetworkSession host;
+  Table table;
+  std::string error;
+  host.set_room_size(kMatchRoom);
+  REQUIRE(host.host(0, error, kMatchRoom));  // (every guest comes from this one address)
+  table.seat(host);
+  std::vector<std::unique_ptr<NetworkSession>> guests;
+  for (int i = 0; i <= kGuests; ++i) {
+    guests.push_back(std::make_unique<NetworkSession>());
+    table.seat(*guests.back());
+    REQUIRE(guests.back()->join(kLocalhost, host.port(), error));
+  }
+  const auto in_state = [&guests](NetworkSession::State state) {
+    return std::count_if(guests.begin(), guests.end(), [state](const auto& guest) { return guest->state() == state; });
+  };
+  REQUIRE(table.until([&] { return in_state(NetworkSession::State::Connecting) == 0; }));
+  CHECK(in_state(NetworkSession::State::Online) == kGuests);
+  CHECK(host.peers().size() == static_cast<std::size_t>(kGuests));
+  CHECK(host.peers().back() == kMatchRoom);  // ids go up to the room's size
+}
+
+TEST_CASE("a room size is held to what the protocol carries") {
+  NetworkSession session;
+  CHECK(session.room_size() == kDefaultRoomSize);
+  session.set_room_size(kMaxPeers + 1);
+  CHECK(session.room_size() == kMaxPeers);
+  session.set_room_size(1);
+  CHECK(session.room_size() == kMinRoomSize);
 }
 
 TEST_CASE("a host told to let more machines from one address wait for their hello lets that many wait") {

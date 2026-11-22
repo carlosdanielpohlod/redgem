@@ -54,8 +54,11 @@ bool own_id_believable(int given, bool through_relay, bool opening_room) {
   return given >= lowest && (!opening_room || given == kHostId);
 }
 
-int free_peer_id(const std::vector<int>& taken) {
-  for (int id = kFirstGuestId; id <= kMaxPeers; ++id) {
+int usable_room_size(int asked) { return std::clamp(asked, kMinRoomSize, kMaxPeers); }
+
+int free_peer_id(const std::vector<int>& taken, int room_size) {
+  const int largest = usable_room_size(room_size);
+  for (int id = kFirstGuestId; id <= largest; ++id) {
     if (std::find(taken.begin(), taken.end(), id) == taken.end()) return id;
   }
   return 0;

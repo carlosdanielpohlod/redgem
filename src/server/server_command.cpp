@@ -51,7 +51,7 @@ TextValues usage_values() {
           {"default_per_address", number(net::kDefaultConnectionsPerAddress)},
           {"most_per_address", number(net::kMostConnectionsPerAddress)},
           {"data_suffix", kDataFolderSuffix},
-          {"default_players", number(kDefaultMaxPlayers)},
+          {"default_players", number(net::kDefaultRoomSize)},
           {"most_players", number(kMostPlayersPerRoom)},
           {"default_rooms", number(kDefaultMaxRooms)},
           {"most_rooms", number(kMostRooms)},

@@ -22,7 +22,7 @@ TEST_CASE("the server program plays the game it is given, as big as the usual se
   CHECK_FALSE(plain.help);
   CHECK(plain.settings.game_dir == "games/platformer");
   CHECK(plain.settings.port == kDefaultServerPort);
-  CHECK(plain.settings.limits.max_players == kDefaultMaxPlayers);
+  CHECK(plain.settings.limits.max_players == kGamesPlayers);  // the game says, when it is read
   CHECK(plain.settings.limits.max_rooms == kDefaultMaxRooms);
   CHECK(plain.settings.threads == processor_count());
   CHECK(processor_count() >= 1);
@@ -49,11 +49,11 @@ TEST_CASE("the server program takes its port and its size, in any order") {
 }
 
 TEST_CASE("the server program's numbers are whole, and within what a server may be") {
-  CHECK(parse_server_command({"game", "--max-players", "15"}).ok);
+  CHECK(parse_server_command({"game", "--max-players", "63"}).ok);
   CHECK(parse_server_command({"game", "--rooms", "64"}).ok);
-  for (const char* wrong : {"0", "16", "-1", "4a", "", "123456"}) {
+  for (const char* wrong : {"0", "64", "-1", "4a", "", "123456"}) {
     CAPTURE(wrong);
-    CHECK(parse_server_command({"game", "--max-players", wrong}).error == "--max-players needs a number from 1 to 15");
+    CHECK(parse_server_command({"game", "--max-players", wrong}).error == "--max-players needs a number from 1 to 63");
   }
   CHECK(parse_server_command({"game", "--rooms", "65"}).error == "--rooms needs a number from 1 to 64");
   CHECK(parse_server_command({"game", "--port", "65536"}).error == "--port needs a number from 0 to 65535");

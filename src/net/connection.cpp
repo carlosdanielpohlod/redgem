@@ -151,7 +151,7 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
     lost_ = true;  // (its network stalled, most likely: what reconnecting is for too)
     return;
   }
-  flush();
+  if (!gathering_ || outgoing_.size() >= kGatheredBytes) flush();
 }
 
 void Connection::flush() {
@@ -196,6 +196,7 @@ void Connection::close_for(const std::string& why) {
 }
 
 void Connection::close() {
+  flush();  // (a last try at what was said and gathered: a refusal, a goodbye)
   hang_up();
   dropped_ = true;
   incoming_ = FrameBuffer();

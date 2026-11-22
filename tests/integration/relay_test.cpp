@@ -44,7 +44,8 @@ constexpr float kPastJoinTimeout = 6.0f;
 constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
 constexpr int kSettleRounds = 50;
 constexpr int kTooManyGuesses = 2 * kMaxPeers + 2;  // more wrong room codes than one address is allowed
-constexpr int kPartyGuests = kMaxPeers - 1;         // everyone a room has places for besides its opener
+constexpr int kPartyGuests = kDefaultRoomSize - 1;  // everyone a room has places for besides its opener
+constexpr int kMatchRoom = 32;                      // machines of a big match: 10v10, spectators, more
 constexpr int kBroadcasts = 4;
 constexpr std::size_t kBroadcastBytes = 256 * 1024;
 constexpr int kRoomsPerAddress = 8;
@@ -722,17 +723,21 @@ TEST_CASE("a room whose opener goes silent is closed, and its guests are told th
 namespace {
 
 // A room's opener and as many guests as it has places for, all from this machine's one address.
+// A whole party connects from one address (here, this machine), so the relay takes them all.
+constexpr RelayLimits kPartyLimits{kMostConnectionsPerAddress, kDefaultRoomsPerAddress};
+
 struct Party {
-  Meeting meeting;
+  Meeting meeting{kPartyLimits};
   NetworkSession opener;
   std::vector<std::unique_ptr<NetworkSession>> guests;
 
-  Party() {
+  explicit Party(int room_size = kDefaultRoomSize, int guests_asking = kPartyGuests) {
     std::string error;
     meeting.seat(opener);
+    opener.set_room_size(room_size);
     REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
     REQUIRE(meeting.until([this] { return opener.state() == NetworkSession::State::Online; }));
-    for (int i = 0; i < kPartyGuests; ++i) {
+    for (int i = 0; i < guests_asking; ++i) {
       guests.push_back(std::make_unique<NetworkSession>());
       meeting.seat(*guests.back());
     }
@@ -768,6 +773,22 @@ TEST_CASE("a whole party behind one address joins a room at once, and hears all 
   }));
   CHECK(party.in_state(NetworkSession::State::Online) == kPartyGuests);
   CHECK(party.opener.state() == NetworkSession::State::Online);
+}
+
+TEST_CASE("a room whose game takes 32 machines seats 31 guests, and turns the next one away") {
+  constexpr int kGuests = kMatchRoom - 1;
+  Party party(kMatchRoom, kGuests + 1);
+  REQUIRE(party.everyone_tries(party.opener.room()));
+  CHECK(party.in_state(NetworkSession::State::Online) == kGuests);
+  CHECK(party.in_state(NetworkSession::State::Offline) == 1);
+  REQUIRE(party.meeting.until([&party] { return party.opener.peers().size() == kGuests; }));
+}
+
+TEST_CASE("a room of a game that says nothing takes the default number of machines") {
+  Party party(kDefaultRoomSize, kPartyGuests + 1);
+  REQUIRE(party.everyone_tries(party.opener.room()));
+  CHECK(party.in_state(NetworkSession::State::Online) == kPartyGuests);
+  CHECK(party.in_state(NetworkSession::State::Offline) == 1);
 }
 
 TEST_CASE("a whole party getting a room's code wrong, twice, is not kept out for guessing") {

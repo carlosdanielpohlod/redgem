@@ -171,6 +171,16 @@ class NetworkSession {
   // The code of the room this game is in, on a relay or a dedicated server; empty for a game
   // hosted directly.
   const std::string& room() const { return room_; }
+  // How many machines a game hosted here takes, the host included (a dedicated server counts as
+  // one): kMinRoomSize to kMaxPeers, kDefaultRoomSize until set. A newcomer past it is turned away.
+  // In a room opened on a relay the relay holds it to that, as said when the room opens. It lasts
+  // while hosting other games, until changed; a game already open keeps who is in it.
+  void set_room_size(int machines) { room_size_ = wire::usable_room_size(machines); }
+  int room_size() const { return room_size_; }
+  // Sends what this machine said since the last poll (and passed on, hosting). Messages are
+  // gathered and go out together, one write a machine: call it once the frame's scripts said what
+  // they had to say. (A poll sends what waits as well.)
+  void flush();
   // Leaves the game (ending it for everyone when hosting).
   void leave();
 
@@ -249,6 +259,8 @@ class NetworkSession {
     // A newcomer that may still say hello.
     bool waiting() const { return !let_in() && !connection.closed(); }
   };
+  // A connection to another machine, whose messages are gathered (see flush).
+  void add_link(Connection connection, int peer);
 
   // A place the host holds for a machine whose connection dropped (allow_reconnect).
   struct Held {
@@ -502,6 +514,7 @@ class NetworkSession {
   bool approving_ = false;      // the game decides who comes in (require_approval)
   int last_ticket_ = 0;
   int waiting_per_address_ = kDefaultWaitingPerAddress;
+  int room_size_ = kDefaultRoomSize;
   std::string refusal_;  // why the host turned this machine away, while joining
   std::string room_;
   Socket listener_;

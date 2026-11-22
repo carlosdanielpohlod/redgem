@@ -18,7 +18,7 @@ void NetworkSession::consider(Link& link, const nlohmann::json& auth, std::vecto
 }
 
 void NetworkSession::ask(Link& link, const nlohmann::json& auth, std::vector<NetworkEvent>& events) {
-  link.asking_as = free_peer_id(ids_taken());
+  link.asking_as = free_peer_id(ids_taken(), room_size_);
   if (!link.asking()) {
     link.connection.close();  // no place left
     return;

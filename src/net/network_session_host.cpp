@@ -24,7 +24,7 @@ void NetworkSession::accept_newcomers() {
     // (Too many waiting already: the newcomer is hung up on.)
     if (!room_to_wait(guest.peer_address())) continue;
     // Let in when it says hello (see admit), if the game has room.
-    links_.push_back({Connection::accepted(std::move(guest), kMaxPendingBytes, identity_), 0});
+    add_link(Connection::accepted(std::move(guest), kMaxPendingBytes, identity_), 0);
   }
 }
 
@@ -77,7 +77,7 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
 }
 
 void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
-  let_in(link, free_peer_id(ids_taken()), events);
+  let_in(link, free_peer_id(ids_taken(), room_size_), events);
 }
 
 void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& events) {

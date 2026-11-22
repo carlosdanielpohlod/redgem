@@ -18,8 +18,12 @@ inline constexpr int kEveryone = 0;
 // The id of the machine hosting the game. Whoever joins gets 2, 3, ... in the order they arrive.
 inline constexpr int kHostId = 1;
 inline constexpr int kFirstGuestId = kHostId + 1;
-// Machines in one game, the host included.
-inline constexpr int kMaxPeers = 16;
+// Machines in one game, the host included: the most the protocol carries (ids 1 to kMaxPeers),
+// and how many a game takes unless it says (game.json's "network": {"max_players": N}, see
+// NetworkSession::set_room_size). Two at the least: a host and one more.
+inline constexpr int kMaxPeers = 64;
+inline constexpr int kDefaultRoomSize = 16;
+inline constexpr int kMinRoomSize = 2;
 // What a message may be: how long its name and the keys of its hashes, and how deep its data may
 // nest (arrays in hashes in arrays...). Checked where a message is sent and again where it arrives,
 // since what arrives may come from a program that is not this one.
@@ -79,7 +83,7 @@ namespace wire {
 // turned away, told why, and both sides log it: nothing of one version is understood by another.
 // What says so never changes, so that every version understands it: a frame (length, then
 // MessagePack) holding a map with kKind, kVersion and, in a refusal, kReason.
-inline constexpr int kProtocolVersion = 2;
+inline constexpr int kProtocolVersion = 3;
 // The largest a version that arrives can be (a number past it is not one).
 inline constexpr int kLargestProtocolVersion = 65535;
 
@@ -101,6 +105,9 @@ inline constexpr const char* kReason = "y";
 // In a hello that opens a room on a relay: whether the opener's game decides who comes in, so that
 // the room is guarded from the start (later changes come as kGuarded).
 inline constexpr const char* kGuards = "g";
+// ... and how many machines its game takes, the opener included (kMinRoomSize to kMaxPeers; the
+// relay takes kDefaultRoomSize from a hello without it).
+inline constexpr const char* kRoomSize = "M";
 inline constexpr const char* kVersion = "v";  // in every first message of a connection: kProtocolVersion
 inline constexpr const char* kGameMessage = "m";
 inline constexpr const char* kPose = "o";     // where an object is (NetworkSync): its pose in kData (pose_codec.hpp)
@@ -127,9 +134,12 @@ inline constexpr const char* kBye =
     "e";  // a guest to its host: I leave (no place to hold); the host to all: the game is over
 inline constexpr const char* kBack = "b";  // to the others: kFrom reconnected (it missed what was said meanwhile)
 
-// The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
-// handed out again once free, so they never outgrow what a message may carry.
-int free_peer_id(const std::vector<int>& taken);
+// The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full: `room_size`
+// machines, the host included. Ids are handed out again once free, so they never outgrow what a
+// message may carry.
+int free_peer_id(const std::vector<int>& taken, int room_size = kMaxPeers);
+// A game's room size as it may be: kMinRoomSize to kMaxPeers.
+int usable_room_size(int asked);
 
 // A newcomer's first words: let me in (with what else it says added to it).
 nlohmann::json hello();

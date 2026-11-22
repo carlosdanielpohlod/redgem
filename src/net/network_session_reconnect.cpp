@@ -41,7 +41,7 @@ void NetworkSession::redial() {
   if (!socket.valid()) return;  // (tried again in a moment)
   nlohmann::json said = resume_hello(rejoin_.token);
   if (!room_.empty()) said[kRoom] = room_;  // a dedicated server's room
-  links_.push_back({Connection::calling(std::move(socket), rejoin_.trust), kHostId});
+  add_link(Connection::calling(std::move(socket), rejoin_.trust), kHostId);
   links_.front().connection.send(said);
 }
 

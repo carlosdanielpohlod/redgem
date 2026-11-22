@@ -6,7 +6,9 @@ description: "Multiplayer: hosting and joining, messages, synced objects, relays
 
 Games can be played together over a local network or the internet. One machine **hosts** the game
 and the others **join** it; every machine has an id (the host is 1, then 2, 3... as players arrive).
-Up to 16 machines play together.
+Up to 16 machines play together by default. A game sets its own number, from 2 to 63, in the
+`network` section of its `game.json`: `{"network": {"max_players": 32}}` (see
+[Room size](#room-size)).
 
 A game that plays online says so in its `game.json` with `"network": true`: its Android app
 then asks the phone for the network, which an app without it does not get (a build of a game
@@ -316,6 +318,18 @@ that is not a number sends at the game's rate.
 `Network.send_hz` is the game's rate. An owner sends at most one pose a frame, so a rate above
 the frame rate is the frame rate. More poses cost bandwidth: about 700 bytes a second per moving
 player at 20 a second, about 2.2 KB at 64, to every other machine.
+
+### Room size
+
+A room holds 16 machines unless the game says otherwise. `"network": {"max_players": 32}` lets 32
+machines into a room the game hosts or opens on a relay. It may be from 2 to 63. `redgem check`
+refuses a number out of those limits, and a game played with one is warned and keeps 16. A
+dedicated server takes the same number of players for each of its rooms, unless `--max-players`
+says otherwise; the server itself is the 64th machine. A newcomer to a full room is turned away.
+
+Traffic grows with the square of the room: each moving player's poses go to every other machine.
+At 20 poses a second a room of 32 moving players sends about 32 × 31 × 700 bytes, near 700 KB a
+second in all, which a dedicated server or a relay sends out.
 
 What the object's own animation does goes along with its place: play an attack on the owner's
 machine (`animation.play(:Attack, loop: false, fade: 0.1)`) and the others see the same clip,

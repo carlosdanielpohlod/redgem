@@ -60,6 +60,11 @@ bool is_id(const nlohmann::json& message, const char* key) {
   return !message.contains(key) || is_number_between(message[key], 0, kLargestId);
 }
 
+// How many machines the game of a room takes (kRoomSize), when it says.
+bool is_room_size(const nlohmann::json& message) {
+  return !message.contains(wire::kRoomSize) || is_number_between(message[wire::kRoomSize], kMinRoomSize, kMaxPeers);
+}
+
 bool is_version(const nlohmann::json& message) {
   return !message.contains(wire::kVersion) ||
          is_number_between(message[wire::kVersion], 0, wire::kLargestProtocolVersion);
@@ -128,7 +133,7 @@ bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
          is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) && is_version(message) &&
-         resumes_well(message) && carries_what_it_may(message);
+         is_room_size(message) && resumes_well(message) && carries_what_it_may(message);
 }
 
 bool acceptable_auth(const nlohmann::json& auth) {

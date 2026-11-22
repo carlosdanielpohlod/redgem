@@ -309,7 +309,6 @@ menu whose look each game sets:
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
 - Hit boxes on the bones of animated characters, posed on a dedicated server.
-- Rooms of more than 16 machines.
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.
 - An unreliable, sequenced channel for inputs and positions beside the reliable one.
@@ -718,8 +717,9 @@ promise of how it will be closed.
   travel, and the players load the whole level. A game's own messages (`Network.emit`) are not
   held across a change: one sent as it starts reaches handlers of whichever level the receiver has
   by then.
-- A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
-  the wire format, not by a game.
+- A room holds at most 64 machines (a game's `network.max_players` and a dedicated server's
+  `--max-players` stop at 63). Every pose still goes to every other machine: there is no
+  interest management, so traffic grows with the square of the room.
 - A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,
   no Prometheus-style metrics, and no IPv6 address to bind it to.
 

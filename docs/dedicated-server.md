@@ -27,7 +27,7 @@ below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-ro
 | Option | Default | What it is |
 |--------|---------|------------|
 | `--port` | 7777 | The TCP port players connect to (0 picks a free one) |
-| `--max-players` | 8 | Players in one room, up to 15 |
+| `--max-players` | The game's `network.max_players` (16) | Players in one room, up to 63 |
 | `--rooms` | 8 | Rooms open at once, up to 64 |
 | `--threads` | The machine's cores | Threads the rooms run on, up to 64: each room has one of its own while there are no more rooms than threads |
 | `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |

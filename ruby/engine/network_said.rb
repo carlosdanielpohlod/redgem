@@ -3,7 +3,7 @@ module Network
   # What other machines say about objects, checked before any of it is used: whoever sent it may
   # not be running this game's code. What does not fit is ignored.
   module Said
-    MAX_PEERS = 16            # machines in one game, the host included
+    MAX_PEERS = 64            # machines in one game, the host included (net::kMaxPeers)
     RECORD_SIZE = 5           # parts of a spawn record: key, template, owner, position, rotation
     SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
     ANIMATION_SIZE = 4        # parts of what says what its animation does: fade, weight, own clip, mixed clip

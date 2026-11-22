@@ -79,7 +79,7 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
   leave();
   Socket socket = Socket::connect_to(address, port, error);
   if (!socket.valid()) return false;
-  links_.push_back({Connection::calling(std::move(socket), trust), kHostId});
+  add_link(Connection::calling(std::move(socket), trust), kHostId);
   links_.front().connection.send(hello);  // goes out once the connection is made
   rejoin_.address = address;
   rejoin_.trust = trust;
@@ -99,6 +99,7 @@ bool NetworkSession::host_room(const std::string& address, std::uint16_t port, s
   nlohmann::json said = hello();
   said[kRoom] = kNewRoom;
   said[kGuards] = approving_;
+  said[kRoomSize] = room_size_;
   if (!connect_out(address, port, said, trust, error)) return false;
   through_relay_ = true;
   opening_room_ = true;
@@ -189,6 +190,16 @@ void NetworkSession::after_serving(float seconds, std::vector<NetworkEvent>& eve
   if (offline()) return;
   drop_closed_links(events);
   if (relaying()) expire_held_places(seconds, events);
+  flush();  // what was passed on in this poll, a write a machine
+}
+
+void NetworkSession::flush() {
+  for (Link& link : links_) link.connection.flush();
+}
+
+void NetworkSession::add_link(Connection connection, int peer) {
+  links_.push_back({std::move(connection), peer});
+  links_.back().connection.gather_writes();
 }
 
 bool NetworkSession::still_serving(std::size_t link) const { return link < links_.size() && !offline(); }

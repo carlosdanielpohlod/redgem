@@ -97,6 +97,7 @@ class RelayServer {
     ByteAllowance allowance{kRelayBytesPerSecond, kRelayBurstBytes};
     bool farewelled = false;  // the others in its room were told it is gone
     bool guarded = false;     // it opened its room, whose game decides who comes in
+    int room_size = kDefaultRoomSize;  // it opened its room: how many machines its game takes
     int asking_as = 0;        // the id it would have, while the game of its room decides on it
     float asking_for = 0.0f;
 

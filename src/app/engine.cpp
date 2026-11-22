@@ -50,6 +50,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
   if (!manifest.send_hz_error.empty()) log::warning(manifest.send_hz_error);
+  if (!manifest.max_players_error.empty()) log::warning(manifest.max_players_error);
   if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
@@ -135,6 +136,9 @@ void Engine::initialize() {
 
 void Engine::open_network(const GameSettings& settings) {
   network_.validate_movement(settings.movement);
+  // A player hosting is one of the game's players. A dedicated server places as many in a room as
+  // it was told (see server/room_choice.hpp), and plays nobody itself.
+  network_.set_room_size(serves_a_room() ? net::kMaxPeers : settings.max_players);
   if (serves_a_room()) network_.serve_room(options_.server_room);
 }
 

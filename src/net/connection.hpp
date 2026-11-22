@@ -30,6 +30,9 @@ inline constexpr int kMostConnectionsPerAddress = 1024;
 // what it wants (kJoinTimeoutSeconds): one that keeps a handshake hanging holds a place, so it
 // is let go sooner. (Nothing waits for it meanwhile: every handshake goes on as bytes arrive.)
 inline constexpr float kHandshakeTimeoutSeconds = 3.0f;
+// A connection that gathers its messages (gather_writes) sends them once this much waits, if not
+// sooner: about one TLS record.
+inline constexpr std::size_t kGatheredBytes = 16 * 1024;
 
 class TlsSession;
 
@@ -66,13 +69,19 @@ class Connection {
   // told why and logged; to one that this one called, they come out as a refusal saying that
   // version, and nothing more of them.
   std::optional<nlohmann::json> next_message();
-  // Queues a message, sent right away when the connection takes it; what is left goes out with
-  // the next pumps. With more than the limit waiting the other side stopped listening: closed.
+  // Queues a message, sent right away when the connection takes it (unless it gathers its
+  // messages); what is left goes out with the next pumps. With more than the limit waiting the
+  // other side stopped listening: closed.
   void send(const nlohmann::json& message);
   // The same, for a message packed already (wire::packed): one that goes to many is packed once.
   void send_packed(const std::vector<std::uint8_t>& message);
-  // One try at sending what waits (pump does it too; this is for a last word before leaving).
+  // One try at sending what waits (pump does it too; this is for a last word before leaving, and
+  // for a connection that gathers its messages).
   void flush();
+  // Messages are gathered and sent together at the next flush or pump (or once kGatheredBytes
+  // wait), not each on its own: many small ones (poses) cost one write and one TLS record, not one
+  // each. Whoever turns it on flushes once it said what it had to say.
+  void gather_writes() { gathering_ = true; }
 
   // Time passing for a machine that is in: says "I am here" when nothing was said to it lately,
   // and gives up on one not heard from for too long.
@@ -167,6 +176,7 @@ class Connection {
   bool gone_ = false;
   bool dropped_ = false;
   bool lost_ = false;  // let go for its silence, or for not listening: gone without a goodbye
+  bool gathering_ = false;
   std::string closed_for_{};
 
   // Lets go of the other side for `why` (see closed_for).

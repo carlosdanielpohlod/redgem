@@ -33,6 +33,7 @@ void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {
   }
   // (Whether the game of a room it opens decides who comes in: from the start, before anyone joins.)
   member.guarded = message.value(kGuards, false);
+  member.room_size = usable_room_size(message.value(kRoomSize, kDefaultRoomSize));
   enter_room(member, message[kRoom], message.value(kAuth, nlohmann::json()));
 }
 
@@ -70,8 +71,8 @@ void RelayServer::open_room(Member& member) {
 }
 
 void RelayServer::join_room(Member& member, const std::string& room, const nlohmann::json& auth) {
-  const int id = free_peer_id(seats_taken(room));
   Member* opener = opener_of(room);
+  const int id = opener != nullptr ? free_peer_id(seats_taken(room), opener->room_size) : 0;
   if (!takes_newcomers(id, opener)) {
     member.connection.close();
     return;

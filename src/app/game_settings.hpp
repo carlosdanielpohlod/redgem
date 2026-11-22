@@ -10,6 +10,7 @@
 #include "app/prefab_budget.hpp"
 #include "core/config.hpp"
 #include "net/movement_rules.hpp"
+#include "net/wire.hpp"
 #include "net/secure/server_pins.hpp"
 #include "navigation/nav_settings.hpp"
 #include "physics/body_limit.hpp"
@@ -56,6 +57,10 @@ struct GameSettings {
   // How many poses a second NetworkSync sends of an object that says nothing itself:
   //   "network": {"send_hz": 64}       (a "network" object also says the game plays online)
   int send_hz = config::kDefaultSendHz;
+  // How many players one game holds: everyone who joined, and the host when a player hosts (a
+  // dedicated server hosts and plays nobody), from net::kMinRoomSize to kMostPlayers:
+  //   "network": {"max_players": 32}
+  int max_players = net::kDefaultRoomSize;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
   // How many threads solve the game's physics: the "threads" key of the "physics" section (see
@@ -82,6 +87,9 @@ struct GameSettings {
   PrefabBudget prefab_budget;
 };
 
+// The most players a game may hold: a room of a dedicated server holds them and the server.
+inline constexpr int kMostPlayers = net::kMaxPeers - 1;
+
 // Everything game.json says, read once.
 struct GameManifest {
   // Always usable: the defaults (folder name as title, the engine's window size, an app with
@@ -105,6 +113,9 @@ struct GameManifest {
   // What is wrong with the "network" section's "send_hz"; empty when it can be used or there is
   // none. (Objects send config::kDefaultSendHz poses a second instead; `redgem check` refuses it.)
   std::string send_hz_error;
+  // What is wrong with the "network" section's "max_players"; empty when it can be used or there
+  // is none. (Games hold net::kDefaultRoomSize players instead; `redgem check` refuses it.)
+  std::string max_players_error;
   // What is wrong with "prefab_budget_mb"; empty when it can be used or the file has none. (The
   // prefabs get the engine's budgets instead; `redgem check` refuses it.)
   std::string prefab_budget_error;

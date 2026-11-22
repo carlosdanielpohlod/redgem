@@ -468,6 +468,19 @@ TEST_CASE("a server of a game at 128 Hz takes its lobby's turns at 128 Hz, and i
   CHECK(std::abs(budget_ms - kFastTickSeconds * kMillisecondsPerSecond) <= kStatusRounding);
 }
 
+TEST_CASE("a server not told how many players a room holds takes as many as its game does") {
+  constexpr int kMatchPlayers = 20;  // 10v10
+  constexpr server::RoomLimits kGamesRooms{server::kGamesPlayers, 2};
+  const FastGame plain;  // (its game.json gives a tick alone)
+  {
+    Online online_game(kGamesRooms, plain.game, kOneThread);
+    CHECK(server::status_json(online_game.server.status())["players"]["limit_per_room"] == net::kDefaultRoomSize);
+  }
+  std::ofstream(plain.game / "game.json") << R"({"network": {"max_players": 20}})";
+  Online online_game(kGamesRooms, plain.game, kOneThread);
+  CHECK(server::status_json(online_game.server.status())["players"]["limit_per_room"] == kMatchPlayers);
+}
+
 TEST_CASE("a server of a game with a tick it cannot use warns, and runs at the default tick") {
   const FastGame too_fast(kTooFastTick);
   std::vector<std::string> warnings;
