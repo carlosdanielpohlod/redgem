@@ -17,6 +17,7 @@
 #include "scene/decal_clip.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/triangle_index.hpp"
 
 namespace redgem {
 
@@ -30,11 +31,11 @@ inline constexpr std::size_t kMaxDecalCorners = 3 * 512;
 // What a decal is placed with (Decals.place).
 struct DecalPlacement {
   Vec3 point;
-  Vec3 normal;  // out of the surface
+  Vec3 normal;         // out of the surface
   float size = 0.0f;   // meters across
   float depth = 0.0f;  // meters it reaches into and out of the surface, all told
   float spin_radians = 0.0f;
-  std::string image;   // a picture of the game's images/ folder; empty for a soft round spot
+  std::string image;  // a picture of the game's images/ folder; empty for a soft round spot
   Color color{0.0f, 0.0f, 0.0f, 1.0f};
 };
 
@@ -56,6 +57,10 @@ class DecalSystem {
   // whether it fell on any: nothing is kept when it did not.
   bool place(const Scene& scene, const SceneDesc& desc, const DecalPlacement& placement);
   void clear() { decals_.clear(); }
+  // A scene starts: no marks, and nothing kept of the last one's surfaces. With the new scene's
+  // `surfaces` (on a machine that draws decals), the triangles of its dense meshes are sorted now,
+  // as it loads, rather than at the first mark on each.
+  void start_over(const SceneDesc* surfaces);
   // How many are kept at most (kMinDecalLimit to kMaxDecalLimit); a lower limit drops the oldest
   // at once.
   void set_limit(std::size_t limit);
@@ -66,6 +71,7 @@ class DecalSystem {
  private:
   std::deque<Decal> decals_;
   std::size_t limit_ = kDefaultDecalLimit;
+  TriangleIndexCache indexes_;
 };
 
 // Whether an object of the scene takes decals: one that is drawn, of a rigid mesh (a skeleton or

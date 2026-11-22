@@ -20,11 +20,6 @@ Vec3 to_local(const Transform& world, Vec3 point) {
   return safe_divide(rotate(conjugate(world.rotation), point - world.position), world.scale);
 }
 
-bool overlaps(const Bounds& a, const Bounds& b) {
-  return a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y &&
-         a.min.z <= b.max.z && b.min.z <= a.max.z;
-}
-
 // What the box reaches of an object's own space, as the smallest box along its axes around it.
 Bounds local_reach(const DecalBox& box, const Transform& world) {
   Bounds reach;
@@ -52,7 +47,7 @@ std::array<Vec3, 3> local_triangle(const PrimitiveDesc& primitive, std::size_t f
 bool within_reach(const std::array<Vec3, 3>& triangle, const Bounds& reach) {
   Bounds around;
   for (const Vec3 corner : triangle) around.include(corner);
-  return overlaps(around, reach);
+  return boxes_overlap(around, reach);
 }
 
 // The triangle in the world, its corners in the order that faces out of its surface (a mirroring
@@ -63,12 +58,14 @@ std::array<Vec3, 3> world_triangle(const std::array<Vec3, 3>& local, const Trans
   return triangle;
 }
 
-// One object's surfaces under the box, and how many more corners the decal may have.
+// One object's surfaces under the box, how many more corners the decal may have, and where the
+// triangles of dense surfaces are sorted to be found.
 struct Cut {
   const DecalBox& box;
   const Transform& world;
   Bounds reach;
   std::size_t room = 0;
+  TriangleIndexCache& indexes;
 };
 
 // Raises the corners a triangle gave the decal (from `first` on) off it, on the side the decal is.
@@ -87,13 +84,34 @@ void cut_triangle(const Cut& cut, const std::array<Vec3, 3>& triangle, bool eith
   lift_off(triangle, cut.box.normal, out, first);
 }
 
-// A two-sided surface takes a mark on either side.
+// The triangle whose corners are listed from `first` on, if it is near the box.
+void cut_listed(const Cut& cut, const PrimitiveDesc& primitive, std::size_t first, bool either_side,
+                std::vector<DecalCorner>& out) {
+  const std::array<Vec3, 3> local = local_triangle(primitive, first);
+  if (within_reach(local, cut.reach)) cut_triangle(cut, world_triangle(local, cut.world), either_side, out);
+}
+
+// The triangles of a dense primitive near the box, in the order the primitive lists them.
+std::vector<std::size_t> near_the_box(const TriangleIndex& index, const Bounds& reach) {
+  std::vector<std::size_t> near;
+  index.find(reach, near);
+  std::sort(near.begin(), near.end());
+  return near;
+}
+
+// A two-sided surface takes a mark on either side. A dense one is looked up in its index; a small
+// one walked whole.
 void cut_primitive(const Cut& cut, const PrimitiveDesc& primitive, bool either_side, std::vector<DecalCorner>& out) {
-  const std::size_t listed = listed_corners(primitive);
-  for (std::size_t first = 0; first + kTriangleIndices <= listed; first += kTriangleIndices) {
+  if (const TriangleIndex* index = cut.indexes.of(primitive)) {
+    for (const std::size_t first : near_the_box(*index, cut.reach)) {
+      if (out.size() >= cut.room) return;
+      cut_listed(cut, primitive, first, either_side, out);
+    }
+    return;
+  }
+  for (std::size_t first = 0; first + kTriangleIndices <= listed_corners(primitive); first += kTriangleIndices) {
     if (out.size() >= cut.room) return;
-    const std::array<Vec3, 3> local = local_triangle(primitive, first);
-    if (within_reach(local, cut.reach)) cut_triangle(cut, world_triangle(local, cut.world), either_side, out);
+    cut_listed(cut, primitive, first, either_side, out);
   }
 }
 
@@ -106,22 +124,32 @@ const MaterialDesc* material_of(const SceneDesc& desc, const PrimitiveDesc& prim
 // it, or on a cut-out's holes, would darken what is behind.
 bool solid(const MaterialDesc& material) { return material.alpha_mode == AlphaMode::Opaque && !material.water.enabled; }
 
+// A primitive marks fall on: of no material, or a solid one.
+bool takes_marks(const SceneDesc& desc, const PrimitiveDesc& primitive) {
+  const MaterialDesc* material = material_of(desc, primitive);
+  return material == nullptr || solid(*material);
+}
+
+bool two_sided(const SceneDesc& desc, const PrimitiveDesc& primitive) {
+  const MaterialDesc* material = material_of(desc, primitive);
+  return material != nullptr && material->double_sided;
+}
+
 std::vector<DecalCorner> cut_mesh(const Cut& cut, const MeshDesc& mesh, const SceneDesc& desc) {
   std::vector<DecalCorner> corners;
-  if (mesh.bounds.valid && !overlaps(mesh.bounds, cut.reach)) return corners;
+  if (mesh.bounds.valid && !boxes_overlap(mesh.bounds, cut.reach)) return corners;
   for (const PrimitiveDesc& primitive : mesh.primitives) {
-    const MaterialDesc* material = material_of(desc, primitive);
-    if (material == nullptr) cut_primitive(cut, primitive, false, corners);
-    else if (solid(*material)) cut_primitive(cut, primitive, material->double_sided, corners);
+    if (takes_marks(desc, primitive)) cut_primitive(cut, primitive, two_sided(desc, primitive), corners);
   }
   corners.resize(std::min(corners.size(), cut.room));
   return corners;
 }
 
 // The piece of a decal on one object: its corners raised off the surface, in the object's space.
-DecalPiece piece_on(const Scene& scene, ObjectId id, const SceneDesc& desc, const DecalBox& box, std::size_t room) {
+DecalPiece piece_on(const Scene& scene, ObjectId id, const SceneDesc& desc, const DecalBox& box, std::size_t room,
+                    TriangleIndexCache& indexes) {
   const Transform world = scene.world_transform(id);
-  const Cut cut{box, world, local_reach(box, world), room};
+  const Cut cut{box, world, local_reach(box, world), room, indexes};
   std::vector<DecalCorner> corners = cut_mesh(cut, desc.meshes[static_cast<std::size_t>(scene.at(id).mesh)], desc);
   for (DecalCorner& corner : corners) corner.position = to_local(world, corner.position);
   return {scene.handle(id), std::move(corners)};
@@ -164,13 +192,24 @@ bool DecalSystem::place(const Scene& scene, const SceneDesc& desc, const DecalPl
   Decal decal{{}, placement.image, placement.color};
   for (const ObjectId id : scene.alive_ids()) {
     if (!marked_in_the_world(scene, id, desc)) continue;
-    DecalPiece piece = piece_on(scene, id, desc, box, kMaxDecalCorners - corners_of(decal));
+    DecalPiece piece = piece_on(scene, id, desc, box, kMaxDecalCorners - corners_of(decal), indexes_);
     if (!piece.corners.empty()) decal.pieces.push_back(std::move(piece));
   }
   if (decal.pieces.empty()) return false;
   decals_.push_back(std::move(decal));
   set_limit(limit_);
   return true;
+}
+
+void DecalSystem::start_over(const SceneDesc* surfaces) {
+  decals_.clear();
+  indexes_.forget();
+  if (surfaces == nullptr) return;
+  for (const MeshDesc& mesh : surfaces->meshes) {
+    for (const PrimitiveDesc& primitive : mesh.primitives) {
+      if (takes_marks(*surfaces, primitive)) indexes_.of(primitive);
+    }
+  }
 }
 
 void DecalSystem::set_limit(std::size_t limit) {

@@ -7,6 +7,7 @@
 #include "scene/decal_clip.hpp"
 #include "scene/decals.hpp"
 #include "scene/scene.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -86,7 +87,7 @@ TEST_CASE("a decal leaves out a surface turned away from it, and one outside its
   const DecalBox box = decal_box(Vec3::zero(), {0, 0, 1}, kSize, kDepth, 0.0f);
   std::vector<DecalCorner> corners;
   clip_to_decal(box, {kWall[0], kWall[2], kWall[1]}, corners);  // its back
-  const Vec3 away{0, 0, kDepth};                                   // past the box's front
+  const Vec3 away{0, 0, kDepth};                                // past the box's front
   clip_to_decal(box, {kWall[0] + away, kWall[1] + away, kWall[2] + away}, corners);
   CHECK(corners.empty());
 }
@@ -248,4 +249,47 @@ TEST_CASE("a decal falls on a mesh listed without indices") {
   quad.texcoords.clear();
   DecalSystem decals;
   CHECK(decals.place(Scene::from_desc(desc), desc, on_the_floor(Vec3::zero())));
+}
+
+namespace {
+
+constexpr float kTerrainSide = 64.0f;
+constexpr int kTerrainCells = 256;  // 131 072 triangles
+
+// A scene of a dense flat terrain, facing up.
+SceneDesc terrain_desc() {
+  SceneDesc desc;
+  MeshDesc mesh;
+  mesh.primitives = {make_terrain({kTerrainSide, kTerrainCells})};
+  mesh.bounds.include({-kTerrainSide * kHalf, 0, -kTerrainSide * kHalf});
+  mesh.bounds.include({kTerrainSide * kHalf, 0, kTerrainSide * kHalf});
+  desc.meshes = {mesh};
+  NodeDesc node;
+  node.mesh = 0;
+  desc.nodes = {node};
+  return desc;
+}
+
+}  // namespace
+
+TEST_CASE("a decal on a dense terrain covers its square of it, cut from the triangles near it") {
+  const SceneDesc desc = terrain_desc();
+  const Scene scene = Scene::from_desc(desc);
+  DecalSystem decals;
+  REQUIRE(decals.place(scene, desc, on_the_floor({3.1f, 0, -2.7f})));
+  const std::vector<DecalCorner>& corners = decals.decals().front().pieces.front().corners;
+  CHECK(area_of(corners) == doctest::Approx(kSize * kSize).epsilon(kTolerance));
+  for (const DecalCorner& corner : corners) CHECK(on_the_picture(corner));
+}
+
+TEST_CASE("a decal system starts over for a scene: no marks, its dense surfaces sorted as it loads") {
+  const SceneDesc desc = terrain_desc();
+  const Scene scene = Scene::from_desc(desc);
+  DecalSystem decals;
+  REQUIRE(decals.place(scene, desc, on_the_floor(Vec3::zero())));
+  decals.start_over(&desc);
+  CHECK(decals.decals().empty());
+  CHECK(decals.place(scene, desc, on_the_floor(Vec3::zero())));
+  decals.start_over(nullptr);  // a machine that draws none sorts nothing
+  CHECK(decals.decals().empty());
 }

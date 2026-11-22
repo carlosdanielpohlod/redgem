@@ -162,8 +162,8 @@ int Engine::chosen_physics_threads(const GameSettings& settings) const {
 void Engine::open_presenter(const GameSettings& settings) {
   if (presenter_ == nullptr) {
     // Shown by nobody, the game is as big as its settings say.
-    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height},
-                                                     fixed_delta());
+    own_presenter_ =
+        std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height}, fixed_delta());
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();
@@ -276,6 +276,7 @@ void Engine::connect_effects() {
   context_.particle_emitters = &particle_emitters_;
   context_.decals = &decals_;
   context_.renders_particles = options_.presenter != nullptr;
+  decals_.start_over(context_.renders_particles ? &scene_desc_ : nullptr);  // the first scene's surfaces
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
 
