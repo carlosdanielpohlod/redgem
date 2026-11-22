@@ -95,6 +95,21 @@ TEST_CASE("a weaker brush goes part of the way, and strokes add up") {
   CHECK(grass_at(layers, kMiddle, kMiddle) > once);
 }
 
+TEST_CASE("a faint brush held a long time still paints, as far as its strength adds up to") {
+  // A share of a frame too small to move a byte: one byte that often instead, on average.
+  constexpr float kFaint = 0.002f;
+  constexpr int kFrames = 1000;
+  constexpr float kExpected = 0.865f;  // 1 - (1 - kFaint)^kFrames
+  constexpr float kSpread = 0.1f;
+  TerrainLayers layers = two_layers();
+  LayerBrush brush = grass_brush(kFaint, 0.0f);
+  for (int frame = 0; frame < kFrames; ++frame) {
+    brush.step = static_cast<std::uint32_t>(frame);
+    brush_layer(layers, kBounds, brush);
+  }
+  CHECK(grass_at(layers, kMiddle, kMiddle) == doctest::Approx(kExpected).epsilon(kSpread));
+}
+
 TEST_CASE("a brush that changes nothing keeps the version, and one of no layer paints nothing") {
   TerrainLayers layers = two_layers();
   const auto version = layers.splat.version;

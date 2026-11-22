@@ -135,7 +135,8 @@ void EditorApp::paint_layer_at(ObjectId terrain, Vec3 point, float seconds) {
                          terrain_tool_.radius,
                          strength_for(terrain_tool_.layer_strength, seconds),
                          terrain_tool_.falloff,
-                         terrain_tool_.layer};
+                         terrain_tool_.layer,
+                         ++layer_brush_steps_};
   session_->paint_layer(terrain, point, brush);
 }
 

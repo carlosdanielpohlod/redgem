@@ -86,9 +86,14 @@ bool SceneDocument::paint_layer(int node, const LayerBrush& brush) {
 std::vector<const TerrainLayers*> SceneDocument::unsaved_weights() const {
   std::vector<const TerrainLayers*> unsaved;
   for (const TerrainLayers& layers : desc_.terrains) {
-    if (unsaved_weights_.count(layers.name) != 0) unsaved.push_back(&layers);
+    // (Weights no object of the scene shows any more stay as the files have them.)
+    if (unsaved_weights_.count(layers.name) != 0 && layers.node != kNoTerrainNode) unsaved.push_back(&layers);
   }
   return unsaved;
+}
+
+void SceneDocument::weights_saved() {
+  for (const TerrainLayers* layers : unsaved_weights()) unsaved_weights_.erase(layers->name);
 }
 
 std::map<std::string, SceneDocument::KeptWeights> SceneDocument::kept_weights() const {
@@ -122,15 +127,13 @@ void SceneDocument::restore_weights(const std::map<std::string, KeptWeights>& we
 }
 
 std::size_t SceneDocument::undo_weights_bytes() const {
+  // Every copy counts once, the one shared by the latest steps too: the weights the terrains hold
+  // now are another vector.
   Copies copies;
   add_copies(undo_, copies);
   add_copies(redo_, copies);
-  for (const TerrainLayers& layers : desc_.terrains) {  // a copy of the weights held now is not undo's
-    const auto copy = weights_copies_.find(layers.name);
-    if (copy == weights_copies_.end()) continue;
-    if (still_current(layers.splat, copy->second.version, copy->second.weights.get()))
-      copies.erase(copy->second.weights.get());
-  }
+  for (const auto& [name, copy] : weights_copies_) copies.insert(copy.weights.get());
+  copies.erase(nullptr);
   std::size_t bytes = 0;
   for (const auto* copy : copies) bytes += copy->size();
   return bytes;

@@ -6,6 +6,7 @@
 // Experimental: the brush and its settings may still change.
 
 #include <cstddef>
+#include <cstdint>
 
 #include "scene/scene_desc.hpp"
 
@@ -23,6 +24,9 @@ struct LayerBrush {
   // 1: it fades from the middle on).
   float falloff = kDefaultBrushFalloff;
   int layer = 0;
+  // Another number each time a held brush paints again. A share too small to move a weight's byte
+  // moves it now and then instead; this says which times (see brush_layer).
+  std::uint32_t step = 0;
 };
 
 // How far toward the layer the brush moves a spot `distance` meters from its middle: its strength
@@ -34,7 +38,9 @@ float brush_share(const LayerBrush& brush, float distance);
 float strength_for(float per_second, float seconds);
 
 // Paints the brush into the weights of `layers`, laid over a mesh of `bounds`. Returns how many
-// texels changed; the weights' version goes up when any did.
+// texels changed; the weights' version goes up when any did. A spot whose share is too small to
+// move its byte (a faint brush, held a frame at a time) moves one byte as often as that share
+// would on average, so a held brush goes as far as its strength adds up to.
 std::size_t brush_layer(TerrainLayers& layers, const Bounds& bounds, const LayerBrush& brush);
 
 }  // namespace redgem

@@ -77,8 +77,10 @@ void choose_layer(TerrainTool& tool, const TerrainLayers& layers) {
   ImGui::SetNextItemWidth(kFillWidth);
   if (!ImGui::BeginCombo(kLayerId, layers.layers[static_cast<std::size_t>(tool.layer)].name.c_str())) return;
   for (int layer = 0; layer < count; ++layer) {
+    ImGui::PushID(layer);  // (two layers may have the same name)
     if (ImGui::Selectable(layers.layers[static_cast<std::size_t>(layer)].name.c_str(), layer == tool.layer))
       tool.layer = layer;
+    ImGui::PopID();
   }
   ImGui::EndCombo();
 }

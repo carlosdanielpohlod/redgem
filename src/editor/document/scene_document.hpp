@@ -130,9 +130,11 @@ class SceneDocument {
   // One brush stroke that paints a layer into a terrain's weights, in the mesh's own space. Like
   // sculpt_terrain, it is not recorded by itself. False when nothing changed.
   bool paint_layer(int node, const LayerBrush& brush);
-  // The terrains whose weights changed since the last save: the session writes their pictures.
+  // The terrains whose weights changed since the last save and an object shows: the session writes
+  // their pictures, then calls weights_saved. (Weights no object shows any more are not written:
+  // the files keep them as other scenes may use them, unless undo brings their object back.)
   std::vector<const TerrainLayers*> unsaved_weights() const;
-  void weights_saved() { unsaved_weights_.clear(); }
+  void weights_saved();
   // Moves a node (and its children) under `new_parent` (kNoIndex = scene root), keeping its world
   // placement. Returns the node's new index (nodes keep parents before children). Refuses cycles
   // and invalid indices (returns `index` unchanged).

@@ -13,6 +13,14 @@ namespace {
 constexpr float kHalfTexel = 0.5f;
 constexpr float kSmoothA = 3.0f;  // of the smoothstep 3t² - 2t³
 constexpr float kSmoothB = 2.0f;
+constexpr float kFullByte = static_cast<float>(kFullSplatWeight);
+// A hash of a texel and a stroke step (a 32-bit mix), as a share from 0 to 1.
+constexpr std::uint32_t kPrimeColumn = 0x8da6b343U;
+constexpr std::uint32_t kPrimeRow = 0xd8163841U;
+constexpr std::uint32_t kPrimeStep = 0xcb1ab31fU;
+constexpr std::uint32_t kMixShift = 15;
+constexpr std::uint32_t kMixFactor = 0x2c1b3c6dU;
+constexpr float kLargestHash = 4294967295.0f;
 
 using TexelBytes = std::array<std::uint8_t, kMaxTerrainLayers>;
 
@@ -45,12 +53,35 @@ TexelBytes bytes_of(const SplatMap& splat, int column, int row) {
   return bytes;
 }
 
+// A share from 0 to 1, the same for the same texel and step of the brush.
+float dice(int column, int row, std::uint32_t step) {
+  std::uint32_t hash = static_cast<std::uint32_t>(column) * kPrimeColumn ^ static_cast<std::uint32_t>(row) * kPrimeRow ^
+                       step * kPrimeStep;
+  hash ^= hash >> kMixShift;
+  hash *= kMixFactor;
+  hash ^= hash >> kMixShift;
+  return static_cast<float>(hash) / kLargestHash;
+}
+
+// A share too small to move the layer's byte at all (a held brush, a frame at a time, or its soft
+// rim) moves it one byte as often as that share would on average: whole bytes, as the weights
+// keep them, without the stroke stalling short of the layer.
+float stored_share(float share, std::uint8_t layer_byte, float roll) {
+  const float room = kFullByte - static_cast<float>(layer_byte);
+  const float bytes = share * room;
+  if (bytes >= 1.0f || room <= 0.0f) return share;
+  return roll < bytes ? 1.0f / room : 0.0f;
+}
+
 // Paints one texel; whether its bytes changed.
 bool brush_texel(SplatMap& splat, const SplatArea& area, const LayerBrush& brush, int column, int row) {
   const GroundPlace place = texel_place(area, splat.size, column, row);
-  const float share = brush_share(brush, std::hypot(place.x - brush.x, place.z - brush.z));
-  if (share <= 0.0f) return false;
+  const float wanted = brush_share(brush, std::hypot(place.x - brush.x, place.z - brush.z));
+  if (wanted <= 0.0f) return false;
   const TexelBytes before = bytes_of(splat, column, row);
+  const float share =
+      stored_share(wanted, before[static_cast<std::size_t>(brush.layer)], dice(column, row, brush.step));
+  if (share <= 0.0f) return false;
   set_texel(splat, column, row, toward_layer(texel_weights(splat, column, row), brush.layer, share));
   return bytes_of(splat, column, row) != before;
 }

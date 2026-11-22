@@ -221,7 +221,10 @@ bool EditorSession::paint_terrain(ObjectId terrain, Vec3 world_point, float radi
 const TerrainLayers* EditorSession::terrain_layers(ObjectId terrain) const { return document_.terrain_layers(terrain); }
 
 bool EditorSession::paint_layer(ObjectId terrain, Vec3 world_point, LayerBrush brush) {
-  if (!can_sculpt(terrain)) return false;
+  const TerrainLayers* layers = document_.terrain_layers(terrain);
+  if (!can_sculpt(terrain) || layers == nullptr || layers->layers.empty()) return false;
+  // (A layer chosen on another terrain with more layers is this one's last.)
+  brush.layer = std::clamp(brush.layer, 0, static_cast<int>(layers->layers.size()) - 1);
   const TerrainBrush local =
       editor_logic::local_brush(preview_.world_transform(terrain), world_point, brush.radius, 0.0f, SculptMode::Smooth);
   brush.x = local.x;

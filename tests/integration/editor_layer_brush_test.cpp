@@ -140,14 +140,15 @@ TEST_CASE("undo steps that leave the weights alone share one copy of them") {
   auto session = open(dir);
   const ObjectId terrain = layered_terrain(*session);
   constexpr std::size_t kWeightBytes = std::size_t{kWideSide} * kWideSide * kMaxTerrainLayers;
-  const std::size_t before = session->document().history_bytes();
-  for (const char* name : {"Ground.a", "Ground.b", "Ground.c"}) {
-    session->document().set_name(terrain, name);  // (each one undo step)
-  }
-  CHECK(session->document().history_bytes() < before + kWeightBytes);
+  session->document().set_name(terrain, "Ground.a");  // (each one undo step, with the weights)
+  const std::size_t one_copy = session->document().history_bytes();
+  for (const char* name : {"Ground.b", "Ground.c", "Ground.d"}) session->document().set_name(terrain, name);
+  CHECK(session->document().history_bytes() < one_copy + kWeightBytes);
+  // A stroke changes them: the next step keeps a copy of its own.
   session->document().checkpoint();
   REQUIRE(session->paint_layer(terrain, kCenter, grass_brush(1.0f)));
-  CHECK(session->document().history_bytes() >= before + kWeightBytes);  // the weights before the stroke
+  session->document().set_name(terrain, "Ground.e");
+  CHECK(session->document().history_bytes() >= one_copy + kWeightBytes);
   std::filesystem::remove_all(dir);
 }
 
