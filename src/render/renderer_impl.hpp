@@ -424,7 +424,7 @@ struct Renderer::Impl {
   };
   std::vector<FrameDecal> frame_decals;
   Shader decal_shader{};
-  Texture2D decal_spot{};  // what a decal without a picture shows: a soft round spot
+  Texture2D decal_spot{};                                // what a decal without a picture shows: a soft round spot
   std::vector<render_math::SeeThroughDraw> see_through;  // the frame's, in the order they are drawn
   std::vector<bool> see_through_meshes;                  // by mesh: whether a part of it is drawn see-through
   bool any_see_through = false;                          // of any mesh: when none is, nothing is gathered
