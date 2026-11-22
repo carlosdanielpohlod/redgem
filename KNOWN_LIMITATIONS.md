@@ -36,6 +36,10 @@ the same pull request.
 
 ## Rendering and animation
 
+- Only dynamic bodies, characters and vehicles (and what hangs from them) are drawn between their
+  last two steps. A kinematic body a script moves in `fixed_update` is drawn in steps, so a body
+  riding a moving kinematic platform shifts against it by up to a step at high frame rates. An
+  object a script places each `update` from a body's `transform.position` follows the step pose.
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Animation events and root motion come from a character's own clips only: the scene's clips

@@ -91,15 +91,6 @@ void lay_weights_over(std::vector<float>& weights, const std::vector<float>& to,
 
 namespace {
 
-using redgem::mix;  // (points; rotations below)
-
-// The rotation `weight` of the way from one to the other, the short way round.
-Quat mix(Quat from, Quat to, float weight) {
-  const float sign = short_way_sign(from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w);
-  return normalize(Quat{from.x + (to.x * sign - from.x) * weight, from.y + (to.y * sign - from.y) * weight,
-                        from.z + (to.z * sign - from.z) * weight, from.w + (to.w * sign - from.w) * weight});
-}
-
 // A clip's pose with all its weight replaces what is there; with less it moves it that share of
 // the way.
 template <typename Value>

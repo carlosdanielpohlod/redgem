@@ -100,6 +100,7 @@ void Engine::install_world(SceneActivation& incoming) {
   runtime_prefab_bytes_ = 0;
   scene_desc_ = std::move(incoming.desc());
   scene_ = std::move(incoming.scene());
+  render_poses_.clear();  // (the old scene's objects are not the new one's)
   adopt_physics(incoming.take_physics());
   water_.reset(scene_desc_);
   settle_world();
