@@ -71,12 +71,14 @@ the same pull request.
   off the muzzle by as much as the shake moves the picture.
 - Decals (`Decals.place`) only darken what they lie on (their color multiplies it): a mark lighter
   than its surface (white paint on a dark wall) cannot be made, and they do not shine or reflect.
-  They are cut from the surfaces' triangles when placed, on the machine's main thread: a mark on a
-  dense mesh costs about a millisecond for each 100 000 triangles of the mesh it lands on, and a
-  mark is cut short past 512 triangles. They are not in reflections, and fog does not lighten them
-  with distance. A mesh that changes shape after a mark is placed (a sculpted terrain in the
-  editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and see-through or
-  cut-out materials (glass, leaves, a fence) take none.
+  They are cut from the surfaces' triangles near them when placed, on the machine's main thread, and
+  a mark is cut short past 512 triangles. The triangles of a dense mesh (512 or more in a part) are
+  sorted for that as the scene loads, about 20 ms for each 130 000 (kept, about 2 MB); a model
+  spawned later is sorted at the first mark on it. A mesh reshaped in place while the game runs is
+  not sorted again: new marks on what moved may fall short. They are not in reflections, and fog
+  does not lighten them with distance. A mesh that changes shape after a mark is placed (a sculpted
+  terrain in the editor) leaves the mark as it was. Skinned meshes, meshes with shape keys, and
+  see-through or cut-out materials (glass, leaves, a fence) take none.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
