@@ -40,6 +40,15 @@ struct ObjectHandle {
 };
 inline constexpr ObjectHandle kNoHandle{};
 
+// A level of detail's sizes on screen (props `screen_size_from`, `screen_size_to`, `lod_radius`,
+// `lod_fade`; see props.hpp): none while `radius` is 0.
+struct ScreenLevel {
+  float from = 0.0f;
+  float to = std::numeric_limits<float>::infinity();
+  float radius = 0.0f;
+  float fade = 0.0f;
+};
+
 struct GameObject {
   ObjectId id = kNoObject;
   ObjectSerial serial = kNoSerial;
@@ -71,8 +80,9 @@ struct GameObject {
   // Drawn only while this far from the camera, in meters (props `visible_from`, `visible_to`).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
-  bool prefab = false;      // a template for Scene.spawn: not simulated, not drawn
-  bool cast_shadow = true;  // in the sun's shadows (prop `cast_shadow`)
+  ScreenLevel screen_level;  // and only while this big on screen
+  bool prefab = false;       // a template for Scene.spawn: not simulated, not drawn
+  bool cast_shadow = true;   // in the sun's shadows (prop `cast_shadow`)
   // Drawn as the view model, with what is under it (prop `view_model`; see props::kViewModel).
   bool view_model = false;
   // Whether wind sways its foliage (prop `sway`; unless said, it does when no skeleton moves it).

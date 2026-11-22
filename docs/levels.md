@@ -198,7 +198,8 @@ however many there are: a street of the same building costs little more than one
 duplicates together by their names (Tree, Tree.001, Tree.002...); copies whose turn comes between
 other objects are drawn in that order, so that surfaces lying on each other look as they did. What still costs is the number of different meshes on
 screen, and of separate parts in each: join the parts of a model that share a material, and give
-heavy models lighter versions for far away with `visible_from` and `visible_to`.
+heavy models lighter versions for far away with `visible_from` and `visible_to`, or let the editor
+make them with the model's [import settings](import-settings.md) (`lod_levels`).
 
 ### Glowing materials from scripts
 
@@ -563,6 +564,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
 | `prefab_file` | `prefabs/crate.glb` | An empty object loads a [reusable object file](prefabs.md) at its placement |
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
+| `screen_size_from`, `screen_size_to`, `lod_radius`, `lod_fade`, `lod_level` | numbers | Experimental. The object is drawn only while its bounding sphere (`lod_radius` meters, times its scale) covers that share of the view's height, cross-fading with the next level over `lod_fade`. The editor writes them when it makes a model's levels of detail (see [import settings](import-settings.md)) |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
 | `cast_shadow` | `false` / `true`                            | `false` keeps the object out of the shadows (a sky dome); `true` on a point or spot light makes it cast shadows (off unless said) |
 | `view_model` | `false` / `true`                            | `true` draws the object and what is under it as the view model: a first-person weapon drawn over the world, never into a wall (see "A first-person weapon" in [gameplay.md](scripting/gameplay.md)) |
