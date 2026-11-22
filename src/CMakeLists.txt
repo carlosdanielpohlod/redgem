@@ -379,6 +379,7 @@ redgem_add_library(redgem_runtime
   scene/particle_look.cpp
   scene/decal_clip.cpp
   scene/decals.cpp
+  scene/triangle_index.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
   scene/water_volume.cpp
@@ -551,6 +552,8 @@ redgem_add_library(redgem_runtime
   render/temporal.cpp
   render/gl_extras.cpp
   render/gpu_timers.cpp
+  render/frame_pacer.cpp
+  render/picture_check.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/compressed_textures.cpp

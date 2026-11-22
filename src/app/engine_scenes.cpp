@@ -87,16 +87,21 @@ void Engine::switch_to(SceneActivation& incoming) {
   install_world(incoming);
   context_.scene_name = incoming.name();
   scene_generation_ = incoming.generation();
+  start_effects_over();
+  // Every object is in place by now: each script's first update sees the whole scene.
+  scripts_->attach_scripts();
+  scripts_->run_scene_script(incoming.name());
+  network_watch_.restart();  // the time the scene took to load is not the network's
+}
+
+// What plays, flies and marks the scene starts over with the new one.
+void Engine::start_effects_over() {
   animations_.reset(scene_desc_.animations, scene_);
   head_aims_.clear();
   particles_.clear();
   hitboxes_.clear();  // (the objects are gone with the scene)
   particle_emitters_.clear();
-  decals_.clear();
-  // Every object is in place by now: each script's first update sees the whole scene.
-  scripts_->attach_scripts();
-  scripts_->run_scene_script(incoming.name());
-  network_watch_.restart();  // the time the scene took to load is not the network's
+  decals_.start_over(context_.renders_particles ? &scene_ : nullptr, scene_desc_);
 }
 
 void Engine::install_world(SceneActivation& incoming) {
