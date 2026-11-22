@@ -16,6 +16,8 @@
 #include "project/scene_lookup.hpp"
 #include "project/runtime_query.hpp"
 #include "project/scene_text.hpp"
+#include "scene/property.hpp"
+#include "scene/props.hpp"
 
 namespace redgem::tools {
 namespace {
@@ -115,12 +117,22 @@ std::string reimported_text(const std::string& model, int done) {
          " object(s), each one undo step; unsaved until editor save";
 }
 
+// Whether an object of the open scene was imported from models/<model> (its model_file).
+bool holds_model(EditorSession& session, const std::string& model) {
+  const SceneDocument& document = session.document();
+  for (int index = 0; index < document.node_count(); ++index)
+    if (get_string(document.node(index).props, props::kModelFile) == model) return true;
+  return false;
+}
+
 // import_settings in the editor: settings and set on the files, as without it; apply imports the
 // model again wherever the open scene holds it (the objects keep their names, places and scripts).
 Json reimport(EditorSession& session, const Json& args, bool busy) {
   if (args.at("action") != "apply") return import_settings_files(session.game_dir(), args);
   require_editable(session, busy);
   const std::string model = model_to_reimport(session.game_dir(), args);
+  // (Nothing to change: the re-import would still extract pictures and drop the selection.)
+  if (!holds_model(session, model)) return tool_result(reimported_text(model, 0));
   std::string error;
   const int done = session.reimport_model(model, error);
   if (error.empty()) return tool_result(reimported_text(model, done));

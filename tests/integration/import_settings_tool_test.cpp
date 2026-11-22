@@ -111,7 +111,7 @@ TEST_CASE("import_settings set writes every field into the sidecar, or none, and
   REQUIRE(ok(game.call(set({{"up_axis", nullptr}}))));
   CHECK(has(game.call(action("settings")), "up_axis = y"));
   CHECK(has(game.call(action("settings")), "colliders = box"));
-  REQUIRE(ok(game.call(set({{"max_size", 512}, {"normal_map", true}}, kTexture))));
+  REQUIRE(ok(game.call(set({{"max_size", 512.0}, {"normal_map", true}}, kTexture))));  // (512.0 is whole)
   CHECK(has(game.call(action("settings", kTexture)), "max_size = 512"));
 }
 
@@ -152,6 +152,9 @@ TEST_CASE("live import_settings apply imports a model again into each copy of th
   const Json applied = invoke_editor(*session, kTool, action("apply"));
   REQUIRE_MESSAGE(ok(applied), applied.dump());
   CHECK(has(applied, "1 object(s)"));
+  const std::string absolute = (game.dir / kModel).string();  // (the same model, named another way)
+  CHECK(ok(invoke_editor(*session, kTool, action("apply", absolute.c_str()))));
+  session->undo();
   const ObjectId tree = session->scene().find("Tree");
   REQUIRE(tree != kNoObject);
   CHECK(imported_scale(*session, tree) == doctest::Approx(kBigger));

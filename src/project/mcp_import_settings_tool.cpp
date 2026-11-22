@@ -1,5 +1,7 @@
 #include "project/mcp_import_settings_tool.hpp"
 
+#include <cmath>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 
@@ -15,9 +17,12 @@ namespace fs = std::filesystem;
 namespace settings = import_settings;
 
 constexpr const char* kFieldIndent = "  ";
+// The largest float taken as a whole number (well inside what a 64-bit integer holds); a bigger one
+// stays a float, which no whole-number field takes anyway.
+constexpr double kLargestWholeFloat = 1e15;
 constexpr const char* kNeedsEditor =
     "apply imports a model again in the editor's open scene: start one with `redgem <game> --editor-bridge` and "
-    "call again. The settings are saved already; the editor uses them the next time it imports the model";
+    "call again. Without it, set is enough: the editor uses the saved settings the next time it imports the model";
 
 std::string asset_name(const Json& args) { return args.at("asset").get<std::string>(); }
 
@@ -56,10 +61,18 @@ std::string default_value(const settings::Settings& values, const std::string& n
   throw std::invalid_argument("unknown field: " + name);
 }
 
+// Whether a value is a number with a fraction part of zero, as 512.0.
+bool whole_float(const Json& value) {
+  if (!value.is_number_float()) return false;
+  const double number = value.get<double>();
+  return std::trunc(number) == number && std::fabs(number) <= kLargestWholeFloat;
+}
+
 // A value as set() reads it: a string as it is, a number or a switch as JSON writes it.
 std::string value_text(const settings::Settings& values, const std::string& name, const Json& value) {
   if (value.is_null()) return default_value(values, name);
   if (value.is_string()) return value.get<std::string>();
+  if (whole_float(value)) return std::to_string(value.get<std::int64_t>());  // (512.0 is 512)
   if (value.is_number() || value.is_boolean()) return value.dump();
   throw std::invalid_argument(name + ": must be text, a number, true, false or null");
 }
@@ -87,7 +100,7 @@ Json set_settings(const fs::path& file, const Json& args) {
   settings::Settings values = read_settings(file);
   assign(values, args["fields"]);  // (all of them, or none: nothing is saved before)
   std::string error;
-  if (!settings::save(file, values, error)) throw std::runtime_error(error);
+  if (!settings::save(file, values, error)) throw std::invalid_argument(error);
   return tool_result(saved_text(asset_name(args), values));
 }
 
@@ -121,7 +134,9 @@ Json import_settings_tool(const Options& options, const Json& args) {
 std::string model_to_reimport(const fs::path& game, const Json& args) {
   refuse_misplaced_fields("apply", args);
   const fs::path file = asset_file(game, args);  // (inside the game, through no link)
-  const fs::path relative = fs::path(asset_name(args)).lexically_normal().lexically_relative(config::kModelsDirName);
+  std::error_code fs_error;
+  const fs::path models = fs::weakly_canonical(game / config::kModelsDirName, fs_error);
+  const fs::path relative = file.lexically_relative(models);
   if (!model_of_models(relative, file))
     throw std::invalid_argument("apply takes a model of models/ (.glb or .gltf): " + asset_name(args));
   return relative.generic_string();
