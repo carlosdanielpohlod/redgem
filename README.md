@@ -54,30 +54,33 @@ end
 
 - **Ruby scripting**: behaviours with `start`, `update`, triggers, collisions, timers and tweens;
   scenes set up in Ruby; classes load on first use, no `require`.
-- **Gameplay kit**: keyboard, mouse and gamepad input, menus and a HUD that scales with the
-  screen, particles, camera follow, orbit, shake and cuts, per-character animation with blending,
-  events and root motion, navigation and crowds, saved progress (a game versions its save data
-  and upgrades older saves).
+- **Gameplay kit**: keyboard, mouse and gamepad input, menus and a HUD that scales with the screen,
+  particles, camera follow, orbit, shake and cuts, per-character animation with blending, events
+  and root motion, navigation and crowds, saved progress (a game versions its save data and
+  upgrades older saves).
 - **NPCs**: state machines with sight and hearing, daily schedules, head tracking, crowd
   navigation, voiced branching dialogue and shared [quests](docs/scripting/quests.md).
-- **Multiplayer**: games found by themselves on the local network, rooms by code over the
-  internet through a relay that ships with the engine, named messages, objects kept in sync.
-- **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors,
-  play mode, undo, sculptable terrain, and one-click builds of the game for Linux, Windows and
-  Android (and, on a Mac, for the Mac), made in the background.
+- **Multiplayer**: games found by themselves on the local network, rooms by code over the internet
+  through a relay that ships with the engine, named messages, objects kept in sync, a send rate per
+  game, smooth drawing between physics steps, and hit boxes that follow each character's bones.
+- **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors, play
+  mode, undo, sculptable terrain painted in layers by hand or by rules, prefab overrides, per-asset
+  import settings with automatic levels of detail, and one-click builds of the game for Linux,
+  Windows and Android (and, on a Mac, for the Mac), made in the background.
 - **LLM support through MCP**: an Agent panel in the editor chats with Claude Code, Codex or your
-  own agent, which edits the open scene, writes scripts, presses Play and reads errors through
-  the editor's MCP tools. `redgem mcp` gives any MCP client the same tools, with or without an
-  open editor ([the Agent panel](docs/assistants.md#the-agent-panel), [MCP tools](docs/mcp.md)).
+  own agent, which edits the open scene, writes scripts, presses Play and reads errors through the
+  editor's MCP tools. `redgem mcp` gives any MCP client the same tools, with or without an open
+  editor ([the Agent panel](docs/assistants.md#the-agent-panel), [MCP tools](docs/mcp.md)).
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
 - **Advanced graphics**: physically based materials, HDR with filmic tone mapping, sun shadows,
   reflections, ambient occlusion, bloom, fog, temporal anti-aliasing, water with refraction and
-  shore foam, scattered vegetation, particles that cast shadows, skeletal animation.
-- **Audio**: 3D positional sound with occlusion, music crossfades, sound priorities, and mix
-  groups with low-pass filters, reverb, and music ducking during dialogue.
+  shore foam, scattered vegetation, particles that cast shadows, skeletal animation, decals such as
+  bullet holes, and a first-person view model drawn over the scene.
+- **Audio**: 3D positional sound with occlusion and Doppler, music crossfades, sound priorities,
+  and mix groups with low-pass filters, reverb, and music ducking during dialogue.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
-- **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
-  own (`redgem-test`): the game your players get has no test code in it, and no editor either.
+- **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their own
+  (`redgem-test`): the game your players get has no test code in it, and no editor either.
 
 ## Built with
 

@@ -15,6 +15,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-22
+
+### Migrating
+
+Games made with 0.6.1 need no change: their scenes, saves and scripts keep working, and the
+network protocol is the same.
+
 ### Added
 
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
@@ -211,6 +218,19 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   built from the editor's primitives only, and each part is a small script of its own. Its own
   tests play the quest alone; the engine's tests play it with two players, hosted and on a
   dedicated server. The project hub shows it with an icon of its own.
+- **Doppler effect**: `Audio.play_at(..., velocity:)`, `Audio.move(id, position, velocity)` and
+  `Audio.listener(position, forward, up, velocity)` give the sounds and the ears a velocity, and a
+  positional sound plays higher coming nearer and lower going away. `Audio.doppler = scale` makes
+  it stronger or turns it off (0 to 10, 1 by default).
+- **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
+  Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
+  NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
+  parts the scripts gave them. **View > NPC gizmos** turns them off.
+- **File > Check Game** in the editor: what `redgem check` finds goes to the Console, each error
+  and warning a line, then the summary. An error at a script's line links to it.
+- **Story panel** in the editor: steps through a dialogue's lines and choices, and moves a quest from
+  stage to stage, without Play. It shows each choice's conditions and effects and whether they
+  hold, on scratch GameVariables that Play never sees.
 
 ### Fixed
 
@@ -271,21 +291,6 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   touching a building made as one mesh still hears its inner walls, and a wall of one quad, or a
   terrain over a cave, muffles from both sides. `Audio.play_at` no longer waits for an overlapped physics step: the sound's walls
   are looked for on the next frame.
-### Added
-
-- **Doppler effect**: `Audio.play_at(..., velocity:)`, `Audio.move(id, position, velocity)` and
-  `Audio.listener(position, forward, up, velocity)` give the sounds and the ears a velocity, and a
-  positional sound plays higher coming nearer and lower going away. `Audio.doppler = scale` makes
-  it stronger or turns it off (0 to 10, 1 by default).
-- **NPC gizmos in the Scene view**: for the selected objects, an Interactable's range and prompt, a
-  Perception's sight cone and hearing ring, a Schedule's plan, and the path and destination of a
-  NavAgent. While editing they come from the objects' properties; during Play and Pause, from the
-  parts the scripts gave them. **View > NPC gizmos** turns them off.
-- **File > Check Game** in the editor: what `redgem check` finds goes to the Console, each error
-  and warning a line, then the summary. An error at a script's line links to it.
-- **Story panel** in the editor: steps through a dialogue's lines and choices, and moves a quest from
-  stage to stage, without Play. It shows each choice's conditions and effects and whether they
-  hold, on scratch GameVariables that Play never sees.
 
 ## [0.6.1] - 2026-11-15
 
