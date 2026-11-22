@@ -18,18 +18,21 @@ class Scatter
   # places none (the corners' heights then hardly matter); without it, copies stand on the box's
   # bottom. scale: a number, or a range each copy is scaled within (on top of the template's own
   # scale). align: true leans them with the slope they stand on (grass); false keeps them upright
-  # (trees, buildings). How they look:
+  # (trees, buildings). layer: the name of one of the ground's layers (a ground with ground layers,
+  # experimental as they are): copies grow only where its painted weight is at least `least` (0 to
+  # 1), as grass on the grass and not on the road. How they look:
   #   tints: [[r, g, b], ...]  each copy takes a color at random along the list (up to 16)
   #   tint_variation: 0.1      each copy brighter or darker by up to this share
   #   fade: 4.0                meters over which copies fade out before the template's visible_to
   #                            (and in after its visible_from) instead of popping
   #   lods: [["TreeMid", 40.0]] lighter mesh starts taking over at 40 meters, over fade meters
   #   normals_up: 0.8          0..1: grass cards lit as the ground they stand on, not as flat cards
-  def self.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, **looks)
+  def self.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, layer: nil, least: 0.5,
+                 **looks)
     low, high = area
     smallest, largest = scale.is_a?(Range) ? [scale.begin, scale.end] : [scale, scale]
-    id, placed = __place(template, count, low, high, ground, seed, smallest.to_f, largest.to_f, align,
-                         *look_options(**looks))
+    id, placed = __place(template, count, low, high, ground, seed, smallest.to_f, largest.to_f, align, layer,
+                         least, *look_options(**looks))
     new(id, placed)
   end
 

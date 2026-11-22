@@ -261,7 +261,9 @@ the same pull request.
   phones) draws the terrain without them. A terrain's mesh must be its own: a mesh another object
   also draws gets no layers. Changed layer pictures show after the scene is loaded again. Each
   layer's pictures are sampled even where the layer is covered by others with a sharp height
-  blend.
+  blend. `Terrain` and `Scatter.place(layer:)` find the layers of objects of the scene's own
+  file (and their copies): a terrain from a scene loaded later, or spawned, has none for them.
+  `layer:` compares the painted weight, not the sharpened blend that is drawn.
 
 ## Tools
 

@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
+  least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
+  grass on the painted roads, trees only on the forest floor. Games with no ground layers need no
+  change.
+
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
