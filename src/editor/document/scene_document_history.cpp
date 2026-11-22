@@ -1,5 +1,5 @@
 // Part of SceneDocument: undo and redo. Every checkpoint is a snapshot of the nodes, the
-// materials and the shape of every terrain.
+// materials, the shape of every terrain and the weights of its ground layers.
 
 #include "editor/document/scene_document.hpp"
 
@@ -68,6 +68,17 @@ bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) 
   return std::equal(a.begin(), a.end(), b.begin(), b.end(), same_node);
 }
 
+// Two copies of a terrain's weights: the same copy (most often), or equal bytes.
+template <typename Kept>
+bool same_kept(const std::pair<const std::string, Kept>& a, const std::pair<const std::string, Kept>& b) {
+  return a.first == b.first && (a.second == b.second || *a.second == *b.second);
+}
+
+template <typename Kept>
+bool same_weights(const std::map<std::string, Kept>& a, const std::map<std::string, Kept>& b) {
+  return std::equal(a.begin(), a.end(), b.begin(), b.end(), same_kept<Kept>);
+}
+
 }  // namespace
 
 void SceneDocument::checkpoint() {
@@ -80,7 +91,7 @@ void SceneDocument::checkpoint() {
 
 SceneDocument::Snapshot SceneDocument::snapshot() const {
   // (Its bytes are worked out once it is kept: see push_step.)
-  Snapshot state{desc_.nodes, desc_.materials, version_, {}, 0};
+  Snapshot state{desc_.nodes, desc_.materials, version_, {}, kept_weights(), 0};
   for (int i = 0; i < node_count(); ++i) {
     if (!terrain_grid(i)) continue;
     const PrimitiveDesc& ground = desc_.meshes[static_cast<std::size_t>(desc_.nodes[i].mesh)].primitives.front();
@@ -99,7 +110,8 @@ void SceneDocument::touch() {
 
 bool SceneDocument::same_content(const Snapshot& a, const Snapshot& b) {
   // Every part of a snapshot but its version, so nothing a checkpoint keeps can change unnoticed.
-  return same_nodes(a.nodes, b.nodes) && same_materials(a.materials, b.materials) && a.shapes == b.shapes;
+  return same_nodes(a.nodes, b.nodes) && same_materials(a.materials, b.materials) && a.shapes == b.shapes &&
+         same_weights(a.weights, b.weights);
 }
 
 void SceneDocument::drop_checkpoint_if_unchanged() {
@@ -115,6 +127,7 @@ void SceneDocument::restore(Snapshot& state) {
   refresh_node_references();
   restore_materials(state.materials);
   restore_shapes(state.shapes);
+  restore_weights(state.weights);
   version_ = state.version;
   changed_since_checkpoint_ = false;
 }

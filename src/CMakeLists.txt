@@ -383,6 +383,7 @@ redgem_add_library(redgem_runtime
   scene/ground/terrain_layers_file.cpp
   scene/ground/ground_survey.cpp
   scene/ground/ground_rules.cpp
+  scene/ground/ground_brush.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
   scene/shapes/primitives.cpp
@@ -713,6 +714,7 @@ if(NOT ANDROID)
     editor/document/scene_document_memory.cpp
     editor/document/scene_document_history_bytes.cpp
     editor/document/scene_document_terrain.cpp
+  editor/document/scene_document_layers.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp
     editor/document/scene_document_clipboard.cpp

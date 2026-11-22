@@ -269,14 +269,17 @@ the same pull request.
   level the camera sees.
 - Terrain is one 100 m square with vertex tint painting, no holes cut through it, and no joining of
   several terrains. A terrain re-exported from Blender is an ordinary mesh.
-- Ground layers have no editor brush yet: their weights are painted by rules (`redgem scene
-  paint`, `Terrain.paint_by_rules`) or by editing the splat pictures. Rules see the terrain mesh's
-  own heights, not its object's scale or place. The layers' textures are three texture arrays in
-  slots 17 to 19: a graphics card with fewer than 20 texture units for the fragment shader (most
-  phones) draws the terrain without them. A terrain's mesh must be its own: a mesh another object
-  also draws gets no layers. Changed layer pictures show after the scene is loaded again. Each
-  layer's pictures are sampled even where the layer is covered by others with a sharp height
-  blend.
+- The editor's layer brush paints only terrains made in the editor (a ground mesh from Blender is
+  painted by rules or by editing its splat pictures). An undo step of a stroke keeps a whole copy of
+  the terrain's weights (8 MB for a 1024 map), so long painting sessions keep fewer undo steps.
+  Painted weights are not in the editor's crash recovery copy: save to keep them. When two objects
+  name the same layers file, the editor draws and paints its layers on the first one only. Rules see
+  the terrain mesh's own heights, not its object's scale or place. The layers' textures are three
+  texture arrays in slots 17 to 19: a graphics card with fewer than 20 texture units for the
+  fragment shader (most phones) draws the terrain without them. A terrain's mesh must be its own: a
+  mesh another object also draws gets no layers. Changed layer pictures show after the scene is
+  loaded again. Each layer's pictures are sampled even where the layer is covered by others with a
+  sharp height blend.
 
 ## Tools
 

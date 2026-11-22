@@ -73,6 +73,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   weights, and `Terrain.paint_by_rules` repaints them while the game runs.
   `Terrain.layer_at(ground, position)` and `Terrain.weights_at` say which ground is under a point
   (footsteps).
+- **Ground layers painted by hand in the editor (experimental).** The editor draws a terrain's
+  ground layers, and its Paint brush paints the chosen layer into the weights, with a strength and
+  a soft falloff. Each stroke is one undo step; Save writes the weights beside the layers file, and
+  Play shows them. See [painting ground layers by hand](docs/levels.md#painting-ground-layers-by-hand-experimental).
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that

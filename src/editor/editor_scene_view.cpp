@@ -126,6 +126,12 @@ void EditorApp::draw_play_border() {
                                       ui::scaled(kPlayBorderThickness));
 }
 
+// What the Paint brush does on the selected terrain: its ground layers, or a tint without them.
+const char* EditorApp::paint_help() const {
+  const bool layered = session_->terrain_layers(session_->selection()) != nullptr;
+  return layered ? "editor.inspector.terrain.layer_help" : "editor.inspector.terrain.paint_help";
+}
+
 // A hint in the bottom-left corner, on a dark pill so it reads over any scene (and stays clear
 // of the game's own HUD at the top).
 void EditorApp::draw_viewport_hint(bool playing) {
@@ -134,7 +140,7 @@ void EditorApp::draw_viewport_hint(bool playing) {
   const Hint& shown = kViewportHints[static_cast<int>(
       editor_logic::viewport_hint({playing, view.focused, terrain_selected, using_terrain_brush()}))];
   const bool paint_hint = !playing && terrain_selected && terrain_tool_.painting;
-  const char* hint = ui::icon_label(shown.icon, paint_hint ? "editor.inspector.terrain.paint_help" : shown.text);
+  const char* hint = ui::icon_label(shown.icon, paint_hint ? paint_help() : shown.text);
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
       editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y, ui::scaled(1));
