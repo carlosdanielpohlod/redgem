@@ -99,7 +99,8 @@ std::size_t Renderer::Impl::draw_view_model_objects(Vec3 viewer) {
 void Renderer::Impl::gather_view_model(bool mirrored, Vec3 viewer) {
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
     const ObjectSight& sight = sights[slot];
-    if (sight.mirrored == mirrored && held_in_sight(sight, viewer)) batches.add(sight.mesh, scattered_records + slot, mirrored);
+    if (sight.mirrored == mirrored && held_in_sight(sight, viewer))
+      batches.add(sight.mesh, scattered_records + slot, mirrored);
   }
 }
 

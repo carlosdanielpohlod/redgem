@@ -24,8 +24,8 @@ struct Game {
   Game() {
     std::filesystem::create_directories(dir / "prefabs");
     write_crate();
-    write("prefabs/cart.glb", {node("cart", {{"children", {1}}}),
-                               node("load", {{"extras", {{"prefab_file", "prefabs/crate.glb"}}}})});
+    write("prefabs/cart.glb",
+          {node("cart", {{"children", {1}}}), node("load", {{"extras", {{"prefab_file", "prefabs/crate.glb"}}}})});
   }
   ~Game() {
     std::error_code error;

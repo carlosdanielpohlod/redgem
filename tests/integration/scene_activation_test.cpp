@@ -117,7 +117,8 @@ TEST_CASE("scripts of a level made ready over frames see all of its objects on t
   WorkClock clock;
   auto engine = game(loader, clock, false);
   begin_loading(*engine);
-  for (int i = 0; i < kFrameLimit && engine->scene_name() != kLevel; ++i) engine->frame(config::kDefaultFixedDeltaSeconds);
+  for (int i = 0; i < kFrameLimit && engine->scene_name() != kLevel; ++i)
+    engine->frame(config::kDefaultFixedDeltaSeconds);
   REQUIRE(engine->scene_name() == kLevel);
   engine->frame(config::kDefaultFixedDeltaSeconds);
   CHECK(ruby(*engine, "$crates_seen") == std::to_string(kCrates));

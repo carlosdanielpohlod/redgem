@@ -58,8 +58,9 @@ TEST_CASE("Decals.place marks the surface a raycast hit, from the hit or its poi
   ruby(*engine, "$hit = Physics.raycast(Vector3.new(1, 5, 2), Vector3.new(0, -1, 0), 20)");
   REQUIRE(ruby(*engine, "$hit.nil?") == "false");
   CHECK(ruby(*engine, "Decals.place($hit)") == "true");
-  CHECK(ruby(*engine, "Decals.place($hit[:point], $hit[:normal], size: 0.3, depth: 0.1, spin: 45, "
-                      "color: [120, 20, 20], alpha: 200, image: :bullet_hole)") == "true");
+  CHECK(ruby(*engine,
+             "Decals.place($hit[:point], $hit[:normal], size: 0.3, depth: 0.1, spin: 45, "
+             "color: [120, 20, 20], alpha: 200, image: :bullet_hole)") == "true");
   CHECK(ruby(*engine, "Decals.count") == "2");
   const Decal& last = decals_of(*engine).decals().back();
   CHECK(last.image == "bullet_hole");
@@ -96,8 +97,8 @@ TEST_CASE("Decals.place refuses a zero normal, a size or depth that is not a pos
     CAPTURE(wrong);
     CHECK_FALSE(error_of(*engine, std::string("Decals.place(Vector3.zero, Vector3.up, ") + wrong + ")").empty());
   }
-  CHECK(error_of(*engine, "Decals.place({ point: Vector3.zero, normal: Vector3.up }, Vector3.up)")
-            .find("normal") != std::string::npos);
+  CHECK(error_of(*engine, "Decals.place({ point: Vector3.zero, normal: Vector3.up }, Vector3.up)").find("normal") !=
+        std::string::npos);
   CHECK(error_of(*engine, "Decals.limit = 2.9").find("whole") != std::string::npos);
   CHECK(ruby(*engine, "Decals.count") == "0");
 }

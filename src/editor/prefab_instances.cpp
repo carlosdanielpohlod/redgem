@@ -115,7 +115,8 @@ fs::path prefab_path(const fs::path& game, const std::string& uri) {
   return held(found, tr("editor.prefab.missing_file", {{"file", uri}}));
 }
 fs::path placement_file(const SceneDocument& document, int placement, const fs::path& game) {
-  return prefab_path(fs::weakly_canonical(game), get_string(document.node(placement).props, props::kPrefabFile).value_or(""));
+  return prefab_path(fs::weakly_canonical(game),
+                     get_string(document.node(placement).props, props::kPrefabFile).value_or(""));
 }
 
 // Where a part path lands in a prefab file: a node of it, and what is left of the path when that
@@ -328,7 +329,8 @@ bool revert_root_prop(SceneDocument& document, int placement, const std::string&
 }
 bool revert_part(SceneDocument& document, int placement, const std::string& path, const std::string& name) {
   auto overrides = overrides_of(document, placement);
-  require(prefabs::revert_field(overrides, path, name), tr("editor.prefab.nothing_to_revert", {{"part", path}, {"field", name}}));
+  require(prefabs::revert_field(overrides, path, name),
+          tr("editor.prefab.nothing_to_revert", {{"part", path}, {"field", name}}));
   write(document, placement, overrides, true);
   return true;
 }

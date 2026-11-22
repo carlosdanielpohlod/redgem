@@ -21,8 +21,8 @@ Vec3 to_local(const Transform& world, Vec3 point) {
 }
 
 bool overlaps(const Bounds& a, const Bounds& b) {
-  return a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y &&
-         a.min.z <= b.max.z && b.min.z <= a.max.z;
+  return a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y && a.min.z <= b.max.z &&
+         b.min.z <= a.max.z;
 }
 
 // What the box reaches of an object's own space, as the smallest box along its axes around it.
@@ -111,8 +111,10 @@ std::vector<DecalCorner> cut_mesh(const Cut& cut, const MeshDesc& mesh, const Sc
   if (mesh.bounds.valid && !overlaps(mesh.bounds, cut.reach)) return corners;
   for (const PrimitiveDesc& primitive : mesh.primitives) {
     const MaterialDesc* material = material_of(desc, primitive);
-    if (material == nullptr) cut_primitive(cut, primitive, false, corners);
-    else if (solid(*material)) cut_primitive(cut, primitive, material->double_sided, corners);
+    if (material == nullptr)
+      cut_primitive(cut, primitive, false, corners);
+    else if (solid(*material))
+      cut_primitive(cut, primitive, material->double_sided, corners);
   }
   corners.resize(std::min(corners.size(), cut.room));
   return corners;
