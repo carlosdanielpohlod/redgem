@@ -15,6 +15,9 @@ class CameraTest < RedGemTest::Case
       @position = position
     end
 
+    # (A spot with no body is drawn where it is.)
+    def render_position = position
+
     def look_at(point)
       @looked_at = point
     end
