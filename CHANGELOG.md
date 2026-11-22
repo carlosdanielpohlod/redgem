@@ -22,6 +22,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
   pose of that frame), on a dedicated server too. `Hitboxes.region(hit)` says which part of the body
   a raycast met.
+- **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
+  least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
+  grass on the painted roads, trees only on the forest floor. Games with no ground layers need no
+  change.
+
 - **Decals: bullet holes and other marks** (experimental). `Decals.place(hit)`, or
   `Decals.place(point, normal, size:, image:, color:, alpha:, spin:)`, projects a mark onto the
   meshes and terrain under it, straight from a raycast hit. A mark darkens what it lies on, so it
@@ -145,6 +150,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **Bodies are drawn between physics steps.** A game drawn more often than it ticks draws its
+  dynamic bodies, characters and vehicles (and what rides on them, a camera parented to a
+  character included) between their last two steps, as far as the frame is into the next one, so
+  at 144 or 240 fps they move smoothly instead of in 60 Hz steps. Scripts still read the physics
+  pose. Runs that take a step a frame (tests, `redgem run`, `redgem shot`) draw as before.
 - **A game's send rate.** `game.json`'s `"network": {"send_hz": N}` (1 to 128, 20 by default)
   sets how many poses a second `NetworkSync` sends of an object, and an object's own `send_hz:`
   setting overrides it (`Network.send_hz`, `NetworkSync#send_hz`, experimental). The watchers'

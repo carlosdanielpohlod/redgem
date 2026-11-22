@@ -254,6 +254,7 @@ unit/temp_dirs_test.cpp
   integration/symbol_cache_test.cpp
   integration/script_budget_test.cpp
   integration/tick_rate_test.cpp
+  integration/render_poses_test.cpp
   integration/script_budget_clock_test.cpp
   integration/save_budget_test.cpp
   integration/crash_handling_test.cpp

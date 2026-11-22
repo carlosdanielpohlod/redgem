@@ -5753,6 +5753,8 @@
             {"name": "seed", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
             {"name": "scale", "type": "Numeric | Range[Numeric]", "keyword": true, "optional": true, "default": "1.0"},
             {"name": "align", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "layer", "type": "String | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "least", "type": "Numeric", "keyword": true, "optional": true, "default": "0.5"},
             {"name": "tints", "type": "Array[Color] | nil", "keyword": true, "optional": true, "default": "nil"},
             {"name": "tint_variation", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
             {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
@@ -5760,7 +5762,7 @@
             {"name": "lods", "type": "Array[[String, Numeric]] | nil", "keyword": true, "optional": true, "default": "nil"}
           ],
           "returns": {"type": "Scatter"},
-          "about": "places copies; returns a set (count, remove)"
+          "about": "places copies; returns a set (count, remove). layer: and least: (experimental, as ground layers are) keep them to where that ground layer's painted weight is at least least (0.5 unless given; least: without layer: is refused)"
         },
         {
           "name": "clear",
@@ -5786,7 +5788,9 @@
         }
       ],
       "internal": [
-        "look_options"
+        "look_options",
+        "layer_share",
+        "least_without_layer?"
       ],
       "guide": "../levels.md#grass-forests-and-cities"
     },

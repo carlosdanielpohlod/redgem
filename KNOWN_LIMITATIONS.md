@@ -36,6 +36,10 @@ the same pull request.
 
 ## Rendering and animation
 
+- Only dynamic bodies, characters and vehicles (and what hangs from them) are drawn between their
+  last two steps. A kinematic body a script moves in `fixed_update` is drawn in steps, so a body
+  riding a moving kinematic platform shifts against it by up to a step at high frame rates. An
+  object a script places each `update` from a body's `transform.position` follows the step pose.
 - Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Animation events and root motion come from a character's own clips only: the scene's clips
@@ -288,7 +292,10 @@ the same pull request.
   fragment shader (most phones) draws the terrain without them. A terrain's mesh must be its own: a
   mesh another object also draws gets no layers. Changed layer pictures show after the scene is
   loaded again. Each layer's pictures are sampled even where the layer is covered by others with a
-  sharp height blend.
+  sharp height blend. `Terrain` and `Scatter.place(layer:)` find the layers of objects of the
+  scene's own file (and their copies): a terrain from a scene loaded later, or spawned, has none
+  for them. `layer:` compares the painted weight, not the sharpened blend that is drawn, and
+  follows the layers even of a terrain whose mesh is shared (which draws none).
 
 ## Tools
 
