@@ -25,6 +25,7 @@
 #include "project/game_templates.hpp"
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
+#include "scene/ground/splat_map.hpp"
 #include "scene/props.hpp"
 #include "physics/joint_config.hpp"
 #include "editor/editor_app.hpp"
@@ -631,6 +632,54 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   const auto flat = session.terrain_hit(terrain, *brushed + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
   REQUIRE(flat.has_value());
   CHECK(std::fabs(flat->y) < kTolerance);
+  CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("the Paint brush paints a terrain's ground layer in the Scene view, and undo takes it back") {
+  constexpr const char* kBeach = R"({"splat_size": 256, "layers": [
+    {"name": "sand", "tint": "#d8c08a"}, {"name": "grass", "tint": "#3f7a2c"}]})";
+  constexpr int kGrass = 1;
+  constexpr float kBrushSeconds = 1.0f;
+  constexpr float kMostlyGrass = 0.9f;
+  const std::filesystem::path game = copy_game();
+  std::string error;
+  std::filesystem::create_directories(game / "terrains");
+  REQUIRE_MESSAGE(write_text_file(game / "terrains" / "beach.json", kBeach, error), error);
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* message = std::get_if<std::string>(&created)) FAIL(*message);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+
+  // A terrain away from the level that names its ground layers: the editor draws them.
+  const Vec3 place{200.0f, 0.0f, 0.0f};
+  const ObjectId terrain = session.create_terrain(place);
+  REQUIRE(terrain != kNoObject);
+  session.document().set_prop(terrain, props::kTerrainLayers, std::string("beach"));
+  session.refresh_preview();
+  REQUIRE(session.terrain_layers(terrain) != nullptr);
+  CHECK(session.preview_desc().terrains.size() == 1);
+  app.camera().look_at(place + Vec3{0.0f, 40.0f, 30.0f}, place);
+  app.terrain_tool().sculpting = false;
+  app.terrain_tool().painting = true;
+  app.terrain_tool().layer = kGrass;
+  app.terrain_tool().layer_strength = 1.0f;
+  run(app, kFrameFrames);
+
+  // One stroke in the middle of the view turns the ground under it to grass.
+  const float center_x = app.viewport_width() * kViewportCenter;
+  const float center_y = app.viewport_height() * kViewportCenter;
+  const auto brushed = app.sculpt_at(center_x, center_y, kBrushSeconds);
+  REQUIRE(brushed.has_value());
+  const TerrainLayers& layers = *session.terrain_layers(terrain);
+  const LayerWeights middle = splat_weights_at(layers.splat, kViewportCenter, kViewportCenter);
+  CHECK(middle[kGrass] > kMostlyGrass);
+  run(app, kFrameFrames);  // the renderer picks the new weights up
+  take_picture(app, screenshot("editor_terrain_layer_brush"));
+
+  session.undo();
+  CHECK(splat_weights_at(session.terrain_layers(terrain)->splat, kViewportCenter, kViewportCenter)[kGrass] == 0.0f);
   CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(game);
 }

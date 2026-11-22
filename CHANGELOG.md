@@ -17,6 +17,13 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Import settings for models, textures and sounds.** A sidecar next to an asset
+  (`models/oak.glb.import.json`) sets a model's scale, up axis, colliders and picture
+  extraction, a texture's color space, normal map flag, largest size and mipmaps, and a sound's
+  streaming, loop, volume and stereo in 3D. The Inspector edits them for the file clicked in the
+  Project panel, and applying a model's settings imports it again in the open scene.
+  `redgem assets <game> --settings <asset> [field=value...]` shows and sets them. Experimental.
+  See [Import settings](docs/import-settings.md).
 - **Agents build the game.** MCP's new `build` tool makes a standalone game for Linux, Windows,
   Android (an APK or an App Bundle) or the Mac, as the editor's Build menu does, on a thread of its
   own: `start` returns at once and `status` (with `wait`) says the step, then what it made or why
@@ -60,6 +67,10 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
   weights, and `Terrain.paint_by_rules` repaints them while the game runs.
   `Terrain.layer_at(ground, position)` and `Terrain.weights_at` say which ground is under a point
   (footsteps).
+- **Ground layers painted by hand in the editor (experimental).** The editor draws a terrain's
+  ground layers, and its Paint brush paints the chosen layer into the weights, with a strength and
+  a soft falloff. Each stroke is one undo step; Save writes the weights beside the layers file, and
+  Play shows them. See [painting ground layers by hand](docs/levels.md#painting-ground-layers-by-hand-experimental).
 - **A scene's look changes while the game runs.** `Environment[:sky_intensity] = 0.2`,
   `Environment.set(sky_image: "night_sky", fog_color: [20, 26, 40])`: a script changes the sky,
   fog, light and effects of the environment object, and the next frame shows them. A day that
