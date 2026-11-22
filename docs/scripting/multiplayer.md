@@ -346,6 +346,37 @@ A machine only creates for others what the game itself spawns: templates it has 
 machine can only spawn objects of its own: 64 at a time, 512 in the whole game. Past that
 `Network.spawn` makes nothing and returns `nil`.
 
+### Lag compensation
+
+*Experimental.* A guest shows the others a moment behind: the poses come through the host, and
+are shown about one and a half send intervals behind the newest. A shot the host judged against
+where the target is now would miss what the shooter aimed at. So the host keeps, for about a
+second, where every object with a `NetworkSync` was and every body under it (hit boxes too, posed
+on their bones), and can put them back where the shooter saw them:
+
+```ruby
+Network.on(:fire) do |aim, from, view_time|
+  hit = Physics.rewind(view_time) { Physics.raycast(aim[:from], aim[:direction], 100, layers: :hitbox) }
+  damage(hit, from) if hit
+end
+```
+
+The host stamps every pose it passes on with its network clock (`Network.time`). A guest blends
+those stamps as it blends the poses, and `Network.view_time` is the time the guest shows the
+others at. Every message a guest sends carries it, and the host's handlers get it as their third
+argument (`nil` from the host itself). `Physics.rewind(time) { ... }` moves the objects and their
+bodies there, runs the block, and puts them back, whatever the block does. It never goes past
+now, nor further back than `game.json` lets it (200 ms unless said, 1000 at most):
+
+```json
+{ "network": {"max_rewind_ms": 250} }
+```
+
+A shooter whose view is older than that is judged at the limit, so a player on a slow connection
+cannot hit what moved away long ago. Only the host rewinds: elsewhere, and with `nil`, the block
+runs with things where they are. Keep what the block does to queries (rays and shapes): moving or
+destroying objects in it is undone or lost.
+
 ## Changing level together
 
 In a game played together the level is the host's to change: on the host (a player hosting, or
@@ -510,9 +541,9 @@ and join `127.0.0.1` in the other.
 There is no matchmaking or public list of games: players are on the same network, share a room
 code, or know the host's or the server's address. No relay or server is run for you: each game
 runs its own. Every message passes through the host (or the relay), over TCP: a packet lost on
-the way holds up the ones after it. Nothing rewinds time to judge a shot where its shooter saw the
-target (lag compensation), so the shooter's machine should decide its own hits, as in "Deciding
-things once": fine for co-op and casual games, not for competitive shooters. Connections are
+the way holds up the ones after it. Lag compensation (experimental) rewinds only what a
+`NetworkSync` keeps in step, and a host that plays through a relay does not stamp its poses, so
+its guests' view times are when the host showed them, not when it sent them. Connections are
 encrypted, but who answers is checked only when the game gives its fingerprint (see "Encrypted
 connections"). Players are not authenticated unless the game hosting asks for it
 ([Online services](online-services.md)), in a room on a relay too. A room on a relay holds no

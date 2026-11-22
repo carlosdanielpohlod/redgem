@@ -22,6 +22,7 @@ namespace {
 
 constexpr int kFastTick = 128;
 constexpr int kFastSends = 64;
+constexpr int kLongerRewindMs = 350;  // more than the 200 the host rewinds by default
 constexpr float kDropHeight = 20.0f;  // meters: high enough not to land within a second
 // What a body falls in one second, g t^2 / 2, give or take (a share of it) what a step's length
 // and the body's damping change of it.
@@ -166,4 +167,22 @@ TEST_CASE("Network.send_hz is what game.json says") {
   const SceneDesc scene = scene_with({});
   auto engine = engine_for(game, scene);
   CHECK(ruby(*engine, "Network.send_hz") == std::to_string(kFastSends));
+}
+
+TEST_CASE("the host rewinds game.json's network max_rewind_ms at most, else 200") {
+  CHECK(manifest_of("{}").settings.max_rewind_ms == config::kDefaultMaxRewindMs);
+  const std::string longer = "{\"network\": {\"max_rewind_ms\": " + std::to_string(kLongerRewindMs) + "}}";
+  CHECK(manifest_of(longer).settings.max_rewind_ms == kLongerRewindMs);
+  CHECK(manifest_of(R"({"network": {"max_rewind_ms": 0}})").max_rewind_error.empty());
+  for (const char* unusable : {"-1", "1001", "20.5", "\"far\""}) {
+    CAPTURE(unusable);
+    const GameManifest manifest = manifest_of(std::string("{\"network\": {\"max_rewind_ms\": ") + unusable + "}}");
+    CHECK(manifest.settings.max_rewind_ms == config::kDefaultMaxRewindMs);
+    CHECK(manifest.max_rewind_error.find("network.max_rewind_ms must be a whole number from 0 to 1000") !=
+          std::string::npos);
+  }
+  const TempGame game(longer);
+  const SceneDesc scene = scene_with({});
+  auto engine = engine_for(game, scene);
+  CHECK(ruby(*engine, "Physics.max_rewind") == "0.35");
 }

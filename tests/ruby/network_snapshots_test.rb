@@ -127,4 +127,20 @@ class NetworkSnapshotsTest < RedGemTest::Case
     fixed.advance(SEND * 2)
     assert_equal :guard, fixed.due_animation[0]
   end
+
+  def test_the_host_time_a_pose_was_passed_on_at_is_blended_as_the_pose_is
+    fixed = Snapshots.new(SEND, SEND)
+    fixed.add(Vector3[0, 0, 0], STILL, nil, 10.0)
+    fixed.advance(SEND)
+    fixed.add(Vector3[1, 0, 0], STILL, nil, 10.0 + SEND)
+    fixed.advance(SEND / 2)
+    assert_in_delta 0.5, fixed.pose[0].x
+    assert_in_delta 10.0 + (SEND / 2), fixed.shown_at
+  end
+
+  def test_a_pose_without_a_host_time_is_shown_at_none
+    arrive_along_x(3)
+    shown_x
+    assert_nil @snapshots.shown_at
+  end
 end

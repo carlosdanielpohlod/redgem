@@ -1814,6 +1814,26 @@
           "example": "hit = Physics.raycast(transform.position, Vector3.down, 2.0, game_object)"
         },
         {
+          "name": "rewind",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "time", "type": "Numeric | nil"},
+            {"name": "block", "type": "^() -> untyped", "block": true}
+          ],
+          "returns": {"type": "untyped"},
+          "about": "on the host, runs the block with every NetworkSync object and the bodies under it (hit boxes too) where they were when shown at that host time (a shot's view_time), then puts them back; the block's value. Never later than now nor longer ago than Physics.max_rewind; elsewhere, or with nil, as things are",
+          "example": "Network.on(:fire) { |aim, from, view_time| hit = Physics.rewind(view_time) { Physics.raycast(aim[:from], aim[:dir]) } }"
+        },
+        {
+          "name": "max_rewind",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds Physics.rewind goes back at most: game.json's network max_rewind_ms (200 by default)"
+        },
+        {
           "name": "raycast_all",
           "stability": "experimental",
           "static": true,
@@ -5732,7 +5752,7 @@
         "__size",
         "__vector"
       ],
-      "notes": "A hit box is a child object of its bone (props region, hitbox and layer), so destroying the character takes its boxes along. Boxes are posed where the game runs, a dedicated server included: the host judges hits against the pose it shows, which for another player's character follows that player's synced animation, a moment behind (no lag compensation).",
+      "notes": "A hit box is a child object of its bone (props region, hitbox and layer), so destroying the character takes its boxes along. Boxes are posed where the game runs, a dedicated server included: the host judges hits against the pose it shows, which for another player's character follows that player's synced animation, a moment behind. Physics.rewind puts the boxes back where a shooter saw them (lag compensation).",
       "guide": "gameplay.md#hit-boxes-on-animated-characters"
     },
     {
@@ -6276,6 +6296,22 @@
           "about": "poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)"
         },
         {
+          "name": "time",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds on this machine's network clock: on the host, the clock lag compensation goes by"
+        },
+        {
+          "name": "view_time",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "the host time this machine shows the others' objects at; every message a guest sends carries it (on the host and offline: Network.time)"
+        },
+        {
           "name": "host?",
           "stability": "stable",
           "static": true,
@@ -6461,10 +6497,10 @@
           "static": true,
           "params": [
             {"name": "name", "type": "String | Symbol"},
-            {"name": "block", "type": "^(untyped, Integer) -> void", "block": true}
+            {"name": "block", "type": "^(untyped, Integer, Float | nil) -> void", "block": true}
           ],
           "returns": {"type": "void"},
-          "about": "receives a message: |data, from|"
+          "about": "receives a message: |data, from, view_time| (view_time, experimental: on the host, the time the sender showed the others at, for Physics.rewind; else nil)"
         },
         {
           "name": "on_connect",

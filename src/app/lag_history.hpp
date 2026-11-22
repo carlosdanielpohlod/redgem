@@ -64,8 +64,8 @@ class LagHistory {
   std::vector<Placement> planned(const Scene& scene, double time) const;
 
   std::vector<ObjectHandle> tracked_;
-  std::unordered_map<ObjectId, double> shown_;  // this frame's
-  std::deque<Moment> moments_;                  // oldest first
+  std::unordered_map<ObjectId, double> shown_;        // this frame's
+  std::deque<Moment> moments_;                        // oldest first
   std::vector<std::pair<ObjectId, Transform>> kept_;  // the locals of what a rewind moved
   std::vector<ObjectId> moved_bodies_;
   double longest_ = 0.0;

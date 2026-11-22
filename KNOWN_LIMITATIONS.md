@@ -176,8 +176,10 @@ the same pull request.
   cores by default). With more rooms open than threads, rooms share them, and a level loading in
   one holds up the others on its thread for that moment.
 - Messages travel over TCP: a packet lost on the way holds up the ones after it. What others
-  move is shown a moment behind them (interpolated), and nothing rewinds time to judge a hit where
-  its shooter saw the target (no lag compensation): fast competitive games will feel the delay.
+  move is shown a moment behind them (interpolated). The host can judge a hit where its shooter
+  saw the target (`Physics.rewind`, experimental), for what a `NetworkSync` keeps in step only,
+  and no further back than `network.max_rewind_ms`. A host playing in a room on a relay does not
+  stamp its poses, so a rewind there goes by when the host showed them.
 - Players behind one shared address (a campus, some mobile networks) count as one address: by
   default a relay or a dedicated server lets it connect 24 machines (a relay, open 8 rooms), and a
   game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
@@ -336,7 +338,6 @@ menu whose look each game sets:
 
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
-- Shots checked by the host against where the shooter saw the others (lag compensation).
 - Rooms of more than 16 machines.
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.

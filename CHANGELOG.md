@@ -17,6 +17,14 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Lag compensation** (experimental). The host stamps the poses it passes on with its network
+  clock (`Network.time`); a guest's `Network.view_time` is the time it shows the others at, and
+  every message it sends carries it, so a host's `Network.on` handler gets it as a third argument.
+  `Physics.rewind(view_time) { Physics.raycast(...) }` puts every `NetworkSync` object and the
+  bodies under it (hit boxes posed on their bones too) where the shooter saw them, runs the
+  block, and puts them back. It never goes past now, nor further back than `game.json`'s
+  `"network": {"max_rewind_ms": 200}` (up to 1000; `Physics.max_rewind`). The network protocol is
+  now version 3: a machine on an older release cannot join one on this release.
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor

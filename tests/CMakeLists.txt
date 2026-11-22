@@ -284,6 +284,8 @@ unit/temp_dirs_test.cpp
   integration/ui_scale_test.cpp
   integration/camera_helpers_test.cpp
   integration/hitboxes_test.cpp
+  integration/lag_history_test.cpp
+  integration/lag_compensation_test.cpp
   integration/decals_test.cpp
   integration/camera_switch_test.cpp
   integration/scene_parenting_test.cpp

@@ -19,8 +19,8 @@ void install_world_bindings(mrb_state* mrb) {
   install_rigidbody_bindings(mrb);  // after the physics': it adds to Rigidbody and CharacterController
   install_physics_query_bindings(mrb);
   install_rewind_bindings(mrb);  // after the queries': it adds to Physics
-  install_joint_bindings(mrb);  // after the queries': it adds to Physics
-  install_light_bindings(mrb);  // after GameObject's: it adds to that class
+  install_joint_bindings(mrb);   // after the queries': it adds to Physics
+  install_light_bindings(mrb);   // after GameObject's: it adds to that class
   install_navigation_bindings(mrb);
   install_water_bindings(mrb);
   install_environment_bindings(mrb);

@@ -407,7 +407,7 @@ class Engine {
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
-  LagHistory lag_;  // on the host: where the objects the network keeps in step were shown (Physics.rewind)
+  LagHistory lag_;            // on the host: where the objects the network keeps in step were shown (Physics.rewind)
   RenderPoses render_poses_;  // where the bodies the physics moves are drawn, between two steps
   DebugDrawBuffer debug_draw_;
   FrameProfiler profiler_;

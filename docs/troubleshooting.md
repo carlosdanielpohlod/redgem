@@ -10,7 +10,7 @@ The full list of what is missing or known to be wrong is
 [KNOWN_LIMITATIONS.md](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md).
 Knowing these up front saves time:
 
-- **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
+- **Multiplayer** has no matchmaking, and lag compensation is experimental; playing over the internet needs a
   relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
 - **Platforms:** the editor is developed on Linux; the Windows and macOS downloads are
   experimental (macOS has only run on GitHub's virtual Macs, drawn by Apple's software renderer).

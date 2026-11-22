@@ -520,8 +520,8 @@ class NetworkSession {
   std::vector<Link> links_;
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;
-  double clock_ = 0.0;                       // see clock()
-  std::optional<double> view_time_;          // see set_view_time()
+  double clock_ = 0.0;                        // see clock()
+  std::optional<double> view_time_;           // see set_view_time()
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
   float reconnect_window_ = 0.0f;             // seconds a dropped machine's place is held (allow_reconnect)
   std::vector<Held> held_;                    // ... on the host

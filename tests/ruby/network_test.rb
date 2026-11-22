@@ -120,4 +120,19 @@ class NetworkTest < RedGemTest::Case
     error = assert_raises(ArgumentError) { Network.emit(:hit, nil, to: NO_MACHINES_ID) }
     assert_equal "no machine has that id", error.message
   end
+
+  def test_a_handler_gets_a_messages_view_time_when_it_takes_one
+    got = []
+    Network.on(:shot) { |data, from, view_time| got << [data, from, view_time] }
+    Network.on(:shot, &->(data) { got << [data] })
+    Network.on(:shot, &->(data, from) { got << [data, from] })
+    Network.__event(:message, 2, "shot", :bang, 1.25)
+    assert_equal [[:bang, 2, 1.25], [:bang], [:bang, 2]], got
+  ensure
+    Network.__scene_reset
+  end
+
+  def test_offline_the_view_time_is_the_networks_time_now
+    assert_in_delta Network.time, Network.view_time
+  end
 end
