@@ -12,6 +12,7 @@
 #include "render/gpu_timers.hpp"
 #include "render/hud.hpp"
 #include "render/window.hpp"
+#include "scene/decals.hpp"
 #include "scene/particles.hpp"
 #include "scene/water_geometry.hpp"
 #include "scene/water_ripples.hpp"
@@ -54,7 +55,8 @@ struct FrameView {
   const std::vector<WaterSurface>* water_surfaces = nullptr;
   // What scripts change of the materials' glow (Material.set_emission); none: the files' own.
   const EmissionOverrides* material_emission = nullptr;
-  float backdrop_blur = 0.0f;  // Camera.backdrop_blur: 0 (none) to 1
+  float backdrop_blur = 0.0f;           // Camera.backdrop_blur: 0 (none) to 1
+  const DecalSystem* decals = nullptr;  // marks laid on the scene's surfaces (Decals)
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

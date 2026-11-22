@@ -106,4 +106,11 @@ bool approx_equal(Quat a, Quat b, float tolerance) {
   return std::fabs(d - kOne) <= tolerance;
 }
 
+Quat mix(Quat from, Quat to, float weight) {
+  // (q and -q are the same rotation: one of the two is flipped so that the blend takes the short way.)
+  const float sign = from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w < 0.0f ? -1.0f : 1.0f;
+  return normalize(Quat{from.x + (to.x * sign - from.x) * weight, from.y + (to.y * sign - from.y) * weight,
+                        from.z + (to.z * sign - from.z) * weight, from.w + (to.w * sign - from.w) * weight});
+}
+
 }  // namespace redgem

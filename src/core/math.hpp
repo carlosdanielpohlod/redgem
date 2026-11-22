@@ -104,5 +104,7 @@ Quat quat_look_rotation(Vec3 direction, Vec3 up);
 // Rotation matrix given as three orthonormal basis columns.
 Quat quat_from_basis(Vec3 x_axis, Vec3 y_axis, Vec3 z_axis);
 bool approx_equal(Quat a, Quat b, float tolerance);
+// The rotation `weight` of the way from one to the other (0 to 1), the short way round.
+Quat mix(Quat from, Quat to, float weight);
 
 }  // namespace redgem

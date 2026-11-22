@@ -54,7 +54,8 @@ BenchCase script_case() {
             ruby(*engine, spawn_code());
             engine->frame(config::kDefaultFixedDeltaSeconds);  // their starts run once, outside the measure
             return Sampler([engine] {
-              return microseconds_each(kFramesPerSample, [&engine] { engine->frame(config::kDefaultFixedDeltaSeconds); });
+              return microseconds_each(kFramesPerSample,
+                                       [&engine] { engine->frame(config::kDefaultFixedDeltaSeconds); });
             });
           }};
 }

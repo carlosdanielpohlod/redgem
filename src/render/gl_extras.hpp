@@ -43,6 +43,9 @@ void set_alpha_to_coverage(bool on);
 // Which way round a triangle's corners go when it faces the viewer: counter-clockwise as glTF
 // says, or clockwise for a mirrored copy (its placement turned its triangles the other way).
 void set_clockwise_front_faces(bool clockwise);
+// Whether what is drawn from now on is drawn a little nearer than its depth says, so it wins over
+// a surface it lies on (a decal on a wall).
+void set_polygon_offset(bool on);
 // Squeezes the depths drawn from now on into [nearest, farthest] of the depth buffer (0 to 1 is
 // the whole of it, as everything is drawn but the view model).
 void set_depth_range(float nearest, float farthest);

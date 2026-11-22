@@ -412,6 +412,17 @@ struct Renderer::Impl {
   Shader particle_shadow_shader{};
   int particle_shadow_textured = -1;
   render_detail::ParticleBuffer particle_buffer;
+  // The marks on the scene's surfaces, while draw_world draws (Renderer::set_decals), and the
+  // frame's: each with its corners where its surfaces are now.
+  const DecalSystem* decals = nullptr;
+  struct FrameDecal {
+    const Texture2D* picture = nullptr;
+    redgem::Color color;
+    std::vector<DecalCorner> corners;
+  };
+  std::vector<FrameDecal> frame_decals;
+  Shader decal_shader{};
+  Texture2D decal_spot{};                                // what a decal without a picture shows: a soft round spot
   std::vector<render_math::SeeThroughDraw> see_through;  // the frame's, in the order they are drawn
   std::vector<bool> see_through_meshes;                  // by mesh: whether a part of it is drawn see-through
   bool any_see_through = false;                          // of any mesh: when none is, nothing is gathered
@@ -657,6 +668,19 @@ struct Renderer::Impl {
   std::size_t lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view, bool depth_pass);
+
+  // --- Decals (renderer_decals.cpp) ------------------------------------------------------------
+
+  // Where the frame's decals are: on the objects they were placed on that are still there, drawn, and
+  // shown at the viewer's distance from them.
+  void gather_decals(const Scene& scene, Vec3 viewer);
+  void gather_decal(const Scene& scene, const Decal& decal, Vec3 viewer);
+  const Texture2D* decal_picture(const std::string& image);
+  // Darkens what the scene's opaque surfaces drew under each decal; nothing is written to depth.
+  void draw_decals();
+  void begin_decals();
+  void end_decals();
+  void release_decals();
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 

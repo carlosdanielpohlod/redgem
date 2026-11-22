@@ -11,8 +11,10 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "scene/ground/splat_map.hpp"
 #include "scene/props.hpp"
 #include "scene/shapes/primitives.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "test_support.hpp"
 #include "temp_dirs.hpp"
 
@@ -58,6 +60,48 @@ SceneDesc meadow() {
   NodeDesc empty;
   empty.name = "Empty";
   desc.nodes = {camera, ground, tuft, empty};
+  return desc;
+}
+
+constexpr std::size_t kGroundNode = 1;
+constexpr int kSplatSize = 16;
+constexpr int kGrass = 0;
+constexpr int kRoad = 1;
+constexpr float kBlendReach = 0.5f;  // meters: where two texels mix, around the road's edge at x = 0
+
+// The meadow, its ground drawn with two layers: grass, and a road over its east half (x > 0).
+SceneDesc meadow_with_road() {
+  SceneDesc desc = meadow();
+  MeshDesc& ground = desc.meshes[kGroundMesh];
+  ground.bounds = mesh_bounds_of(ground.primitives.front());  // the map lies over the mesh's bounds
+  TerrainLayers layers;
+  layers.name = "meadow";
+  layers.node = static_cast<int>(kGroundNode);
+  for (const char* name : {"grass", "road"}) {
+    TerrainLayer layer;
+    layer.name = name;
+    layers.layers.push_back(layer);
+  }
+  layers.splat = make_splat(kSplatSize, kGrass);
+  LayerWeights road{};
+  road[kRoad] = 1.0f;
+  for (int row = 0; row < kSplatSize; ++row) {
+    for (int column = kSplatSize / 2; column < kSplatSize; ++column) set_texel(layers.splat, column, row, road);
+  }
+  desc.nodes[kGroundNode].props[props::kTerrainLayers] = std::string("meadow");
+  desc.terrains = {layers};
+  return desc;
+}
+
+// The meadow with every texel of its map the same mix of grass and road.
+SceneDesc meadow_mixed_with_road(float road_share) {
+  SceneDesc desc = meadow_with_road();
+  LayerWeights mix{};
+  mix[kGrass] = 1.0f - road_share;
+  mix[kRoad] = road_share;
+  for (int row = 0; row < kSplatSize; ++row) {
+    for (int column = 0; column < kSplatSize; ++column) set_texel(desc.terrains.front().splat, column, row, mix);
+  }
   return desc;
 }
 
@@ -185,5 +229,46 @@ TEST_CASE("Scatter.place keeps all LOD transitions inside the base drawing range
   CHECK(fails(*engine,
               "Scatter.place('Tuft', count: 1, area: [Vector3.zero, Vector3.one], "
               "fade: 4.0, lods: [['Ground', 30.0]])"));
+  CHECK(engine->scene().scattered().sets().empty());
+}
+
+TEST_CASE("Scatter.place on a layer puts copies only where that layer takes enough of the ground") {
+  const SceneDesc scene = meadow_with_road();
+  auto engine = engine_for(scene);
+  const std::string area = "area: [Vector3[-15, 0, -15], Vector3[15, 0, 15]], ground: Scene.find('Ground'), seed: 4";
+  const std::size_t grass =
+      std::stoul(ruby(*engine, "Scatter.place('Tuft', count: 400, " + area + ", layer: 'grass').count"));
+  const std::size_t road =
+      std::stoul(ruby(*engine, "Scatter.place('Tuft', count: 400, " + area + ", layer: :road).count"));
+  REQUIRE(grass > 0);
+  REQUIRE(road > 0);
+  for (const Transform& place : places(*engine, 0)) CHECK(place.position.x < kBlendReach);
+  for (const Transform& place : places(*engine, 1)) CHECK(place.position.x > -kBlendReach);
+  const std::size_t all = std::stoul(ruby(*engine, "Scatter.place('Tuft', count: 400, " + area + ").count"));
+  CHECK(grass + road <= all + all / 10);  // the halves, give or take where they mix
+  CHECK(grass < all);
+}
+
+TEST_CASE("Scatter.place on a layer keeps the copies where the layer takes at least least: of the spot") {
+  constexpr float kRoadShare = 0.3f;  // of every spot: past least: 0.2, short of the usual 0.5
+  const SceneDesc scene = meadow_mixed_with_road(kRoadShare);
+  auto engine = engine_for(scene);
+  const std::string call =
+      "Scatter.place('Tuft', count: 50, area: [Vector3[-10, 0, -10], Vector3[10, 0, 10]], "
+      "ground: Scene.find('Ground'), layer: 'road'";
+  CHECK(ruby(*engine, call + ", least: 0.2).count") == "50");
+  CHECK(ruby(*engine, call + ").count") == "0");
+  CHECK(ruby(*engine, call + ", least: 0.5).count") == "0");
+}
+
+TEST_CASE("Scatter.place refuses a layer it cannot find, a ground without layers, and a bad least:") {
+  const SceneDesc scene = meadow_with_road();
+  auto engine = engine_for(scene);
+  const std::string call = "Scatter.place('Tuft', count: 1, area: [Vector3[-1, 0, -1], Vector3[1, 0, 1]], ";
+  CHECK(fails(*engine, call + "ground: Scene.find('Ground'), layer: 'sand')"));
+  CHECK(fails(*engine, call + "layer: 'grass')"));
+  CHECK(fails(*engine, call + "ground: Scene.find('Tuft'), layer: 'grass')"));
+  CHECK(fails(*engine, call + "ground: Scene.find('Ground'), layer: 'grass', least: 1.5)"));
+  CHECK(fails(*engine, call + "ground: Scene.find('Ground'), least: 0.5)"));  // least: without a layer:
   CHECK(engine->scene().scattered().sets().empty());
 }

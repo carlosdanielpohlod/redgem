@@ -39,6 +39,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_controls.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/decals.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_follow.rb
@@ -47,6 +48,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_rig.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/camera_cut.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/hitboxes.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation_graph.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
@@ -375,6 +377,8 @@ redgem_add_library(redgem_runtime
   scene/particle_emitters.cpp
   scene/particles.cpp
   scene/particle_look.cpp
+  scene/decal_clip.cpp
+  scene/decals.cpp
   scene/water_geometry.cpp
   scene/water_interactions.cpp
   scene/water_volume.cpp
@@ -382,6 +386,7 @@ redgem_add_library(redgem_runtime
   scene/ground/splat_map.cpp
   scene/ground/terrain_layers_file.cpp
   scene/ground/ground_survey.cpp
+  scene/ground/ground_weights.cpp
   scene/ground/ground_rules.cpp
   scene/ground/ground_brush.cpp
   scene/shapes/terrain_sculpt.cpp
@@ -514,6 +519,8 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
+  script/bindings/hitboxes_bindings.cpp
+  script/bindings/decals_bindings.cpp
   script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
   script/bindings/save_slot_bindings.cpp
@@ -572,6 +579,7 @@ redgem_add_library(redgem_runtime
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
   render/renderer_particles.cpp
+  render/renderer_decals.cpp
   render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
@@ -640,6 +648,7 @@ redgem_add_library(redgem_runtime
   app/scene_loader.cpp
   app/scene_activation.cpp
   app/scene_bodies.cpp
+  app/render_poses.cpp
   app/scene_joints.cpp
   app/scene_water.cpp
   app/scene_files.cpp

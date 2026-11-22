@@ -150,7 +150,8 @@ TEST_CASE("prefab export refuses incomplete skeletons and root animation while p
   std::string error;
   CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Arm"), {}, {game.dir, {}}, "incomplete", error));
   CHECK(error.find("joint") != std::string::npos);
-  CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Lower"), {}, {game.dir, {}}, "animated-root", error));
+  CHECK_FALSE(
+      prefab_files::save(document, document.desc().find_node("Lower"), {}, {game.dir, {}}, "animated-root", error));
   CHECK(error.find("descendants") != std::string::npos);
   const int rig = document.desc().find_node("Rig");
   Transform pose;

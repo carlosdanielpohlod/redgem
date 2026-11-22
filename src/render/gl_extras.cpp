@@ -15,6 +15,9 @@ namespace {
 
 constexpr GLenum kDepthFormat = GL_DEPTH_COMPONENT24;  // of every depth the scene's pictures share
 constexpr GLuint64 kFenceWaitNanoseconds = 100000000;  // a wait at a time: 0.1 s, then again
+// How much nearer a polygon offset draws: by its slope, and by the depth buffer's least steps.
+constexpr float kNearerBySlope = -1.0f;
+constexpr float kNearerByUnits = -1.0f;
 
 unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   unsigned int buffer = 0;
@@ -111,6 +114,15 @@ void set_alpha_to_coverage(bool on) {
 }
 
 void set_clockwise_front_faces(bool clockwise) { glFrontFace(clockwise ? GL_CW : GL_CCW); }
+
+void set_polygon_offset(bool on) {
+  if (!on) {
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    return;
+  }
+  glEnable(GL_POLYGON_OFFSET_FILL);
+  glPolygonOffset(kNearerBySlope, kNearerByUnits);
+}
 
 void set_depth_range(float nearest, float farthest) {
 #if defined(GRAPHICS_API_OPENGL_ES3)
