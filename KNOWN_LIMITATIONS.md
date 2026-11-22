@@ -55,6 +55,12 @@ the same pull request.
   the physics only: root motion leaves them alone. Root motion is not sent over the network:
   `NetworkSync` sends where the owner's character went, and on the other machines a character
   following a graph received from the owner is not pinned (its root moves in the pose).
+- Hit boxes (`Hitboxes.build`) are placed where their bones are after the clips pose them, before
+  scripts run: a head turned by `Animator#look_at` (which turns after the scripts) is met where the
+  clips put it. Their bodies keep the size they were made with when a bone is scaled (the box
+  object's own scale follows the bone), and they are made at run time only (the editor does not
+  show or place them). The host judges hits against its own pose of another player's character,
+  which follows that player's synced animation a moment behind.
 - The view model (`view_model = true`) is drawn over the world in one layer: particles, lights
   and debug lines are the world's, drawn with the world's field of view (start them at
   `Camera.from_view_model`), and the weapon is never hidden behind particles. It writes no motion
@@ -323,7 +329,6 @@ menu whose look each game sets:
 - A fixed step and server tick a game picks (64 or 128 Hz), and a send rate of its own.
 - Moving bodies and characters drawn between physics steps, so the camera is smooth above 60 fps.
 - Shots checked by the host against where the shooter saw the others (lag compensation).
-- Hit boxes on the bones of animated characters, posed on a dedicated server.
 - Rooms of more than 16 machines.
 - Inputs sent as numbered commands, character movement decided by the host, and prediction with
   correction on the player's own machine.

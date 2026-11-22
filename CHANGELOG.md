@@ -17,6 +17,11 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 
 ### Added
 
+- **Hit boxes on animated characters** (experimental). `Hitboxes.build(character, { "Head" =>
+  { region: :head, size: 0.25 }, ... }, layer: "hitbox")` makes a kinematic box, capsule or sphere
+  under each named bone, kept where the bone is in every frame (a ray cast by a script meets the
+  pose of that frame), on a dedicated server too. `Hitboxes.region(hit)` says which part of the body
+  a raycast met.
 - **Grass grows on the grass layer (experimental).** `Scatter.place(..., ground: island, layer: "grass",
   least: 0.5)` places copies only where that ground layer's painted weight is at least `least`: no
   grass on the painted roads, trees only on the forest floor. Games with no ground layers need no

@@ -156,6 +156,7 @@ void Engine::update_frame(float delta) {
   // scripts run after and may override poses.
   animations_.advance(delta, scene_);
   apply_root_motion();
+  snap_hitboxes();
   particles_.update(delta);
   // (Animation events are part of the scripts' update: they come first in it.)
   hand_on_animation_events();
