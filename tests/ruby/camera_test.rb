@@ -26,6 +26,7 @@ class CameraTest < RedGemTest::Case
     def right = Vector3.right
     def up = Vector3.up
     def forward = Vector3.forward
+    def __render_axes = [right, up, forward]
   end
 
   # Stands in for an object followed or orbited.

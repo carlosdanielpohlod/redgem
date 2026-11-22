@@ -67,8 +67,8 @@ module Camera
     def world_offset
       return @offset unless @relative
 
-      turned = @target.transform
-      turned.right * @offset.x + turned.up * @offset.y - turned.forward * @offset.z
+      right, up, forward = @target.transform.__render_axes  # (turned as it is drawn, as it is placed)
+      right * @offset.x + up * @offset.y - forward * @offset.z
     end
   end
 end

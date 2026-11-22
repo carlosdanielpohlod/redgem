@@ -1,6 +1,9 @@
 // Transform natives.
 
 #include <mruby.h>
+#include <mruby/array.h>
+
+#include <iterator>
 
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -47,6 +50,13 @@ mrb_value transform_render_position(mrb_state* mrb, mrb_value self) {
 
 mrb_value transform_render_rotation(mrb_state* mrb, mrb_value self) {
   return vec3_value(mrb, quat_to_euler_degrees(drawn_of(mrb, self).rotation));
+}
+
+// __render_axes: [right, up, forward] of where the object is drawn this frame.
+mrb_value transform_render_axes(mrb_state* mrb, mrb_value self) {
+  const Transform drawn = drawn_of(mrb, self);
+  mrb_value axes[] = {vec3_value(mrb, drawn.right()), vec3_value(mrb, drawn.up()), vec3_value(mrb, drawn.forward())};
+  return mrb_ary_new_from_values(mrb, static_cast<mrb_int>(std::size(axes)), axes);
 }
 
 mrb_value transform_local_position(mrb_state* mrb, mrb_value self) {
@@ -129,6 +139,7 @@ void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "position=", transform_set_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "render_position", transform_render_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "render_rotation", transform_render_rotation, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "__render_axes", transform_render_axes, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position", transform_local_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position=", transform_set_local_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "rotation", transform_rotation, MRB_ARGS_NONE());
