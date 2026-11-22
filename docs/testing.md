@@ -194,7 +194,7 @@ jobs:
     timeout-minutes: 20
     env:
       GAME_DIR: .
-      # The latest release. To stay on one version, name it: .../releases/download/v0.6.1/...
+      # The latest release. To stay on one version, name it: .../releases/download/v0.7.0/...
       REDGEM_DOWNLOAD: https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz
     steps:
       - uses: actions/checkout@v4
@@ -213,7 +213,7 @@ jobs:
 It runs the system tests with no window, so it needs no display, and their `t.screenshot` calls
 take no pictures. To keep a game on one version of RedGem, name that version in `REDGEM_DOWNLOAD`
 instead of `latest` (for example
-`https://github.com/carlosdanielpohlod/redgem/releases/download/v0.6.1/redgem-linux-x86_64.tar.gz`).
+`https://github.com/carlosdanielpohlod/redgem/releases/download/v0.7.0/redgem-linux-x86_64.tar.gz`).
 A game whose scripts use what only a newer RedGem has fails on an older one: a game made from
 templates newer than the last release, with a RedGem built from source, needs that build in its
 workflow instead of the download.
