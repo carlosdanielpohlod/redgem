@@ -28,7 +28,6 @@ namespace {
 
 using namespace binding;
 
-
 constexpr int kSmallestTextPixels = 1;
 constexpr float kUnitSlack = 1e-3f;  // a width a hair over a whole unit, from dividing by the scale, is that unit
 // How a picture UI.image draws may be named, after its name (as the renderer looks for it).
@@ -83,8 +82,8 @@ struct Channels {
 mrb_value ui_gradient(mrb_state* mrb, mrb_value) {
   Box box;
   Channels top, bottom;
-  mrb_get_args(mrb, "ffffiiiiiiii", &box.x, &box.y, &box.width, &box.height, &top.r, &top.g, &top.b, &top.a,
-               &bottom.r, &bottom.g, &bottom.b, &bottom.a);
+  mrb_get_args(mrb, "ffffiiiiiiii", &box.x, &box.y, &box.width, &box.height, &top.r, &top.g, &top.b, &top.a, &bottom.r,
+               &bottom.g, &bottom.b, &bottom.a);
   HudItem item;
   item.kind = HudItem::Kind::Gradient;
   place(item, box, ui_scale_of(context(mrb)));
@@ -117,8 +116,8 @@ mrb_value ui_image(mrb_state* mrb, mrb_value) {
   Box box;
   Channels tint;
   Part part;
-  mrb_get_args(mrb, "zffffiiiiffff", &name, &box.x, &box.y, &box.width, &box.height, &tint.r, &tint.g, &tint.b,
-               &tint.a, &part.x, &part.y, &part.width, &part.height);
+  mrb_get_args(mrb, "zffffiiiiffff", &name, &box.x, &box.y, &box.width, &box.height, &tint.r, &tint.g, &tint.b, &tint.a,
+               &part.x, &part.y, &part.width, &part.height);
   HudItem item = image_item(mrb, name, box);
   item.part = part.picture();
   item.color = tint.color();

@@ -26,6 +26,10 @@ constexpr const char* kScale = "scale";
 constexpr const char* kUpAxis = "up_axis";
 constexpr const char* kColliders = "colliders";
 constexpr const char* kMaterials = "materials";
+constexpr const char* kLodLevels = "lod_levels";
+constexpr const char* kLodRatio = "lod_ratio";
+constexpr const char* kLodScreenSize = "lod_screen_size";
+constexpr const char* kLodFade = "lod_fade";
 constexpr const char* kColorSpace = "color_space";
 constexpr const char* kNormalMap = "normal_map";
 constexpr const char* kMaxSize = "max_size";
@@ -100,7 +104,11 @@ json json_of(const ModelSettings& model) {
   return {{key::kScale, written_number(model.scale)},
           {key::kUpAxis, word_of(kUpAxes, model.up_axis)},
           {key::kColliders, word_of(kColliderChoices, model.colliders)},
-          {key::kMaterials, word_of(kMaterialChoices, model.materials)}};
+          {key::kMaterials, word_of(kMaterialChoices, model.materials)},
+          {key::kLodLevels, model.lod_levels},
+          {key::kLodRatio, written_number(model.lod_ratio)},
+          {key::kLodScreenSize, written_number(model.lod_screen_size)},
+          {key::kLodFade, written_number(model.lod_fade)}};
 }
 json json_of(const TextureSettings& texture) {
   return {{key::kColorSpace, word_of(kColorSpaces, texture.color_space)},
@@ -160,6 +168,15 @@ bool size_fits(const json& value) {
   return size == kNoSizeLimit || (size >= kMinTextureSize && size <= kMaxTextureSize);
 }
 
+bool read_count(const json& given, const char* field, int most, int& out, std::string& error) {
+  if (!given.contains(field)) return true;
+  const json& value = given[field];
+  const bool fits = whole_number(value) && value.get<double>() >= 0 && value.get<double>() <= most;
+  if (!fits) return refuse(error, field, "needs a whole number from 0 to " + std::to_string(most));
+  out = static_cast<int>(value.get<double>());
+  return true;
+}
+
 bool read_size(const json& given, int& out, std::string& error) {
   if (!given.contains(key::kMaxSize)) return true;
   const json& value = given[key::kMaxSize];
@@ -184,11 +201,19 @@ bool read_choice(const json& given, const char* field, const Choice<Enum> (&choi
   return refuse(error, field, "needs one of: " + words_of(choices));
 }
 
+bool read_lods(const json& given, ModelSettings& model, std::string& error) {
+  return read_count(given, key::kLodLevels, kMaxLodLevels, model.lod_levels, error) &&
+         read_float(given, key::kLodRatio, {kMinLodRatio, kMaxLodRatio}, model.lod_ratio, error) &&
+         read_float(given, key::kLodScreenSize, {kMinLodScreenSize, kMaxLodScreenSize}, model.lod_screen_size, error) &&
+         read_float(given, key::kLodFade, {0.0f, kMaxLodFade}, model.lod_fade, error);
+}
+
 bool read_into(const json& given, ModelSettings& model, std::string& error) {
   return read_float(given, key::kScale, {kMinScale, kMaxScale}, model.scale, error) &&
          read_choice(given, key::kUpAxis, kUpAxes, model.up_axis, error) &&
          read_choice(given, key::kColliders, kColliderChoices, model.colliders, error) &&
-         read_choice(given, key::kMaterials, kMaterialChoices, model.materials, error);
+         read_choice(given, key::kMaterials, kMaterialChoices, model.materials, error) &&
+         read_lods(given, model, error);
 }
 bool read_into(const json& given, TextureSettings& texture, std::string& error) {
   return read_choice(given, key::kColorSpace, kColorSpaces, texture.color_space, error) &&
@@ -287,8 +312,10 @@ std::optional<std::string> sidecar_text(const fs::path& sidecar, std::string& er
 }  // namespace
 
 bool ModelSettings::operator==(const ModelSettings& other) const {
+  const bool same_lods = lod_levels == other.lod_levels && lod_ratio == other.lod_ratio &&
+                         lod_screen_size == other.lod_screen_size && lod_fade == other.lod_fade;
   return scale == other.scale && up_axis == other.up_axis && colliders == other.colliders &&
-         materials == other.materials;
+         materials == other.materials && same_lods;
 }
 bool TextureSettings::operator==(const TextureSettings& other) const {
   return color_space == other.color_space && normal_map == other.normal_map && max_size == other.max_size &&

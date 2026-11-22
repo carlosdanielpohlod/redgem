@@ -148,16 +148,12 @@ void Renderer::Impl::tone_map(const Environment& env) {
 }
 
 void Renderer::Impl::send_grade(const Environment& env) {
-  const std::pair<const char*, float> grade[] = {{shaders::kBloomStrength, env.bloom},
-                                                 {shaders::kExposure, env.exposure},
-                                                 {shaders::kVignette, env.vignette},
-                                                 {shaders::kContrast, env.contrast},
-                                                 {shaders::kSaturation, env.saturation},
-                                                 {shaders::kGrain, env.grain},
-                                                 {shaders::kAberration, env.aberration},
-                                                 {shaders::kMotionBlur, motion_blur},
-                                                 {shaders::kBackdropBlur, backdrop_blur},
-                                                 {shaders::kGradeTime, now()}};
+  const std::pair<const char*, float> grade[] = {
+      {shaders::kBloomStrength, env.bloom},    {shaders::kExposure, env.exposure},
+      {shaders::kVignette, env.vignette},      {shaders::kContrast, env.contrast},
+      {shaders::kSaturation, env.saturation},  {shaders::kGrain, env.grain},
+      {shaders::kAberration, env.aberration},  {shaders::kMotionBlur, motion_blur},
+      {shaders::kBackdropBlur, backdrop_blur}, {shaders::kGradeTime, now()}};
   for (const auto& [name, value] : grade) send(composite_shader, name, value);
 }
 

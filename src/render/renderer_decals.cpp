@@ -10,9 +10,9 @@ namespace {
 
 using namespace render_detail;
 
-constexpr int kSpotSide = 64;          // texels a side of the soft round spot
-constexpr float kSpotFalloff = 0.6f;   // the share of its radius marked wholly, before it fades out
-constexpr float kPictureTop = 1.0f;    // a picture's rows go down from its top; a decal's go up
+constexpr int kSpotSide = 64;                       // texels a side of the soft round spot
+constexpr float kSpotFalloff = 0.6f;                // the share of its radius marked wholly, before it fades out
+constexpr float kPictureTop = 1.0f;                 // a picture's rows go down from its top; a decal's go up
 constexpr ::Color kSpotMiddle{255, 255, 255, 255};  // marks wholly, in the decal's color
 constexpr ::Color kSpotEdge{255, 255, 255, 0};      // marks nothing
 

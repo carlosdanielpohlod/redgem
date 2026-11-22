@@ -7,5 +7,4 @@ namespace redgem {
 
 int NullPresenter::text_width(const std::string& text, int size) const { return estimated_text_width(text, size); }
 
-
 }  // namespace redgem

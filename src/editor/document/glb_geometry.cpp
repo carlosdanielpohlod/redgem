@@ -198,4 +198,21 @@ int append_mesh(GlbFile& glb, const std::string& name, const PrimitiveDesc& prim
   return last_index(meshes);
 }
 
+std::optional<int> append_mesh_level(GlbFile& glb, int source, const std::vector<std::vector<std::uint32_t>>& indices,
+                                     const std::string& name) {
+  const nlohmann::json* mesh = entry_at(glb.json, kMeshes, source);
+  if (mesh == nullptr) return std::nullopt;
+  const nlohmann::json& parts = mesh->value(kPrimitives, nlohmann::json::array());
+  if (parts.size() != indices.size()) return std::nullopt;
+  nlohmann::json levels = nlohmann::json::array();
+  for (std::size_t part = 0; part < indices.size(); ++part) {
+    nlohmann::json level = parts[part];
+    level[kIndices] = append_indices(glb, indices[part]);
+    levels.push_back(std::move(level));
+  }
+  nlohmann::json& meshes = array_at(glb.json, kMeshes);
+  meshes.push_back({{kName, name}, {kPrimitives, std::move(levels)}});
+  return last_index(meshes);
+}
+
 }  // namespace redgem::glb_geometry

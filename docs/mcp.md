@@ -28,6 +28,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `scene_list` | Lists objects, taking optional `scene`, `limit` (default 50, `0` for all) and `depth`. |
 | `scene_get` | Reads one `object` by persistent `#id`, unique name or hierarchy path. |
 | `scene_edit` | Changes objects (see [Editing objects](#editing-objects)): `action` `set`, `add`, `duplicate`, `group` or `remove`, on `object` or several `objects`, with `assignments` (`key=value` strings), `kind`, `from`, `parent`, `scene`. Removal requires `confirm: true`. Saves the scene file. |
+| `scene_prefab` | A [prefab placement](prefabs.md#overrides)'s overrides (see [Prefab placements](#prefab-placements)): `action` `overrides`, `override`, `revert`, `apply` or `unpack`, on `object`. |
 | `scene_diff` | Compares with an earlier scene file named by `against` (a `.glb` inside the game), or with the scene as a Git `revision` saved it (`HEAD`, `HEAD~1`, `main`, a commit hash). Takes one of the two. |
 | `asset_search` | Finds the game's assets by the words of `query` in their name or folder, best match first: a line each with the kind and the path. `kind` keeps one kind (`model`, `texture`, `sound`, `script`, `prefab`: the folders `models/`, `images/`, `sounds/`, `scripts/`, `prefabs/`), `tag` the assets inside a subfolder of that name; `limit` defaults to 20 (`0` for all). |
 | `template_search` | Finds the templates new games start from by the words of `query` in their name or description. |
@@ -160,6 +161,28 @@ error the game did not have is refused, with the errors, and the file stays as i
 warnings it brings, such as texts a new language still lacks, come with the answer. An item is
 checked only through the quests that name it. The
 `changes`, `texts` and `content` objects are free-form; the checks, not the schema, judge them.
+
+## Prefab placements
+
+`scene_prefab` works on one placement of a prefab file, named by `object`:
+
+| Action | Result |
+|--------|--------|
+| `overrides` | What it overrides, a line per field: `lid position=0,3,0`, `lid props.tag=unset`; `.` is the placement itself. |
+| `override` | Sets fields of the inherited `part` (`lid`, `load/wheel`) with `assignments`: the keys of `scene_edit` `set` but `name` and `parent`. `prop.key=` drops a property the file gives, `removed=true` leaves the part out (`revert` brings it back). A field set back to the file's value is no longer overridden. The placement's own fields are set with `scene_edit` `set`. |
+| `revert` | Drops one `field` of a `part` (`part` `.` with a `field`: the placement's own, such as `props.tag`), every override of a `part`, or, with neither, all of them. Added children stay. |
+| `apply` | Writes the overrides and added children into the prefab file, which every placement of it then has. Needs `confirm: true`. |
+| `unpack` | Replaces the placement with plain objects from its file, its overrides applied. Needs `confirm: true`. |
+
+```json
+{"action": "override", "object": "Crate1", "part": "lid", "assignments": ["position=0,3,0", "prop.tag="]}
+{"action": "revert", "object": "Crate1", "part": "lid", "field": "props.tag"}
+```
+
+In a live editor each change is one undo step and stays unsaved until `save`; `apply` writes the
+prefab file at once (undo gives the placement its overrides and added children back, while the
+file keeps them too: apply again, or revert, rather than undo). On
+files, the scene is saved after each change. `--read-only` keeps `overrides`.
 
 ## Building the game
 

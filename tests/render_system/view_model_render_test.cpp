@@ -48,7 +48,7 @@ constexpr Vec3 kBarrelSize{0.08f, 0.08f, 0.4f};
 constexpr Vec3 kMuzzleAt{0.0f, 0.07f, -0.17f};  // on top of the barrel's far end, in sight
 constexpr float kMuzzleSize = 0.06f;
 constexpr Vec3 kWallAt{0.0f, 0.0f, -0.4f};
-constexpr Vec3 kWallSize{4.0f, 4.0f, 0.2f};  // its face 0.3 m in front of the camera
+constexpr Vec3 kWallSize{4.0f, 4.0f, 0.2f};   // its face 0.3 m in front of the camera
 constexpr Vec3 kTargetAt{1.5f, 1.0f, -6.0f};  // above the weapon, never behind it
 constexpr float kTargetSize = 0.5f;
 constexpr float kWideFov = 80.0f;  // degrees

@@ -55,7 +55,7 @@ struct FrameView {
   const std::vector<WaterSurface>* water_surfaces = nullptr;
   // What scripts change of the materials' glow (Material.set_emission); none: the files' own.
   const EmissionOverrides* material_emission = nullptr;
-  float backdrop_blur = 0.0f;  // Camera.backdrop_blur: 0 (none) to 1
+  float backdrop_blur = 0.0f;           // Camera.backdrop_blur: 0 (none) to 1
   const DecalSystem* decals = nullptr;  // marks laid on the scene's surfaces (Decals)
 };
 

@@ -6,7 +6,8 @@
 // their defaults).
 //
 //   - a model (.glb, .gltf): its scale, its up axis, the colliders made for its meshes, and
-//     whether its pictures are extracted into images/ (applied when the editor imports it);
+//     whether its pictures are extracted into images/, and its levels of detail (applied when the
+//     editor imports it);
 //   - a texture (.png, .jpg, .jpeg, .webp, .ktx2): its color space and whether it is a normal map
 //     (the Inspector warns when it goes into a material slot that reads it otherwise), its largest
 //     side (applied when it is loaded or put on a material) and its mipmaps;
@@ -34,6 +35,20 @@ inline constexpr const char* kSidecarSuffix = ".import.json";
 inline constexpr float kDefaultScale = 1.0f;
 inline constexpr float kMinScale = 0.001f;
 inline constexpr float kMaxScale = 1000.0f;
+// Levels of detail made for a model's meshes on import: none (0) up to kMaxLodLevels, each with
+// about lod_ratio of the triangles of the one before. Level 1 is drawn once the model covers less
+// than lod_screen_size of the view's height, each next one at half of that; lod_fade is how wide
+// the dithered cross-fade is (0: they switch at once).
+inline constexpr int kNoLods = 0;
+inline constexpr int kMaxLodLevels = 4;
+inline constexpr float kDefaultLodRatio = 0.5f;
+inline constexpr float kMinLodRatio = 0.05f;
+inline constexpr float kMaxLodRatio = 0.95f;
+inline constexpr float kDefaultLodScreenSize = 0.25f;
+inline constexpr float kMinLodScreenSize = 0.01f;
+inline constexpr float kMaxLodScreenSize = 1.0f;
+inline constexpr float kDefaultLodFade = 0.1f;
+inline constexpr float kMaxLodFade = 1.0f;
 // max_size 0: the picture keeps its own size.
 inline constexpr int kNoSizeLimit = 0;
 inline constexpr int kMinTextureSize = 1;
@@ -49,6 +64,10 @@ struct ModelSettings {
   UpAxis up_axis = UpAxis::Y;
   Colliders colliders = Colliders::None;
   Materials materials = Materials::Keep;
+  int lod_levels = kNoLods;
+  float lod_ratio = kDefaultLodRatio;
+  float lod_screen_size = kDefaultLodScreenSize;
+  float lod_fade = kDefaultLodFade;
   bool operator==(const ModelSettings& other) const;
 };
 

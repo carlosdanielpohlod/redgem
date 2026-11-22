@@ -1819,6 +1819,17 @@ module Decals
   def self.clear: () -> void
 end
 
+# Hit boxes on an animated character's bones, and the body part a shot hit.
+%a{redgem:experimental}
+module Hitboxes
+  # makes a kinematic box, capsule or sphere under each named bone (region:, size:, offset:, shape:), kept where its bone is every frame; returns them
+  %a{redgem:experimental}
+  def self.build: (GameObject character, Hash[String | Symbol, Hash[Symbol, untyped]] map, ?layer: String | Symbol | nil) -> Array[GameObject]
+  # the region of the hit box a raycast hit met, or nil for no hit or anything else
+  %a{redgem:experimental}
+  def self.region: (Hash[Symbol, untyped] | nil hit) -> (Symbol | nil)
+end
+
 # Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
 %a{redgem:stable}
 class Scatter

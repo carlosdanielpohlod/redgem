@@ -3,6 +3,7 @@
 
 #include "app/engine.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,6 +14,8 @@
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
 #include "physics/physics_config.hpp"
+#include "scene/property.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 
@@ -87,6 +90,7 @@ void Engine::switch_to(SceneActivation& incoming) {
   animations_.reset(scene_desc_.animations, scene_);
   head_aims_.clear();
   particles_.clear();
+  hitboxes_.clear();  // (the objects are gone with the scene)
   particle_emitters_.clear();
   decals_.clear();
   // Every object is in place by now: each script's first update sees the whole scene.
@@ -125,6 +129,32 @@ ObjectId Engine::spawn(const SpawnRequest& request) {
   return finish_spawn(scene_.clone_pairs(request.source), request);
 }
 
+ObjectId Engine::make_object(const NodeDesc& node, const SpawnRequest& request) {
+  const ObjectId id = scene_.instantiate_rigid({node}, 0, scene_desc_).front();
+  finish_spawn({{kNoObject, id}}, request);
+  return id;
+}
+
+// A hit box with a body: one Hitboxes.build made, or a copy of a character that has them.
+bool Engine::is_hitbox(ObjectId id) const {
+  return get_bool(scene_.at(id).props, props::kHitbox).value_or(false) && physics_->has_object(id);
+}
+
+void Engine::note_hitboxes(const std::vector<std::pair<ObjectId, ObjectId>>& copies) {
+  for (const auto& [original, id] : copies) {
+    if (is_hitbox(id)) hitboxes_.push_back(scene_.handle(id));
+  }
+}
+
+void Engine::snap_hitboxes() {
+  const auto gone = [this](ObjectHandle hitbox) { return scene_.resolve(hitbox) == kNoObject; };
+  hitboxes_.erase(std::remove_if(hitboxes_.begin(), hitboxes_.end(), gone), hitboxes_.end());
+  for (const ObjectHandle hitbox : hitboxes_) {
+    const ObjectId id = scene_.resolve(hitbox);
+    physics_->teleport(id, scene_.world_transform(id));
+  }
+}
+
 ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& copies, const SpawnRequest& request) {
   shape_spawned(copies.front().second, request);
   if (request.physics) {
@@ -132,6 +162,7 @@ ObjectId Engine::finish_spawn(const std::vector<std::pair<ObjectId, ObjectId>>& 
     // (Once every body of the copy is there: a joint may hold two of its parts.)
     joints::create_copies({scene_, scene_desc_}, *physics_, copies, context_.scene_joints);
   }
+  note_hitboxes(copies);
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   for (const auto& [original, id] : copies) scripts_->attach_object(id);
   return copies.front().second;

@@ -32,6 +32,20 @@ std::optional<prefabs::PartOverride> part_change(const NodeDesc& current, const 
                                                  const std::filesystem::path& scripts_dir, std::string& error,
                                                  std::vector<std::string>& notes);
 
+// A part of a placement: its `path` under `placement`, in a scene of the game in `game_dir`.
+struct PlacedPart {
+  const SceneDocument& document;
+  int placement;
+  const std::filesystem::path& game_dir;
+  std::string path;
+};
+
+// The whole override `words` make of the part: part_change between the part as the placement has
+// it and as the file gives it, keeping a removal the placement already made. nullopt with `error`.
+std::optional<prefabs::PartOverride> placement_part_change(const PlacedPart& part,
+                                                           const std::vector<std::string>& words, std::string& error,
+                                                           std::vector<std::string>& notes);
+
 // One line per overridden field: "<path> <field>=<value>", the root as ".".
 std::string overrides_listing(const std::vector<prefab_instances::Field>& fields);
 

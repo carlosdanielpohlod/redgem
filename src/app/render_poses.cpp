@@ -16,8 +16,8 @@ constexpr float kUnmovedTolerance = 1e-4f;
 constexpr float kUnturnedTolerance = 1e-5f;
 
 bool parts_within(Quat a, Quat b, float tolerance) {
-  return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) &&
-         approx_equal(a.z, b.z, tolerance) && approx_equal(a.w, b.w, tolerance);
+  return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) && approx_equal(a.z, b.z, tolerance) &&
+         approx_equal(a.w, b.w, tolerance);
 }
 
 // Whether two rotations are the same turn (q and -q are).
