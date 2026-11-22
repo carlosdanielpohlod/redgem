@@ -277,7 +277,7 @@ A key is one object's: a second `NetworkSync` under a key another object goes by
 an error (the behaviour is disabled, the first object keeps the key), and so does `assign` to it.
 A key is at most 128 bytes long.
 
-The owner sends where its object is 20 times a second, in a few bytes: only what changed since the
+The owner sends where its object is 20 times a second (see [Send rate](#send-rate)), in a few bytes: only what changed since the
 last time (an object standing still sends little more than its key). The other machines show it a moment behind,
 blended between the last two places they heard of, so it moves smoothly however unevenly those
 arrive. The delay follows the network: about 75 milliseconds when places arrive steadily, longer
@@ -290,6 +290,32 @@ machine. Each watcher can tune it per object:
 add_component(NetworkSync, delay: 0.2)            # always this many seconds behind
 add_component(NetworkSync, interpolate: false)    # no delay: chases the newest place, less smoothly
 ```
+
+### Send rate
+
+A game can send poses more often, for every object, with the `network` section of its
+`game.json` (5 to 128 a second; such a section also says the game plays online, as
+`"network": true` does):
+
+```json
+{ "tick_hz": 128, "network": {"send_hz": 64} }
+```
+
+and one object can differ from the game's rate:
+
+```ruby
+add_component(NetworkSync, send_hz: 60)   # a player in a shooter: as often as the frames go
+add_component(NetworkSync, send_hz: 5)    # a slow lift: a few poses are enough
+```
+
+Every machine needs the same rate for an object: the watchers expect its poses that often, and
+show it about one and a half intervals behind (75 ms at 20 a second, never less than 50 ms
+nor more than 350 ms, which is why 5 a second is the least). An object's `send_hz` that is
+not a number from 5 to 128 is warned of: one out of those limits is kept within them, and one
+that is not a number sends at the game's rate.
+`Network.send_hz` is the game's rate. An owner sends at most one pose a frame, so a rate above
+the frame rate is the frame rate. More poses cost bandwidth: about 700 bytes a second per moving
+player at 20 a second, about 2.2 KB at 64, to every other machine.
 
 What the object's own animation does goes along with its place: play an attack on the owner's
 machine (`animation.play(:Attack, loop: false, fade: 0.1)`) and the others see the same clip,

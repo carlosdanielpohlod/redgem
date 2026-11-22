@@ -25,7 +25,7 @@ struct BotCounts {
 };
 
 // A player that joins a dedicated server's room by its address, as a game does, and plays like
-// one: it runs in circles, its NetworkSync sending where it is SENDS_PER_SECOND times a second (in
+// one: it runs in circles, its NetworkSync sending where it is at the default send rate (in
 // poses that say what changed, see net/pose_codec.hpp), and fires a shot (a game message) a few
 // times a second. Nothing here waits: tick() it often.
 class LoadBot {

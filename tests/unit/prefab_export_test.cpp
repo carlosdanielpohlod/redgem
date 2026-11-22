@@ -100,20 +100,31 @@ TEST_CASE("prefab export refuses invalid names existing files and linked destina
   std::string error;
   for (const auto* name : {"", "../other", "Upper", "a/b", "a.glb", "a:b", "a\\b"}) {
     CAPTURE(name);
-    CHECK_FALSE(prefab_files::save(document, root, {}, game.dir, name, error));
+    CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, {}}, name, error));
     CHECK_FALSE(error.empty());
   }
   CHECK_FALSE(prefab_files::valid_name(std::string(65, 'a')));
-  REQUIRE(prefab_files::save(document, root, {}, game.dir, "valid-name_2", error));
+  REQUIRE(prefab_files::save(document, root, {}, {game.dir, {}}, "valid-name_2", error));
   const auto before = read_text_file(game.file("valid-name_2"), error);
-  CHECK_FALSE(prefab_files::save(document, root, {}, game.dir, "valid-name_2", error));
+  CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, {}}, "valid-name_2", error));
   CHECK(read_text_file(game.file("valid-name_2"), error) == before);
   std::filesystem::create_symlink(game.file("valid-name_2"), game.file("linked"));
-  CHECK_FALSE(prefab_files::save(document, root, {}, game.dir, "linked", error));
+  CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, {}}, "linked", error));
   std::filesystem::rename(game.dir / "prefabs", game.dir / "elsewhere");
   std::filesystem::create_directory_symlink(game.dir / "elsewhere", game.dir / "prefabs");
-  CHECK_FALSE(prefab_files::save(document, root, {}, game.dir, "outside", error));
+  CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, {}}, "outside", error));
   CHECK_FALSE(std::filesystem::exists(game.dir / "elsewhere/outside.glb"));
+}
+TEST_CASE("prefab export keeps within the game's prefab budgets") {
+  ExportGame game;
+  auto document = SceneDocument::create_empty(game.dir / config::kSceneFileName);
+  const int root = document.add_empty("Root");
+  prefabs::Limits tiny;
+  tiny.input_bytes = 1;
+  std::string error;
+  CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, tiny}, "tiny", error));
+  CHECK(error == "prefab file exceeds its input byte budget");
+  CHECK_FALSE(std::filesystem::exists(game.file("tiny")));
 }
 TEST_CASE("prefab export validates dependencies and removes staging files on failure") {
   test::LogCapture quiet;
@@ -122,13 +133,13 @@ TEST_CASE("prefab export validates dependencies and removes staging files on fai
   const int root = document.add_empty("Root");
   document.set_prop(root, props::kPrefabFile, std::string("prefabs/missing.glb"));
   std::string error;
-  CHECK_FALSE(prefab_files::save(document, root, {}, game.dir, "broken", error));
+  CHECK_FALSE(prefab_files::save(document, root, {}, {game.dir, {}}, "broken", error));
   CHECK_FALSE(std::filesystem::exists(game.file("broken")));
   for (const auto& entry : std::filesystem::directory_iterator(game.dir)) CHECK(entry.path().filename() == "prefabs");
   document.remove_prop(root, props::kPrefabFile);
-  REQUIRE(prefab_files::save(document, root, {}, game.dir, "base", error));
+  REQUIRE(prefab_files::save(document, root, {}, {game.dir, {}}, "base", error));
   document.set_prop(root, props::kPrefabFile, std::string("prefabs/base.glb"));
-  REQUIRE_MESSAGE(prefab_files::save(document, root, {}, game.dir, "nested", error), error);
+  REQUIRE_MESSAGE(prefab_files::save(document, root, {}, {game.dir, {}}, "nested", error), error);
   const auto nested = load(game.file("nested"));
   CHECK(get_string(nested.nodes[0].props, props::kPrefabFile) == "prefabs/base.glb");
   CHECK(place(game, "nested").nodes.size() == 1);
@@ -137,9 +148,9 @@ TEST_CASE("prefab export refuses incomplete skeletons and root animation while p
   ExportGame game;
   auto document = document_at(test::fixture("skinned.glb"));
   std::string error;
-  CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Arm"), {}, game.dir, "incomplete", error));
+  CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Arm"), {}, {game.dir, {}}, "incomplete", error));
   CHECK(error.find("joint") != std::string::npos);
-  CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Lower"), {}, game.dir, "animated-root", error));
+  CHECK_FALSE(prefab_files::save(document, document.desc().find_node("Lower"), {}, {game.dir, {}}, "animated-root", error));
   CHECK(error.find("descendants") != std::string::npos);
   const int rig = document.desc().find_node("Rig");
   Transform pose;
@@ -147,7 +158,7 @@ TEST_CASE("prefab export refuses incomplete skeletons and root animation while p
   pose.rotation = quat_from_axis_angle(Vec3::up(), kPi / 4);
   pose.scale = {2, 2, 2};
   document.set_local(rig, pose);
-  REQUIRE_MESSAGE(prefab_files::save(document, rig, pose, game.dir, "rig", error), error);
+  REQUIRE_MESSAGE(prefab_files::save(document, rig, pose, {game.dir, {}}, "rig", error), error);
   const auto exported = place(game, "rig", pose.position);
   REQUIRE(exported.skins.size() == 1);
   CHECK(exported.skins[0].joints.size() == document.desc().skins[0].joints.size());

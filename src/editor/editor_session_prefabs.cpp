@@ -83,10 +83,10 @@ struct PrefabPlacement {
   PrefabPreview preview;
   Scene scene;
 
-  std::string prepare(SceneDocument& document, const std::filesystem::path& game, const std::string& file,
-                      const Transform& local, int parent) {
+  std::string prepare(SceneDocument& document, const std::filesystem::path& game, const prefabs::Limits& limits,
+                      const std::string& file, const Transform& local, int parent) {
     object = add_reference(document, file, local, parent);
-    preview.rebuild(document.desc(), game);
+    preview.rebuild(document.desc(), game, limits);
     if (!preview.error().empty()) return preview.error();
     scene = Scene::from_desc(*preview.resolved());
     return {};
@@ -112,7 +112,7 @@ ObjectId EditorSession::place_linked(const std::string& file, const Transform& w
                                      std::string& error) {
   const auto local = reference_local(preview_, parent, world);
   PrefabPlacement ready;
-  const auto edit = [&] { return ready.prepare(document_, game_dir_, file, local, parent); };
+  const auto edit = [&] { return ready.prepare(document_, game_dir_, prefab_limits_, file, local, parent); };
   if (!document_.edit_nodes(edit, error)) return kNoObject;
   prefab_preview_.adopt(std::move(ready.preview));
   preview_ = std::move(ready.scene);
@@ -125,6 +125,6 @@ bool EditorSession::export_prefab(const std::string& name, std::string& error) {
     return false;
   }
   const int root = selected_roots().front();
-  return prefab_files::save(document_, root, placement_world(root), game_dir_, name, error);
+  return prefab_files::save(document_, root, placement_world(root), {game_dir_, prefab_limits_}, name, error);
 }
 }  // namespace redgem

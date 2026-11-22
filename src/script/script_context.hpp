@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "audio/audio.hpp"
+#include "core/config.hpp"
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
@@ -85,6 +86,9 @@ struct ScriptContext {
   std::function<nlohmann::json(ObjectHandle)> capture_object_state;
   std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;
+  // What the running scene is made of: its terrains' ground layers and weights (Terrain). Null
+  // outside a running engine.
+  SceneDesc* scene_desc = nullptr;
   PhysicsWorld* physics = nullptr;
   SceneJoints scene_joints;  // made with the scene's bodies, and with those of what is spawned
   InputState* input = nullptr;
@@ -163,6 +167,9 @@ struct ScriptContext {
   std::string game_title;
   // The servers game.json knows by their fingerprints: a join that gives none checks these.
   std::vector<net::ServerPin> server_pins;
+  // The poses a second NetworkSync sends of an object that says nothing itself (game.json's
+  // "network": {"send_hz": N}): Network.send_hz.
+  int send_hz = config::kDefaultSendHz;
   // Its version (game.json), for Game.version; empty when it gives none.
   std::string game_version;
   bool quit_requested = false;

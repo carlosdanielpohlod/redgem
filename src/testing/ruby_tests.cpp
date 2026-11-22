@@ -57,6 +57,7 @@ struct BareWorld {
     context.discovery = &discovery;
     context.http = &http;
     context.time.fixed_delta = config::tick_seconds(game.tick_hz);
+    context.send_hz = game.send_hz;
   }
 };
 

@@ -2383,6 +2383,63 @@
       "notes": "A material's name is the one it has in the scene's file (Blender's). The glow holds for every object with a material of that name, copies and prefabs spawned later and the scenes loaded after, until reset_emission. A negative strength raises an ArgumentError, an unknown color name too. Each machine keeps its own: over the network, set it on every machine. A game with no window (a dedicated server) keeps it and draws nothing."
     },
     {
+      "name": "Terrain",
+      "stability": "experimental",
+      "kind": "module",
+      "about": "The ground layers of a terrain: which one is where, and its weights painted again by rules.",
+      "methods": [
+        {
+          "name": "layers",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject"}
+          ],
+          "returns": {"type": "Array[String] | nil"},
+          "about": "the names of the object's ground layers, in order, or nil when it has none",
+          "example": "Terrain.layers(Scene.find(\"Island\"))  # => [\"sand\", \"grass\", \"rock\"]"
+        },
+        {
+          "name": "weights_at",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject"},
+            {"name": "position", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "Hash[String, Float] | nil"},
+          "about": "each layer's share (0 to 1) of the ground under a point of the world, seen from above; nil without layers or past the terrain's edges",
+          "example": "Terrain.weights_at(ground, player.position)  # => {\"sand\" => 0.7, \"grass\" => 0.3}"
+        },
+        {
+          "name": "layer_at",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject"},
+            {"name": "position", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "String | nil"},
+          "about": "the layer with the largest share under a point of the world; nil without layers or past the terrain's edges",
+          "example": "step_sound = Terrain.layer_at(ground, position) == \"sand\" ? \"step_sand\" : \"step_grass\""
+        },
+        {
+          "name": "paint_by_rules",
+          "stability": "experimental",
+          "static": true,
+          "params": [
+            {"name": "object", "type": "GameObject"},
+            {"name": "rules", "type": "Array[Hash[Symbol | String, untyped]] | nil", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Integer"},
+          "about": "paints the weights by rules (as the layers file's \"rules\"; nil: the file's own) and returns how many texels changed; the next frame shows them",
+          "example": "Terrain.paint_by_rules(ground, [{layer: \"rock\", slope: {min: 30, soft: 8}}])"
+        }
+      ],
+      "guide": "../levels.md#painting-ground-layers-by-rules-experimental",
+      "notes": "A terrain has ground layers when its object names a layers file (terrain_layers = \"island\": terrains/island.json). Points are in the world; heights in rules are in the terrain mesh's own space. What paint_by_rules paints is kept while the scene runs and never written to the game's files: redgem scene paint writes them. A rule naming no layer of the file raises an ArgumentError, an object without layers too. Each machine keeps its own: over the network, paint on every machine."
+    },
+    {
       "name": "CharacterController",
       "stability": "stable",
       "kind": "class",
@@ -6028,6 +6085,14 @@
           "about": "holds a dropped player's place and id that long, up to 300 (0 turns it off)"
         },
         {
+          "name": "send_hz",
+          "stability": "experimental",
+          "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
+          "about": "poses a second a NetworkSync sends unless it says otherwise: game.json's network send_hz (20 by default)"
+        },
+        {
           "name": "host?",
           "stability": "stable",
           "static": true,
@@ -6474,6 +6539,20 @@
           ],
           "returns": {"type": "void"},
           "about": "sets its owner and key"
+        },
+        {
+          "name": "send_hz",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "poses a second its owner sends: its send_hz setting, else Network.send_hz"
+        },
+        {
+          "name": "send_interval",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Float"},
+          "about": "seconds between two of its poses (1 / send_hz)"
         }
       ],
       "internal": [

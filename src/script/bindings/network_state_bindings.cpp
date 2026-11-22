@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "core/config.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/network_bindings.hpp"
@@ -45,6 +46,7 @@ mrb_value network_id(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, netw
 mrb_value network_port(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, network(mrb).port()); }
 mrb_value network_peers(mrb_state* mrb, mrb_value) { return ids_value(mrb, network(mrb).peers()); }
 mrb_value network_players(mrb_state* mrb, mrb_value) { return ids_value(mrb, network(mrb).players()); }
+mrb_value network_send_hz(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, binding::context(mrb).send_hz); }
 
 }  // namespace
 
@@ -63,6 +65,10 @@ void install_network_state_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "port", network_port, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "peers", network_peers, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "players", network_players, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "send_hz", network_send_hz, MRB_ARGS_NONE());
+  // The fewest and most poses a second an object's NetworkSync may send (its send_hz setting).
+  mrb_define_const(mrb, network_module, "MIN_SEND_HZ", mrb_int_value(mrb, config::kMinSendHz));
+  mrb_define_const(mrb, network_module, "MAX_SEND_HZ", mrb_int_value(mrb, config::kMaxSendHz));
 }
 
 }  // namespace redgem
