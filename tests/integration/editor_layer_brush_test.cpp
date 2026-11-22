@@ -96,6 +96,7 @@ TEST_CASE("the Paint brush paints a terrain's chosen layer, one undo step a stro
   REQUIRE(session->document().can_redo());
   session->redo();
   CHECK(grass_in_middle(*session, terrain) == doctest::Approx(painted));
+  session.reset();  // close the recovery lease before removing its directory on Windows
   std::filesystem::remove_all(dir);
 }
 
@@ -123,6 +124,7 @@ TEST_CASE("saving writes the painted weights, and the editor opens them as they 
   const ObjectId terrain = again->scene_desc().find_node(name);
   REQUIRE(again->terrain_layers(terrain) != nullptr);
   CHECK(grass_in_middle(*again, terrain) == doctest::Approx(painted).epsilon(0.01));
+  again.reset();  // close the recovery lease before removing its directory on Windows
   std::filesystem::remove_all(dir);
 }
 
@@ -132,6 +134,7 @@ TEST_CASE("the Paint brush leaves a terrain without layers to its vertex tint") 
   const ObjectId terrain = session->create_terrain(kCenter);
   CHECK(session->terrain_layers(terrain) == nullptr);
   CHECK_FALSE(session->paint_layer(terrain, kCenter, grass_brush(1.0f)));
+  session.reset();  // close the recovery lease before removing its directory on Windows
   std::filesystem::remove_all(dir);
 }
 
@@ -149,6 +152,7 @@ TEST_CASE("undo steps that leave the weights alone share one copy of them") {
   REQUIRE(session->paint_layer(terrain, kCenter, grass_brush(1.0f)));
   session->document().set_name(terrain, "Ground.e");
   CHECK(session->document().history_bytes() >= one_copy + kWeightBytes);
+  session.reset();  // close the recovery lease before removing its directory on Windows
   std::filesystem::remove_all(dir);
 }
 
@@ -160,5 +164,6 @@ TEST_CASE("a layers file that cannot be read leaves the terrain to its own mater
   session->refresh_preview();
   CHECK(session->terrain_layers(terrain) == nullptr);
   CHECK(session->preview_desc().terrains.empty());
+  session.reset();  // close the recovery lease before removing its directory on Windows
   std::filesystem::remove_all(dir);
 }
