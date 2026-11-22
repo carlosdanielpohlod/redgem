@@ -96,6 +96,8 @@ inline constexpr float kFillWidth = -1.0f;  // ImGui: a widget this wide takes t
 // The terrain brush as it starts.
 inline constexpr float kDefaultBrushRadius = 6.0f;    // meters
 inline constexpr float kDefaultBrushStrength = 4.0f;  // meters per second
+// How far toward its layer the Paint brush moves the ground of a terrain with layers in a second.
+inline constexpr float kDefaultLayerStrength = 0.5f;
 
 // Project panel.
 inline constexpr float kFolderColumnWidth = 150.0f;

@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "core/import_settings.hpp"
 #include "core/log.hpp"
 #include "render/texture_loading.hpp"
 #include "render/ui_font.hpp"
@@ -13,6 +14,15 @@ namespace redgem {
 namespace {
 
 using namespace render_detail;
+
+// A picture whose import settings ask for mipmaps gets them, and is filtered through them: it
+// stays smooth drawn smaller than it is.
+void filter_picture(Texture2D& picture, const std::filesystem::path& images_dir, const std::string& name) {
+  const auto file = picture_file(images_dir, name);
+  const bool smaller_copies = file && import_settings::texture_settings(*file).mipmaps;
+  if (smaller_copies) GenTextureMipmaps(&picture);
+  SetTextureFilter(picture, smaller_copies ? TEXTURE_FILTER_TRILINEAR : TEXTURE_FILTER_BILINEAR);
+}
 
 // A cached picture (including a placeholder), or null when GPU allocation failed.
 const Texture2D* if_loaded(const Texture2D& picture) { return loaded(picture) ? &picture : nullptr; }
@@ -24,9 +34,9 @@ void Renderer::Impl::load_ui_font() { ui_fonts.get("", ""); }
 const Texture2D* Renderer::Impl::ui_image(const std::string& name) {
   const auto found = ui_images.find(name);
   if (found != ui_images.end()) return if_loaded(found->second);
-  const Texture2D picture = load_picture_file(images_dir, name);
+  Texture2D picture = load_picture_file(images_dir, name);
   if (loaded(picture)) {
-    SetTextureFilter(picture, TEXTURE_FILTER_BILINEAR);
+    filter_picture(picture, images_dir, name);
   } else {
     log::error("no picture named '" + name + "' in " + images_dir.string());
   }

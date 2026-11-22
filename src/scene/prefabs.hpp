@@ -8,6 +8,10 @@
 
 namespace redgem::prefabs {
 inline constexpr const char* kFileProperty = props::kPrefabFile;
+// game.json's key that raises the byte budgets below, in MiB: {"source": 1024, "decoded": 2048}.
+inline constexpr const char* kBudgetKey = "prefab_budget_mb";
+// The most either budget may be, in MiB: a scene's own byte budget (gltf_budget::kMaxSceneBytes).
+inline constexpr std::uint64_t kMostBudgetMb = 4096;
 // Bounds apply to one complete expansion, including nested references and cached files.
 struct Limits {
   static constexpr std::size_t kDefaultFiles = 64;
@@ -23,6 +27,10 @@ struct Limits {
   std::size_t nodes = kDefaultNodes;
   std::uint64_t input_bytes = kDefaultInputBytes;
   std::uint64_t expanded_bytes = kDefaultExpandedBytes;
+  // Decoded bytes already spent before the expansion starts (the editor's copy of the scene).
+  std::uint64_t spent_bytes = 0;
+  // Whether game.json's kBudgetKey sets the byte budgets, so running out of one names it.
+  bool from_game = true;
 };
 // Editor caches retain source defaults and ordered root offsets for cheap placement edits.
 struct Origin {

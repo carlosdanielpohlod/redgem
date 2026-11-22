@@ -30,6 +30,7 @@ unit/temp_dirs_test.cpp
   unit/quest_file_test.cpp
   unit/splat_map_test.cpp
   unit/ground_rules_test.cpp
+  unit/ground_brush_test.cpp
   unit/terrain_look_test.cpp
   unit/terrain_layers_file_test.cpp
   unit/translation_keys_test.cpp
@@ -45,6 +46,7 @@ unit/temp_dirs_test.cpp
   unit/object_state_test.cpp
   unit/scene_identity_test.cpp
   unit/prefabs_test.cpp
+  unit/prefab_budget_test.cpp
   unit/prefab_export_test.cpp
   unit/prefab_overrides_test.cpp
   unit/prefab_instances_test.cpp
@@ -52,6 +54,7 @@ unit/temp_dirs_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
   unit/asset_search_test.cpp
+  unit/import_settings_test.cpp
   unit/mcp_test.cpp
   unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
@@ -305,6 +308,7 @@ unit/temp_dirs_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_layer_brush_test.cpp
   integration/editor_joints_test.cpp
   integration/editor_bridge_test.cpp
   integration/mcp_game_tools_test.cpp
@@ -312,6 +316,7 @@ unit/temp_dirs_test.cpp
   integration/packed_game_test.cpp
   integration/scene_tools_test.cpp
   integration/project_tools_test.cpp
+  integration/build_tool_test.cpp
   integration/scene_revision_test.cpp
   integration/play_tools_test.cpp
   integration/menu_checks_test.cpp

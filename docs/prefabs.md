@@ -32,6 +32,19 @@ expanded nodes, with 256 MiB of source GLB files and 512 MiB of estimated expand
 content. The GLB reader also checks a tighter memory budget before reading buffers. Editor
 previews count copied scene data against their budget before allocating the snapshot.
 
+A large world raises the two byte budgets in `game.json`, in MiB:
+
+```json
+{ "prefab_budget_mb": { "source": 1024, "decoded": 2048 } }
+```
+
+`source` counts the prefab files as read from disk, `decoded` what they take once loaded (their
+pictures decoded). Each is at most 4096, a scene's own budget: more is taken as 4096. A value that
+is not a whole number from 1, or another key, is refused whole: the game keeps the defaults and
+`redgem check` reports it. When a scene's prefabs pass a budget, the error names the one to raise;
+at 4096 it asks to split the scene. The editor reads the budgets when it opens a game.
+`Scene.spawn_prefab` keeps its own fixed runtime budget.
+
 The editing viewport previews inherited geometry, lights and cameras. Clicking inherited parts
 selects the authored reference; its placement pivot stays independent of source-root offsets.
 Moving references, copying, reparenting and undo preserve their world placement. Saving keeps
@@ -57,8 +70,9 @@ remain nested references rather than flattened geometry.
 
 Include every joint of a used skeleton in the selected hierarchy and animate descendants rather
 than the selected root. The editor validates dependencies and runtime budgets before publishing
-a complete file; it never exposes an incomplete source. Export checks a conservative 512 MiB
-estimate of the edited scene's data before copying and caps the source GLB at 256 MiB.
+a complete file; it never exposes an incomplete source. Export checks a conservative estimate of the
+edited scene's data against the game's decoded budget (512 MiB by default) before copying and caps
+the source GLB at its source budget (256 MiB by default).
 Built games include regular files in `prefabs/` along with the other game assets.
 
 ## Overrides

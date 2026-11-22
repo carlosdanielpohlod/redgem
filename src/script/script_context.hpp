@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "audio/audio.hpp"
+#include "core/config.hpp"
 #include "input/input.hpp"
 #include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
@@ -166,6 +167,9 @@ struct ScriptContext {
   std::string game_title;
   // The servers game.json knows by their fingerprints: a join that gives none checks these.
   std::vector<net::ServerPin> server_pins;
+  // The poses a second NetworkSync sends of an object that says nothing itself (game.json's
+  // "network": {"send_hz": N}): Network.send_hz.
+  int send_hz = config::kDefaultSendHz;
   // Its version (game.json), for Game.version; empty when it gives none.
   std::string game_version;
   bool quit_requested = false;

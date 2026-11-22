@@ -12,6 +12,7 @@
 #include "editor/scripts/script_workspace.hpp"
 #include "editor/ui/panel_state.hpp"
 
+#include "scene/ground/ground_brush.hpp"
 #include "scene/shapes/terrain.hpp"
 
 namespace redgem {
@@ -32,6 +33,11 @@ struct TerrainTool {
   float radius = editor_config::kDefaultBrushRadius;  // meters
   // Meters per second for Raise and Lower; how fast Smooth and Flatten act.
   float strength = editor_config::kDefaultBrushStrength;
+  // On a terrain with ground layers, Paint paints `layer` into its weights: `layer_strength` (0 to
+  // 1) of the way in a second at the brush's middle, fading out over `falloff` of its radius.
+  int layer = 0;
+  float layer_strength = editor_config::kDefaultLayerStrength;
+  float falloff = kDefaultBrushFalloff;
 };
 
 // What every panel works with.

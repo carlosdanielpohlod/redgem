@@ -9,6 +9,9 @@
 
 namespace redgem {
 
+// The error of a file that would take more than the byte budget it was loaded with.
+inline constexpr const char* kLoadingBudgetError = "scene exceeds its loading byte budget";
+
 struct LoadResult {
   bool ok = false;
   std::string error;

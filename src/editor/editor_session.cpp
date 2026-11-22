@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <utility>
 
+#include "app/game_settings.hpp"
+#include "app/terrain_files.hpp"
+#include "core/log.hpp"
 #include "editor/editor_logic.hpp"
 #include "scene/props.hpp"
 #include "script/script_naming.hpp"
@@ -27,7 +30,7 @@ std::vector<ObjectId> collision_layer_targets(const SceneDocument& document, con
 }  // namespace
 
 EditorSession::EditorSession(std::filesystem::path game_dir, SceneDocument document)
-    : game_dir_(std::move(game_dir)), document_(std::move(document)) {}
+    : game_dir_(std::move(game_dir)), prefab_limits_(read_prefab_limits(game_dir_)), document_(std::move(document)) {}
 
 bool EditorSession::set_collision_layer(const std::vector<ObjectId>& objects, const std::string& name) {
   if (!editing() || !collision_layers_.find(name)) return false;
@@ -48,9 +51,27 @@ bool EditorSession::set_collision_layer(const std::vector<ObjectId>& objects, co
 const Scene& EditorSession::scene() const { return runtime_ ? runtime_->scene() : preview_; }
 
 void EditorSession::refresh_preview() {
-  prefab_preview_.rebuild(document_.desc(), game_dir_);
+  follow_terrain_layers();
+  prefab_preview_.rebuild(document_.desc(), game_dir_, prefab_limits_);
   preview_ = Scene::from_desc(preview_desc());
   selection_.keep_below(document_.node_count());
+}
+
+void EditorSession::follow_terrain_layers() {
+  document_.relink_terrain_layers();
+  for (const std::string& name : document_.missing_terrain_layers()) hold_layers_named(name);
+}
+
+void EditorSession::hold_layers_named(const std::string& name) {
+  if (unreadable_layers_.count(name) != 0) return;
+  std::string error;
+  auto layers = read_terrain_files(game_dir_, name, TerrainReading::WeightsAndPictures, error);
+  if (!layers) {
+    log::warning("ground layers '" + name + "' cannot be read: " + error);
+    unreadable_layers_.insert(name);
+    return;
+  }
+  document_.hold_terrain_layers(std::move(*layers));
 }
 
 void EditorSession::refresh_node(ObjectId node) {
@@ -196,6 +217,21 @@ bool EditorSession::paint_terrain(ObjectId terrain, Vec3 world_point, float radi
       editor_logic::local_brush(preview_.world_transform(terrain), world_point, radius, amount, SculptMode::Smooth);
   brush.amount = amount;
   return document_.paint_terrain(terrain, brush, tint);
+}
+
+const TerrainLayers* EditorSession::terrain_layers(ObjectId terrain) const { return document_.terrain_layers(terrain); }
+
+bool EditorSession::paint_layer(ObjectId terrain, Vec3 world_point, LayerBrush brush) {
+  const TerrainLayers* layers = document_.terrain_layers(terrain);
+  if (!can_sculpt(terrain) || layers == nullptr || layers->layers.empty()) return false;
+  // (A layer chosen on another terrain with more layers is this one's last.)
+  brush.layer = std::clamp(brush.layer, 0, static_cast<int>(layers->layers.size()) - 1);
+  const TerrainBrush local =
+      editor_logic::local_brush(preview_.world_transform(terrain), world_point, brush.radius, 0.0f, SculptMode::Smooth);
+  brush.x = local.x;
+  brush.z = local.z;
+  brush.radius = local.radius;
+  return document_.paint_layer(terrain, brush);
 }
 
 void EditorSession::reparent(ObjectId child, ObjectId parent) {

@@ -59,20 +59,4 @@ ObjectId EditorSession::create_environment() {
   return existing;
 }
 
-ObjectId EditorSession::import_model(const std::filesystem::path& path, Vec3 position, std::string& error,
-                                     ObjectId parent) {
-  if (!editing()) {
-    error = "stop the game to edit the scene";
-    return kNoObject;
-  }
-  const int node = document_.import_model(path, error, parent);
-  if (node == kNoIndex) return kNoObject;
-  log::info("imported " + path.filename().string());
-  if (parent == kNoObject) return place_new(node, position);
-  refresh_preview();  // the parent's world placement is needed below
-  Transform world = preview_.world_transform(node);
-  world.position = position;
-  return place_new(node, relative_to(preview_.world_transform(parent), world).position);
-}
-
 }  // namespace redgem
