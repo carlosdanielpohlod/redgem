@@ -374,9 +374,12 @@ struct Known {
   std::size_t most;   // how many it takes (a word too many is refused, never left unread)
 };
 constexpr Known kSubcommands[] = {
-    {"list", list, kObjectWord, kObjectWord},          {kDiffWord, diff, kObjectWord, kObjectWord},
-    {"get", get, kFirstAssignment, kFirstAssignment},  {"set", set, kFirstAssignment, kAnyMore},
-    {"add", add, kFirstAssignment, kAnyMore},          {"remove", remove, kFirstAssignment, kFirstAssignment},
+    {"list", list, kObjectWord, kObjectWord},
+    {kDiffWord, diff, kObjectWord, kObjectWord},
+    {"get", get, kFirstAssignment, kFirstAssignment},
+    {"set", set, kFirstAssignment, kAnyMore},
+    {"add", add, kFirstAssignment, kAnyMore},
+    {"remove", remove, kFirstAssignment, kFirstAssignment},
     {kCompactWord, compact, kObjectWord, kObjectWord},
     {kPaintWord, paint, kFirstAssignment, kFirstAssignment},
     {"overrides", overrides, kFirstAssignment, kFirstAssignment},

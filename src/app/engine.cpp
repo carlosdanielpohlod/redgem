@@ -162,8 +162,8 @@ int Engine::chosen_physics_threads(const GameSettings& settings) const {
 void Engine::open_presenter(const GameSettings& settings) {
   if (presenter_ == nullptr) {
     // Shown by nobody, the game is as big as its settings say.
-    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height},
-                                                     fixed_delta());
+    own_presenter_ =
+        std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height}, fixed_delta());
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();

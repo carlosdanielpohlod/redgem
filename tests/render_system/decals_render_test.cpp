@@ -40,9 +40,9 @@ constexpr float kHillHeight = 1.0f;
 constexpr Vec3 kCameraAbove{0.0f, 7.0f, 3.0f};
 
 constexpr float kMiddle = 0.5f;
-constexpr int kDark = 150;         // the sum of a marked pixel's channels is below this
-constexpr int kBright = 450;       // and an unmarked one's above this
-constexpr int kStrongly = 60;      // a tinted channel is this much over the others, at least
+constexpr int kDark = 150;          // the sum of a marked pixel's channels is below this
+constexpr int kBright = 450;        // and an unmarked one's above this
+constexpr int kStrongly = 60;       // a tinted channel is this much over the others, at least
 constexpr std::size_t kSeen = 200;  // pixels of a mark, at least
 constexpr float kLeftOfMiddle = 0.45f;
 constexpr float kRightOfMiddle = 0.55f;

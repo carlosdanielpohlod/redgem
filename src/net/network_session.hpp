@@ -234,8 +234,8 @@ class NetworkSession {
     int asking_as = 0;      // the id a newcomer would have, while the game decides on it
     int ticket = 0;         // ... and what the decision names
     float asking_for = 0.0f;
-    std::string token{};  // what gets its place back should it drop (empty: none is held for it)
-    float window = 0.0f;  // ... and for how long, as its welcome said
+    std::string token{};       // what gets its place back should it drop (empty: none is held for it)
+    float window = 0.0f;       // ... and for how long, as its welcome said
     std::string let_go_for{};  // why the host let it go, when it did (see kick)
 
     bool let_in() const { return peer != 0; }

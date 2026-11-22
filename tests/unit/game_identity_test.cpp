@@ -88,7 +88,8 @@ TEST_CASE("what game.json says of the game and cannot be used is left out, and s
   CHECK(complaint(R"({"icon": "../icon.png"})").find("game.json: icon must name a .png file inside") == 0);
   CHECK(complaint(R"({"icon": "/tmp/icon.png"})").find("game.json: icon") == 0);
   CHECK(complaint(R"({"splash": "images/splash.jpg"})").find("game.json: splash") == 0);
-  CHECK(complaint(R"({"network": "yes"})") == "game.json: network must be true, false or a section of network settings");
+  CHECK(complaint(R"({"network": "yes"})") ==
+        "game.json: network must be true, false or a section of network settings");
   // The first thing wrong is said; the rest that can be used still is.
   const GameIdentityReading reading = read_game_identity(game_saying(R"({"version": "x", "network": true})"));
   CHECK(reading.identity.version.empty());
