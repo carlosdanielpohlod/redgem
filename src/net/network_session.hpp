@@ -240,16 +240,16 @@ class NetworkSession {
     int peer = 0;  // 0 on the host until the newcomer said hello and was let in
     ByteAllowance allowance{kServedBytesPerSecond, kServedBurstBytes};       // on the game's host
     ByteAllowance messages{kServedMessagesPerSecond, kServedBurstMessages};  // ... counted in messages
-    float idle_for = 0.0f;  // seconds since it last said something to the game, on a dedicated server
-    int asking_as = 0;      // the id a newcomer would have, while the game decides on it
-    int ticket = 0;         // ... and what the decision names
+    float idle_for = 0.0f;      // seconds since it last said something to the game, on a dedicated server
+    int asking_as = kNoPeerId;  // the id a newcomer would have, while the game decides on it
+    int ticket = 0;             // ... and what the decision names
     float asking_for = 0.0f;
-    std::string token{};  // what gets its place back should it drop (empty: none is held for it)
-    float window = 0.0f;  // ... and for how long, as its welcome said
+    std::string token{};       // what gets its place back should it drop (empty: none is held for it)
+    float window = 0.0f;       // ... and for how long, as its welcome said
     std::string let_go_for{};  // why the host let it go, when it did (see kick)
 
-    bool let_in() const { return peer != 0; }
-    bool asking() const { return asking_as != 0; }
+    bool let_in() const { return peer != kNoPeerId; }
+    bool asking() const { return asking_as != kNoPeerId; }
     // A newcomer that has not said hello yet.
     bool before_hello() const { return !let_in() && !asking(); }
     // Whether it is the newcomer a decision with this ticket is about, and still there to hear it.

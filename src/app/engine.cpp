@@ -49,8 +49,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   if (!manifest.tick_hz_error.empty()) log::warning(manifest.tick_hz_error);
-  if (!manifest.send_hz_error.empty()) log::warning(manifest.send_hz_error);
-  if (!manifest.max_players_error.empty()) log::warning(manifest.max_players_error);
+  warn_of_all(network_problems(manifest));
   if (!manifest.prefab_budget_error.empty()) log::warning(manifest.prefab_budget_error);
   warn_of_all(physics_problems(manifest));
   warn_of_all(manifest.servers_warnings);
@@ -166,8 +165,8 @@ int Engine::chosen_physics_threads(const GameSettings& settings) const {
 void Engine::open_presenter(const GameSettings& settings) {
   if (presenter_ == nullptr) {
     // Shown by nobody, the game is as big as its settings say.
-    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height},
-                                                     fixed_delta());
+    own_presenter_ =
+        std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height}, fixed_delta());
     presenter_ = own_presenter_.get();
   }
   read_surface_sizes();

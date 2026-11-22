@@ -307,6 +307,12 @@ GameManifest default_manifest(const std::filesystem::path& game_dir) {
   return manifest;
 }
 
+// The "network" section's settings: its send rate and its room size.
+void read_network(const nlohmann::json& json, GameManifest& manifest) {
+  manifest.send_hz_error = read_send_hz(json, manifest.settings);
+  manifest.max_players_error = read_max_players(json, manifest.settings);
+}
+
 }  // namespace
 
 GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
@@ -321,11 +327,18 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   manifest.tick_hz_error = read_tick_hz(json, manifest.settings);
-  manifest.send_hz_error = read_send_hz(json, manifest.settings);
-  manifest.max_players_error = read_max_players(json, manifest.settings);
+  read_network(json, manifest);
   manifest.prefab_budget_error = read_prefab_budget(json, manifest.settings.prefab_budget);
   read_sections(json, manifest);
   return manifest;
+}
+
+std::vector<std::string> network_problems(const GameManifest& manifest) {
+  std::vector<std::string> problems;
+  for (const std::string* error : {&manifest.send_hz_error, &manifest.max_players_error}) {
+    if (!error->empty()) problems.push_back(*error);
+  }
+  return problems;
 }
 
 std::vector<std::string> physics_problems(const GameManifest& manifest) {

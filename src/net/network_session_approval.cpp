@@ -41,7 +41,7 @@ bool NetworkSession::decide(int ticket, bool accepted, const std::string& reason
 }
 
 void NetworkSession::refuse(Link& link, const std::string& reason) {
-  link.asking_as = 0;
+  link.asking_as = kNoPeerId;
   link.connection.refuse(reason);
 }
 

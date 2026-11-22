@@ -72,11 +72,9 @@ void RelayServer::open_room(Member& member) {
 
 void RelayServer::join_room(Member& member, const std::string& room, const nlohmann::json& auth) {
   Member* opener = opener_of(room);
-  const int id = opener != nullptr ? free_peer_id(seats_taken(room), opener->room_size) : kNoPeerId;
-  if (id == kNoPeerId) {
-    member.connection.close();
-    return;
-  }
+  if (opener == nullptr) return member.connection.close();
+  const int id = free_peer_id(seats_taken(room), opener->room_size);
+  if (id == kNoPeerId) return member.connection.close();
   place_in(member, room);
   if (opener->guarded) {
     ask(member, *opener, id, auth);
@@ -89,7 +87,7 @@ void RelayServer::let_in(Member& member, int id) {
   std::vector<int> ids;
   for (const Member* other : members_of(member.room)) ids.push_back(other->peer);
   member.peer = id;
-  member.asking_as = 0;
+  member.asking_as = kNoPeerId;
   member.connection.send(welcome(id, ids, member.room));
   tell_room(member.room, id, {{kKind, kArrived}, {kFrom, id}});
 }

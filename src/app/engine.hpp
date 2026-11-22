@@ -298,6 +298,7 @@ class Engine {
   bool frozen() const { return is_loading_scene() || context_.level_held; }
   bool deterministic_scene_load() const;
   void advance_or_loading(float frame_seconds);
+  void advance_and_send(float frame_seconds);
   void request_scene(const std::string& name);
   void begin_scene_load(const std::string& name);
   void cancel_scene_load();

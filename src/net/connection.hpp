@@ -142,9 +142,9 @@ class Connection {
   IoStatus write_out();
   // Whether nothing more goes to the other side: it hung up, or was let go.
   bool hung_up() const { return gone_ || dropped_; }
+  bool sends_at_once() const;  // not gathering, or gathered enough to send now
   // Whether what waits can be written out now: to a side that is there, over a connection that is
   // made (and encrypted, when it is to be).
-  bool sends_at_once() const;  // not gathering, or gathered enough to send now
   bool can_write() const { return !hung_up() && established_ && !handshaking(); }
   // Whether one more message may be taken this poll (see kMaxMessagesPerPoll).
   bool takes_more() const { return !dropped_ && taken_this_poll_ < kMaxMessagesPerPoll; }

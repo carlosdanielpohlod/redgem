@@ -22,8 +22,7 @@ void Engine::frame(float frame_seconds) {
   poll_network();
   answer_requests();
   follow_presenter();
-  advance_or_loading(frame_seconds);
-  network_.flush();  // what the scripts said this frame, together
+  advance_and_send(frame_seconds);
   // Audio can query static bodies. Do this before the next physics step runs in parallel.
   audio().update(frame_seconds);
   begin_prepared_step();
@@ -32,6 +31,12 @@ void Engine::frame(float frame_seconds) {
   keep_bindings();
   switch_scene_if_asked();
   profiler_.finish_frame();
+}
+
+// The frame's game (or loading), then what its scripts said goes out together: a write a machine.
+void Engine::advance_and_send(float frame_seconds) {
+  advance_or_loading(frame_seconds);
+  network_.flush();
 }
 
 void Engine::prepare_frame() {
@@ -115,8 +120,7 @@ void Engine::advance_game(float frame_seconds) {
   settle_physics();  // (where the step would have run in place: after the frame's start and its callbacks)
   run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
-  const float unscaled =
-      options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
+  const float unscaled = options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
 }

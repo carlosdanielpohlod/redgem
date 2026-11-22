@@ -95,14 +95,14 @@ class RelayServer {
     std::string room;
     int peer = 0;
     ByteAllowance allowance{kRelayBytesPerSecond, kRelayBurstBytes};
-    bool farewelled = false;  // the others in its room were told it is gone
-    bool guarded = false;     // it opened its room, whose game decides who comes in
+    bool farewelled = false;           // the others in its room were told it is gone
+    bool guarded = false;              // it opened its room, whose game decides who comes in
     int room_size = kDefaultRoomSize;  // it opened its room: how many machines its game takes
-    int asking_as = 0;        // the id it would have, while the game of its room decides on it
+    int asking_as = kNoPeerId;         // the id it would have, while the game of its room decides on it
     float asking_for = 0.0f;
 
-    bool in_room() const { return peer != 0; }
-    bool asking() const { return asking_as != 0; }
+    bool in_room() const { return peer != kNoPeerId; }
+    bool asking() const { return asking_as != kNoPeerId; }
     // The id it holds in its room: its own, or the one it would have.
     int seat() const { return in_room() ? peer : asking_as; }
     // Holding a place in room `code` (in it, or waiting to be let in). One that left holds it until
@@ -163,6 +163,7 @@ class RelayServer {
   std::vector<int> seats_taken(const std::string& room) const;
   void pass_on(Member& sender, const nlohmann::json& message);
   void drop_closed_members();
+  void flush_members();  // writes what each member was told this poll
   void close_rooms_without_opener();
   // Lets go of everyone holding a place in a room whose opener left.
   void empty_room(const std::string& room);

@@ -49,7 +49,7 @@ void NetworkSession::let_go_after_drop(const Held& held, std::vector<NetworkEven
 
 void NetworkSession::resume(Link& link, const std::string& token, std::vector<NetworkEvent>& events) {
   const Held claimed = claim_place(token, events);
-  if (claimed.peer == 0) return refuse(link, kResumeRefused);
+  if (claimed.peer == kNoPeerId) return refuse(link, kResumeRefused);
   link.peer = claimed.peer;
   issue_token(link);  // a token gets a place back once
   link.connection.send(welcome_for(link));
@@ -72,7 +72,7 @@ void NetworkSession::tell_departures(Link& link, const std::vector<int>& departe
 NetworkSession::Held NetworkSession::claim_place(const std::string& token, std::vector<NetworkEvent>& events) {
   // (Only a token handed out is anyone's, held for as long as its welcome said.)
   Held held = claim_held(token);
-  return held.peer != 0 ? held : claim_open(token, events);
+  return held.peer != kNoPeerId ? held : claim_open(token, events);
 }
 
 NetworkSession::Held NetworkSession::claim_held(const std::string& token) {

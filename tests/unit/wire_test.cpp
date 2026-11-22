@@ -187,13 +187,13 @@ TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
   CHECK(wire::free_peer_id({kFirstGuestId, kOtherGuest}) == kGuest);
   std::vector<int> everyone;
   for (int id = kFirstGuestId; id <= kMaxPeers; ++id) everyone.push_back(id);
-  CHECK(wire::free_peer_id(everyone) == 0);
+  CHECK(wire::free_peer_id(everyone) == kNoPeerId);
 }
 
 TEST_CASE("a game of a smaller room is full sooner, and a room's size is held to what the protocol carries") {
   constexpr int kSmallRoom = 4;
   CHECK(wire::free_peer_id({kFirstGuestId, kFirstGuestId + 1}, kSmallRoom) == kSmallRoom);
-  CHECK(wire::free_peer_id({kFirstGuestId, kFirstGuestId + 1, kSmallRoom}, kSmallRoom) == 0);
+  CHECK(wire::free_peer_id({kFirstGuestId, kFirstGuestId + 1, kSmallRoom}, kSmallRoom) == kNoPeerId);
   CHECK(wire::usable_room_size(0) == kMinRoomSize);
   CHECK(wire::usable_room_size(kMaxPeers * 2) == kMaxPeers);
 }
