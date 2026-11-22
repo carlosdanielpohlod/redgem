@@ -137,9 +137,6 @@ mrb_value transform_up(mrb_state* mrb, mrb_value self) { return vec3_value(mrb, 
 void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "position", transform_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "position=", transform_set_position, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, transform, "render_position", transform_render_position, MRB_ARGS_NONE());
-  mrb_define_method(mrb, transform, "render_rotation", transform_render_rotation, MRB_ARGS_NONE());
-  mrb_define_method(mrb, transform, "__render_axes", transform_render_axes, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position", transform_local_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "local_position=", transform_set_local_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "rotation", transform_rotation, MRB_ARGS_NONE());
@@ -150,6 +147,13 @@ void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "look_at", transform_look_at, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "scale", transform_scale, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "scale=", transform_set_scale, MRB_ARGS_REQ(1));
+}
+
+// Where an object is drawn this frame (between two physics steps for a body the physics moves).
+void install_drawn_bindings(RClass* transform, mrb_state* mrb) {
+  mrb_define_method(mrb, transform, "render_position", transform_render_position, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "render_rotation", transform_render_rotation, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "__render_axes", transform_render_axes, MRB_ARGS_NONE());
 }
 
 void install_direction_bindings(RClass* transform, mrb_state* mrb) {
@@ -163,6 +167,7 @@ void install_direction_bindings(RClass* transform, mrb_state* mrb) {
 void install_transform_bindings(mrb_state* mrb) {
   RClass* transform = mrb_define_class(mrb, "Transform", mrb->object_class);
   install_placement_bindings(transform, mrb);
+  install_drawn_bindings(transform, mrb);
   install_direction_bindings(transform, mrb);
 }
 
