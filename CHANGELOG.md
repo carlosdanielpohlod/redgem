@@ -204,8 +204,9 @@ when a game needs no change), **Added**, **Changed**, **Fixed**. A release moves
 - **`redgem shot` of a heavy scene no longer comes out black.** A shot draws its frames off
   screen, and nothing held them back: on a scene with tens of thousands of scattered copies the
   commands of hundreds of frames piled up ahead of the graphics card, the driver dropped work, and
-  a picture taken about four seconds in was black (or garbage). The shot now waits for the card
-  once more than two frames are in flight.
+  a picture taken about four seconds in was black (or garbage). Water in view at 1920x1080 did the
+  same with no scattered copies at all. The shot now waits for the card once more than two frames
+  are in flight, and warns when a picture still comes back see-through over much of it.
 - **The engine's tests can run side by side.** Each C++ test run writes in a temporary folder of its
   own, removed when it ends, so two runs on one machine no longer read each other's temporary files (one
   failed with "scene.glb file not found" while another worktree's run was going on).

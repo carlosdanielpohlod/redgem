@@ -1,6 +1,6 @@
 #pragma once
 
-// Keeps drawing that never shows a frame on a screen (a shot, a recording's frames) from running
+// Keeps drawing that never shows a frame on a screen (a shot) from running
 // ahead of the graphics card. A window's frames are held back by the swap that shows them; frames
 // drawn off screen are not, and the commands of hundreds of frames then pile up in the driver
 // until it drops work: on a heavy scene (tens of thousands of scattered copies) a picture read

@@ -60,7 +60,7 @@ void filter_cube_maps_across_seams();
 // done everything sent before it. Core in desktop OpenGL 3.3 and OpenGL ES 3.
 using CardFence = void*;
 CardFence insert_card_fence();
-// Waits until the card has passed the mark, however long that takes.
+// Waits until the card has passed the mark, or (stuck) up to ten seconds, with a warning.
 void wait_card_fence(CardFence fence);
 void release_card_fence(CardFence fence);
 

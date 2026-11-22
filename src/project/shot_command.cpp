@@ -4,6 +4,8 @@
 #include <rlgl.h>
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -15,11 +17,13 @@
 #include "app/recording.hpp"
 #include "core/command_line.hpp"
 #include "core/config.hpp"
+#include "core/log.hpp"
 #include "core/translations.hpp"
 #include "project/scene_text.hpp"
 #include "project/script_messages.hpp"
 #include "project/tool_play.hpp"
 #include "render/frame_pacer.hpp"
+#include "render/picture_check.hpp"
 #include "render/renderer.hpp"
 #include "render/window.hpp"
 
@@ -49,6 +53,15 @@ WindowSettings hidden_window(FrameSize size) {
   settings.width = size.width;
   settings.height = size.height;
   return settings;
+}
+
+// A word on a picture the card did not draw whole: it is saved, and whoever reads it is told.
+void warn_if_unfinished(const Image& image) {
+  if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) return;
+  const auto pixels = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
+  const auto* rgba = static_cast<const std::uint8_t*>(image.data);
+  if (!unfinished(rgba, pixels)) return;
+  log::warning(tr("project.shot.unfinished", {{"count", std::to_string(see_through_pixels(rgba, pixels))}}));
 }
 
 // Shows a game to nobody, frame by frame off screen, and keeps the picture of one frame.
@@ -92,6 +105,7 @@ class ShotPresenter final : public Presenter {
   void take() {
     Image image = LoadImageFromTexture(picture_.texture);
     ImageFlipVertical(&image);  // (a framebuffer's rows start at the bottom)
+    warn_if_unfinished(image);
     saved_ = ExportImage(image, file_.string().c_str());
     UnloadImage(image);
     taken_ = true;

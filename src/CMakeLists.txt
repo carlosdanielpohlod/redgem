@@ -552,6 +552,7 @@ redgem_add_library(redgem_runtime
   render/gl_extras.cpp
   render/gpu_timers.cpp
   render/frame_pacer.cpp
+  render/picture_check.cpp
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/compressed_textures.cpp
