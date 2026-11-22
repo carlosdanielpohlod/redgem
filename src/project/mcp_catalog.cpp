@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "project/mcp_project_tools.hpp"
+#include "project/mcp_terrain_tool.hpp"
 #include "project/ruby_eval.hpp"
 
 namespace redgem::tools::mcp {
@@ -155,21 +156,21 @@ Json available_tools(const Options& options) {
   return tools;
 }
 
-// The actions of project that only read.
-Json project_reads() {
-  Json reads = Json::array();
-  for (const auto& action : Json::parse(kSchemas)) {
-    if (action["name"] != "project") continue;
-    for (const auto& word : action["inputSchema"]["properties"]["action"]["enum"])
-      if (reads_project(word)) reads.push_back(word);
+// The actions of a tool of kSchemas that only read, as `reads` says.
+Json reading_actions(const std::string& name, bool (*reads)(const std::string&)) {
+  Json actions = Json::array();
+  for (const auto& tool : Json::parse(kSchemas)) {
+    if (tool["name"] != name) continue;
+    for (const auto& word : tool["inputSchema"]["properties"]["action"]["enum"])
+      if (reads(word)) actions.push_back(word);
   }
-  return reads;
+  return actions;
 }
 
 Json read_only_actions(const std::string& name) {
   if (name == "editor") return {"status", "capture"};
-  if (name == "terrain") return {"layers"};
-  return project_reads();
+  if (name == "terrain") return reading_actions(name, reads_terrain);
+  return reading_actions(name, reads_project);
 }
 
 // Whether this run keeps only the tool's reading actions.

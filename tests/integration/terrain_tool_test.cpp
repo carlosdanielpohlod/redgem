@@ -82,6 +82,21 @@ TEST_CASE("terrain paint paints the layers an object names, and reads them by th
   CHECK_FALSE(painted["isError"].get<bool>());
   CHECK(has(painted, "terrains/beach.splat0.png"));
   CHECK(fs::exists(game.dir() / "terrains" / "beach.splat0.png"));
+  CHECK_THROWS_AS(game.call({{"action", "layers"}, {"object", "Ground"}, {"name", "beach"}}), std::invalid_argument);
+  Json swapped = write_beach();
+  swapped["confirm"] = true;
+  swapped["content"]["layers"] = {{{"name", "grass"}}, {{"name", "sand"}}};
+  CHECK(has(game.call(swapped), "paint it again"));
+  CHECK_FALSE(fs::exists(game.dir() / "terrains" / "beach.splat0.png"));
+}
+
+TEST_CASE("terrain reads only the layers files of terrains/, whatever an object names") {
+  const GameCopy game;
+  const Json named =
+      mcp::invoke(game.options(), "scene_edit",
+                  {{"action", "set"}, {"object", "Ground"}, {"assignments", {"prop.terrain_layers=../game"}}});
+  REQUIRE_FALSE(named["isError"].get<bool>());
+  CHECK_THROWS_AS(game.call({{"action", "layers"}, {"object", "Ground"}}), std::invalid_argument);
 }
 
 TEST_CASE("read-only terrain only reads the layers") {
