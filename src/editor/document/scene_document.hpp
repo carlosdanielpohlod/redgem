@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -13,6 +14,7 @@
 
 #include "editor/document/glb_file.hpp"
 #include "editor/document/glb_usage.hpp"
+#include "scene/ground/ground_brush.hpp"
 #include "scene/shapes/primitives.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/shapes/terrain.hpp"
@@ -113,6 +115,24 @@ class SceneDocument {
   bool paint_terrain(int node, const TerrainBrush& brush, Color tint);
   // Meshes reshaped since the last call (the renderer has to upload their vertices again).
   std::vector<int> take_changed_meshes();
+
+  // Ground layers (see scene/ground/terrain_layers.hpp), held in desc().terrains: the session
+  // reads them from the game's folder, the document keeps their weights in its undo steps.
+  // The layers files the objects name (props::kTerrainLayers) whose layers are not held yet.
+  std::vector<std::string> missing_terrain_layers() const;
+  // Holds the layers read from a terrain's files. Not an edit: nothing to undo.
+  void hold_terrain_layers(TerrainLayers layers);
+  // Points every held terrain at the first object with a mesh that names it now (at none when no
+  // object does, so undoing a delete finds its weights as they were). Call after nodes change.
+  void relink_terrain_layers();
+  // The layers of a terrain object; null when it has none.
+  const TerrainLayers* terrain_layers(int node) const;
+  // One brush stroke that paints a layer into a terrain's weights, in the mesh's own space. Like
+  // sculpt_terrain, it is not recorded by itself. False when nothing changed.
+  bool paint_layer(int node, const LayerBrush& brush);
+  // The terrains whose weights changed since the last save: the session writes their pictures.
+  std::vector<const TerrainLayers*> unsaved_weights() const;
+  void weights_saved() { unsaved_weights_.clear(); }
   // Moves a node (and its children) under `new_parent` (kNoIndex = scene root), keeping its world
   // placement. Returns the node's new index (nodes keep parents before children). Refuses cycles
   // and invalid indices (returns `index` unchanged).
@@ -149,7 +169,7 @@ class SceneDocument {
   bool redo();
 
   // How much undo keeps: at most this many steps, and at most this many bytes of what only the
-  // undo and redo steps still use (their copies of the objects and terrains; the vertices,
+  // undo and redo steps still use (their copies of the objects, terrains and layer weights; the vertices,
   // pictures and file bytes of deleted objects and undone imports), checked as each step begins.
   // The oldest steps go first; the latest one always stays.
   // What no step can bring back any more is let go of.
@@ -184,12 +204,19 @@ class SceneDocument {
       return positions == other.positions && normals == other.normals && colors == other.colors;
     }
   };
+  // A terrain's weights as an undo step keeps them: shared by the steps they did not change in.
+  using KeptWeights = std::shared_ptr<const std::vector<std::uint8_t>>;
+  struct WeightsCopy {
+    std::uint64_t version = 0;  // of the weights it was taken from
+    KeptWeights weights;
+  };
   struct Snapshot {
     std::vector<NodeDesc> nodes;
     std::vector<MaterialDesc> materials;
     long long version = 0;
-    std::map<int, MeshShape> shapes;  // of every terrain, by mesh index
-    std::size_t bytes = 0;            // what all of that takes (see bytes_of), worked out as it is kept
+    std::map<int, MeshShape> shapes;             // of every terrain, by mesh index
+    std::map<std::string, KeptWeights> weights;  // of every terrain with layers, by its name
+    std::size_t bytes = 0;                       // what all of that takes (see bytes_of), worked out as it is kept
   };
 
   SceneDocument() = default;
@@ -247,6 +274,12 @@ class SceneDocument {
   void restore(Snapshot& state);
   // Puts the terrains back as a snapshot had them.
   void restore_shapes(const std::map<int, MeshShape>& shapes);
+  // The weights of every terrain with layers, copied only when they changed since the last copy.
+  std::map<std::string, KeptWeights> kept_weights() const;
+  void restore_weights(const std::map<std::string, KeptWeights>& weights);
+  TerrainLayers* held_layers(const std::string& name);
+  // The weights only undo and redo steps hold, in bytes (each copy once).
+  std::size_t undo_weights_bytes() const;
   // A mesh whose vertices changed: new bounds, and the renderer and the next save get to know.
   void mark_reshaped(int mesh);
   // Gives a reshaped mesh positions and normals of its own where it shares them with other data
@@ -401,9 +434,13 @@ class SceneDocument {
   long long saved_version_ = 0;
   bool changed_since_checkpoint_ = false;
   bool node_edit_active_ = false;
-  std::set<int> changed_meshes_;   // reshaped since the renderer last asked
-  std::set<int> unsaved_meshes_;   // reshaped since the last save
-  std::set<int> released_meshes_;  // let go of: nothing can use them again
+  std::set<int> changed_meshes_;           // reshaped since the renderer last asked
+  std::set<int> unsaved_meshes_;           // reshaped since the last save
+  std::set<int> released_meshes_;          // let go of: nothing can use them again
+  std::set<std::string> unsaved_weights_;  // terrains painted since the last save, by name
+  // The last copy of each terrain's weights an undo step took, by name: the next step shares it
+  // while they stay the same.
+  mutable std::map<std::string, WeightsCopy> weights_copies_;
   SaveReport last_save_;
   std::set<int> unshown_images_;  // added for a texture slot, no material shows them yet: held until one does
 };

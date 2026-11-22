@@ -1,4 +1,7 @@
-// Inspector card of a terrain: the brush that sculpts it in the Scene view.
+// Inspector card of a terrain: the brush that sculpts it in the Scene view, and paints it (its
+// ground layers, when it has them).
+
+#include <algorithm>
 
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
@@ -24,6 +27,11 @@ constexpr const char* kSculptOffHelp = "editor.inspector.terrain.sculpt_off_help
 constexpr const char* kBrushModeId = "##mode";
 constexpr const char* kBrushRadiusId = "##radius";
 constexpr const char* kBrushStrengthId = "##strength";
+constexpr const char* kLayerId = "##layer";
+constexpr const char* kLayerStrengthId = "##layer_strength";
+constexpr const char* kFalloffId = "##falloff";
+constexpr const char* kLayerHelp = "editor.inspector.terrain.layer_help";
+constexpr const char* kShareFormat = "%.2f";
 
 // The editor has a brush, and the object is a terrain to use it on.
 bool has_terrain_card(const PanelContext& context, int index) {
@@ -43,7 +51,13 @@ void draw_brush_tools(TerrainTool& tool) {
   if (ImGui::Checkbox("##paint", &tool.painting)) tool.sculpting = false;
 }
 
-const char* brush_help(const TerrainTool& tool) {
+// The ground layers of the terrain, when Paint paints them (it tints the vertices of one without).
+const TerrainLayers* painted_layers(const PanelContext& context, int index) {
+  return context.terrain->painting ? context.session.terrain_layers(index) : nullptr;
+}
+
+const char* brush_help(const TerrainTool& tool, const TerrainLayers* layers) {
+  if (layers != nullptr) return kLayerHelp;
   if (tool.painting) return "editor.inspector.terrain.paint_help";
   return tool.sculpting ? kSculptingHelp : kSculptOffHelp;
 }
@@ -57,10 +71,43 @@ void draw_brush_kind(TerrainTool& tool) {
   edit_rgb("##terrain_tint", tool.tint, ImGuiColorEditFlags_Float);
 }
 
-void draw_brush_size(TerrainTool& tool) {
+void choose_layer(TerrainTool& tool, const TerrainLayers& layers) {
+  const int count = static_cast<int>(layers.layers.size());
+  tool.layer = std::clamp(tool.layer, 0, count - 1);
+  ImGui::SetNextItemWidth(kFillWidth);
+  if (!ImGui::BeginCombo(kLayerId, layers.layers[static_cast<std::size_t>(tool.layer)].name.c_str())) return;
+  for (int layer = 0; layer < count; ++layer) {
+    if (ImGui::Selectable(layers.layers[static_cast<std::size_t>(layer)].name.c_str(), layer == tool.layer))
+      tool.layer = layer;
+  }
+  ImGui::EndCombo();
+}
+
+void draw_share(const char* label, const char* id, float& share) {
+  property_label(tr(label));
+  ImGui::SetNextItemWidth(kFillWidth);
+  ImGui::SliderFloat(id, &share, 0.0f, 1.0f, kShareFormat);
+}
+
+void draw_brush_radius(TerrainTool& tool) {
   property_label(tr("editor.inspector.terrain.radius"));
   ImGui::SetNextItemWidth(kFillWidth);
   ImGui::SliderFloat(kBrushRadiusId, &tool.radius, kMinBrushRadius, kMaxBrushRadius, kMetersFormat);
+}
+
+// Paint on a terrain with ground layers: which layer, how strong, how soft, how wide.
+void draw_layer_brush(TerrainTool& tool, const TerrainLayers& layers) {
+  if (!layers.layers.empty()) {
+    property_label(tr("editor.inspector.terrain.layer"));
+    choose_layer(tool, layers);
+  }
+  draw_share("editor.inspector.terrain.strength", kLayerStrengthId, tool.layer_strength);
+  draw_share("editor.inspector.terrain.falloff", kFalloffId, tool.falloff);
+  draw_brush_radius(tool);
+}
+
+void draw_brush_size(TerrainTool& tool) {
+  draw_brush_radius(tool);
   property_label(tr("editor.inspector.terrain.strength"));
   ImGui::SetNextItemWidth(kFillWidth);
   ImGui::SliderFloat(kBrushStrengthId, &tool.strength, kMinBrushStrength, kMaxBrushStrength, "%.1f");
@@ -73,9 +120,11 @@ void draw_terrain(PanelContext& context, int index) {
   if (!component_header(ICON_FA_MOUNTAIN, tr("editor.inspector.terrain.title"))) return;
   TerrainTool& tool = *context.terrain;
   draw_brush_tools(tool);
+  const TerrainLayers* layers = painted_layers(context, index);
   ImGui::PushTextWrapPos();
-  ImGui::TextColored(muted_color(), "%s", tr(brush_help(tool)));
+  ImGui::TextColored(muted_color(), "%s", tr(brush_help(tool, layers)));
   ImGui::PopTextWrapPos();
+  if (layers != nullptr) return draw_layer_brush(tool, *layers);
   draw_brush_kind(tool);
   draw_brush_size(tool);
 }

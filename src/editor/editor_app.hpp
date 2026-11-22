@@ -322,6 +322,8 @@ class EditorApp {
   // The brush is on, and a terrain is selected.
   bool using_terrain_brush() const;
   void apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds);
+  // The Paint brush on a terrain with ground layers: its chosen layer into the weights.
+  void paint_layer_at(ObjectId terrain, Vec3 point, float seconds);
   void use_brush();
   bool stroke_ends(bool brushing) const { return !brushing && stroke_started_; }
   void draw_gizmo();

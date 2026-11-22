@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <variant>
@@ -127,6 +128,12 @@ class EditorSession {
   // when a stroke begins. False when nothing changed or while playing.
   bool sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode);
   bool paint_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, Color tint);
+  // The ground layers of a terrain (see scene/ground/terrain_layers.hpp); null when it has none.
+  const TerrainLayers* terrain_layers(ObjectId terrain) const;
+  // One stroke of the Paint brush on a terrain with ground layers: `brush` (its radius in meters
+  // of the world) paints its layer into the weights around a point of the world. Call
+  // document().checkpoint() once when a stroke begins. False when nothing changed or while playing.
+  bool paint_layer(ObjectId terrain, Vec3 world_point, LayerBrush brush);
   // An object whose properties set the scene's sky, fog and effects (see render/environment.hpp),
   // filled with a sunset to start from. Selects the existing one if the scene already has it.
   ObjectId create_environment();
@@ -205,6 +212,12 @@ class EditorSession {
   // followed for changes others make to it.
   void begin_editing();
   void apply_layer_settings();
+  // Reads the ground layers the objects name and the document does not hold yet (a layers file
+  // that cannot be read is warned of once, and its object keeps its own material).
+  void follow_terrain_layers();
+  void hold_layers_named(const std::string& name);
+  // Writes the weights painted since the last save into the game's terrains/ folder.
+  bool save_weights(std::string& error);
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
   void follow_scene_file(bool offer_archives = false);
@@ -247,6 +260,7 @@ class EditorSession {
                   const std::vector<Transform>& locals);
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
+  std::set<std::string> unreadable_layers_;  // layers files that could not be read, warned of once
   CollisionLayers collision_layers_;
   std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;

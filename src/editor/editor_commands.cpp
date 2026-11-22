@@ -129,7 +129,21 @@ std::optional<Vec3> EditorApp::sculpt_at(float x, float y, float seconds) {
   return point;
 }
 
+void EditorApp::paint_layer_at(ObjectId terrain, Vec3 point, float seconds) {
+  const LayerBrush brush{0.0f,
+                         0.0f,
+                         terrain_tool_.radius,
+                         strength_for(terrain_tool_.layer_strength, seconds),
+                         terrain_tool_.falloff,
+                         terrain_tool_.layer};
+  session_->paint_layer(terrain, point, brush);
+}
+
 void EditorApp::apply_terrain_brush(ObjectId terrain, Vec3 point, float seconds) {
+  if (terrain_tool_.painting && session_->terrain_layers(terrain) != nullptr) {
+    paint_layer_at(terrain, point, seconds);
+    return;
+  }
   if (terrain_tool_.painting) {
     session_->paint_terrain(terrain, point, terrain_tool_.radius, terrain_tool_.strength * seconds, terrain_tool_.tint);
     return;

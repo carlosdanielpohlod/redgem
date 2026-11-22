@@ -131,6 +131,16 @@ bool PrefabPreview::sync_assets(const SceneDesc& document, const std::vector<int
   if (counts(document) != base_counts_) return false;
   std::copy(document.materials.begin(), document.materials.end(), resolved_->materials.begin());
   for (const int mesh : changed_meshes) resolved_->meshes.at(static_cast<std::size_t>(mesh)) = document.meshes.at(mesh);
+  return sync_weights(document);
+}
+bool PrefabPreview::sync_weights(const SceneDesc& document) {
+  if (resolved_->terrains.size() != document.terrains.size()) return false;
+  for (std::size_t i = 0; i < document.terrains.size(); ++i) {
+    const TerrainLayers& painted = document.terrains[i];
+    TerrainLayers& shown = resolved_->terrains[i];
+    if (shown.name != painted.name || shown.node != painted.node) return false;
+    if (shown.splat.version != painted.splat.version) shown.splat = painted.splat;
+  }
   return true;
 }
 }  // namespace redgem
