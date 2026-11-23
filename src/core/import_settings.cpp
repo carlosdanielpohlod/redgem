@@ -53,7 +53,7 @@ constexpr Choice<ColorSpace> kColorSpaces[] = {
 constexpr Choice<Compression> kCompressions[] = {{Compression::None, "none"}};
 
 struct KindExtensions {
-  Kind kind;
+  Kind kind = Kind::Model;
   std::vector<std::string> extensions;
 };
 const std::vector<KindExtensions>& kind_extensions() {

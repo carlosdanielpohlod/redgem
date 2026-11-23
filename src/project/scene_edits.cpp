@@ -4,6 +4,7 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 
 #include "core/translations.hpp"
 #include "editor/new_object_kinds.hpp"
@@ -200,6 +201,8 @@ bool names_both_sources(const Json& args) { return args.contains("from") && args
 
 // One add, as it goes: its object made (index), then named, placed and set.
 struct Adding {
+  Adding(SceneEdit& edit, const Json& args, std::string name, int source)
+      : edit(edit), args(args), name(std::move(name)), source(source) {}
   SceneEdit& edit;
   const Json& args;
   std::string name;

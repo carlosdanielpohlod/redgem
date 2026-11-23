@@ -147,7 +147,7 @@ class GameMenu < Behaviour
 end
 
 # (What the menu draws with, in UI.)
-module UI # rubocop:disable Style/OneClassPerFile
+module UI
   # The theme the menu lays itself out with: the one it is drawn with while it draws, else its open
   # screen's (as a script asks where a button is, between frames).
   def self.theme_of_menu(menu) = themes.empty? ? menu.theme_of(menu.screen) : theme

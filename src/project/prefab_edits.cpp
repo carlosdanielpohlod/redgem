@@ -21,6 +21,8 @@ constexpr const char* kKeepWord = "removed=false";
 std::invalid_argument wrong(const std::string& what) { return std::invalid_argument(what); }
 
 struct Placement {
+  Placement(SceneDocument& document, const fs::path& game_dir, int index)
+      : document(document), game_dir(game_dir), index(index) {}
   SceneDocument& document;
   const fs::path& game_dir;
   int index;

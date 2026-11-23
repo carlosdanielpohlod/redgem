@@ -20,13 +20,16 @@ module Environment
 
   # Changes several settings: all of them, or none when one is refused.
   def self.set(**settings)
-    kept = settings.keys.map { |key| [key, self[key]] }.to_h
+    kept = settings.keys.to_h { |key| [key, self[key]] }
     settings.each { |key, value| self[key] = value }
     nil
   rescue StandardError
-    kept.each { |key, value| __set(key.to_s, value) } if kept
+    __restore(kept)
     raise
   end
+
+  # Gives back what the settings were before a set that was refused (nothing when none was read).
+  def self.__restore(kept) = kept&.each { |key, value| __set(key.to_s, value) }
 
   # A color as the environment object keeps it: "#rrggbb" (nil and Strings as they are).
   def self.__hex(color, key)

@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "editor/document/scene_document.hpp"
@@ -34,6 +35,8 @@ std::optional<prefabs::PartOverride> part_change(const NodeDesc& current, const 
 
 // A part of a placement: its `path` under `placement`, in a scene of the game in `game_dir`.
 struct PlacedPart {
+  PlacedPart(const SceneDocument& document, int placement, const std::filesystem::path& game_dir, std::string path)
+      : document(document), placement(placement), game_dir(game_dir), path(std::move(path)) {}
   const SceneDocument& document;
   int placement;
   const std::filesystem::path& game_dir;
