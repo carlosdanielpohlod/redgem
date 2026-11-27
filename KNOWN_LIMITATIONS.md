@@ -46,6 +46,8 @@ the same pull request.
   (`Animation`) fire no events and move nothing, and a graph received from another machine fires
   no events there. In a blend only the clip with the most weight fires events; a clip a
   character fades from is silent. At most eight laps of a clip fire per frame.
+- The editor's pose preview lists the clips the scene holds, those of its prefabs included. It
+  poses one object at a time with one clip: no blends, animation graphs, head aim or root motion.
 - Authored markers are read from one string custom property of the action (`redgem_events`):
   Blender's timeline and pose markers are not exported by its glTF exporter.
 - Root motion takes the horizontal travel and the yaw of each clip's highest moving node; its

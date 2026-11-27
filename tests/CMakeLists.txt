@@ -58,6 +58,7 @@ unit/temp_dirs_test.cpp
   unit/asset_search_test.cpp
   unit/import_settings_test.cpp
   unit/lod_levels_test.cpp
+  unit/pose_preview_test.cpp
   unit/mcp_test.cpp
   unit/project_json_files_test.cpp
   unit/new_object_kinds_test.cpp
@@ -704,6 +705,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
                editor_system/prefab_preview_test.cpp
+               editor_system/pose_preview_test.cpp
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
                editor_system/story_panel_test.cpp

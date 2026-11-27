@@ -15,6 +15,7 @@
 #include "editor/inspector_logic.hpp"
 #include "editor/new_object_kinds.hpp"
 #include "editor/selection.hpp"
+#include "editor/pose_preview.hpp"
 #include "editor/prefab_preview.hpp"
 #include "editor/scene_recovery.hpp"
 #include "scene/shapes/terrain.hpp"
@@ -73,6 +74,17 @@ class EditorSession {
   // placement, light or camera), which is what a drag repeats every frame.
   void refresh_preview();
   void refresh_node(ObjectId node);
+
+  // Pose preview (editor_session_pose.cpp): while editing, an object shown as a clip of the scene
+  // poses it some seconds in, in the Scene view only; the document, and every save, keep the rest
+  // pose. It ends when another object is selected, at Play, or with end_pose_preview.
+  // The clips that move `id` (see pose_preview::clips_moving).
+  std::vector<int> clips_moving(ObjectId id) const;
+  // Shows `id` posed by `clip` at `seconds`; false while playing, or for a clip that does not move it.
+  bool preview_pose(ObjectId id, int clip, float seconds);
+  // Back to the rest pose.
+  void end_pose_preview();
+  const std::optional<pose_preview::Pose>& pose_preview() const { return pose_; }
 
   // The first object selected (kNoObject without one): the one the Inspector shows alone, the
   // terrain the brush shapes.
@@ -211,6 +223,12 @@ class EditorSession {
   void keep_my_edits() { external_change_pending_ = false; }
 
  private:
+  // Whether `pose` can be shown: the game is stopped, and its clip moves its object.
+  bool can_pose(const pose_preview::Pose& pose) const;
+  // Lays the previewed pose, if any, on the preview scene (after it is made again).
+  void show_pose();
+  // Ends the pose preview once its object is no longer the one selected.
+  void keep_pose_with_selection();
   // A child moved to another parent no longer hangs from a prefab part (unrecorded).
   void unhang(int index);
   EditorSession(std::filesystem::path game_dir, SceneDocument document);
@@ -284,6 +302,7 @@ class EditorSession {
   std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;
   PrefabPreview prefab_preview_;
+  std::optional<pose_preview::Pose> pose_;
   Selection selection_;
   PlayState play_state_ = PlayState::Editing;
   std::unique_ptr<Engine> runtime_;

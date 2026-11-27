@@ -95,6 +95,7 @@ void EditorSession::begin_editing() {
   follow_scene_file(true);
   scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_.clear();
+  pose_.reset();  // (its object was in the scene before)
   refresh_preview();
 }
 
@@ -169,6 +170,7 @@ bool EditorSession::files_found_from(const std::filesystem::path& file, std::str
 
 bool EditorSession::play(const PlayDevices& devices, std::string& error) {
   if (!editing()) return true;
+  end_pose_preview();  // (the game starts from the rest pose, and Stop comes back to it)
   auto created = Engine::create(runtime_options(game_dir_, document_.desc(), scene_name(), devices));
   if (auto* message = std::get_if<std::string>(&created)) {
     error = *message;
@@ -198,6 +200,7 @@ void EditorSession::stop() {
 }
 
 void EditorSession::tick(float frame_seconds) {
+  if (editing()) keep_pose_with_selection();
   if (!playing()) return;
   runtime_->frame(frame_seconds);
   if (runtime_->finished()) stop();  // a script called Game.quit
@@ -239,6 +242,7 @@ void EditorSession::use_disk_document(SceneDocument document) {
   const auto selected = selected_names();
   forget_recovery();
   document_ = std::move(document);
+  pose_.reset();
   unreadable_layers_.clear();
   follow_scene_file();
   refresh_and_reselect(selected);

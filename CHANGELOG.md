@@ -24,6 +24,11 @@ network protocol is the same.
 
 ### Added
 
+- **Pose preview in the editor.** The Inspector's new Pose preview card picks a clip that moves the
+  selected model and a time in it, and the Scene view shows the model posed that far into the clip
+  without running the game. The scene keeps its rest pose: saves and undo never see the preview,
+  and selecting another object or pressing Play brings the model back to rest. See
+  [Pose preview](docs/editor.md#pose-preview).
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor

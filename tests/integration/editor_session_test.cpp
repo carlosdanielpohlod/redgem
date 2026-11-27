@@ -732,3 +732,40 @@ TEST_CASE("a model whose import settings ask for levels of detail comes in with 
   session.reset();
   std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("a skinned model is posed by a clip in the editor's view only, and back at rest when deselected") {
+  const std::filesystem::path dir = copy_sandbox("pose_preview");
+  auto session = open(dir);
+  std::string error;
+  const ObjectId model = session->import_model(fixture("skinned.glb"), Vec3{}, error);
+  REQUIRE_MESSAGE(model != kNoObject, error);
+  const ObjectId upper = session->scene().find("Upper");  // (the bone the clip turns)
+  REQUIRE(upper != kNoObject);
+  const Transform rest = session->scene().at(upper).local;
+  const std::vector<int> clips = session->clips_moving(model);
+  REQUIRE(clips.size() == 1);
+  CHECK(session->clips_moving(session->scene().find("Lower")) == clips);
+  session->select(model);
+  REQUIRE(session->preview_pose(model, clips[0], 1.0f));
+  const auto moved = [&](ObjectId id) {
+    const Transform now = session->scene().at(id).local;
+    return length(now.position - rest.position) > 1e-4f || std::abs(now.rotation.w - rest.rotation.w) > 1e-4f;
+  };
+  CHECK(moved(upper));
+  CHECK(session->document().node(upper).local.rotation.w == doctest::Approx(rest.rotation.w));
+  session->refresh_preview();  // (an edit makes the view again: the pose stays)
+  CHECK(moved(upper));
+  REQUIRE(session->save(error));
+  auto saved = SceneDocument::open(dir / "scene.glb");
+  REQUIRE(std::holds_alternative<SceneDocument>(saved));
+  const SceneDesc& saved_desc = std::get<SceneDocument>(saved).desc();
+  CHECK(saved_desc.nodes[static_cast<std::size_t>(saved_desc.find_node("Upper"))].local.rotation.w ==
+        doctest::Approx(rest.rotation.w));
+  session->select(kNoObject);
+  session->tick(0.0f);
+  CHECK_FALSE(session->pose_preview().has_value());
+  CHECK_FALSE(moved(upper));
+  CHECK_FALSE(session->preview_pose(session->scene().find("Camera"), clips[0], 0.0f));
+  session.reset();
+  std::filesystem::remove_all(dir);
+}
