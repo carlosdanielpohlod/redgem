@@ -170,6 +170,11 @@ network protocol is the same.
   in step with the fixed-step frames: exactly 48000/fps samples a frame, with the fraction carried
   over, so the sound never drifts. Positional sounds, music, effects, ducking, Doppler and occlusion
   are all in it. `--record-audio off` records the pictures alone.
+- **A camera follows where a body is drawn.** `transform.render_position` and
+  `render_rotation` (experimental) say where an object is drawn this frame, between its body's
+  last two steps; `Camera.follow` and `Camera.orbit` follow it, so at 240 fps a following camera
+  moves as evenly as its target. A system test plays at a frame rate of its own with
+  `t.frame_rate = 240`.
 - **Bodies are drawn between physics steps.** A game drawn more often than it ticks draws its
   dynamic bodies, characters and vehicles (and what rides on them, a camera parented to a
   character included) between their last two steps, as far as the frame is into the next one, so

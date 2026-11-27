@@ -14,6 +14,7 @@ class SystemTest
   DEFAULT_WAIT_UNTIL_FRAMES = 600
   MOST_DIFFERENT_SHARE = 0.01   # of a picture's pixels that may differ from its baseline
   PERCENT = 100
+  MIN_FRAME_RATE = 4            # frames a second: a frame is a quarter of a second at most (kMaxFrameSeconds)
 
   attr_reader :failure
 
@@ -98,7 +99,21 @@ class SystemTest
 
   def log(message) = Debug.log("[test] #{message}")
 
+  # Plays the game from the next frame as a window drawing `fps` frames a second would: each frame
+  # that much game time, with as many fixed steps as it holds (none, one or more), and the bodies
+  # drawn between their steps. The same every run. nil goes back to a fixed step a frame.
+  def frame_rate=(fps)
+    unless fps.nil? || frame_rate_usable?(fps)
+      raise ArgumentError, "frame_rate takes from #{MIN_FRAME_RATE} frames a second up, or nil, not #{fps.inspect}"
+    end
+
+    TestInput.frame_seconds = fps ? 1.0 / fps : 0.0
+  end
+
   private
+
+  # (Slower than MIN_FRAME_RATE, a frame would be longer than the engine lets one be.)
+  def frame_rate_usable?(fps) = fps.is_a?(Numeric) && fps.to_f.finite? && fps >= MIN_FRAME_RATE
 
   def real_time_frame
     @waiting_real_time = true

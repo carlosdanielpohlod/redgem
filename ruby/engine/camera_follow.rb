@@ -55,7 +55,7 @@ module Camera
 
     # The point followed: the object, or as far behind it as the dead zone lets it lag.
     def focus
-      point = @target.transform.position
+      point = @target.transform.render_position  # (where it is drawn: between its steps, for a body)
       return point if follows_exactly?
 
       away = point - @focus
@@ -67,8 +67,8 @@ module Camera
     def world_offset
       return @offset unless @relative
 
-      turned = @target.transform
-      turned.right * @offset.x + turned.up * @offset.y - turned.forward * @offset.z
+      right, up, forward = @target.transform.__render_axes  # (turned as it is drawn, as it is placed)
+      right * @offset.x + up * @offset.y - forward * @offset.z
     end
   end
 end

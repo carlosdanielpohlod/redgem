@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "core/config.hpp"
 #include "input/keys.hpp"
 #include "script/bindings/binding_helpers.hpp"
 
@@ -101,6 +102,14 @@ mrb_value set_gamepad_button(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// TestInput.frame_seconds = seconds: how much game time each frame of the test is (0: a step).
+mrb_value set_frame_seconds(mrb_state* mrb, mrb_value) {
+  const mrb_float seconds = binding::float_arg(mrb);
+  binding::context(mrb).fixed_frame_seconds =
+      static_cast<float>(binding::from_to(mrb, seconds, 0.0, config::kMaxFrameSeconds, "TestInput.frame_seconds="));
+  return mrb_float_value(mrb, seconds);
+}
+
 void define_keyboard(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "set", set_key, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, module, "down?", key_down, MRB_ARGS_REQ(1));
@@ -132,6 +141,7 @@ void install_test_input(mrb_state* mrb, ScriptedInputSource& source) {
   mrb_iv_set(mrb, mrb_obj_value(module), mrb_intern_cstr(mrb, kSourceVariable), mrb_cptr_value(mrb, &source));
   define_keyboard(mrb, module);
   define_mouse_and_gamepad(mrb, module);
+  mrb_define_module_function(mrb, module, "frame_seconds=", set_frame_seconds, MRB_ARGS_REQ(1));
   install_test_notes(mrb, module);
 }
 

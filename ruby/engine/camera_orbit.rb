@@ -93,7 +93,7 @@ module Camera
     def orbits_object? = @target.is_a?(GameObject)
 
     def center
-      point = orbits_object? ? @target.transform.position : @target
+      point = orbits_object? ? @target.transform.render_position : @target
       point + Vector3.up * @height
     end
 

@@ -1,6 +1,9 @@
 // Transform natives.
 
 #include <mruby.h>
+#include <mruby/array.h>
+
+#include <iterator>
 
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -32,6 +35,28 @@ mrb_value transform_set_position(mrb_state* mrb, mrb_value self) {
   scene(mrb).set_world_position(id, to_vec3(mrb, value));
   notify_transform_written(mrb, id, TransformWrite::Position);
   return value;
+}
+
+// Where the object is drawn this frame (see ScriptContext::drawn_transform).
+Transform drawn_of(mrb_state* mrb, mrb_value self) {
+  const ObjectId id = alive_id(mrb, self);
+  const ScriptContext& ctx = context(mrb);
+  return ctx.drawn_transform ? ctx.drawn_transform(id) : scene(mrb).world_transform(id);
+}
+
+mrb_value transform_render_position(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, drawn_of(mrb, self).position);
+}
+
+mrb_value transform_render_rotation(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, quat_to_euler_degrees(drawn_of(mrb, self).rotation));
+}
+
+// __render_axes: [right, up, forward] of where the object is drawn this frame.
+mrb_value transform_render_axes(mrb_state* mrb, mrb_value self) {
+  const Transform drawn = drawn_of(mrb, self);
+  mrb_value axes[] = {vec3_value(mrb, drawn.right()), vec3_value(mrb, drawn.up()), vec3_value(mrb, drawn.forward())};
+  return mrb_ary_new_from_values(mrb, static_cast<mrb_int>(std::size(axes)), axes);
 }
 
 mrb_value transform_local_position(mrb_state* mrb, mrb_value self) {
@@ -124,6 +149,13 @@ void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "scale=", transform_set_scale, MRB_ARGS_REQ(1));
 }
 
+// Where an object is drawn this frame (between two physics steps for a body the physics moves).
+void install_drawn_bindings(RClass* transform, mrb_state* mrb) {
+  mrb_define_method(mrb, transform, "render_position", transform_render_position, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "render_rotation", transform_render_rotation, MRB_ARGS_NONE());
+  mrb_define_method(mrb, transform, "__render_axes", transform_render_axes, MRB_ARGS_NONE());
+}
+
 void install_direction_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "forward", transform_forward, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "right", transform_right, MRB_ARGS_NONE());
@@ -135,6 +167,7 @@ void install_direction_bindings(RClass* transform, mrb_state* mrb) {
 void install_transform_bindings(mrb_state* mrb) {
   RClass* transform = mrb_define_class(mrb, "Transform", mrb->object_class);
   install_placement_bindings(transform, mrb);
+  install_drawn_bindings(transform, mrb);
   install_direction_bindings(transform, mrb);
 }
 

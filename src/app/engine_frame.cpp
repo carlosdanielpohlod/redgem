@@ -113,8 +113,7 @@ void Engine::advance_game(float frame_seconds) {
   const float scale = context_.time.scale;
   settle_physics();  // (where the step would have run in place: after the frame's start and its callbacks)
   run_fixed_steps(fixed_steps_due(frame_seconds, scale));
-  // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
-  const float unscaled = options_.fixed_step ? fixed_delta() : std::min(frame_seconds, config::kMaxFrameSeconds);
+  const float unscaled = frame_length(frame_seconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
 }
@@ -142,8 +141,16 @@ void Engine::settle_physics() {
   finish_fixed_step(fixed_delta());
 }
 
+bool Engine::paced_by_clock() const { return !options_.fixed_step || context_.fixed_frame_seconds > 0.0f; }
+
+float Engine::frame_length(float frame_seconds) const {
+  // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
+  if (!options_.fixed_step) return std::min(frame_seconds, config::kMaxFrameSeconds);
+  return context_.fixed_frame_seconds > 0.0f ? context_.fixed_frame_seconds : fixed_delta();
+}
+
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
-  if (!options_.fixed_step) return clock_.advance(frame_seconds * scale);
+  if (paced_by_clock()) return clock_.advance(frame_length(frame_seconds) * scale);
   pending_steps_ += scale;
   const int steps = static_cast<int>(pending_steps_);
   pending_steps_ -= static_cast<float>(steps);
@@ -256,10 +263,10 @@ void Engine::hand_to_presenter() {
                        &context_.material_emission, context_.backdrop_blur, &decals_});
 }
 
-// A frame that took a whole step, or whose step is still on the physics thread, draws the last step
-// it has: the clock's share is of a step it does not have yet. (Each frame then stays about a step
-// behind the clock.)
-bool Engine::draws_last_step() const { return options_.fixed_step || step_in_flight_; }
+// A frame that took a whole step, or whose step is waiting for or on the physics thread (as its
+// scripts run, then as it is drawn), draws the last step it has: the clock's share is of a step it
+// does not have yet. (Each frame then stays about a step behind the clock.)
+bool Engine::draws_last_step() const { return !paced_by_clock() || step_prepared_ || step_in_flight_; }
 
 float Engine::drawn_share() const { return draws_last_step() ? 1.0f : std::clamp(clock_.alpha(), 0.0f, 1.0f); }
 

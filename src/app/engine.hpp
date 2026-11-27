@@ -331,6 +331,11 @@ class Engine {
   // a whole step a frame, or whose step is still on the physics thread, draws the step's pose (1).
   float drawn_share() const;
   bool draws_last_step() const;
+  // Whether the fixed clock decides how many steps a frame takes: on real time, or in a fixed-step
+  // run told how long its frames are (ScriptContext::fixed_frame_seconds).
+  bool paced_by_clock() const;
+  // How much game time a frame of `frame_seconds` is.
+  float frame_length(float frame_seconds) const;
   void hand_to_presenter();
   // The fixed steps a frame owes: the last one only prepared when the steps overlap the drawing.
   void run_fixed_steps(int steps);

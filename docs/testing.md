@@ -60,6 +60,7 @@ runs in. They are only there while `redgem-test` plays it.
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
 | `t.wait_for(seconds: 20) { ... }` | Waits until the block is true, or fails after that many real seconds: for another program (a game that joins, a server). Its frames go at the game's pace and do not count toward the test's 3600 (a test may spend five minutes of real time in such waits, slow frames counted for the time they take, or the seconds `redgem-test --wait-limit <seconds>` gives, for a long run such as a load test) |
 | `t.assert("message") { ... }` | Fails the test when the block is false |
+| `t.frame_rate = 240` | From the next frame, plays the game as a window drawing 240 frames a second would: each frame is that much game time, with as many fixed steps as it holds, and bodies drawn between their steps. The same every run. `nil` goes back to a fixed step a frame, the default |
 | `t.screenshot("name")` | Saves a picture of the next frame as `name.png` in the screenshots folder (`--screenshots <dir>`, `screenshots` unless said) |
 
 Inside the blocks you have the whole scripting API, so a test can also move objects or read any

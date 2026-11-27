@@ -229,3 +229,25 @@ TEST_CASE("a game that takes a whole step a frame draws the step's pose") {
   const float x = std::stof(ruby(*sliding.engine, "Scene.find('Crate').transform.position.x"));
   CHECK(sliding.screen.crate.back().x == doctest::Approx(x));
 }
+
+TEST_CASE("render_position is where the frame draws an object; position, where the physics has it") {
+  SlidingGame sliding;
+  sliding.play(kWarmUpFrames + 1);  // (a frame between two steps: the two differ)
+  ruby(*sliding.engine, "$crate = Scene.find('Crate'); $rider = Scene.find('Rider')");
+  // What update read last frame is what that frame drew.
+  sliding.engine->frame(config::tick_seconds(kDrawnHz));
+  const float drawn = std::stof(ruby(*sliding.engine, "$crate.transform.render_position.x"));
+  const float stepped = std::stof(ruby(*sliding.engine, "$crate.transform.position.x"));
+  CHECK(drawn == doctest::Approx(sliding.screen.crate.back().x));
+  CHECK(stepped != doctest::Approx(drawn));
+  const float rider = std::stof(ruby(*sliding.engine, "$rider.transform.render_position.x"));
+  CHECK(rider == doctest::Approx(sliding.screen.rider.back().x));
+}
+
+TEST_CASE("a game that takes a whole step a frame renders where the physics has it") {
+  Sliding whole_steps;
+  whole_steps.fixed_step = true;
+  SlidingGame sliding(whole_steps);
+  sliding.play(kWarmUpFrames);
+  CHECK(ruby(*sliding.engine, "t = Scene.find('Crate').transform; t.render_position == t.position") == "true");
+}

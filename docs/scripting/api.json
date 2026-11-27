@@ -691,6 +691,20 @@
           "example": "transform.position = Vector3.new(0, 1, 0)"
         },
         {
+          "name": "render_position",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "where it is drawn this frame: between its body's last two physics steps (or those of the body it rides on); its position otherwise. Read it in update or late_update: in fixed_update the frame's steps are not all taken yet"
+        },
+        {
+          "name": "render_rotation",
+          "stability": "experimental",
+          "params": [],
+          "returns": {"type": "Vector3"},
+          "about": "how it is turned as drawn this frame, in degrees (see render_position)"
+        },
+        {
           "name": "local_position",
           "stability": "stable",
           "params": [],

@@ -246,6 +246,12 @@ class Transform
   # moves it; a physics object is teleported
   %a{redgem:stable}
   def position=: (Vector3 vector) -> Vector3
+  # where it is drawn this frame: between its body's last two physics steps (or those of the body it rides on); its position otherwise. Read it in update or late_update: in fixed_update the frame's steps are not all taken yet
+  %a{redgem:experimental}
+  def render_position: () -> Vector3
+  # how it is turned as drawn this frame, in degrees (see render_position)
+  %a{redgem:experimental}
+  def render_rotation: () -> Vector3
   # its position relative to its parent
   %a{redgem:stable}
   def local_position: () -> Vector3
