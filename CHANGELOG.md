@@ -24,6 +24,9 @@ network protocol is the same.
 
 ### Added
 
+- **Agents paint terrains.** MCP's new `terrain` tool reads and writes a terrain's layers file
+  (terrains/<name>.json: its ground layers and the rules that paint them), refusing one the game
+  could not read, and paints an object's layers by those rules as `redgem scene paint` does.
 - **Agents change prefab placements.** MCP's new `scene_prefab` tool lists a placement's
   overrides and overrides fields of its inherited parts, reverts them, applies them to the prefab
   file or unpacks the placement, as `redgem scene override` and the Inspector do. In a live editor

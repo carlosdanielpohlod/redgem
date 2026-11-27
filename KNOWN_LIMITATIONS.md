@@ -797,6 +797,9 @@ see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not
   answer the editor's dialogs: `status` says when the editor offers to recover an earlier
   session's edits (`recovery_pending`), and while that dialog is open changes are refused (try
   again once someone answered it in the editor).
+- MCP's `terrain` works on the saved files: `paint` uses the saved mesh, and an open editor
+  shows the new weights once it reads the scene's files again. The editor's layer brush has no MCP
+  action yet.
 - MCP's `build` runs in the MCP server's process, from the files on disk: an open editor's
   unsaved edits are not in it, and its progress is not shown in the editor. A build cannot be
   cancelled, and a server asked to quit waits for its build to end.
